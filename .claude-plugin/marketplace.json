@@ -1,0 +1,17 @@
+{
+  "name": "shoofi",
+  "owner": {
+    "name": "shoofi-dev"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for the Shoofi platform (5 repos). Distributes shared skills so local sessions AND cloud routines/Slack agents can use them across every repo.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "shoofi-testing",
+      "source": "./plugins/shoofi-testing",
+      "description": "After finishing a feature/bug, generate the tests covering the changed flow across the Shoofi repo(s) it touched — bootstrapping each repo's test infra (best-fit runner) on first use. Provides the cover-changes skill."
+    }
+  ]
+}
