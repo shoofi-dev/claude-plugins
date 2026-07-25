@@ -1,14 +1,30 @@
 # Shoofi Claude Code plugins
 
-A Claude Code **plugin marketplace** that distributes shared skills across the 5
-Shoofi repos — so they work in **local** sessions *and* **cloud** runs (scheduled
-routines, the Slack agent), without copy-pasting skills into each repo.
+A Claude Code **plugin marketplace** that distributes shared skills and
+domain-owner subagents across the 5 Shoofi repos — so they work in **local**
+sessions *and* **cloud** runs (scheduled routines, the Slack agent), without
+copy-pasting into each repo.
 
 ## Plugins
 
 | Plugin | Provides | What it does |
 |--------|----------|--------------|
 | `shoofi-testing` | `/shoofi-testing:cover-changes` | After finishing a feature/bug, generates the tests covering the changed flow across the repo(s) it touched; bootstraps each repo's test infra (best-fit runner) on first use. |
+| `shoofi-domains` | `menu-catalog` subagent | Domain-owner "employees" — one per territory. Delegate a task to the domain agent that owns the area; it loads a human-reviewed context doc and works inside its guardrails. Menu/Catalog first; payments, delivery, orders to follow. |
+
+### `shoofi-domains` — the domain-owner model
+
+Each territory of the platform gets a **subagent** that owns it, paired with a
+**context document** (its human-reviewed ground truth). The main agent delegates
+a feature/bug to whichever domain owns the area; that agent reads its context
+doc, respects the money/identity guardrails, and stays inside its domain.
+
+| Domain agent | Owns | Context doc |
+|--------------|------|-------------|
+| `menu-catalog` | products, categories, menu assembly, options/extras, availability & stock, catalog i18n (shoofi-server) | `context/menu-catalog.md` |
+
+Adding a domain: drop `agents/<domain>.md` (routing description + guardrails) and
+`context/<domain>.md` (the reviewed ground truth) into `plugins/shoofi-domains/`.
 
 ## Layout
 
@@ -20,6 +36,10 @@ plugins/
     skills/cover-changes/
       SKILL.md                           # the skill
       references/bootstrap-recipes.md    # per-repo test-infra recipes
+  shoofi-domains/
+    .claude-plugin/plugin.json           # plugin manifest
+    agents/menu-catalog.md               # the domain-owner subagent
+    context/menu-catalog.md              # its human-reviewed context doc
 ```
 
 ## One-time setup
@@ -41,7 +61,7 @@ gh repo create shoofi-dev/claude-plugins --private --source=. --remote=origin --
   "extraKnownMarketplaces": {
     "shoofi": { "source": { "source": "github", "repo": "shoofi-dev/claude-plugins" } }
   },
-  "enabledPlugins": { "shoofi-testing@shoofi": true }
+  "enabledPlugins": { "shoofi-testing@shoofi": true, "shoofi-domains@shoofi": true }
 }
 ```
 

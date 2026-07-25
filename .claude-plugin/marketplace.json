@@ -4,14 +4,19 @@
     "name": "shoofi-dev"
   },
   "metadata": {
-    "description": "Claude Code plugins for the Shoofi platform (5 repos). Distributes shared skills so local sessions AND cloud routines/Slack agents can use them across every repo.",
-    "version": "1.0.0"
+    "description": "Claude Code plugins for the Shoofi platform (5 repos). Distributes shared skills and domain-owner subagents so local sessions AND cloud routines/Slack agents can use them across every repo.",
+    "version": "1.1.0"
   },
   "plugins": [
     {
       "name": "shoofi-testing",
       "source": "./plugins/shoofi-testing",
       "description": "After finishing a feature/bug, generate the tests covering the changed flow across the Shoofi repo(s) it touched — bootstrapping each repo's test infra (best-fit runner) on first use. Provides the cover-changes skill."
+    },
+    {
+      "name": "shoofi-domains",
+      "source": "./plugins/shoofi-domains",
+      "description": "Domain-owner subagents — one 'employee' per territory. Ships menu-catalog (owns products, categories, menu assembly, extras, availability/stock, catalog i18n in shoofi-server), each with a human-reviewed context doc and guardrails. More domains (payments, delivery, orders) to follow."
     }
   ]
 }
