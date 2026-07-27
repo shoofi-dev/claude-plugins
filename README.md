@@ -10,21 +10,28 @@ copy-pasting into each repo.
 | Plugin | Provides | What it does |
 |--------|----------|--------------|
 | `shoofi-testing` | `/shoofi-testing:cover-changes` | After finishing a feature/bug, generates the tests covering the changed flow across the repo(s) it touched; bootstraps each repo's test infra (best-fit runner) on first use. |
-| `shoofi-domains` | `menu-catalog` subagent | Domain-owner "employees" — one per territory. Delegate a task to the domain agent that owns the area; it loads a human-reviewed context doc and works inside its guardrails. Menu/Catalog first; payments, delivery, orders to follow. |
+| `shoofi-domains` | `menu-catalog`, `orders` subagents | Domain-owner "employees" — one per territory, **full-stack across all 5 repos** by default. Delegate a task to the domain agent that owns the area; it loads the shared constitution + its human-reviewed context doc and works inside its guardrails. Payments, delivery, customers, etc. to follow. |
 
 ### `shoofi-domains` — the domain-owner model
 
-Each territory of the platform gets a **subagent** that owns it, paired with a
-**context document** (its human-reviewed ground truth). The main agent delegates
-a feature/bug to whichever domain owns the area; that agent reads its context
-doc, respects the money/identity guardrails, and stays inside its domain.
+Each territory of the platform gets a **subagent** that owns it across every repo
+it touches, paired with a **context document** (its human-reviewed ground truth).
+The main agent delegates a feature/bug to whichever domain owns the area; that agent
+loads the shared constitution, reads its context doc, respects the money/identity
+guardrails, and works full-stack (one PR per repo it touches).
+
+Every domain agent inherits **`context/_shared-guardrails.md`** — the platform
+constitution (PR-only/never-merge, high-risk zones, multi-tenant scoping, full-stack
+rules, legacy-hands-off, definition of done).
 
 | Domain agent | Owns | Context doc |
 |--------------|------|-------------|
-| `menu-catalog` | products, categories, menu assembly, options/extras, availability & stock, catalog i18n (shoofi-server) | `context/menu-catalog.md` |
+| `menu-catalog` | products, categories, menu assembly, options/extras, availability & stock, catalog i18n (server-first) | `context/menu-catalog.md` |
+| `orders` | order creation, status lifecycle, twin orders, tracking/monitoring — **full-stack** (server + app + partner + shoofir + admin-web) | `context/orders.md` |
 
 Adding a domain: drop `agents/<domain>.md` (routing description + guardrails) and
-`context/<domain>.md` (the reviewed ground truth) into `plugins/shoofi-domains/`.
+`context/<domain>.md` (the reviewed ground truth) into `plugins/shoofi-domains/`;
+have the agent load `_shared-guardrails.md` first.
 
 ## Layout
 
@@ -38,8 +45,11 @@ plugins/
       references/bootstrap-recipes.md    # per-repo test-infra recipes
   shoofi-domains/
     .claude-plugin/plugin.json           # plugin manifest
-    agents/menu-catalog.md               # the domain-owner subagent
-    context/menu-catalog.md              # its human-reviewed context doc
+    context/_shared-guardrails.md        # the constitution every agent inherits
+    agents/menu-catalog.md               # domain-owner subagent
+    context/menu-catalog.md              #   its context doc
+    agents/orders.md                     # domain-owner subagent (full-stack)
+    context/orders.md                    #   its context doc
 ```
 
 ## One-time setup

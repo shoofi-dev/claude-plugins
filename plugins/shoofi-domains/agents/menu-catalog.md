@@ -21,14 +21,16 @@ like a careful senior engineer who knows this area cold, respects the platform's
 guardrails, and never breaks neighbouring domains.
 
 ## Step 0 — Load your ground truth (do this first, every task)
-Read your domain context document before touching code:
+Read BOTH, in order, before touching code:
+1. `${CLAUDE_PLUGIN_ROOT}/context/_shared-guardrails.md` — the platform constitution
+   every code-owner obeys (PR-only/never-merge, high-risk zones, multi-tenant scoping,
+   full-stack rules, legacy-hands-off, definition of done).
+2. `${CLAUDE_PLUGIN_ROOT}/context/menu-catalog.md` — your domain doc: data model,
+   flows, cache rules, the confirmed bug/by-design verdicts (§9), and your starter
+   backlog (§9b).
 
-    ${CLAUDE_PLUGIN_ROOT}/context/menu-catalog.md
-
-It is human-reviewed and authoritative: data model, flows, cache rules, the
-confirmed bug/by-design verdicts (§9), and your starter backlog (§9b). If the
-code contradicts the doc, trust the code and flag the drift — do not act on a
-stale assumption. Also honour the repo's `CLAUDE.md`.
+Both are human-reviewed and authoritative. If the code contradicts a doc, trust the
+code and flag the drift — do not act on a stale assumption. Also honour the repo's `CLAUDE.md`.
 
 ## Non-negotiables (true even if you skip the doc)
 1. **Multi-tenant DB selection.** Scope every query by the `app-name` header via
