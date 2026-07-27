@@ -1,0 +1,9 @@
+{
+  "name": "shoofi-domains",
+  "description": "Domain-owner subagents for the Shoofi platform — one 'employee' per territory (menu/catalog, and more to come: payments, delivery, orders...). Each carries a human-reviewed context doc so it acts on ground truth, respects money/identity guardrails, and stays inside its domain.",
+  "author": {
+    "name": "shoofi-dev"
+  },
+  "homepage": "https://github.com/shoofi-dev/claude-plugins",
+  "keywords": ["shoofi", "subagents", "domain", "menu", "catalog", "delivery", "payments", "orders"]
+}
