@@ -1,0 +1,44 @@
+{
+  "doc": "menu-catalog",
+  "lastVerified": "shoofi-server@561e3ca / 2026-07-28",
+  "repos": {
+    "shoofi-server": {
+      "files": [
+        "routes/menu.js",
+        "routes/product.js",
+        "routes/category.js",
+        "routes/store.js",
+        "routes/translations.js",
+        "routes/global-search.js",
+        "utils/menu-cache.js",
+        "utils/order-stock.js",
+        "services/database/DatabaseInitializationService.js",
+        "docs/stock-management.md",
+        "docs/menu-search.md"
+      ],
+      "symbols": {
+        "utils/menu-cache.js": ["clearStore", "getStats"],
+        "utils/order-stock.js": ["decrementOrderStock", "restoreOrderStock"],
+        "routes/product.js": ["menuCache", "supportedCategoryIds"],
+        "routes/menu.js": ["outOfStockExtras", "categoryOrders"]
+      },
+      "patterns": [
+        {
+          "file": "routes/product.js",
+          "regex": "update/isInStore/byCategory",
+          "desc": "bulk category availability endpoint (doc CORE: cache rule)"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "hasGeneralCategories",
+          "desc": "general-categories gate flag"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "outOfStockByQuantity",
+          "desc": "stock invariant field"
+        }
+      ]
+    }
+  }
+}

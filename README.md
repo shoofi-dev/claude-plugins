@@ -10,7 +10,7 @@ copy-pasting into each repo.
 | Plugin | Provides | What it does |
 |--------|----------|--------------|
 | `shoofi-testing` | `/shoofi-testing:cover-changes` | After finishing a feature/bug, generates the tests covering the changed flow across the repo(s) it touched; bootstraps each repo's test infra (best-fit runner) on first use. |
-| `shoofi-domains` | `menu-catalog`, `orders` subagents | Domain-owner "employees" — one per territory, **full-stack across all 5 repos** by default. Delegate a task to the domain agent that owns the area; it loads the shared constitution + its human-reviewed context doc and works inside its guardrails. Payments, delivery, customers, etc. to follow. |
+| `shoofi-domains` | `menu-catalog`, `orders`, `payments`, `accountant`, `delivery`, `customers` subagents | Domain-owner "employees" — one per territory, **full-stack across all 5 repos** by default. Each loads the shared constitution + its human-reviewed context doc and ships work as PRs you review. Ships `docs-check`, a drift checker.|
 
 ### `shoofi-domains` — the domain-owner model
 
@@ -24,14 +24,18 @@ Every domain agent inherits **`context/_shared-guardrails.md`** — the platform
 constitution (PR-only/never-merge, high-risk zones, multi-tenant scoping, full-stack
 rules, legacy-hands-off, definition of done).
 
-| Domain agent | Owns | Context doc |
-|--------------|------|-------------|
-| `menu-catalog` | products, categories, menu assembly, options/extras, availability & stock, catalog i18n (server-first) | `context/menu-catalog.md` |
-| `orders` | order creation, status lifecycle, twin orders, tracking/monitoring — **full-stack** (server + app + partner + shoofir + admin-web) | `context/orders.md` |
+| Domain agent | Owns | Scope |
+|--------------|------|-------|
+| `menu-catalog` | products, categories, menu assembly, extras, availability/stock, catalog i18n | server-first |
+| `orders` | order creation, status lifecycle, twin orders, tracking | full-stack |
+| `payments` | **money IN** — card charges, tokenization, Apple/Google Pay, refunds | server + customer app |
+| `accountant` | **money OUT** — settlement, commission, tax invoices, driver payouts, MASAV | server + admin web |
+| `delivery` | driver assignment, area/coverage model, bookDelivery, shifts, location | full-stack |
+| `customers` | phone+OTP auth, tokens/sessions, profiles, addresses, referrals | full-stack |
 
-Adding a domain: drop `agents/<domain>.md` (routing description + guardrails) and
-`context/<domain>.md` (the reviewed ground truth) into `plugins/shoofi-domains/`;
-have the agent load `_shared-guardrails.md` first.
+Each domain has `context/<domain>/CORE.md` (**always read** — scope, invariants, human
+verdicts, recipes) and `reference.md` (depth, loaded on demand). See
+`plugins/shoofi-domains/README.md` for the full model and the `docs-check` drift checker.
 
 ## Layout
 
@@ -39,17 +43,14 @@ have the agent load `_shared-guardrails.md` first.
 .claude-plugin/marketplace.json          # this marketplace
 plugins/
   shoofi-testing/
-    .claude-plugin/plugin.json           # plugin manifest
-    skills/cover-changes/
-      SKILL.md                           # the skill
-      references/bootstrap-recipes.md    # per-repo test-infra recipes
+    skills/cover-changes/                # test-generation skill
   shoofi-domains/
-    .claude-plugin/plugin.json           # plugin manifest
-    context/_shared-guardrails.md        # the constitution every agent inherits
-    agents/menu-catalog.md               # domain-owner subagent
-    context/menu-catalog.md              #   its context doc
-    agents/orders.md                     # domain-owner subagent (full-stack)
-    context/orders.md                    #   its context doc
+    agents/<domain>.md                   # 6 domain-owner subagents
+    context/_shared-guardrails.md        # the constitution they all inherit
+    context/<domain>/CORE.md             #   always read
+    context/<domain>/reference.md        #   read on demand
+    context/assert/<domain>.assert.json  #   machine-checkable claims
+    scripts/docs-check.js                # drift checker (zero deps)
 ```
 
 ## One-time setup
