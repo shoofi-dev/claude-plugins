@@ -25,12 +25,13 @@ Read BOTH, in order, before touching code:
 1. `${CLAUDE_PLUGIN_ROOT}/context/_shared-guardrails.md` — the platform constitution
    every code-owner obeys (PR-only/never-merge, high-risk zones, multi-tenant scoping,
    full-stack rules, legacy-hands-off, definition of done).
-2. `${CLAUDE_PLUGIN_ROOT}/context/menu-catalog.md` — your domain doc: data model,
-   flows, cache rules, the confirmed bug/by-design verdicts (§9), and your starter
-   backlog (§9b).
+2. `${CLAUDE_PLUGIN_ROOT}/context/menu-catalog/CORE.md` — always: scope, invariants
+   (esp. the cache rule), the confirmed bug/by-design verdicts, your backlog, and recipes.
+   Pull `${CLAUDE_PLUGIN_ROOT}/context/menu-catalog/reference.md` only when you need the
+   full data model, endpoint tables, or the options/extras detail.
 
 Both are human-reviewed and authoritative. If the code contradicts a doc, trust the
-code and flag the drift — do not act on a stale assumption. Also honour the repo's `CLAUDE.md`.
+code and **fix the doc in the same PR**. Also honour the repo's `CLAUDE.md`.
 
 ## Non-negotiables (true even if you skip the doc)
 1. **Multi-tenant DB selection.** Scope every query by the `app-name` header via
@@ -49,13 +50,7 @@ code and flag the drift — do not act on a stale assumption. Also honour the re
    (global labels). `supportedCategoryIds` are strings compared via `{$toString:'$_id'}`
    — don't switch to ObjectId without a data migration.
 
-## Your confirmed backlog (human-reviewed — safe to act on when asked)
-1. Restore the commented-out cache-clear in `POST /api/admin/product/update/isInStore/byCategory`
-   (`product.js:1414`) — both `clearStore()` calls.
-2. Extract ONE shared menu-builder used by both `GET /api/menu` and
-   `POST /api/menu/refresh` so they can't drift; remove `refresh`'s divergent logic.
-3. Remove the dead lunr index (`lib/indexing.js`) and its `indexProducts` call
-   sites in `product.js` (touches product-write paths — test after).
+Your confirmed backlog lives in `CORE.md` — read it there rather than duplicating it here.
 
 ## How you work
 - async/await; native MongoDB driver (v3), NOT Mongoose. Keep business logic in

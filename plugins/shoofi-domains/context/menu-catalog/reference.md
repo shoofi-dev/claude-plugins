@@ -43,11 +43,11 @@ const shoofiDb = req.app.db['shoofi'];                         // central regist
 ```
 - `app-type` header = client identity: `shoofi-app`/`shoofi-shopping` (customer),
   `shoofi-partner` (partner), `shoofi-admin` (admin web). It gates hidden-product
-  visibility and cache bypass (`menu.js:22-23`).
+  visibility and cache bypass (`menu.js`).
 - **Intentional cross-store reads** (verify carefully, they touch other tenants'
   DBs on purpose): `/api/menu/search` (all stores), `/api/menu/mock` &
   create-from-mock (a mock store's DB), `store/copy-arabic-products` (source→dest).
-- **Existing non-lazy access to be aware of:** `category.js:35`
+- **Existing non-lazy access to be aware of:** `category.js`
   (`req.app.db[appName || 'shoofi']`) skips `getOrInitializeDb` and can 500 for a
   store DB not yet in memory. Prefer the canonical pattern for anything new.
 
@@ -129,8 +129,8 @@ Three interacting product fields — keep them consistent:
 **Invariant for stock-managed stores** (`store.isStockManagment === true`) —
 **human-confirmed, applies to ALL products, no exceptions:**
 `quantity <= 0  ⟺  { isInStore:false, outOfStockByQuantity:true }`.
-Enforced at: product edit (`product.js:559-569`), set-quantity
-(`product.js:1300-1344`), enable-stock backfill (`store.js:302-320`), and the
+Enforced at: product edit (`product.js`), set-quantity
+(`product.js`), enable-stock backfill (`store.js`), and the
 order lifecycle via `utils/order-stock.js` (`decrementOrderStock` /
 `restoreOrderStock` — idempotent via `stockDecremented`/`stockRestored`; restore
 only re-enables products that were `outOfStockByQuantity`, never un-hides manual
@@ -176,12 +176,12 @@ endpoints also emit a websocket `menu_refresh` (`shoofi-shopping`) /
 Each item below was reviewed with the product owner. Respect these verdicts.
 
 - **CONFIRMED BUG — `update/isInStore/byCategory` cache-clear is commented out**
-  (`product.js:1414`) → stale menus after a bulk category toggle. Fix: restore
+  (`product.js`) → stale menus after a bulk category toggle. Fix: restore
   both `clearStore(appName)` and `clearStore(\`${appName}_schoolProject\`)`. (Backlog #1.)
 - **CONFIRMED BUG — `GET /api/menu` vs `POST /api/menu/refresh` diverge.**
   `refresh` is a *real, admin-triggered* action ("Refresh Menu Cache", audited)
   that re-caches under the same key `GET /api/menu` reads — but builds a
-  different payload (`id.$oid` general-category matcher `menu.js:453`; omits
+  different payload (`id.$oid` general-category matcher `menu.js`; omits
   `outOfStockExtras`/`supportedGeneralCategoryIds`), so clicking Refresh degrades
   the live menu for up to the 5-min TTL. Fix: **extract one shared menu-builder
   function** both endpoints call so they can't drift. (Backlog #2.)
@@ -190,11 +190,11 @@ Each item below was reviewed with the product owner. Respect these verdicts.
   legacy) → indexes nothing, yet runs on every product write. Real search is the
   regex in `/api/menu/search`. Fix: remove `lib/indexing.js` and its `indexProducts`
   call sites in `product.js`. (Backlog #3 — touches product-write paths, test after.)
-- **BY DESIGN — do NOT change:** `translations.js:7` reads a header literally
+- **BY DESIGN — do NOT change:** `translations.js` reads a header literally
   named `shoofi` because **translations are global/platform-wide by design**, not
   per-store. This is intentional; leave it. (Do not "fix" it to `app-name`.)
 - **FACT (not a bug) — `supportedCategoryIds` are strings**, compared via
-  `{$toString:'$_id'}` (`menu.js:66-72`). Don't switch to ObjectId comparison
+  `{$toString:'$_id'}` (`menu.js`). Don't switch to ObjectId comparison
   without a data migration.
 
 ## 9b. Menu agent — initial backlog (human-confirmed, safe to act on)

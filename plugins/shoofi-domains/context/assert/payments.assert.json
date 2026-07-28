@@ -1,0 +1,60 @@
+{
+  "doc": "payments",
+  "lastVerified": "shoofi-server@561e3ca / 2026-07-28",
+  "repos": {
+    "shoofi-server": {
+      "files": [
+        "routes/payments.js",
+        "routes/payments/validate-card.js",
+        "routes/creditCard.js",
+        "routes/hyp-pay.js",
+        "routes/payment-methods.js",
+        "utils/hyp-pay.js",
+        "utils/invoice-mail.js",
+        "lib/schemas/creditCard.json"
+      ],
+      "symbols": {
+        "utils/hyp-pay.js": ["buildCcPaymentRefData", "chargeToken"],
+        "utils/invoice-mail.js": ["saveInvoice"],
+        "routes/order.js": ["ccPaymentRefData", "applePayIntentId"]
+      },
+      "patterns": [
+        {
+          "file": "routes/order.js",
+          "regex": "CommitFullTransaction",
+          "desc": "ZCredit charge call (money-in path)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "GetSessionStatus",
+          "desc": "ZCredit Apple/Google Pay verification"
+        },
+        {
+          "file": "routes/hyp-pay.js",
+          "regex": "hyp-tokenize-session",
+          "desc": "HYP tokenization session endpoint (migration target)"
+        },
+        {
+          "file": "lib/schemas/creditCard.json",
+          "regex": "ccToken",
+          "desc": "stored card token field"
+        }
+      ]
+    },
+    "shoofi-app": {
+      "files": [
+        "hooks/checkout/use-hyp-tokenize.ts",
+        "helpers/get-supported-payment-methods.ts",
+        "stores/creditCards/index.ts",
+        "data/zcredit-config.ts"
+      ],
+      "patterns": [
+        {
+          "file": "consts/shared.ts",
+          "regex": "PAYMENT_METHODS",
+          "desc": "client payment-method constants"
+        }
+      ]
+    }
+  }
+}

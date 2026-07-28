@@ -24,7 +24,7 @@ Read BOTH, in order, and follow them:
 1. `${CLAUDE_PLUGIN_ROOT}/context/_shared-guardrails.md` — the platform constitution
    every code-owner obeys (PR-only/never-merge, high-risk zones, multi-tenant scoping,
    full-stack rules, legacy-hands-off, definition of done).
-2. `${CLAUDE_PLUGIN_ROOT}/context/orders.md` — your domain doc: the status state
+2. `${CLAUDE_PLUGIN_ROOT}/context/orders/CORE.md` — your domain doc: the status state
    machine, the creation pipeline, twin orders, idempotency invariants, cross-domain
    boundaries, crons, the per-repo client sections (Part 2), and the human-confirmed
    verdicts (§10). If code contradicts the doc, trust the code and flag the drift.

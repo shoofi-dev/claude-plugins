@@ -1,0 +1,80 @@
+{
+  "doc": "customers",
+  "lastVerified": "shoofi-server@561e3ca / 2026-07-28",
+  "repos": {
+    "shoofi-server": {
+      "files": [
+        "routes/auth.js",
+        "routes/customer.js",
+        "routes/customer-referrals.js",
+        "routes/customer-campaigns.js",
+        "routes/customer-feedback.js",
+        "routes/shoofi-admin-users.js",
+        "utils/auth-service.js",
+        "utils/admin-auth-service.js",
+        "utils/app-name-helper.js",
+        "controllers/customerAddressController.js",
+        "docs/customer-orders-snapshot.md"
+      ],
+      "symbols": {
+        "utils/auth-service.js": ["generateJWT", "toAuthJSON"],
+        "utils/app-name-helper.js": ["getCustomerAppName"],
+        "utils/admin-auth-service.js": [
+          "generateAccessToken",
+          "verifyAccessToken",
+          "verifyAdminCredentials"
+        ],
+        "routes/customer-referrals.js": [
+          "attributeCustomerToReferrer",
+          "recordFirstOrderForReferrer"
+        ],
+        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store"]
+      },
+      "patterns": [
+        {
+          "file": "routes/auth.js",
+          "regex": "app-type",
+          "desc": "identity routing is by app-type, not app-name"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "shoofi-shoofir",
+          "desc": "driver identity branch -> delivery-company.customers"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "storeUsers",
+          "desc": "partner identity collection"
+        },
+        {
+          "file": "utils/app-name-helper.js",
+          "regex": "shoofi",
+          "desc": "customers are central: getCustomerAppName always returns shoofi"
+        }
+      ]
+    },
+    "shoofi-partner": {
+      "files": ["stores/auth/index.ts", "stores/user-details/index.tsx"],
+      "patterns": [
+        {
+          "file": "stores/auth/index.ts",
+          "regex": "switchStore",
+          "desc": "per-store token re-mint mechanism"
+        }
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/contexts/AdminAuthContext.tsx",
+        "src/utils/http-interceptor/index.ts"
+      ],
+      "patterns": [
+        {
+          "file": "src/utils/http-interceptor/index.ts",
+          "regex": "Bearer",
+          "desc": "admin uses Bearer (RN apps use 'Token')"
+        }
+      ]
+    }
+  }
+}

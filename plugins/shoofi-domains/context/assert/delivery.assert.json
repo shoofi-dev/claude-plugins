@@ -1,0 +1,81 @@
+{
+  "doc": "delivery",
+  "lastVerified": "shoofi-server@561e3ca / 2026-07-28",
+  "repos": {
+    "shoofi-server": {
+      "files": [
+        "routes/delivery.js",
+        "routes/delivery/orders.js",
+        "routes/delivery/driver.js",
+        "routes/delivery/admin.js",
+        "routes/delivery/company.js",
+        "routes/delivery/geography.js",
+        "routes/driver-shift-manager.js",
+        "routes/geo.js",
+        "services/delivery/assignDriver.js",
+        "services/delivery/book-delivery.js",
+        "services/delivery/delayed-assignment.js",
+        "services/delivery/driver-status-service.js",
+        "consts/consts.js",
+        "docs/delivery-areas-model.md"
+      ],
+      "symbols": {
+        "services/delivery/assignDriver.js": [
+          "findBestAreaForLocation",
+          "personalSupportedAreas",
+          "supportedCities",
+          "supportedAreas"
+        ],
+        "services/delivery/driver-status-service.js": ["setDriverActiveStatus"],
+        "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
+        "services/delivery/book-delivery.js": ["originalBookId"]
+      },
+      "patterns": [
+        {
+          "file": "consts/consts.js",
+          "regex": "DELIVERY_STATUS",
+          "desc": "authoritative delivery status enum"
+        },
+        {
+          "file": "consts/consts.js",
+          "regex": "COLLECTED_FROM_RESTAURANT:\\s*\"3\"",
+          "desc": "COLLECTED = 3 (clients must match; partner was off-by-one)"
+        },
+        {
+          "file": "consts/consts.js",
+          "regex": "DELIVERED:\\s*\"4\"",
+          "desc": "DELIVERED = 4"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "isSendNotificationToDeliveryCompany",
+          "desc": "global switch gating bookDelivery creation"
+        }
+      ]
+    },
+    "shoofi-shoofir": {
+      "files": [
+        "hooks/useDriverLocationTracking.ts",
+        "stores/delivery-driver/index.ts",
+        "consts/shared.ts"
+      ],
+      "patterns": [
+        {
+          "file": "consts/shared.ts",
+          "regex": "DELIVERY_STATUS",
+          "desc": "driver client copy of delivery status enum"
+        }
+      ]
+    },
+    "shoofi-partner": {
+      "files": ["consts/shared.ts", "hooks/useAvailableDrivers.ts"],
+      "patterns": [
+        {
+          "file": "consts/shared.ts",
+          "regex": "COLLECTED_FROM_RESTAURANT:\\s*\"3\"",
+          "desc": "partner delivery status must match server (fixed off-by-one)"
+        }
+      ]
+    }
+  }
+}

@@ -20,10 +20,10 @@ Primary files: `routes/order.js` (~7k lines), `routes/twin-order.js`,
 `routes/order-origin-validator.js`, `routes/admin/order-monitoring.js`,
 `routes/admin/twin-order-config.js`, `services/twin-order/*`,
 `utils/order-stock.js` (stock semantics), `utils/crons/*order*`,
-`utils/centralized-flow-monitor.js`. Status constants: `consts/consts.js:15-41`.
+`utils/centralized-flow-monitor.js`. Status constants: `consts/consts.js`.
 
 **⚠️ HIGH-RISK code (change via draft PR flagged HIGH-RISK; never merge):**
-- `POST /api/order/create` — the creation pipeline (`order.js:2685-4014`)
+- `POST /api/order/create` — the creation pipeline (`order.js`)
 - Any **status-transition** code: `/api/order/update` (`4174`), `/update/viewd`
   (`4706`), `/start-preparing` (`5854`), `/updateCCPayment` (`1817`), Apple Pay /
   ZCredit finalize & callbacks (`2509`, `2583`, `finalizeApplePayOrder` `2234`),
@@ -38,18 +38,18 @@ explicit "what could break" section in the PR body. Open it as a **draft**.
 - **Orders live in the STORE DB**, selected per request:
   `db = await getOrInitializeDb(req.headers['app-name'], req.app.db)`.
 - **Customers are ALWAYS central `shoofi`** — `getCustomerAppName()` ignores
-  appName and returns `req.app.db['shoofi']` (`utils/app-name-helper.js:9-11`).
+  appName and returns `req.app.db['shoofi']` (`utils/app-name-helper.js`).
   So `customers` + `customers.orders[]` are central, orders are per-store.
 - Central `shoofi` also holds: `orderFlowEvents`, `twinOrderGroups`, `couponUsages`,
   `fraudChecks`, `deviceCustomers`, `ipCustomers`, `applePaySessions`,
   `hypPaySessions`, `pendingFeedbackNotifications`, `stores`, `store{id:1}` (platform creds).
 - `delivery-company` holds `bookDelivery` + twin config (`readConfig`).
-- ⚠️ `verifiedAppName()` (`order.js:2026`) is currently a **pass-through** — its
+- ⚠️ `verifiedAppName()` (`order.js`) is currently a **pass-through** — its
   cross-check is commented out. Treat store selection as trust-on-header today
   (see §10).
 
 ## 2. Status lifecycle — the state machine (know it cold)
-Status is a **string** on the store `orders.status`. Values (`consts/consts.js:15-31`):
+Status is a **string** on the store `orders.status`. Values (`consts/consts.js`):
 
 `0` unpaid-CC (implicit) · `1` IN_PROGRESS · `2` COMPLETED · `3` WAITING_FOR_DRIVER
 · `4` CANCELLED · `5` REJECTED · `6` PENDING · `7` CANCELLED_BY_ADMIN · `8`
@@ -70,12 +70,12 @@ Buckets (`docs/customer-orders-snapshot.md`): **completed** `2,3,10,11,12` ·
 - **Twin cascade** mutates the peer side **directly via services**, not routes (avoids recursion).
 
 **Transition guards you must not weaken:** PENDING(`6`) only from FRAUD_REVIEW
-(`order.js:4189`); `/update/viewd` rejects already-cancelled (`4732`);
+(`order.js`); `/update/viewd` rejects already-cancelled (`4732`);
 `start-preparing` only from `14`. Fields: `status`, `statusUpdatedAt`,
 `statusUpdateReason`, `completedAt`, `viewdAt`, `isViewd`, `isPrinted`, `orderDate`.
 
 ## 3. Order creation pipeline (understand; do not edit without sign-off)
-`POST /api/order/create` (`order.js:2685-4014`) — ordered side effects:
+`POST /api/order/create` (`order.js`) — ordered side effects:
 lock (Redis `SET NX` + in-mem fallback + 30s dup check) → fraud checks → generate
 `originalOrderId`/`orderId` → image upload → decide initial status → validate coins
 (no debit) → build `orderDoc` → **insert into store `orders`** (authoritative) →
@@ -90,7 +90,7 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 (`services/twin-order/twin-group-service.js`): `pending_payment` →
 `primary_dispatched` → `secondary_dispatched` → `completed`; plus `cancelled`,
 `degraded_to_single`. Key facts:
-- **Place** (`twin-order.js:424`) validates BOTH sides' coins before inserting
+- **Place** (`twin-order.js`) validates BOTH sides' coins before inserting
   either; inserts a skeleton order into each store with
   `twinGroup:{groupId, role, peerAppName, peerOrderId, ...}`; pushes both snapshots.
 - **Pay** (`781`) = **one combined ZCredit capture** for both totals + fee → both
@@ -120,12 +120,12 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 
 ## 6. Idempotency & invariants — never break these
 1. **Stock**: `decrementOrderStock`/`restoreOrderStock` gated by the
-   `stockDecremented && !stockRestored` pair (`order-stock.js:22`) + `store.isStockManagment`.
+   `stockDecremented && !stockRestored` pair (`order-stock.js`) + `store.isStockManagment`.
    Decrement **only** on confirmation (never `status:"0"`) — a failed charge must
    never consume stock. Restore covers every cancel actor incl. driver `9`.
 2. **Payment**: Apple Pay finalize uses atomic `findOneAndUpdate({_id,status:"0"})`
    to guarantee single finalize; the callback can arrive **before** the order exists
-   (self-heal `order.js:3208-3254`). Twin = single combined capture.
+   (self-heal `order.js`). Twin = single combined capture.
 3. **Amount-mismatch backstop**: charged vs `order.total` drift ≥0.01 → force
    FRAUD_REVIEW (`finalizeApplePayOrder:2254`); twin excluded.
 4. **Creation lock** must always release in `finally`.
@@ -133,7 +133,7 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
    attribution, coupon minting, invoices, notifications, external-provider, flow
    events are all try/caught and swallowed. Coins-redeem-after-charge failure is
    logged **CRITICAL** (customer charged discounted total, coins not debited →
-   manual reconciliation, `order.js:3085`).
+   manual reconciliation, `order.js`).
 
 ## 7. Cross-domain boundaries — hand off, don't reach in
 - **PAYMENTS / INVOICING** (🔒 never modify): `processCreditCardPayment`,
@@ -169,14 +169,14 @@ decrement/restore logic, transition guards. Minimal diff + extra tests + a "what
 could break" section. Payments/invoicing files stay off-limits — hand off in the PR.
 
 ## 10. Known status (human-confirmed) — do NOT "fix" these
-- **BY DESIGN — leave it:** `verifiedAppName()` is a pass-through (`order.js:2026`);
+- **BY DESIGN — leave it:** `verifiedAppName()` is a pass-through (`order.js`);
   the multi-tenant cross-check is intentionally disabled — order creation trusts
   the `app-name` header today. Do not "re-enable" it without an explicit task.
 - **BY DESIGN — leave it:** fraud **rejection** is intentionally off. `performFraudChecks`
   routes risky orders to FRAUD_REVIEW(`13`) for manual handling; `shouldBlockCustomer`
   exists but the hard-block path stays disabled on purpose. Do not turn it on.
 - **Awareness (not a bug):** coins-redeem-after-charge failure → CRITICAL log +
-  manual reconciliation, not auto-refund (`order.js:3085`).
+  manual reconciliation, not auto-refund (`order.js`).
 - **Awareness (not a bug):** HYP "verified=false but paid" → logged paid-but-stuck; no auto-recovery.
 - **Awareness:** background work in `/update/viewd` (delivery booking, external
   provider, twin coordination) runs after the 200 response — failures never reach the client.
