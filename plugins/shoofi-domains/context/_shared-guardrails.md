@@ -128,13 +128,27 @@ failure is **swallowed and logged**, never thrown into the primary path.
 ## 7. Definition of done (every change, before you hand off the PR)
 1. `npm run lint` → **0 errors**, and add **no new warnings**.
 2. `npm run deadcode` → no new unused files.
-3. **Tests**: cover the changed flow — invoke the `shoofi-testing` /cover-changes
-   skill to generate/run the test slice for what you touched; it must run green.
+3. **Tests — not optional, and the PR must say so explicitly.**
+   Cover the changed behaviour; the `shoofi-testing` /cover-changes skill will generate
+   the slice. Your PR **must** contain one of these two lines, verbatim enough to find:
+   - `Tests: <what they cover>` — added or updated, run green, and
+   - `No test because: <reason>` — only for a pure rename, config/copy change, or a
+     genuinely untestable integration point. "It's small" and "it's obvious" are not reasons.
+
+   **A test that passes on the broken code is worse than no test** — it manufactures false
+   confidence. Before you trust a new test, confirm it **fails** against the bug you fixed
+   (re-introduce the fault, watch it go red, restore). Say in the PR that you did this.
+
+   The test suites are thin (shoofi-server runs a small infra-free set; the client repos
+   are close to empty), so you are usually *adding* the first coverage of a path rather
+   than extending a suite. Prefer pure logic and route-level tests with faked infra —
+   that's the pattern in `test/integration/`.
 4. `npm run routes:check` **if you moved/added/renamed any route** (expect an
    empty diff unless the route change is intentional — then regenerate the baseline).
-5. `smoke` needs live infra (Mongo/Redis/Firebase). If it can't run in the
+5. `npm run docs:check` — the agent context docs must still match the code.
+6. `smoke` needs live infra (Mongo/Redis/Firebase). If it can't run in the
    environment, say so explicitly — do **not** claim it passed.
-6. **Report**: what changed, what you verified (with the actual gate output),
+7. **Report**: what changed, what you verified (with the actual gate output),
    what you deliberately left untouched, and any guardrail boundary you stopped at.
 
 ## 8. When to actually pause and ask (rare — only genuine blockers)
