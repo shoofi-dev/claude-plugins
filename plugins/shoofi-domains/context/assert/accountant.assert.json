@@ -1,0 +1,66 @@
+{
+  "doc": "accountant",
+  "lastVerified": "shoofi-server@561e3ca / 2026-07-28",
+  "repos": {
+    "shoofi-server": {
+      "files": [
+        "routes/payments/admin-reports.js",
+        "routes/payments/admin.js",
+        "routes/payments/summaries.js",
+        "routes/driver-reports.js",
+        "routes/admin/masav.js",
+        "routes/hyp.js",
+        "lib/payments/calc.js",
+        "utils/vat.js",
+        "utils/greeninvoice.js",
+        "utils/invoice-provider.js"
+      ],
+      "symbols": {
+        "lib/payments/calc.js": [
+          "getFullDiscountMatrix",
+          "effectiveDeliveryFee",
+          "couponDeliveryPortion",
+          "calculateCommission",
+          "getDateRange"
+        ],
+        "utils/vat.js": [
+          "VAT_RATE",
+          "VAT_MULTIPLIER",
+          "calculateVAT",
+          "withoutVAT",
+          "withoutVATIfExempt"
+        ],
+        "routes/payments/admin-reports.js": [
+          "checkOverlappingReports",
+          "validateOrdersClosed",
+          "calculateCommissionTiered",
+          "generateStoreReportData",
+          "totalForTransfer"
+        ],
+        "utils/invoice-provider.js": ["getActiveProvider"]
+      },
+      "patterns": [
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "totalForTransfer\\s*=\\s*creditCardRevenue",
+          "desc": "CORE money formula: transfer is credit-card revenue minus outcomes"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "actualDriverPayment",
+          "desc": "cash-vs-card driver payout branch"
+        },
+        {
+          "file": "routes/admin/masav.js",
+          "regex": "CP862|cp862",
+          "desc": "MASAV DOS-Hebrew encoding"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "Only draft reports can be deleted",
+          "desc": "delete guard (re-enabled) must stay active"
+        }
+      ]
+    }
+  }
+}

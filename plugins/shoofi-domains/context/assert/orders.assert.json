@@ -1,0 +1,88 @@
+{
+  "doc": "orders",
+  "lastVerified": "shoofi-server@561e3ca / 2026-07-28",
+  "repos": {
+    "shoofi-server": {
+      "files": [
+        "routes/order.js",
+        "routes/twin-order.js",
+        "routes/order-fraud-checks.js",
+        "routes/order-origin-validator.js",
+        "routes/admin/order-monitoring.js",
+        "routes/admin/twin-order-config.js",
+        "services/twin-order/twin-group-service.js",
+        "services/twin-order/twin-payment-service.js",
+        "consts/consts.js",
+        "utils/order-stock.js",
+        "utils/customer-orders.js",
+        "docs/customer-orders-snapshot.md"
+      ],
+      "symbols": {
+        "routes/order.js": [
+          "processCreditCardPayment",
+          "processHypTokenPayment",
+          "finalizeApplePayOrder",
+          "verifiedAppName"
+        ],
+        "services/twin-order/twin-group-service.js": [
+          "cascadeCancel",
+          "degradeToSingle"
+        ],
+        "utils/order-stock.js": [
+          "decrementOrderStock",
+          "restoreOrderStock",
+          "stockDecremented",
+          "stockRestored"
+        ],
+        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+      },
+      "patterns": [
+        {
+          "file": "consts/consts.js",
+          "regex": "ORDER_STATUS",
+          "desc": "authoritative order status enum"
+        },
+        {
+          "file": "consts/consts.js",
+          "regex": "FRAUD_REVIEW:\\s*\"13\"",
+          "desc": "FRAUD_REVIEW = 13 (doc CORE state machine)"
+        },
+        {
+          "file": "consts/consts.js",
+          "regex": "FUTURE_ORDER_PENDING:\\s*\"14\"",
+          "desc": "FUTURE_ORDER_PENDING = 14"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "/api/order/update/viewd",
+          "desc": "store-accept endpoint (6->1 transition)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "twinGroup",
+          "desc": "twin linkage field on orders"
+        }
+      ]
+    },
+    "shoofi-app": {
+      "files": ["consts/shared.ts", "stores/cart/index.ts"],
+      "patterns": [
+        {
+          "file": "consts/shared.ts",
+          "regex": "ORDER_STATUS",
+          "desc": "client copy of order status enum (must track server)"
+        }
+      ]
+    },
+    "shoofi-partner": {
+      "files": ["consts/shared.ts", "stores/orders/index.tsx"],
+      "patterns": [
+        {
+          "file": "consts/shared.ts",
+          "regex": "ORDER_STATUS",
+          "desc": "client copy of order status enum (must track server)"
+        }
+      ]
+    }
+  }
+}

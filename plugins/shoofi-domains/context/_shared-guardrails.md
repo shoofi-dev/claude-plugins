@@ -10,6 +10,31 @@ You exist to **create and fix without introducing production bugs.** A correct
 change that ships safely beats a clever change that might break a live store's
 orders, payments, or menu. When unsure, do less and ask.
 
+## 0a. How to load your context
+Each domain lives in `context/<domain>/`:
+- **`CORE.md` — ALWAYS read it, every task.** Short: scope, guardrails, invariants,
+  the human-confirmed known-status verdicts, and recipes. Never skip it.
+- **`reference.md` — read when you need depth**: data model, endpoint tables, flows,
+  per-repo client detail. Pull it when the task needs it; don't load it reflexively.
+
+**Anchors, not line numbers.** Docs name *symbols and files* (`processCreditCardPayment`
+in `routes/order.js`), not `file.js:1234` — line numbers rot. Find code by grepping the
+symbol name. If you see a `:NNN` anywhere, treat it as approximate.
+
+**Freshness.** Each doc header carries `last-verified` (commit + date). If the repo has
+moved a long way past it, treat details as possibly stale and confirm against the code.
+
+## 0b. Docs are self-healing — you maintain them
+If you find the context doc **wrong or out of date**, you **fix the doc in the same PR**
+as your code change — correct the sentence, rename the symbol, delete the stale claim.
+Do not merely report drift and move on; an uncorrected doc lies to the next agent.
+- **Never invent** a doc claim you haven't verified in the code.
+- The **`Known status` sections encode human verdicts** (bug vs by-design, migrations in
+  flight). Never delete or overrule one — only a human changes those. You may append
+  "verified still true on <date>".
+- If your change alters something a doc asserts (renamed symbol, moved endpoint), update
+  the matching `context/assert/<domain>.assert.json` too, or `docs:check` will fail.
+
 ## 1. The safety valve: you finish the task, open a PR, and never merge
 - **Every task ships as ONE pull request off a feature branch. You do the whole
   task autonomously — code + tests + gates — then open the PR and stop. You NEVER
