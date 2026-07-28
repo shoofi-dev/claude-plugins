@@ -1,0 +1,166 @@
+{
+  "_comment": [
+    "Which domain owns which paths, per repo. Used by scripts/docs-touch-check.js to warn",
+    "when a PR changes code a domain doc describes, so the doc gets revisited before it rots.",
+    "Matching is by path PREFIX (no glob dependency). A path may be owned by more than one",
+    "domain - both get warned, which is correct for shared files like utils/order-stock.js."
+  ],
+  "domains": {
+    "menu-catalog": {
+      "shoofi-server": [
+        "routes/menu.js",
+        "routes/product.js",
+        "routes/category.js",
+        "routes/translations.js",
+        "routes/global-search.js",
+        "utils/menu-cache.js",
+        "utils/order-stock.js"
+      ],
+      "shoofi-partner": ["screens/admin/product", "screens/menu"],
+      "shoofi-app": ["screens/menu"]
+    },
+    "orders": {
+      "shoofi-server": [
+        "routes/order.js",
+        "routes/twin-order.js",
+        "routes/order-fraud",
+        "routes/order-origin-validator.js",
+        "routes/admin/order-monitoring.js",
+        "routes/admin/twin-order-config.js",
+        "services/twin-order/",
+        "utils/order-stock.js",
+        "utils/customer-orders.js",
+        "utils/crons/order-overdue-checker.js",
+        "utils/crons/fix-stuck-orders.js",
+        "consts/consts.js"
+      ],
+      "shoofi-app": [
+        "screens/checkout",
+        "screens/order",
+        "stores/cart/",
+        "stores/orders/",
+        "stores/twin-order/",
+        "consts/shared.ts"
+      ],
+      "shoofi-partner": [
+        "screens/admin/order",
+        "stores/orders/",
+        "consts/shared.ts"
+      ],
+      "shoofi-delivery-web": [
+        "src/apis/admin/order",
+        "src/views/admin/orders.tsx",
+        "src/components/Cards/CardOrder.tsx",
+        "src/components/Cards/CardTwinOrder.tsx",
+        "src/components/OrderMonitoring/",
+        "src/consts/shared.ts"
+      ]
+    },
+    "payments": {
+      "shoofi-server": [
+        "routes/payments.js",
+        "routes/payments/validate-card.js",
+        "routes/creditCard.js",
+        "routes/hyp-pay.js",
+        "routes/payment-methods.js",
+        "utils/hyp-pay.js",
+        "utils/invoice-mail.js",
+        "lib/schemas/creditCard.json"
+      ],
+      "shoofi-app": [
+        "components/credit-card/",
+        "components/payment-method/",
+        "hooks/checkout/",
+        "helpers/hyp-",
+        "helpers/get-supported-payment-methods.ts",
+        "stores/creditCards/",
+        "data/zcredit-config.ts"
+      ]
+    },
+    "accountant": {
+      "shoofi-server": [
+        "routes/payments/admin-reports.js",
+        "routes/payments/admin.js",
+        "routes/payments/summaries.js",
+        "routes/driver-reports.js",
+        "routes/admin/masav.js",
+        "routes/hyp.js",
+        "lib/payments/",
+        "utils/vat.js",
+        "utils/greeninvoice.js",
+        "utils/invoice-provider.js"
+      ],
+      "shoofi-delivery-web": [
+        "src/views/admin/DriverPayments.tsx",
+        "src/views/admin/DriverBonuses.tsx",
+        "src/views/admin/CompensationManagement.tsx",
+        "src/views/admin/driver-reports/",
+        "src/views/admin/generate-stores-summaries.tsx"
+      ]
+    },
+    "delivery": {
+      "shoofi-server": [
+        "routes/delivery.js",
+        "routes/delivery/",
+        "routes/geo.js",
+        "routes/driver-shift-manager.js",
+        "services/delivery/",
+        "lib/delivery/",
+        "utils/crons/delivery-",
+        "utils/crons/driver-",
+        "consts/consts.js"
+      ],
+      "shoofi-shoofir": [
+        "stores/delivery-driver/",
+        "screens/delivery-driver/",
+        "hooks/useDriverLocationTracking.ts",
+        "utils/locationBackgroundTask.ts",
+        "services/driverShiftService.ts",
+        "consts/shared.ts"
+      ],
+      "shoofi-delivery-web": [
+        "src/apis/admin/delivery/",
+        "src/apis/delivery/",
+        "src/views/admin/delivery-areas/",
+        "src/views/admin/driver-locations/",
+        "src/views/admin/driver-shifts/",
+        "src/views/admin/DeliveryMonitor.tsx",
+        "src/views/admin/settings/DeliverySettings.tsx",
+        "src/consts/shared.ts"
+      ],
+      "shoofi-partner": ["hooks/useAvailableDrivers.ts", "screens/book-delivery/"]
+    },
+    "customers": {
+      "shoofi-server": [
+        "routes/auth.js",
+        "routes/customer.js",
+        "routes/customer-referrals.js",
+        "routes/customer-campaigns.js",
+        "routes/customer-feedback.js",
+        "routes/shoofi-admin-users.js",
+        "utils/auth-service.js",
+        "utils/admin-auth-service.js",
+        "utils/app-name-helper.js",
+        "controllers/customerAddressController.js"
+      ],
+      "shoofi-app": [
+        "screens/login",
+        "screens/verify-code",
+        "screens/insert-customer-name",
+        "screens/profile",
+        "screens/addresses",
+        "stores/auth/",
+        "stores/user-details/",
+        "stores/address/"
+      ],
+      "shoofi-partner": ["screens/login", "screens/verify-code", "stores/auth/", "stores/user-details/"],
+      "shoofi-shoofir": ["screens/login", "screens/verify-code", "stores/auth/", "stores/user-details/"],
+      "shoofi-delivery-web": [
+        "src/contexts/AdminAuthContext.tsx",
+        "src/views/admin/users/",
+        "src/components/ProtectedRoute.tsx",
+        "src/components/RoleBasedAccess.tsx"
+      ]
+    }
+  }
+}

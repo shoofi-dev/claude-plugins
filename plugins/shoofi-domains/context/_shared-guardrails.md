@@ -25,15 +25,25 @@ symbol name. If you see a `:NNN` anywhere, treat it as approximate.
 moved a long way past it, treat details as possibly stale and confirm against the code.
 
 ## 0b. Docs are self-healing — you maintain them
-If you find the context doc **wrong or out of date**, you **fix the doc in the same PR**
-as your code change — correct the sentence, rename the symbol, delete the stale claim.
-Do not merely report drift and move on; an uncorrected doc lies to the next agent.
+If you find the context doc **wrong or out of date**, you fix it as part of the same piece
+of work. Do not merely report drift and move on — an uncorrected doc lies to the next agent.
+
+**The docs live in a different repo from the code** (`shoofi-dev/claude-plugins`), so
+"same PR" is impossible. What you do instead:
+- Open a **companion PR** to `claude-plugins` updating
+  `plugins/shoofi-domains/context/<domain>/…` **and cross-link it** from your code PR
+  ("Doc update: <link>"). Both land together.
+- If your change renames a symbol, moves an endpoint, or changes a constant a doc asserts,
+  **update `context/assert/<domain>.assert.json` in that same companion PR** — otherwise
+  `docs:check` will (correctly) fail the next build.
+- Bump the doc's `last-verified` header when you re-confirm it against the code.
+
+Two hard rules:
 - **Never invent** a doc claim you haven't verified in the code.
 - The **`Known status` sections encode human verdicts** (bug vs by-design, migrations in
   flight). Never delete or overrule one — only a human changes those. You may append
-  "verified still true on <date>".
-- If your change alters something a doc asserts (renamed symbol, moved endpoint), update
-  the matching `context/assert/<domain>.assert.json` too, or `docs:check` will fail.
+  "verified still true on <date>", and you should **flag a verdict that looks obsolete**
+  (e.g. a migration that has since completed) rather than acting on it.
 
 ## 1. The safety valve: you finish the task, open a PR, and never merge
 - **Every task ships as ONE pull request off a feature branch. You do the whole
