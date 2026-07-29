@@ -53,19 +53,10 @@ plugins/
     scripts/docs-check.js                # drift checker (zero deps)
 ```
 
-## One-time setup
+## Setup — per developer, once
 
-**1. Publish this marketplace** — create the GitHub repo and push:
-
-```bash
-cd /Users/Saridev/Documents/project/shoofi/claude-plugins
-git init && git add -A && git commit -m "shoofi-testing plugin: cover-changes skill"
-gh repo create shoofi-dev/claude-plugins --private --source=. --remote=origin --push
-```
-(If you prefer a public repo, cloud routines authenticate more simply — see Notes.)
-
-**2. Enable it in each repo** — each of the 5 repos now carries a committed
-`.claude/settings.json` that points here and enables the plugin:
+The committed `.claude/settings.json` in each repo declares the marketplace and marks the
+plugins **enabled**:
 
 ```json
 {
@@ -76,8 +67,39 @@ gh repo create shoofi-dev/claude-plugins --private --source=. --remote=origin --
 }
 ```
 
-Because that file is committed, both local sessions **and** cloud routines load
-the plugin automatically when they work on the repo — no manual install.
+> **`enabled` is not `installed`.** That file does **not** install anything on your machine —
+> it only says "when this plugin is present, turn it on". Each developer installs once:
+
+```bash
+claude plugin marketplace update shoofi       # refresh the marketplace cache first
+claude plugin install shoofi-domains@shoofi --scope project
+claude plugin install shoofi-testing@shoofi  --scope project
+claude plugin list                            # both should appear, enabled
+```
+
+**Restart Claude Code afterwards** — agents and skills are picked up at session start.
+
+### Keeping up to date
+
+Marketplace plugins are **copied into a local cache** (`~/.claude/plugins/cache`), not read
+live from GitHub. So after we push changes here, local sessions need:
+
+```bash
+claude plugin marketplace update shoofi
+claude plugin update shoofi-domains@shoofi
+```
+
+Cloud routines re-clone each run, so they pick up changes on their own.
+
+### Verifying the agents are live
+
+```bash
+claude plugin list
+```
+then, in a fresh session, ask **"which subagents can you delegate to?"** — you should see six
+`shoofi-domains:…` entries. `/agents` is only a help stub in current versions and lists nothing.
+
+If they still don't appear, the plugin is installed but not loaded — restart the session.
 
 ## Usage
 
