@@ -124,6 +124,13 @@ AsyncStorage offline-retry queue. **Availability/active**: `delivery/driver/avai
 **Assignment**: arrives via push/WS (not polling); lifecycle actions POST `delivery/driver/order/*`.
 `DELIVERY_STATUS` copy = `1..4` (`consts/shared.ts`). Key: `stores/delivery-driver/index.ts`,
 `screens/delivery-driver/*`, `hooks/{useDriverLocationTracking,use-websocket}.ts`.
+**Company-admin dispatch lives HERE, not in partner:** an admin of an `isControlledByAdmin`
+company (`profile.role === 'admin'`, `screens/delivery-driver/index.tsx`) gets `isAdmin`
+passed into `OrderCard`, which renders the assigned-driver row + `DriverReassignModal` →
+`POST delivery/admin/:adminId/order/:orderId/reassign`. This is the **only** mobile surface
+that picks a driver. Twin pairs collapse into `TwinOrderCard` (`groupTwinPairs`, unless
+`twinAssignmentMode === 'split'`), so anything admin-only must be wired into BOTH cards or
+it silently does not exist for twins.
 **Dead/inherited (leave alone):** `services/deliveryDriverService.ts` (legacy fetch dup,
 `app-name: shoofi-app`), `getNearbyOrders`/`getSchedule` (no UI callers), customer-app city/address remnants.
 
@@ -144,7 +151,11 @@ orderId}`), `order/book-custom-delivery` (ad-hoc), reads `delivery/book/:bookId`
 `delivery/order/:orderId/driver`. Store-side coverage/ETA: `hooks/useAvailableDrivers.ts` →
 `POST /delivery/available-drivers` (`stores/shoofi-admin`). Key: `stores/orders/index.tsx`,
 `screens/book-delivery/*`, `hooks/useAvailableDrivers.ts`.
-**Dead/inherited (leave alone):** customer-app city/address remnants, `screens/menu/menu.tsx.backup`.
+**Partner has NO driver-assignment surface** — it books and reads, it never picks a driver.
+**Dead/inherited (leave alone):** `components|screens|stores/delivery-driver/*` (a pre-admin
+copy of the shoofir driver UI — no `isAdmin`, no reassign, no `DriverReassignModal`, and no
+navigation entry point despite being registered in `navigation/MainStackNavigator.tsx`),
+customer-app city/address remnants, `screens/menu/menu.tsx.backup`.
 
 ## 10. Known status / flagged for verdict (do NOT silently "fix")
 1. **CONFIRMED BUG — FIXED** (partner PR #4): partner `DELIVERY_STATUS` was `0..3`, off by one

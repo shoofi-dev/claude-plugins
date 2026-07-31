@@ -57,13 +57,26 @@
       "files": [
         "hooks/useDriverLocationTracking.ts",
         "stores/delivery-driver/index.ts",
-        "consts/shared.ts"
+        "consts/shared.ts",
+        "components/delivery-driver/DriverReassignModal.tsx",
+        "components/delivery-driver/TwinOrderCard.tsx",
+        "screens/delivery-driver/index.tsx"
       ],
       "patterns": [
         {
           "file": "consts/shared.ts",
           "regex": "DELIVERY_STATUS",
           "desc": "driver client copy of delivery status enum"
+        },
+        {
+          "file": "components/delivery-driver/DriverReassignModal.tsx",
+          "regex": "order/\\$\\{orderId\\}/reassign",
+          "desc": "the only mobile driver-picker posts to the company-admin reassign endpoint"
+        },
+        {
+          "file": "screens/delivery-driver/index.tsx",
+          "regex": "twinAssignmentMode",
+          "desc": "twin pairs collapse into TwinOrderCard unless mode is split"
         }
       ]
     },
