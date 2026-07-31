@@ -61,16 +61,41 @@
           "file": "routes/order.js",
           "regex": "twinGroup",
           "desc": "twin linkage field on orders"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "isFutureOrder:\\s*\\{\\s*\\$exists:\\s*false\\s*\\}",
+          "desc": "server treats isFutureOrder as absent-when-false (CORE invariant 9)"
         }
       ]
     },
     "shoofi-app": {
-      "files": ["consts/shared.ts", "stores/cart/index.ts"],
+      "files": [
+        "consts/shared.ts",
+        "stores/cart/index.ts",
+        "screens/checkout/index.tsx",
+        "components/checkout/FutureOrderPicker.tsx"
+      ],
       "patterns": [
         {
           "file": "consts/shared.ts",
           "regex": "ORDER_STATUS",
           "desc": "client copy of order status enum (must track server)"
+        },
+        {
+          "file": "stores/cart/index.ts",
+          "regex": "if\\s*\\(order\\?\\.isRamadanIftar\\)",
+          "desc": "isRamadanIftar attached only when true (CORE invariant 9)"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "isRamadanIftar:\\s*orderTimingMode === \"ramadan-iftar\"",
+          "desc": "the two later-day flags are mutually exclusive, from one orderTimingMode"
+        },
+        {
+          "file": "components/checkout/FutureOrderPicker.tsx",
+          "regex": "MAX_RAMADAN_DAYS_AHEAD",
+          "desc": "ramadan-iftar orders can be days ahead without isFutureOrder"
         }
       ]
     },
