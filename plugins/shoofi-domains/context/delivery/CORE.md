@@ -54,6 +54,11 @@ normalize (`getId()` / `.toString()`).
    aligned to the later side. Breaking any of it splits a twin.
 6. **Manual-admin routing:** companies with `isControlledByAdmin && manualAssignmentOnly` route
    to a company **admin**, not a driver. Don't auto-assign them.
+7. **Collection name ≠ property name:** `db.bookDelivery` is bound to the MongoDB collection
+   **`book-delivery`** (hyphenated) — `services/database/DatabaseInitializationService.js:28`.
+   Querying `delivery-company.bookDelivery` directly returns **zero documents silently**
+   (Mongo just reports an empty collection), so a read-only investigation looks like "no twin
+   deliveries exist". Check the binding in that file before querying production by hand.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`

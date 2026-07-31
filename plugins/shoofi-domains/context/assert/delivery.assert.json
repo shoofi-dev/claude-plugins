@@ -17,7 +17,8 @@
         "services/delivery/delayed-assignment.js",
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
-        "docs/delivery-areas-model.md"
+        "docs/delivery-areas-model.md",
+        "services/database/DatabaseInitializationService.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -50,6 +51,11 @@
           "file": "routes/order.js",
           "regex": "isSendNotificationToDeliveryCompany",
           "desc": "global switch gating bookDelivery creation"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "db\\.bookDelivery\\s*=\\s*db\\.collection",
+          "desc": "db.bookDelivery is bound to the hyphenated book-delivery collection"
         }
       ]
     },
