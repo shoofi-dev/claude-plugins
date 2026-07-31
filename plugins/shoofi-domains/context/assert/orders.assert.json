@@ -61,6 +61,16 @@
           "file": "routes/order.js",
           "regex": "twinGroup",
           "desc": "twin linkage field on orders"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "updateData\\.startPreparingAt\\s*=",
+          "desc": "future accept sets startPreparingAt and does NOT rewrite orderDate (ref §2)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "originalOrderDate",
+          "desc": "/update-delay shifts orderDate and preserves the original (ref §5)"
         }
       ]
     },
@@ -71,6 +81,11 @@
           "file": "consts/shared.ts",
           "regex": "ORDER_STATUS",
           "desc": "client copy of order status enum (must track server)"
+        },
+        {
+          "file": "stores/cart/index.ts",
+          "regex": "orderDateValue\\s*=\\s*order\\.orderDate\\s*\\|\\|\\s*nowMoment\\.format\\(\\)",
+          "desc": "datetime = placed, orderDate = due; both offset strings, orderDate always set (ref §5)"
         }
       ]
     },

@@ -63,7 +63,8 @@ Buckets (`docs/customer-orders-snapshot.md`): **completed** `2,3,10,11,12` ·
 **Transitions & who triggers them:**
 - **Create** → `0` (CC) / `6` (cash/digital) / `1` (school) / `13` (fraud) / `14`,`15` (future/ramadan). Trigger: customer app.
 - **Payment success** → `6` (or `1` school). Trigger: CC branch, Apple Pay finalize (atomic `findOneAndUpdate {status:"0"}`), HYP.
-- **Store accept** (`/update/viewd`) → `6`→`1` (or `14`/`15`); sets `isViewd`,`viewdAt`,`orderDate`; **books delivery in background**. Trigger: partner app.
+- **Store accept** (`/update/viewd`) → `6`→`1` (or `14`/`15`); sets `isViewd`,`viewdAt`; **books delivery in background**. Trigger: partner app.
+  `orderDate` is rewritten to the ready time **only in the default branch** (`currentTime + readyMinutes`, and `currentTime` is the *tablet's* clock, not the server's). A `14` keeps the customer's requested `orderDate` and gets `startPreparingAt = orderDate - readyMinutes` + `isPrinted:true`; a `15` re-sets `orderDate` to itself. See §5 "order dates".
 - **Future → in-progress** (`/start-preparing`) → `14`→`1`.
 - **Cancel/reject** → `4,5,7,8,9`; cascades stock restore + delivery cancel + refunds (§3, §6).
 - **Cron** `fix-stuck-orders` bumps stale `1` → `3` (delivery) or `2` (takeaway).
@@ -117,6 +118,17 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 - **`delivery-company.bookDelivery`** keyed by `bookId` = order `orderId`; mirrors
   `DELIVERY_STATUS` (`1` waiting_approve … `3` collected/pickup … `4` delivered).
 - **`shoofi.twinOrderGroups`** links `orders.twinGroup` ↔ group `primary`/`secondary`.
+- **Order dates — `datetime` is when it was PLACED, `orderDate` is when it is DUE.** Both are
+  client-supplied ISO-8601 **offset strings** (`"2026-08-03T15:00:00+03:00"`, never UTC, never
+  a `Date`) built by `moment().format()` in `shoofi-app/stores/cart/index.ts` and stored
+  verbatim — `POST /api/order/create` copies them into `orderDoc` untouched. Only `created` is
+  server-computed. `orderDate` always exists (it falls back to *now* at create), but its
+  meaning **shifts across the lifecycle**: the requested handover time at create, the ready
+  time after a non-future accept (§2), and `+delayMinutes` after `/update-delay` (which
+  preserves `originalOrderDate`). For a same-day order the two land on the same calendar day,
+  which is why code that displays "the order's date" tends to pick `datetime` and go unnoticed
+  until a future/ramadan order arrives — see shoofi-dev/shoofi-partner#8. Date windows must be
+  built as offset strings to compare correctly.
 
 ## 6. Idempotency & invariants — never break these
 1. **Stock**: `decrementOrderStock`/`restoreOrderStock` gated by the
