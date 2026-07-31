@@ -52,6 +52,15 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    **customers are central** (`shoofi`). Don't cross them.
 8. **Twin peers** are mutated by `services/twin-order/*` directly, never via
    `/api/order/update` (recursion).
+9. **`isFutureOrder`/`isRamadanIftar` are written only when TRUE — never `false`.** Both come
+   from one client-side `orderTimingMode` (`shoofi-app/screens/checkout/index.tsx`) and are
+   attached conditionally in `submitOrder` (`shoofi-app/stores/cart/index.ts`), so on a
+   same-day order the fields are **absent**, not `false`. They are **mutually exclusive** — a
+   ramadan-iftar order can be up to `MAX_RAMADAN_DAYS_AHEAD` = 3 days ahead
+   (`shoofi-app/components/checkout/FutureOrderPicker.tsx`) and never carries `isFutureOrder`.
+   "Is this order for a later day?" must therefore test **both**, **truthily** — as the server
+   does (`routes/order.js`: `$or: [{isFutureOrder:{$ne:true}},{isFutureOrder:{$exists:false}}]`).
+   Testing `isFutureOrder` alone silently misses every ramadan order.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
