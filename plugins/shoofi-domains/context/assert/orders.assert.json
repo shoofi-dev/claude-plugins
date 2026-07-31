@@ -66,6 +66,16 @@
           "file": "routes/order.js",
           "regex": "isFutureOrder:\\s*\\{\\s*\\$exists:\\s*false\\s*\\}",
           "desc": "server treats isFutureOrder as absent-when-false (CORE invariant 9)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "updateData\\.startPreparingAt\\s*=",
+          "desc": "future accept sets startPreparingAt and does NOT rewrite orderDate (ref §2)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "originalOrderDate",
+          "desc": "/update-delay shifts orderDate and preserves the original (ref §5)"
         }
       ]
     },
@@ -86,6 +96,11 @@
           "file": "stores/cart/index.ts",
           "regex": "if\\s*\\(order\\?\\.isRamadanIftar\\)",
           "desc": "isRamadanIftar attached only when true (CORE invariant 9)"
+        },
+        {
+          "file": "stores/cart/index.ts",
+          "regex": "orderDateValue\\s*=\\s*order\\.orderDate\\s*\\|\\|\\s*nowMoment\\.format\\(\\)",
+          "desc": "datetime = placed, orderDate = due; both offset strings, orderDate always set (ref §5)"
         },
         {
           "file": "screens/checkout/index.tsx",
