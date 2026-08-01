@@ -82,7 +82,8 @@ lock (Redis `SET NX` + in-mem fallback + 30s dup check) → fraud checks → gen
 (no debit) → build `orderDoc` → **insert into store `orders`** (authoritative) →
 **stock decrement if status≠"0"** → first-order attribution → Apple Pay session
 self-heal → fraud persistence → **push `customers.orders[]` snapshot (central)** →
-notify store owner → flow event → (CC/HYP branch: charge → set `6`/`1`/`13`, stock,
+notify store owner (**a repeating alert, not one push** — see §7) → flow event →
+(CC/HYP branch: charge → set `6`/`1`/`13`, stock,
 coupon usage, coins, invoice) → success flow event → release lock in `finally`.
 Delivery is **not** booked here — it's booked at store-accept.
 
@@ -157,6 +158,17 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 - **STOCK / menu**: `utils/order-stock.js` (shared with menu-catalog) — stock
   semantics only; coordinate on changes.
 - **NOTIFICATIONS**: `services/notification/*`, websocket, persistent-alerts, SMS.
+  ⚠️ The store-owner new-order alert does **not** come from `services/notification/*`
+  directly — `sendStoreOwnerNotifications` (`routes/order.js:843`) delegates to
+  `utils/persistent-alerts.js`, which inserts a `shoofi.persistentAlerts` doc and
+  **keeps re-pushing it once a minute until the partner accepts the order**.
+  `persistent-alerts-cron` runs on `*/1 * * * *`, and `sendReminders`' throttle
+  (`lastReminderSent`) is **commented out** (`utils/persistent-alerts.js:271`), so the
+  only brake is `reminderCount < 5` — i.e. 5 pushes a minute apart, per store user, not
+  the 5-minute spacing `reminderInterval` on the record implies. `clearPersistentAlert`
+  (on `isViewd`) is what stops it. If you are asked why a store gets the same
+  notification five times, this is why, and it is the `persistentAlerts` collection —
+  not `notifications` — that holds the pending state.
 - **FRAUD**: `order-fraud-*`, `fraud-config-loader`, `fraud-check-storage` →
   `shoofi.fraudChecks`/`deviceCustomers`/`ipCustomers`.
 - **GROWTH/COINS (secondary)**: `coinsService`, `worldCupService`, attribution — must never fail the order.
