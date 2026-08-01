@@ -13,10 +13,12 @@
         "utils/auth-service.js",
         "utils/admin-auth-service.js",
         "utils/app-name-helper.js",
+        "services/database/DatabaseInitializationService.js",
         "controllers/customerAddressController.js",
         "docs/customer-orders-snapshot.md"
       ],
       "symbols": {
+        "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
         "utils/auth-service.js": ["generateJWT", "toAuthJSON"],
         "utils/app-name-helper.js": ["getCustomerAppName"],
         "utils/admin-auth-service.js": [
