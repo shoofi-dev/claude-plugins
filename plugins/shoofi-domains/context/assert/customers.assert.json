@@ -50,6 +50,11 @@
           "file": "utils/app-name-helper.js",
           "regex": "shoofi",
           "desc": "customers are central: getCustomerAppName always returns shoofi"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "customerDB\\.customers\\.findOneAndUpdate\\([\\s\\S]{0,80}token: null, notificationToken: null",
+          "desc": "logout still hardcodes .customers with no app-type branch, so partner/driver tokens are never cleared - when this stops matching the fix has landed and the reference.md warning must be removed"
         }
       ]
     },

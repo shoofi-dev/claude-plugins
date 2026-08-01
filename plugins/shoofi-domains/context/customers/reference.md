@@ -83,7 +83,20 @@ Profile: `GET /api/customer/details` (joins store orders for a valid-order count
 `update`, `update-name`, `update-language`, `update-city-area` (resolves city from lat/lng
 via `delivery-company.cities`). Addresses: `controllers/customerAddressController.js` —
 add/get/update/delete/setDefault on the `addresses[]` subdoc (default toggling clears all
-then sets one). Push tokens: `update-notification-token`, cleared on logout.
+then sets one). Push tokens: `update-notification-token` — writes `notificationToken` on the
+**one** identity doc `req.auth.id` names, so for a partner it lands on the currently-active
+`storeUsers` doc, not on every store that phone owns.
+
+⚠️ **`POST /api/customer/logout` clears nothing for partners and drivers.** It does **not**
+branch on `app-type` — it hardcodes `customerDB.customers` (`routes/customer.js:2002`), and
+`getCustomerAppName` always returns the `shoofi` DB. A partner's id belongs to
+`shoofi.storeUsers` and a driver's to `delivery-company.customers`, so the update matches no
+document and `token` / `notificationToken` survive logout — only the client drops its local
+copy. Contrast `POST /api/customer/delete` directly below it, which *does* branch on
+`app-type`. Consequence: the stored-token equality check in `routes/auth.js` is **not** a
+working revocation path for partner or driver sessions, and stale push tokens accumulate on
+those docs indefinitely. Fixing it is an auth change with a logout blast radius — its own
+draft, HIGH-RISK, minimal-diff PR, never a rider on a feature.
 
 ## 6. Referrals (`routes/customer-referrals.js`)
 8-char code (ambiguity-free alphabet) + TinyURL short link with `/r/:code` fallback. Config on
