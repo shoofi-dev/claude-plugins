@@ -13,7 +13,8 @@
         "utils/invoice-mail.js",
         "lib/schemas/creditCard.json",
         "services/twin-order/twin-payment-service.js",
-        "routes/twin-order.js"
+        "routes/twin-order.js",
+        "routes/store.js"
       ],
       "symbols": {
         "utils/hyp-pay.js": [
@@ -69,6 +70,11 @@
           "file": "routes/twin-order.js",
           "regex": "api/twin-order/pay",
           "desc": "the twin charge entrypoint that bypasses routes/order.js entirely"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "hyp_enabled",
+          "desc": "platform tokenization rollout flag — NOT read by any charge path"
         }
       ]
     },
@@ -77,13 +83,19 @@
         "hooks/checkout/use-hyp-tokenize.ts",
         "helpers/get-supported-payment-methods.ts",
         "stores/creditCards/index.ts",
-        "data/zcredit-config.ts"
+        "data/zcredit-config.ts",
+        "helpers/hyp-card.ts"
       ],
       "patterns": [
         {
           "file": "consts/shared.ts",
           "regex": "PAYMENT_METHODS",
           "desc": "client payment-method constants"
+        },
+        {
+          "file": "components/payment-method/index.tsx",
+          "regex": "hypEnabled|hyp_enabled",
+          "desc": "hyp_enabled's only live consumer: which add-card tokenization flow to open"
         }
       ]
     }
