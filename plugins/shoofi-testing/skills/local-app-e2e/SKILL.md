@@ -118,6 +118,9 @@ working flow to copy, and the selector rules for a forced-RTL Arabic UI. The one
 thing to internalise here: **screenshot at every assertion** and collect them into
 a folder the user can open.
 
+If this is the repo's first flow, add `.maestro/screenshots/` to its `.gitignore`
+before you commit anything — the PNGs are run output, not source.
+
 ## What cannot work on a simulator — don't chase it
 
 - **Push notifications**, and anything built on them (tap-to-open, tap-to-switch-

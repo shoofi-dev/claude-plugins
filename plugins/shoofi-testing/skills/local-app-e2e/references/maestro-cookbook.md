@@ -39,6 +39,24 @@ find "$RUN_OUT" -path "*/takeScreenshot/*.png" -exec cp {} .maestro/screenshots/
 find "$RUN_OUT" -path "*/screenshots/*.png"    -exec cp {} .maestro/screenshots/ \;
 ```
 
+**Gitignore the output directory** the first time you add a flow to a repo — the
+PNGs are regenerated on every run and add up fast (8 screenshots ≈ 2.5 MB on an
+iPad). Track the flow and its driver; never the artifacts:
+
+```gitignore
+# Maestro UI-test output — regenerated on every run, and they are PNGs.
+# The flow and its driver ARE tracked; only the artifacts are not.
+.maestro/screenshots/
+```
+
+Check it took before the first commit, since a stray `git add -A` bakes them into
+history permanently:
+
+```bash
+git check-ignore -v .maestro/screenshots/<any>.png
+git status --porcelain --untracked-files=all .maestro   # only .yaml/.sh/.js should show
+```
+
 ## Selectors: read this before writing any assertion
 
 **Maestro full-matches an element's text as a regex.** Combined with iOS collapsing
