@@ -9,7 +9,7 @@ copy-pasting into each repo.
 
 | Plugin | Provides | What it does |
 |--------|----------|--------------|
-| `shoofi-testing` | `/shoofi-testing:cover-changes` | After finishing a feature/bug, generates the tests covering the changed flow across the repo(s) it touched; bootstraps each repo's test infra (best-fit runner) on first use. |
+| `shoofi-testing` | `/shoofi-testing:cover-changes`, `/shoofi-testing:local-app-e2e` | **cover-changes**: after finishing a feature/bug, generates the tests covering the changed flow across the repo(s) it touched; bootstraps each repo's test infra (best-fit runner) on first use. **local-app-e2e**: stands up the local stack (Mongo + server on :1111) and drives the customer/partner/driver app through its real UI on an iOS simulator with Maestro. |
 | `shoofi-domains` | `menu-catalog`, `orders`, `payments`, `accountant`, `delivery`, `customers` subagents | Domain-owner "employees" — one per territory, **full-stack across all 5 repos** by default. Each loads the shared constitution + its human-reviewed context doc and ships work as PRs you review. Ships `docs-check`, a drift checker.|
 
 ### `shoofi-domains` — the domain-owner model
@@ -44,6 +44,10 @@ verdicts, recipes) and `reference.md` (depth, loaded on demand). See
 plugins/
   shoofi-testing/
     skills/cover-changes/                # test-generation skill
+    skills/local-app-e2e/                # local stack + simulator + Maestro
+      references/app-matrix.md           #   per-app: identity, first-run gates, dev-client
+      references/local-stack.md          #   server, Mongo seeding, order/accept scripts
+      references/maestro-cookbook.md     #   install, selectors, worked example
   shoofi-domains/
     agents/<domain>.md                   # 6 domain-owner subagents
     context/_shared-guardrails.md        # the constitution they all inherit
@@ -90,6 +94,18 @@ After finishing a feature or bug fix, in any repo:
 or just tell the agent "cover my change with tests." It reads the diff, sets up
 test infra if this is the repo's first run, writes the test slice for the changed
 flow, runs it green, and reports coverage + gaps.
+
+To exercise a change in the **real app** instead — local server, simulator, login,
+screenshots:
+
+```
+/shoofi-testing:local-app-e2e
+```
+
+or just ask to "test this end to end on a simulator." It handles the boilerplate
+(stack, `api.js` → localhost, identity, build/install, Maestro, login) so the
+session only has to work out the fixture data its own feature needs — delegate
+*that* to the `shoofi-domains` agents. Verified end to end on all three RN apps.
 
 ## Notes
 
