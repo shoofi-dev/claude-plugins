@@ -11,12 +11,28 @@
         "routes/payment-methods.js",
         "utils/hyp-pay.js",
         "utils/invoice-mail.js",
-        "lib/schemas/creditCard.json"
+        "lib/schemas/creditCard.json",
+        "services/twin-order/twin-payment-service.js",
+        "routes/twin-order.js"
       ],
       "symbols": {
-        "utils/hyp-pay.js": ["buildCcPaymentRefData", "chargeToken"],
-        "utils/invoice-mail.js": ["saveInvoice"],
-        "routes/order.js": ["ccPaymentRefData", "applePayIntentId"]
+        "utils/hyp-pay.js": [
+          "buildCcPaymentRefData",
+          "chargeToken"
+        ],
+        "utils/invoice-mail.js": [
+          "saveInvoice"
+        ],
+        "routes/order.js": [
+          "ccPaymentRefData",
+          "applePayIntentId"
+        ],
+        "services/twin-order/twin-payment-service.js": [
+          "captureCombined",
+          "resolveSavedCard",
+          "chargeCombinedHyp",
+          "refundPartial"
+        ]
       },
       "patterns": [
         {
@@ -38,6 +54,21 @@
           "file": "lib/schemas/creditCard.json",
           "regex": "ccToken",
           "desc": "stored card token field"
+        },
+        {
+          "file": "services/twin-order/twin-payment-service.js",
+          "regex": "creditCards",
+          "desc": "twin capture resolves the saved card's provider from shoofi.creditCards (CORE invariant 8)"
+        },
+        {
+          "file": "services/twin-order/twin-payment-service.js",
+          "regex": "chargeToken",
+          "desc": "twin capture routes HYP-tokenized cards to the HYP soft charge, not ZCredit"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "api/twin-order/pay",
+          "desc": "the twin charge entrypoint that bypasses routes/order.js entirely"
         }
       ]
     },
