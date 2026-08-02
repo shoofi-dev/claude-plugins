@@ -92,7 +92,38 @@ Profile: `GET /api/customer/details` (joins store orders for a valid-order count
 `update`, `update-name`, `update-language`, `update-city-area` (resolves city from lat/lng
 via `delivery-company.cities`). Addresses: `controllers/customerAddressController.js` —
 add/get/update/delete/setDefault on the `addresses[]` subdoc (default toggling clears all
-then sets one). Push tokens: `update-notification-token`, cleared on logout.
+then sets one). Push tokens: `update-notification-token` — writes `notificationToken` on the
+identity doc `req.auth.id` names, and **for a partner then mirrors it onto every sibling
+`storeUsers` doc sharing that phone** (`updateMany`, self excluded). The mirror exists
+because a new-order push is addressed to the token on the doc of *the store that got the
+order*, while the app only ever registers the doc it is logged into — without it, a store
+the owner hasn't opened on this device never pushes at all. Only `notificationToken` is
+shared; each doc keeps its own `_id`, `token` and `roles`, so the per-store `recipientId`
+addressing is unchanged. Guarded on a truthy token (an empty registration can't wipe the
+siblings) and on the phone read off the *authenticated* doc, never the request body; a
+failure there is logged, never fails the registration.
+
+⚠️ **`getCustomerAppName(req, appName)` ignores both arguments and always returns the
+`shoofi` DB** (`utils/app-name-helper.js`) — it is a customer-only helper, so
+`getCustomerAppName(...).customers` resolves the identity doc **only** for
+`app-type: shoofi-shopping`. A partner's id belongs to `shoofi.storeUsers` and a driver's to
+`delivery-company.customers`, so the same expression silently matches **no document** for
+those two apps — a write no-ops and a read returns null, neither of them erroring. Resolve
+identity by `app-type` the way `validateAuthCode`, `delete` and `update-notification-token`
+do. `POST /api/customer/logout` was the live instance of this: it nulled `token` /
+`notificationToken` on `shoofi.customers` unconditionally, so partner and driver sessions
+were never revoked server-side (only the client dropped its local copy) and their push
+tokens accumulated indefinitely — fixed in shoofi-server#47.
+
+**Logout is phone-wide for partners.** One partner identity is one `storeUsers` doc *per
+store*, and `switch-store` mints a token onto the target store's doc without clearing the
+previous one — so clearing only `req.auth.id` leaves a valid ~4-year token on every store
+the session visited. `logout` therefore also `updateMany`s `token` / `notificationToken` to
+null across every `storeUsers` doc sharing the phone (guarded: a failure there is logged,
+never fails the logout). Consequence for reasoning about sessions: a partner logging out on
+one device ends that identity's sessions on **all** its stores and devices, and the push
+token mirrored across the sibling docs above dies with it — the sweep is what keeps the
+mirror from outliving the logout.
 
 ## 6. Referrals (`routes/customer-referrals.js`)
 8-char code (ambiguity-free alphabet) + TinyURL short link with `/r/:code` fallback. Config on
