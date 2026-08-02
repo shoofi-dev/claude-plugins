@@ -87,16 +87,26 @@ then sets one). Push tokens: `update-notification-token` — writes `notificatio
 **one** identity doc `req.auth.id` names, so for a partner it lands on the currently-active
 `storeUsers` doc, not on every store that phone owns.
 
-⚠️ **`POST /api/customer/logout` clears nothing for partners and drivers.** It does **not**
-branch on `app-type` — it hardcodes `customerDB.customers` (`routes/customer.js:2002`), and
-`getCustomerAppName` always returns the `shoofi` DB. A partner's id belongs to
-`shoofi.storeUsers` and a driver's to `delivery-company.customers`, so the update matches no
-document and `token` / `notificationToken` survive logout — only the client drops its local
-copy. Contrast `POST /api/customer/delete` directly below it, which *does* branch on
-`app-type`. Consequence: the stored-token equality check in `routes/auth.js` is **not** a
-working revocation path for partner or driver sessions, and stale push tokens accumulate on
-those docs indefinitely. Fixing it is an auth change with a logout blast radius — its own
-draft, HIGH-RISK, minimal-diff PR, never a rider on a feature.
+⚠️ **`getCustomerAppName(req, appName)` ignores both arguments and always returns the
+`shoofi` DB** (`utils/app-name-helper.js`) — it is a customer-only helper, so
+`getCustomerAppName(...).customers` resolves the identity doc **only** for
+`app-type: shoofi-shopping`. A partner's id belongs to `shoofi.storeUsers` and a driver's to
+`delivery-company.customers`, so the same expression silently matches **no document** for
+those two apps — a write no-ops and a read returns null, neither of them erroring. Resolve
+identity by `app-type` the way `validateAuthCode`, `delete` and `update-notification-token`
+do. `POST /api/customer/logout` was the live instance of this: it nulled `token` /
+`notificationToken` on `shoofi.customers` unconditionally, so partner and driver sessions
+were never revoked server-side (only the client dropped its local copy) and their push
+tokens accumulated indefinitely — fixed in shoofi-server#47.
+
+**Logout is phone-wide for partners.** One partner identity is one `storeUsers` doc *per
+store*, and `switch-store` mints a token onto the target store's doc without clearing the
+previous one — so clearing only `req.auth.id` leaves a valid ~4-year token on every store
+the session visited. `logout` therefore also `updateMany`s `token` / `notificationToken` to
+null across every `storeUsers` doc sharing the phone (guarded: a failure there is logged,
+never fails the logout). Consequence for reasoning about sessions: a partner logging out on
+one device ends that identity's sessions on **all** its stores and devices, and any push
+token mirrored onto sibling docs dies with it.
 
 ## 6. Referrals (`routes/customer-referrals.js`)
 8-char code (ambiguity-free alphabet) + TinyURL short link with `/r/:code` fallback. Config on

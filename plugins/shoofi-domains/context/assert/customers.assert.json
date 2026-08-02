@@ -53,8 +53,8 @@
         },
         {
           "file": "routes/customer.js",
-          "regex": "customerDB\\.customers\\.findOneAndUpdate\\([\\s\\S]{0,80}token: null, notificationToken: null",
-          "desc": "logout still hardcodes .customers with no app-type branch, so partner/driver tokens are never cleared - when this stops matching the fix has landed and the reference.md warning must be removed"
+          "regex": "customer/logout\"[\\s\\S]{0,2400}storeUsers\\.updateMany",
+          "desc": "logout sweeps every storeUsers doc sharing the phone - the bounded tail pins the sweep to the logout handler, and it only appears once logout resolves the identity doc by app-type at all (shoofi-server#47)"
         }
       ]
     },
