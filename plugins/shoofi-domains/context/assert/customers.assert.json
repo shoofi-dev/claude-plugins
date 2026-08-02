@@ -57,6 +57,11 @@
           "file": "routes/customer.js",
           "regex": "customer/logout\"[\\s\\S]{0,2400}storeUsers\\.updateMany",
           "desc": "logout sweeps every storeUsers doc sharing the phone - the bounded tail pins the sweep to the logout handler, and it only appears once logout resolves the identity doc by app-type at all (shoofi-server#47)"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "storeUsers\\.updateMany\\([\\s\\S]{0,120}notificationToken: req\\.body\\.notificationToken",
+          "desc": "update-notification-token mirrors the device push token onto every sibling storeUsers doc for the phone (shoofi-server#46) - the mirrored value is what distinguishes this updateMany from the logout sweep (nulls) and the OTP sweep (authCode)"
         }
       ]
     },

@@ -93,8 +93,15 @@ Profile: `GET /api/customer/details` (joins store orders for a valid-order count
 via `delivery-company.cities`). Addresses: `controllers/customerAddressController.js` —
 add/get/update/delete/setDefault on the `addresses[]` subdoc (default toggling clears all
 then sets one). Push tokens: `update-notification-token` — writes `notificationToken` on the
-**one** identity doc `req.auth.id` names, so for a partner it lands on the currently-active
-`storeUsers` doc, not on every store that phone owns.
+identity doc `req.auth.id` names, and **for a partner then mirrors it onto every sibling
+`storeUsers` doc sharing that phone** (`updateMany`, self excluded). The mirror exists
+because a new-order push is addressed to the token on the doc of *the store that got the
+order*, while the app only ever registers the doc it is logged into — without it, a store
+the owner hasn't opened on this device never pushes at all. Only `notificationToken` is
+shared; each doc keeps its own `_id`, `token` and `roles`, so the per-store `recipientId`
+addressing is unchanged. Guarded on a truthy token (an empty registration can't wipe the
+siblings) and on the phone read off the *authenticated* doc, never the request body; a
+failure there is logged, never fails the registration.
 
 ⚠️ **`getCustomerAppName(req, appName)` ignores both arguments and always returns the
 `shoofi` DB** (`utils/app-name-helper.js`) — it is a customer-only helper, so
@@ -114,8 +121,9 @@ previous one — so clearing only `req.auth.id` leaves a valid ~4-year token on 
 the session visited. `logout` therefore also `updateMany`s `token` / `notificationToken` to
 null across every `storeUsers` doc sharing the phone (guarded: a failure there is logged,
 never fails the logout). Consequence for reasoning about sessions: a partner logging out on
-one device ends that identity's sessions on **all** its stores and devices, and any push
-token mirrored onto sibling docs dies with it.
+one device ends that identity's sessions on **all** its stores and devices, and the push
+token mirrored across the sibling docs above dies with it — the sweep is what keeps the
+mirror from outliving the logout.
 
 ## 6. Referrals (`routes/customer-referrals.js`)
 8-char code (ambiguity-free alphabet) + TinyURL short link with `/r/:code` fallback. Config on
