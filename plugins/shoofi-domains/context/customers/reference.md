@@ -69,6 +69,15 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
   (`isBlocked`, `isDeleted`+`deletedAt`, `cashRestricted`), location (`cityId`, `cityAreaId`),
   `schoolProject{…}`. **No `tokenExpiry` field** — expiry lives only inside the JWT.
 - **`shoofi.storeUsers`** (partners) — `phone`, `appName`, `roles[]`, `token`, `authCode`.
+  ⚠️ **`storeUsers` is the accessor, not the collection.** `db.storeUsers` is bound to the
+  collection literally named **`store-users`**
+  (`services/database/DatabaseInitializationService.js:49`); same trick for
+  `db.persistentAlerts` → `persistent-alerts`, `db.shoofiAdminUsers` → `shoofi-admin-users`,
+  `db.customerCampaigns` → `customer-campaigns`, `db.deliveryConfig` → `delivery-config`.
+  A mongosh query or a hand-written seed against `shoofi.storeUsers` therefore hits an empty
+  collection and **fails silently** — zero memberships, `error_code: -7` on login, and no
+  error anywhere saying why. The repo's own `find-test-users.js:37` has this bug and always
+  reports "no store users found"; don't use it to check your work.
   One phone can map to **multiple** store docs → OTP is propagated with `updateMany`.
 - **`delivery-company.customers`** (drivers) — `role`, `isActive`, `companyId`,
   `personalSupportedAreas` (delivery-owned field).

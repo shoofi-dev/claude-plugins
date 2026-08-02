@@ -5,18 +5,18 @@
   },
   "metadata": {
     "description": "Claude Code plugins for the Shoofi platform (5 repos). Distributes shared skills and domain-owner subagents so local sessions AND cloud routines/Slack agents can use them across every repo.",
-    "version": "1.2.0"
+    "version": "1.3.0"
   },
   "plugins": [
     {
       "name": "shoofi-testing",
       "source": "./plugins/shoofi-testing",
-      "description": "After finishing a feature/bug, generate the tests covering the changed flow across the Shoofi repo(s) it touched \u2014 bootstrapping each repo's test infra (best-fit runner) on first use. Provides the cover-changes skill."
+      "description": "Testing across the 5 Shoofi repos. cover-changes generates the tests covering a finished feature/bug in whichever repo(s) it touched, bootstrapping test infra on first use. local-app-e2e stands up the local stack and drives the customer/partner/driver apps through their real UI on an iOS simulator with Maestro."
     },
     {
       "name": "shoofi-domains",
       "source": "./plugins/shoofi-domains",
-      "description": "Domain-owner subagents \u2014 one full-stack 'employee' per territory: menu-catalog, orders, payments (money in), accountant (money out/settlement), delivery, customers. Each loads a human-reviewed context doc (CORE + reference), inherits the shared safety constitution, and ships work as PRs. Includes docs-check, a drift checker that fails the build when a doc stops matching the code."
+      "description": "Domain-owner subagents — one full-stack 'employee' per territory: menu-catalog, orders, payments (money in), accountant (money out/settlement), delivery, customers. Each loads a human-reviewed context doc (CORE + reference), inherits the shared safety constitution, and ships work as PRs. Includes docs-check, a drift checker that fails the build when a doc stops matching the code."
     }
   ]
 }

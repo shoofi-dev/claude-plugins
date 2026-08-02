@@ -1,9 +1,21 @@
 {
   "name": "shoofi-testing",
-  "description": "After finishing a feature/bug, generate the tests covering the changed flow across the Shoofi repo(s) it touched — bootstrapping each repo's test infra (best-fit runner) on first use.",
+  "description": "Testing for the Shoofi platform: generate the tests covering a finished change across the repo(s) it touched, and stand up the local stack + simulator to drive any of the three React-Native apps through their real UI.",
   "author": {
     "name": "shoofi-dev"
   },
   "homepage": "https://github.com/shoofi-dev/claude-plugins",
-  "keywords": ["testing", "shoofi", "ci", "ava", "jest", "playwright"]
+  "keywords": [
+    "testing",
+    "shoofi",
+    "ci",
+    "ava",
+    "jest",
+    "playwright",
+    "maestro",
+    "e2e",
+    "simulator",
+    "ios",
+    "react-native"
+  ]
 }

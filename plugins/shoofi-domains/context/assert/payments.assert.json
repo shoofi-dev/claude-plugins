@@ -11,12 +11,29 @@
         "routes/payment-methods.js",
         "utils/hyp-pay.js",
         "utils/invoice-mail.js",
-        "lib/schemas/creditCard.json"
+        "lib/schemas/creditCard.json",
+        "services/twin-order/twin-payment-service.js",
+        "routes/twin-order.js",
+        "routes/store.js"
       ],
       "symbols": {
-        "utils/hyp-pay.js": ["buildCcPaymentRefData", "chargeToken"],
-        "utils/invoice-mail.js": ["saveInvoice"],
-        "routes/order.js": ["ccPaymentRefData", "applePayIntentId"]
+        "utils/hyp-pay.js": [
+          "buildCcPaymentRefData",
+          "chargeToken"
+        ],
+        "utils/invoice-mail.js": [
+          "saveInvoice"
+        ],
+        "routes/order.js": [
+          "ccPaymentRefData",
+          "applePayIntentId"
+        ],
+        "services/twin-order/twin-payment-service.js": [
+          "captureCombined",
+          "resolveSavedCard",
+          "chargeCombinedHyp",
+          "refundPartial"
+        ]
       },
       "patterns": [
         {
@@ -38,6 +55,26 @@
           "file": "lib/schemas/creditCard.json",
           "regex": "ccToken",
           "desc": "stored card token field"
+        },
+        {
+          "file": "services/twin-order/twin-payment-service.js",
+          "regex": "creditCards",
+          "desc": "twin capture resolves the saved card's provider from shoofi.creditCards (CORE invariant 8)"
+        },
+        {
+          "file": "services/twin-order/twin-payment-service.js",
+          "regex": "chargeToken",
+          "desc": "twin capture routes HYP-tokenized cards to the HYP soft charge, not ZCredit"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "api/twin-order/pay",
+          "desc": "the twin charge entrypoint that bypasses routes/order.js entirely"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "hyp_enabled",
+          "desc": "platform tokenization rollout flag — NOT read by any charge path"
         }
       ]
     },
@@ -46,13 +83,19 @@
         "hooks/checkout/use-hyp-tokenize.ts",
         "helpers/get-supported-payment-methods.ts",
         "stores/creditCards/index.ts",
-        "data/zcredit-config.ts"
+        "data/zcredit-config.ts",
+        "helpers/hyp-card.ts"
       ],
       "patterns": [
         {
           "file": "consts/shared.ts",
           "regex": "PAYMENT_METHODS",
           "desc": "client payment-method constants"
+        },
+        {
+          "file": "components/payment-method/index.tsx",
+          "regex": "hypEnabled|hyp_enabled",
+          "desc": "hyp_enabled's only live consumer: which add-card tokenization flow to open"
         }
       ]
     }

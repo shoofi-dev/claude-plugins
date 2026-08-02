@@ -51,6 +51,16 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 6. **Coins/coupons settle only AFTER payment success**; failures log CRITICAL for manual
    reconciliation — never roll back an irreversible capture.
 7. **Order dedup lock** (Redis `SET NX` + fallback + recent-order window) prevents double charges.
+8. **There are TWO charge implementations, and a fix to one does not reach the other.**
+   `routes/order.js` charges single orders; `services/twin-order/twin-payment-service.js`
+   (`captureCombined`) charges twin orders. `POST /api/twin-order/pay` never enters
+   `routes/order.js` — twin child orders are inserted straight into each store DB — so every
+   guard in the single-order charge path is *structurally unreachable* from the twin path.
+   Not theoretical: the saved-HYP-card provider routing added at `routes/order.js:2758` on
+   2026-07-29 left the twin path untouched, and every twin order paid with a saved HYP card
+   failed with `"תאריך תוקף לא במבנה תקין ,expirationDate"` until the same lookup was ported
+   into `twin-payment-service.js`. **When you change charge routing, provider selection or a
+   charge guard, apply it in both places — or say in the PR why the twin path doesn't need it.**
 
 ## Known status (human-confirmed — do NOT "fix")
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.
@@ -65,6 +75,20 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 - **Flagged, needs verdict:** `updateCCPayment` references an undefined `orderId` in its
   background block; `refundPartial`'s ZCredit field shape is unverified across terminals
   (sandbox first).
+- **`hyp_enabled` is a PLATFORM tokenization switch, NOT a chargeability gate.** It lives on the
+  `app-name: "shoofi"` config document and is served through `SHOOFI_CONFIG_PUBLIC_FIELDS`
+  (`routes/store.js`), alongside rollout flags like `isTwinEnabledForAll`. It has **zero**
+  server-side readers — no charge path consults it. Its only live consumer is
+  `openNewCreditCardDialog` in `shoofi-app/components/payment-method/index.tsx`, which uses it
+  to pick the HYP hosted tokenization flow over the legacy ZCredit add-card form. Because
+  credentials are central (invariant 1), **a saved HYP card is chargeable for any store**, and
+  `routes/order.js:2758` correctly routes such cards without checking this flag.
+  ⚠️ A per-store `storeData` never carries `hyp_enabled`, so any per-store check against it
+  evaluates falsy for every store. `shoofi-app/helpers/hyp-card.ts` `isCardUsable(card,
+  storeData)` is written that way and has **zero call sites** — wiring it up as typed would
+  block every HYP card at every store. It was reconstructed from a deployed OTA bundle, so its
+  semantics are a reconstruction, not recovered intent. **Do not wire it up; deletion or a
+  corrected signature is a human decision.**
 
 ## Recipe — touching a charge path
 1. Identify which of the three paths you're in (CC / HYP token / digital-wallet) and say so in
