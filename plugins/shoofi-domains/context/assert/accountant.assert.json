@@ -57,8 +57,8 @@
         },
         {
           "file": "routes/payments/admin-reports.js",
-          "regex": "Only draft reports can be deleted",
-          "desc": "delete guard (re-enabled) must stay active"
+          "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
+          "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
         }
       ]
     }

@@ -55,14 +55,23 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `calculateVAT`, `withoutVAT`, `withoutVATIfExempt`). **Never re-introduce a `0.18`/`1.18`
    literal** — divergent rounding points silently skew payouts.
 5. **Report guards must stay on:** duplicate + **overlap across ALL statuses** (a sent report
-   blocks a new overlapping one), orders-closed, compensations-approved, and
-   **"only draft reports can be deleted"**.
+   blocks a new overlapping one), orders-closed, and compensations-approved.
+   **Delete is deliberately NOT status-gated** — a report can be sent and only then found
+   wrong, and the fix is delete + regenerate. But delete **must release the carry-over
+   compensations** that `/send` consumed (`appNameBackfill.pendingReportCarryover` back to
+   `true`), or the regenerated report silently drops those amounts.
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
 
 ## Known status (human-confirmed — do NOT "fix")
-- **FIXED, keep it that way:** the overlap guard now covers sent reports; the delete guard is
-  re-enabled; VAT is centralized in `utils/vat.js`.
+- **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
+  in `utils/vat.js`.
+- **INTENTIONAL, do NOT "restore":** delete accepts **any** report status (2026-08-03). The
+  old "only draft reports can be deleted" guard was removed on purpose so a wrong report that
+  already went out to a store/driver can be regenerated. Deleting a report that carries an
+  issued tax invoice only **warns** (logging `hypInvoiceDocUuid`, needed by
+  `/api/hyp/admin/reports/:id/cancel-invoice` once the row is gone) — cancelling or
+  credit-noting at the provider stays a separate, manual step.
 - **OPEN — flagged, needs a decision:** `reset-invoice` only clears the *local* invoice fields;
   it does **not** cancel the document at GreenInvoice/HYP, so a following `create-invoice`
   issues a **second** invoice. Do not silently change behavior — ask.
