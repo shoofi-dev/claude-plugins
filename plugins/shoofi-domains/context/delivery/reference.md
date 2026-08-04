@@ -83,6 +83,23 @@ pickupTime + area.maxETA`. Geo helpers in `lib/delivery/helpers` (`computeSuppor
   `driverLocationHistory` (TTL) + broadcasts to admin/tracking. Driver app sends fg (10s) + background.
 - **Shifts** (`routes/driver-shift-manager.js`, `driverShifts` collection): booking system
   gated by `useBookingSystem`; peak-hours per `cityArea`; permanent-drivers; block/unblock.
+- **Shift capacity is sized per `cityArea`, from order history, at insert time only**
+  (`services/driver-shift/shift-service.js`, `peak-hour-detection.js`). One shift row =
+  one area × one slot (no per-city rows), so demand must be measured over the area's
+  **whole `cityArea.cityIds` set in one pass** — `detectPeakHours({cityIds})`. Detecting
+  per city and combining afterwards cannot be made correct: stores are attributed to a
+  city via `shoofi.stores.supportedCities` (a *different* collection from the
+  `delivery-company.store.supportedCities` in §7), a store serving several of the area's
+  cities is counted once per city, and a store with **no** `supportedCities` passes the
+  filter for *every* city. Formula: `base = ceil(avgOrders / ordersPerDriver)`, `× (1 +
+  buffer/100)`, then `minDrivers = ceil(base × 0.8)` / `maxDrivers = ceil(base × 1.2)`;
+  `minDriversCap`/`maxDriversCap` **replace** those values rather than clamping them
+  (the admin UI advertises this as override, `ShiftConfigForm.tsx`).
+  **`minDrivers`/`maxDrivers` are written only when the row is inserted** —
+  `generateShifts` finds an existing row and `$set`s just `isPeakHour`/`peakHourScore`,
+  `copyWeekShifts` copies capacity verbatim, and saving the config touches nothing. So
+  re-generating a week never repairs bad capacity; the rows must be deleted and
+  regenerated (which drops `bookedDrivers`) or explicitly back-filled.
 
 ## 6. Crons (prod-only, Redis-locked; `docs/distributed-cron-jobs.md`)
 `assignment-scheduler` (60s — assign due pendings) · `delivery-pickup-checker` (3m) ·

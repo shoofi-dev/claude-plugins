@@ -11,6 +11,8 @@
         "routes/delivery/company.js",
         "routes/delivery/geography.js",
         "routes/driver-shift-manager.js",
+        "services/driver-shift/shift-service.js",
+        "services/driver-shift/peak-hour-detection.js",
         "routes/geo.js",
         "services/delivery/assignDriver.js",
         "services/delivery/book-delivery.js",
@@ -56,6 +58,21 @@
           "file": "services/database/DatabaseInitializationService.js",
           "regex": "db\\.bookDelivery\\s*=\\s*db\\.collection",
           "desc": "db.bookDelivery is bound to the hyphenated book-delivery collection"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "detectPeakHours\\(\\{\\s*\\n?\\s*cityIds",
+          "desc": "shift demand is detected for the whole cityArea at once, never per city then combined"
+        },
+        {
+          "file": "services/driver-shift/peak-hour-detection.js",
+          "regex": "citySet\\.has\\(supportedCity\\.toString\\(\\)\\)",
+          "desc": "one pass over stores for the whole city set — each store counted exactly once"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "minDrivers\\s*=\\s*Math\\.ceil\\(baseDrivers\\s*\\*\\s*0\\.8\\)",
+          "desc": "capacity formula: minDrivers = 80% of base, maxDrivers = 120%"
         }
       ]
     },
