@@ -15,7 +15,9 @@
         "utils/app-name-helper.js",
         "services/database/DatabaseInitializationService.js",
         "controllers/customerAddressController.js",
-        "docs/customer-orders-snapshot.md"
+        "docs/customer-orders-snapshot.md",
+        "lib/paginate.js",
+        "utils/customer-orders.js"
       ],
       "symbols": {
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
@@ -62,6 +64,21 @@
           "file": "routes/customer.js",
           "regex": "storeUsers\\.updateMany\\([\\s\\S]{0,120}notificationToken: req\\.body\\.notificationToken",
           "desc": "update-notification-token mirrors the device push token onto every sibling storeUsers doc for the phone (shoofi-server#46) - the mirrored value is what distinguishes this updateMany from the logout sweep (nulls) and the OTP sweep (authCode)"
+        },
+        {
+          "file": "lib/paginate.js",
+          "regex": "const paginateData = \\([^)]*limit = 20\\)",
+          "desc": "paginateData caps at 20 rows unless the caller passes a limit - the number behind invariant 5's per-store truncation"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "customer/orders\"[\\s\\S]{0,1800}paginateData\\(\\s*true,\\s*req,\\s*1,\\s*\"orders\"",
+          "desc": "the order-history list asks paginateData for page 1 with no limit, so it returns at most 20 orders per store and its totalItems is a truncated count (shoofi-server#48) - the bounded tail pins the call to that handler"
+        },
+        {
+          "file": "utils/customer-orders.js",
+          "regex": "aggregate\\(\\[[\\s\\S]{0,200}\\$group[\\s\\S]{0,80}\\$status",
+          "desc": "getCustomerOrderStatusCounts groups each store's orders by status - the uncapped, status-aware way to count a customer's lifetime orders (shoofi-server#48)"
         }
       ]
     },

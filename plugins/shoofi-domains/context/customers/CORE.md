@@ -48,7 +48,13 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
 4. **The partner `switch-store` flow** re-mints a **per-store token** and sets
    `@storage_storeDB`; that's how later requests get scoped to the right store. Don't bypass it.
 5. **`customers.orders[]` is a snapshot with NO status** — join the store `orders` collection;
-   reuse `getSuccessfulOrdersByCustomerIds`.
+   reuse `getSuccessfulOrdersByCustomerIds`. **And never take a lifetime order count from
+   `POST /api/customer/orders`** either: it calls `paginateData` with `page = 1` and no
+   `limit`, which defaults to **20 rows per store** (`lib/paginate.js`), then throws away
+   the real `countDocuments` and recomputes `totalItems` from that truncated array. So the
+   response over-counts (no status filter) *and* under-counts (capped per store) at the same
+   time. Aggregate per store instead — `getCustomerOrderStatusCounts`
+   (`utils/customer-orders.js`), served by `GET /api/customer/:customerId/order-stats`.
 6. **Never log OTPs, tokens, or secrets** — including in debug output added "temporarily".
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
