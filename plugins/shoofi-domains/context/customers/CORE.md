@@ -48,7 +48,18 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
 4. **The partner `switch-store` flow** re-mints a **per-store token** and sets
    `@storage_storeDB`; that's how later requests get scoped to the right store. Don't bypass it.
 5. **`customers.orders[]` is a snapshot with NO status** — join the store `orders` collection;
-   reuse `getSuccessfulOrdersByCustomerIds`.
+   reuse `getSuccessfulOrdersByCustomerIds`. **Two "how many orders has this customer placed"
+   definitions coexist and legitimately disagree.** Customer-facing surfaces — the app's own
+   profile count (`GET /api/customer/details`) and the admin profile badge
+   (`POST /api/customer/orders`) — count everything **except** status `"0"` and `4/5/7/8/9`, so
+   **in-flight orders (1/6/13/14/15) count**. Every revenue/report path instead uses
+   `COMPLETED_STATUSES = ["2","3","10","11","12"]` (`utils/customer-orders.js`). The same
+   customer therefore shows a *higher* number on their profile than in the reports — that gap is
+   intended, **do not "fix" it**. Bucket with `summarizeOrderStatuses`
+   (`utils/customer-orders.js`), which returns the disjoint valid / failed-payment / cancelled
+   split. Status `"0"` is the one to watch: an order document is inserted at `"0"` *before* its
+   card is charged and is written straight back to `"0"` and **kept** when the charge fails, so
+   a customer who retried a declined card leaves a permanent order document per attempt.
 6. **Never log OTPs, tokens, or secrets** — including in debug output added "temporarily".
 
 ## Known status (human-confirmed — do NOT act without an explicit task)

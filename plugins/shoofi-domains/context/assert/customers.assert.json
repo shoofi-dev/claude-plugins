@@ -15,12 +15,18 @@
         "utils/app-name-helper.js",
         "services/database/DatabaseInitializationService.js",
         "controllers/customerAddressController.js",
+        "utils/customer-orders.js",
         "docs/customer-orders-snapshot.md"
       ],
       "symbols": {
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
         "utils/auth-service.js": ["generateJWT", "toAuthJSON"],
         "utils/app-name-helper.js": ["getCustomerAppName"],
+        "utils/customer-orders.js": [
+          "COMPLETED_STATUSES",
+          "CANCELLED_STATUSES",
+          "summarizeOrderStatuses"
+        ],
         "utils/admin-auth-service.js": [
           "generateAccessToken",
           "verifyAccessToken",
@@ -52,6 +58,26 @@
           "file": "utils/app-name-helper.js",
           "regex": "shoofi",
           "desc": "customers are central: getCustomerAppName always returns shoofi"
+        },
+        {
+          "file": "utils/customer-orders.js",
+          "regex": "COMPLETED_STATUSES = \\[\"2\", \"3\", \"10\", \"11\", \"12\"\\]",
+          "desc": "the report-path definition of a real order is strictly fulfilled - deliberately stricter than the customer-facing count"
+        },
+        {
+          "file": "utils/customer-orders.js",
+          "regex": "CANCELLED_STATUSES = \\[\"4\", \"5\", \"7\", \"8\", \"9\"\\]",
+          "desc": "there is no single cancelled status - five of them, and summarizeOrderStatuses buckets on this set"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "invalidStatuses = \\[\"0\", \"4\", \"5\", \"7\", \"8\", \"9\"\\]",
+          "desc": "the customer-facing order count excludes only never-charged (0) + cancelled, so in-flight orders count - it is looser than COMPLETED_STATUSES on purpose"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "customer/orders\"[\\s\\S]{0,3600}summarizeOrderStatuses",
+          "desc": "the admin profile badge count comes from the store-level status join, never from customers.orders[].length - the bounded tail pins the summary to the orders handler"
         },
         {
           "file": "routes/customer.js",
