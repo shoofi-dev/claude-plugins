@@ -71,7 +71,20 @@ order-load penalty + same-store batching bonus (config in `deliveryConfig {type:
 vs `company.coverageRadius`** (not a geo index) then load+distance. Price/ETA:
 `POST /api/delivery/company/price-by-location` (`geography.js`) resolves geometry→areas→
 `company.supportedAreas` → `{areaId, price, minOrder, eta}`. `expectedDeliveryAt =
-pickupTime + area.maxETA`. Geo helpers in `lib/delivery/helpers` (`computeSupportedAreasForCities`,
+pickupTime + area.maxETA`.
+> ⚠️ **A missing or non-numeric `maxETA` does NOT fail — it produces a promise equal to
+> `pickupTime`.** `maxETA` is stored as whatever the admin UI sent (`geography.js` assigns
+> `req.body.maxETA` untyped), and `moment.add(NaN, 'minutes')` is a **silent no-op** that
+> leaves the moment valid — it does not produce `"Invalid date"`. So `expectedDeliveryAt`
+> comes out well-formed and exactly equal to the pickup time: a promise to deliver the
+> instant the courier collects. The immediate-assignment path (`book-delivery.js`) has no
+> fallback; the pending path (`delayed-assignment.js`) uses `|| 30`, which rescues
+> null/undefined/empty but **not** a non-numeric string like `"abc"`. Any on-time metric
+> must drop these — they score late essentially always, so counting them measures a config
+> gap, not courier performance. Detect by comparing `expectedDeliveryAt`'s `HH:mm` to the
+> stored `pickupTime` (see `services/exec-dashboard/delivery-metrics.js:parsePromisedEta`).
+> Verified by execution against moment 2.30.1, not inferred.
+ Geo helpers in `lib/delivery/helpers` (`computeSupportedAreasForCities`,
 `resolveParentCityGeometryId`, `populateAreaGeometry`, `calculateDistance`, …).
 
 ## 5. Driver shifts, availability, location, active-status
