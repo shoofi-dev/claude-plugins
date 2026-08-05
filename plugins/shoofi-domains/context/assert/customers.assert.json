@@ -16,7 +16,8 @@
         "services/database/DatabaseInitializationService.js",
         "controllers/customerAddressController.js",
         "utils/customer-orders.js",
-        "docs/customer-orders-snapshot.md"
+        "docs/customer-orders-snapshot.md",
+        "package.json"
       ],
       "symbols": {
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
@@ -88,6 +89,16 @@
           "file": "routes/customer.js",
           "regex": "storeUsers\\.updateMany\\([\\s\\S]{0,120}notificationToken: req\\.body\\.notificationToken",
           "desc": "update-notification-token mirrors the device push token onto every sibling storeUsers doc for the phone (shoofi-server#46) - the mirrored value is what distinguishes this updateMany from the logout sweep (nulls) and the OTP sweep (authCode)"
+        },
+        {
+          "file": "package.json",
+          "regex": "\"express-jwt\": \"\\^8",
+          "desc": "express-jwt v8 writes the verified payload to req.auth - v5's req.user default is gone"
+        },
+        {
+          "file": "routes/auth.js",
+          "regex": "userProperty: \"auth\"",
+          "desc": "the authenticated user is req.auth, never req.user - nothing in the codebase assigns req.user"
         }
       ]
     },

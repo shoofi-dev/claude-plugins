@@ -61,6 +61,21 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    card is charged and is written straight back to `"0"` and **kept** when the charge fails, so
    a customer who retried a declined card leaves a permanent order document per attempt.
 6. **Never log OTPs, tokens, or secrets** — including in debug output added "temporarily".
+7. **The authenticated user is `req.auth`, NEVER `req.user`.** `auth.required` is
+   **express-jwt v8** (`package.json`) configured with `userProperty: "auth"`
+   (`routes/auth.js`), so the verified payload lands on `req.auth` —
+   `{ id, fullName, phoneNumber, roles, type }` for admins, minted by `generateAccessToken`
+   (`utils/admin-auth-service.js`). **Nothing in the codebase ever assigns `req.user`** (v8
+   dropped the v5 default), so every `req.user?.…` read is permanently `undefined` and silently
+   falls through to its default: `routes/shoofi-admin.js` writes the literal `'admin'` for
+   `createdBy`/`approvedBy`, `routes/customer.js` writes `'Admin'` for `createdByName`,
+   `routes/store.js` and `routes/delivery/company.js` skip their `if (req.user)` history-
+   attribution blocks entirely, and `routes/notifications.js` falls back to a **client-supplied
+   `user-id` header**. Those sites are pre-existing and out of scope unless the task names them
+   — but **do not copy them**. `req.auth.id` is the 24-char hex **string** (`jwt.sign`
+   serialises the ObjectId), so compare with `String(...)` or cast via `getId`
+   (`lib/common.js`). Any new `createdBy`-style provenance must be read from `req.auth` and
+   never from the request body; `routes/team-tasks.js` is the reference implementation.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
