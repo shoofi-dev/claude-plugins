@@ -18,7 +18,9 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "services/audit/admin-audit-routes.js",
+        "middleware/admin-audit-middleware.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -27,9 +29,16 @@
           "supportedCities",
           "supportedAreas"
         ],
-        "services/delivery/driver-status-service.js": ["setDriverActiveStatus"],
-        "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "services/delivery/driver-status-service.js": [
+          "setDriverActiveStatus"
+        ],
+        "services/delivery/delayed-assignment.js": [
+          "isPendingAssignment",
+          "assignDriverAt"
+        ],
+        "services/delivery/book-delivery.js": [
+          "originalBookId"
+        ]
       },
       "patterns": [
         {
@@ -56,6 +65,21 @@
           "file": "services/database/DatabaseInitializationService.js",
           "regex": "db\\.bookDelivery\\s*=\\s*db\\.collection",
           "desc": "db.bookDelivery is bound to the hyphenated book-delivery collection"
+        },
+        {
+          "file": "services/audit/admin-audit-routes.js",
+          "regex": "action:\\s*'bulk_toggle_city_areas'",
+          "desc": "navbar area-tag on/off button audits as bulk_toggle_city_areas"
+        },
+        {
+          "file": "services/audit/admin-audit-routes.js",
+          "regex": "action:\\s*'update_delivery_area'",
+          "desc": "single-area isActive flip audits as update_delivery_area (catch-all, not status-specific)"
+        },
+        {
+          "file": "routes/delivery/geography.js",
+          "regex": "delivery_area_off",
+          "desc": "delivery_area_off is an adminNotifications type, not an audit action"
         }
       ]
     },
@@ -87,7 +111,10 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "hooks/useAvailableDrivers.ts"],
+      "files": [
+        "consts/shared.ts",
+        "hooks/useAvailableDrivers.ts"
+      ],
       "patterns": [
         {
           "file": "consts/shared.ts",

@@ -73,6 +73,20 @@ normalize (`getId()` / `.toString()`).
   it now matches the server. Server `consts/consts.js` is the single source of truth.
 - **Awareness:** a legacy `updateDelivery` path uses different status literals; `driver-inactivate-cron`
   is currently disabled (commented out in `app.js`).
+- **Awareness — auditing an area on/off flip.** Toggling `areas.isActive` from the admin
+  navbar's area tags is recorded in the **admin audit log** (`shoofi.admin-audit-log`, written
+  by `middleware/admin-audit-middleware.js`) under two action names, both category `delivery`:
+  **`bulk_toggle_city_areas`** for the tag's on/off button
+  (`POST /api/delivery/city-area/:id/bulk-toggle-areas`) and **`update_delivery_area`** for a
+  single area (`POST /api/delivery/area/update/:id`) — `services/audit/admin-audit-routes.js`.
+  There is **no status-specific action name**: `update_delivery_area` is a catch-all that also
+  covers renaming an area and editing its price/ETA/geometry, so the only way to tell an
+  activate from a deactivate is to read `requestBody.isActive` on the entry. The map keys on
+  `pattern + method` only and has no hook to branch on the body.
+- **Awareness — `delivery_area_off` is NOT an audit action.** It is an *adminNotifications*
+  type emitted in `routes/delivery/geography.js`, and only on the **single-area** route and
+  only when switching **off**. The bulk city-area route raises no notification at all, so
+  killing a whole region is silent on that channel while killing one area is not.
 
 ## Recipe — change assignment or coverage
 1. State which of **pickup-zone / dropoff-geometry / `supportedCities` / `supportedAreas` /
