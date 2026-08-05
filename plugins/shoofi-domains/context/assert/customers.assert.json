@@ -17,6 +17,7 @@
         "controllers/customerAddressController.js",
         "utils/customer-orders.js",
         "docs/customer-orders-snapshot.md",
+        "routes/order.js",
         "package.json"
       ],
       "symbols": {
@@ -99,6 +100,16 @@
           "file": "routes/auth.js",
           "regex": "userProperty: \"auth\"",
           "desc": "the authenticated user is req.auth, never req.user - nothing in the codebase assigns req.user"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "created: new Date\\(\\)",
+          "desc": "customers.created is a real BSON Date - a string bound will never match it"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "created: moment\\(new Date\\(\\)\\)\\.utcOffset\\(offsetHours\\)\\.format\\(\\)",
+          "desc": "orders.created - and the customers.orders[] snapshot of it - is an ISO string with an Israel offset, the opposite type from customers.created on the same document"
         }
       ]
     },
