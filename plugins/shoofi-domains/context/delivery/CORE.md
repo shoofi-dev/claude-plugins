@@ -36,6 +36,17 @@ has **BOTH** `supportedCities` (permission) **AND** `supportedAreas` (the wired 
 **fully replaces** company coverage.
 **ID trap:** `area.cityId` is a **string**, cities/`supportedCities` are **ObjectIds** — always
 normalize (`getId()` / `.toString()`).
+**`isActive` trap — an area is dispatchable only on a STRICT `true`.** `findBestAreaForLocation`
+builds `areaQuery.isActive = true` (`services/delivery/assignDriver.js`), and the coverage-alert
+and store-availability crons filter the same way. But **`POST /api/delivery/area/add` never sets
+the field** (`routes/delivery/geography.js`) — so an area created through that route has
+`isActive: undefined` and **is already not serving**, silently, from birth. (`/admin/area/quick-add`
+in `routes/delivery/admin.js` does set `isActive: true`; the two creation paths disagree.)
+Consequences: `find({isActive: true})` and `find({isActive: {$ne: false}})` return **different
+sets**, and the second one is wrong for anything dispatch-related. Note the asymmetry with the
+scope documents above it — `cityAreas.isActive` and `parentCities.isActive` really are read as
+`{$ne: false}`, so absent means active *there*. Same field name, opposite default, one collection
+apart. Anything reasoning about whether an area was serving must use `isActive === true`.
 
 ## Invariants — never weaken
 1. **`DELIVERY_STATUS` is authoritative in `consts/consts.js`**: `1` waiting-approve → `2`
