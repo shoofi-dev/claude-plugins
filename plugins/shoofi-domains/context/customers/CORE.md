@@ -91,6 +91,20 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    (`lib/common.js`). Any new `createdBy`-style provenance must be read from `req.auth` and
    never from the request body; `routes/team-tasks.js` is the reference implementation.
 
+8. **`shoofi.customers` is not a table of food-delivery customers, so `countDocuments({})`
+   is never the answer to "how many customers do we have".** Three other cohorts land in the
+   same collection with no tenant field to separate them: **soft-deleted accounts**
+   (`isDeleted: true`; the row is never removed), **school-project parents** (a
+   `schoolProject` sub-document, bulk-inserted by the school upload path) and
+   **world-of-swimming course leads** (`status: APP_CONSTS.USER_STATUS.LEAD` = `"1"`, from
+   `POST /api/customer/create/lead`) — all three inserted by `routes/customer.js`. The
+   canonical exclusion is **`REAL_CUSTOMER_FILTER`**
+   (`services/exec-dashboard/customer-metrics.js`): **reuse it, never restate it.** Test
+   phones are deliberately *not* excluded — `config/test-phones.js` is a fixed-OTP
+   convenience list and at least one of those numbers is a real customer with real orders.
+   Two admin screens answering the same question with two different filters is exactly how
+   the exec dashboard and the לקוחות screen came to report customer totals hundreds apart.
+
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
 - **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin

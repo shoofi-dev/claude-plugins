@@ -16,6 +16,8 @@
         "services/database/DatabaseInitializationService.js",
         "controllers/customerAddressController.js",
         "utils/customer-orders.js",
+        "services/exec-dashboard/customer-metrics.js",
+        "consts/consts.js",
         "docs/customer-orders-snapshot.md",
         "routes/order.js",
         "package.json"
@@ -38,7 +40,8 @@
           "attributeCustomerToReferrer",
           "recordFirstOrderForReferrer"
         ],
-        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store"]
+        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store"],
+        "services/exec-dashboard/customer-metrics.js": ["REAL_CUSTOMER_FILTER"]
       },
       "patterns": [
         {
@@ -110,6 +113,21 @@
           "file": "routes/order.js",
           "regex": "created: moment\\(new Date\\(\\)\\)\\.utcOffset\\(offsetHours\\)\\.format\\(\\)",
           "desc": "orders.created - and the customers.orders[] snapshot of it - is an ISO string with an Israel offset, the opposite type from customers.created on the same document"
+        },
+        {
+          "file": "services/exec-dashboard/customer-metrics.js",
+          "regex": "REAL_CUSTOMER_FILTER = \\{[\\s\\S]{0,200}isDeleted[\\s\\S]{0,80}schoolProject[\\s\\S]{0,80}status",
+          "desc": "the canonical 'is a real food-delivery customer' filter excludes exactly three cohorts that share shoofi.customers - soft-deleted accounts, school-project parents, and world-of-swimming leads"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "status: APP_CONSTS\\.USER_STATUS\\.LEAD",
+          "desc": "world-of-swimming course leads are inserted into shoofi.customers with status '1' - they are not customers and must be filtered out of any count"
+        },
+        {
+          "file": "consts/consts.js",
+          "regex": "LEAD: \"1\"",
+          "desc": "the lead marker REAL_CUSTOMER_FILTER excludes via {status: {$exists: false}} is the literal string '1'"
         }
       ]
     },
