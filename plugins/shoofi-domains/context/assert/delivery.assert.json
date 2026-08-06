@@ -27,9 +27,16 @@
           "supportedCities",
           "supportedAreas"
         ],
-        "services/delivery/driver-status-service.js": ["setDriverActiveStatus"],
-        "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "services/delivery/driver-status-service.js": [
+          "setDriverActiveStatus"
+        ],
+        "services/delivery/delayed-assignment.js": [
+          "isPendingAssignment",
+          "assignDriverAt"
+        ],
+        "services/delivery/book-delivery.js": [
+          "originalBookId"
+        ]
       },
       "patterns": [
         {
@@ -97,12 +104,27 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "hooks/useAvailableDrivers.ts"],
+      "files": [
+        "consts/shared.ts",
+        "hooks/useAvailableDrivers.ts"
+      ],
       "patterns": [
         {
           "file": "consts/shared.ts",
           "regex": "COLLECTED_FROM_RESTAURANT:\\s*\"3\"",
           "desc": "partner delivery status must match server (fixed off-by-one)"
+        }
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/views/admin/analytics/DeliveryListAnalytics.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "src/views/admin/analytics/DeliveryListAnalytics.tsx",
+          "regex": "twinGroupId && !d\\?\\.twinDegraded",
+          "desc": "the per-row reassign button is deliberately suppressed for a live twin side (renders an em dash) - a missing button there is BY DESIGN, not the styling fault it looks like"
         }
       ]
     }

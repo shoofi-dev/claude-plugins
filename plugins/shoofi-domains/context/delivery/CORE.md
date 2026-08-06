@@ -71,6 +71,15 @@ normalize (`getId()` / `.toString()`).
   so assignment isn't starved). Do not re-enable without an explicit task.
 - **FIXED:** the partner app's `DELIVERY_STATUS` was off by one (showed "delivered" at pickup);
   it now matches the server. Server `consts/consts.js` is the single source of truth.
+- **BY DESIGN:** on the admin deliveries board
+  (`shoofi-delivery-web/src/views/admin/analytics/DeliveryListAnalytics.tsx:673`) the per-row
+  **שיוך מחדש** reassign button is **suppressed for a live twin side** — that cell renders a
+  grey `—` instead. Reassigning an active twin goes through the twin-actions row's modal,
+  which moves both sides together (invariant 5); the per-row button returns for the kept side
+  once the group degrades (`twinDegraded`). So a report of "the reassign button is missing"
+  has **two unrelated causes** — this deliberate `—`, and a styling fault rendering the button
+  invisible. They look identical to a reporter and different in the DOM: check which one is
+  actually there before investigating.
 - **Awareness:** a legacy `updateDelivery` path uses different status literals; `driver-inactivate-cron`
   is currently disabled (commented out in `app.js`).
 
