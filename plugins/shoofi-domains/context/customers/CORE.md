@@ -60,6 +60,20 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    split. Status `"0"` is the one to watch: an order document is inserted at `"0"` *before* its
    card is charged and is written straight back to `"0"` and **kept** when the charge fails, so
    a customer who retried a declined card leaves a permanent order document per attempt.
+
+   **The two `created` fields on a customer doc are different TYPES, and mixing them
+   matches nothing.** `customers.created` is a real BSON `Date` (`new Date()`,
+   `routes/customer.js`), while `customers.orders[].created` — and the store
+   `orders.created` it snapshots — is an **ISO string carrying Israel's local offset**,
+   `"2026-08-05T14:23:11+03:00"` (`moment(new Date()).utcOffset(offsetHours).format()`,
+   `routes/order.js`). A Mongo range predicate compares a Date to a Date and a string to a
+   string; cross them and you get **zero rows and no error**. Build each bound to match the
+   field: `new Date(x)` for `customers.created`, `momentTZ.tz(x, 'Asia/Jerusalem').format()`
+   for anything inside `orders[]`. (`lib/churn-360/compute.js` carries the same warning
+   in-line, and `utils/business-day.js` returns both representations under separate names for
+   exactly this reason — neither is asserted here, so treat them as pointers, not proof.) **Never build a string bound with `.toISOString()`** — a `Z` string
+   and a `+03:00` string share a `YYYY-MM-DDTHH:` prefix, so the range silently drops the
+   evening hours instead of failing loudly.
 6. **Never log OTPs, tokens, or secrets** — including in debug output added "temporarily".
 7. **The authenticated user is `req.auth`, NEVER `req.user`.** `auth.required` is
    **express-jwt v8** (`package.json`) configured with `userProperty: "auth"`
