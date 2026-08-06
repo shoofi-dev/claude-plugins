@@ -25,6 +25,19 @@ Server: `routes/payments/{admin-reports,admin,summaries}.js`, `routes/driver-rep
 amounts but **never edit it**.
 **Not yours:** charge acceptance/tokenization = `payments`; driver assignment = `delivery`.
 
+## The admin cockpit is RTL — SVG charts pay for it
+Every dashboard page renders inside `dir="rtl"` (e.g. `src/views/admin/exec-dashboard/ExecDashboard.tsx`),
+and CSS `direction` is **inherited by SVG `<text>`**. On a recharts axis that means
+`textAnchor="end"` anchors the run's *left* edge at the tick and the label extends
+**rightwards**; add an `angle` and it swings up into the plot area — where recharts paints the
+bar layer *after* the axis layer and covers it. A mixed Hebrew+digits label then loses its
+Hebrew half on screen and reads as a label nobody ever wrote, which is exactly how a
+"the chart is missing the weekday name" report turns out to be a chart that had it all along.
+**Never rotate an axis tick here.** Stack two unrotated lines in a custom tick instead, one
+script per line, so bidi has nothing to reorder — `WeekdayAxisTick` in
+`src/views/admin/exec-dashboard/widgets.tsx` is the pattern. Corollary: a chart can look
+correct in an LTR test or storybook and be wrong on the real page.
+
 ## The mental model — CASH vs CARD (hold this before touching anything)
 A customer pays `items + delivery + driveIn`. What happens next depends on **who physically
 collected the money**:

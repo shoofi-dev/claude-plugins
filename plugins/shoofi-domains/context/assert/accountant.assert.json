@@ -61,6 +61,30 @@
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
         }
       ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/views/admin/exec-dashboard/ExecDashboard.tsx",
+        "src/views/admin/exec-dashboard/widgets.tsx"
+      ],
+      "symbols": {
+        "src/views/admin/exec-dashboard/widgets.tsx": [
+          "WeekdayAxisTick",
+          "WEEKDAY_NAMES"
+        ]
+      },
+      "patterns": [
+        {
+          "file": "src/views/admin/exec-dashboard/ExecDashboard.tsx",
+          "regex": "dir=\"rtl\"",
+          "desc": "the dashboard page is RTL - SVG <text> inherits it, which is why axis ticks must not be rotated"
+        },
+        {
+          "file": "src/views/admin/exec-dashboard/widgets.tsx",
+          "regex": "tick=\\{<WeekdayAxisTick />\\}",
+          "desc": "weekday axis uses the unrotated two-line tick; reverting to angle/textAnchor='end' hides the day name behind the bars"
+        }
+      ]
     }
   }
 }
