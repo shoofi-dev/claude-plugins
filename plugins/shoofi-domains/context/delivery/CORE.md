@@ -59,6 +59,17 @@ normalize (`getId()` / `.toString()`).
    Querying `delivery-company.bookDelivery` directly returns **zero documents silently**
    (Mongo just reports an empty collection), so a read-only investigation looks like "no twin
    deliveries exist". Check the binding in that file before querying production by hand.
+8. **A `bookDelivery` doc has `bookId`, never `orderId`.** The doc is assembled in
+   `services/delivery/book-delivery.js` as `{...deliveryData, bookId, originalBookId, ...}` and
+   no producer of `deliveryData` supplies an `orderId` (`routes/order.js`,
+   `routes/delivery/admin.js`). **`bookId` IS the human order number** — it equals the store
+   order's `orderId` at creation. Interpolating `order.orderId` off a bookDelivery doc yields
+   the literal string `undefined`, and did: the driver's reassign pushes read
+   `لقد تم تعيينك للطلب: undefined` (`routes/delivery/admin.js`), as did the modal title in
+   `shoofi-delivery-web/src/components/Modals/ReassignDriverModal.tsx`. House format is
+   `` `#${bookId}` ``. The trap is that the *same file* later does `const bookId =
+   order.orderId` correctly — there, `order` is the **store** order off `req.body`, a different
+   shape entirely. Check which `order` you are holding.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`

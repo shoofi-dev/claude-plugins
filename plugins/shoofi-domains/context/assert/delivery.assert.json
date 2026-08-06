@@ -29,9 +29,19 @@
         ],
         "services/delivery/driver-status-service.js": ["setDriverActiveStatus"],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "services/delivery/book-delivery.js": ["originalBookId", "bookId"]
       },
       "patterns": [
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "bookId:\\s*deliveryData\\.bookId",
+          "desc": "bookDelivery docs are built with bookId — there is no orderId field (CORE invariant 8)"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "#\\$\\{order\\.bookId\\}",
+          "desc": "driver-facing reassign pushes interpolate bookId, not the non-existent order.orderId"
+        },
         {
           "file": "consts/consts.js",
           "regex": "DELIVERY_STATUS",
