@@ -16,6 +16,7 @@
         "services/delivery/book-delivery.js",
         "services/delivery/delayed-assignment.js",
         "services/delivery/driver-status-service.js",
+        "lib/delivery/helpers.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
         "services/database/DatabaseInitializationService.js"
@@ -29,9 +30,20 @@
         ],
         "services/delivery/driver-status-service.js": ["setDriverActiveStatus"],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "services/delivery/book-delivery.js": ["originalBookId"],
+        "lib/delivery/helpers.js": ["notifyCompanyAdmins", "excludeCustomerIds"]
       },
       "patterns": [
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "excludeCustomerIds:\\s*\\[deliveryOrder\\.driver\\?\\._id\\]",
+          "desc": "the acting driver is excluded from the company-admin fan-out (CORE invariant 6 corollary)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "String\\(assignmentResult\\.driver\\?\\._id\\)",
+          "desc": "the inline admin fan-out in the delayed path also excludes the assignee"
+        },
         {
           "file": "consts/consts.js",
           "regex": "DELIVERY_STATUS",

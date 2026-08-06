@@ -54,6 +54,19 @@ normalize (`getId()` / `.toString()`).
    aligned to the later side. Breaking any of it splits a twin.
 6. **Manual-admin routing:** companies with `isControlledByAdmin && manualAssignmentOnly` route
    to a company **admin**, not a driver. Don't auto-assign them.
+   **Corollary — every admin fan-out must exclude whoever acted.** Because of this rule a
+   company admin is routinely *also* the driver on his own orders, so an oversight notification
+   sent to "all admins" is a self-echo: he taps Approve and is immediately pushed
+   `السائق <himself> أكد الطلب #X`. For a one-man company that was ~93 of ~213 notifications a
+   day. `notifyCompanyAdmins` (`lib/delivery/helpers.js`) takes `excludeCustomerIds` for this —
+   pass the server-side `deliveryOrder.driver._id`, not the request body's. **Two more copies of
+   the same fan-out are inline and do NOT go through the helper** —
+   `services/delivery/book-delivery.js` and `services/delivery/delayed-assignment.js`, both
+   firing `type: 'new_order'` right after pushing the assignment to the driver himself. Change
+   one, change all three, or you remove half the volume and think you're done. All three
+   hard-code `appType: "shoofi-shoofir"`, which is **correct**: drivers and company admins share
+   `delivery-company.customers`, and that is the only appType `getCustomerByAppType` resolves
+   them under — `shoofi-admin` would look in `shoofi.customers` and find nobody.
 7. **Collection name ≠ property name:** `db.bookDelivery` is bound to the MongoDB collection
    **`book-delivery`** (hyphenated) — `services/database/DatabaseInitializationService.js:28`.
    Querying `delivery-company.bookDelivery` directly returns **zero documents silently**
