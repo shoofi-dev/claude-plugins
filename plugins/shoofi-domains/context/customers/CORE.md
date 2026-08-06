@@ -91,6 +91,18 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    (`lib/common.js`). Any new `createdBy`-style provenance must be read from `req.auth` and
    never from the request body; `routes/team-tasks.js` is the reference implementation.
 
+8. **`isDeleted` is not a tombstone — it is un-set on the next OTP request.**
+   `POST /api/customer/delete` only stamps `isDeleted: true` + `deletedAt`; the document
+   stays, with its addresses, referrals and `orders[]` intact. Every subsequent
+   `POST /api/customer/create` — i.e. every request for a login code — writes
+   `isDeleted: false` straight back in the same `findOneAndUpdate` that mints the
+   `authCode` (and the `storeUsers.updateMany` sweep beside it does the same for
+   partners), so a "deleted" account silently returns the moment its owner asks for a
+   code. Read the flag as *"deleted and not since logged back in"*. Two consequences:
+   deletion is **not** a GDPR-style erasure, and any count filtered on `isDeleted` can go
+   **down as well as up** without a single new signup — so a "cumulative" registered-users
+   series built on it is not monotonic.
+
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
 - **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin

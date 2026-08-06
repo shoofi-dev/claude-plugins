@@ -110,6 +110,16 @@
           "file": "routes/order.js",
           "regex": "created: moment\\(new Date\\(\\)\\)\\.utcOffset\\(offsetHours\\)\\.format\\(\\)",
           "desc": "orders.created - and the customers.orders[] snapshot of it - is an ISO string with an Israel offset, the opposite type from customers.created on the same document"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "\\$set: \\{ isDeleted: true, deletedAt: new Date\\(\\) \\}",
+          "desc": "account deletion is a soft flag, not a removal - the document and everything hanging off it survive"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "authCode: random4DigitsCode, token: null, isDeleted: false",
+          "desc": "every OTP request un-deletes the account, so isDeleted means 'deleted and not since logged back in' and any count filtered on it is not monotonic"
         }
       ]
     },
