@@ -14,6 +14,7 @@
         "utils/admin-auth-service.js",
         "utils/app-name-helper.js",
         "services/database/DatabaseInitializationService.js",
+        "services/exec-dashboard/store-registry.js",
         "controllers/customerAddressController.js",
         "utils/customer-orders.js",
         "docs/customer-orders-snapshot.md",
@@ -21,9 +22,18 @@
         "package.json"
       ],
       "symbols": {
-        "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
-        "utils/auth-service.js": ["generateJWT", "toAuthJSON"],
-        "utils/app-name-helper.js": ["getCustomerAppName"],
+        "services/database/DatabaseInitializationService.js": [
+          "store-users",
+          "persistent-alerts",
+          "customers-feedback"
+        ],
+        "utils/auth-service.js": [
+          "generateJWT",
+          "toAuthJSON"
+        ],
+        "utils/app-name-helper.js": [
+          "getCustomerAppName"
+        ],
         "utils/customer-orders.js": [
           "COMPLETED_STATUSES",
           "CANCELLED_STATUSES",
@@ -38,7 +48,11 @@
           "attributeCustomerToReferrer",
           "recordFirstOrderForReferrer"
         ],
-        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store"]
+        "routes/customer.js": [
+          "validateAuthCode",
+          "authCode",
+          "switch-store"
+        ]
       },
       "patterns": [
         {
@@ -110,11 +124,24 @@
           "file": "routes/order.js",
           "regex": "created: moment\\(new Date\\(\\)\\)\\.utcOffset\\(offsetHours\\)\\.format\\(\\)",
           "desc": "orders.created - and the customers.orders[] snapshot of it - is an ISO string with an Israel offset, the opposite type from customers.created on the same document"
+        },
+        {
+          "file": "services/exec-dashboard/store-registry.js",
+          "regex": "s\\.name_he \\|\\| s\\.name_ar \\|\\| s\\.appName",
+          "desc": "shoofi.stores has no name/storeName field - a store display name resolves as name_he || name_ar || appName, and reading store.name silently yields the appName slug instead"
+        },
+        {
+          "file": "routes/customer-feedback.js",
+          "regex": "!orderId \\|\\| !appName \\|\\| !orderRating",
+          "desc": "a feedback row is keyed by the human orderId string PLUS the appName naming the per-store DB - neither identifies an order alone"
         }
       ]
     },
     "shoofi-partner": {
-      "files": ["stores/auth/index.ts", "stores/user-details/index.tsx"],
+      "files": [
+        "stores/auth/index.ts",
+        "stores/user-details/index.tsx"
+      ],
       "patterns": [
         {
           "file": "stores/auth/index.ts",

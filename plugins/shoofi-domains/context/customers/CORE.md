@@ -91,6 +91,23 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    (`lib/common.js`). Any new `createdBy`-style provenance must be read from `req.auth` and
    never from the request body; `routes/team-tasks.js` is the reference implementation.
 
+8. **Customer feedback is central, and keyed by order number + `appName`.** A row in
+   `shoofi.customers-feedback` (driver alias `db.customersFeedback`,
+   `services/database/DatabaseInitializationService.js`) carries `orderId` - the *human*
+   order-number string, not an ObjectId - plus the `appName` naming the per-store DB the
+   order actually lives in (`routes/customer-feedback.js` requires both). Neither identifies
+   an order on its own. `deliveryRating` is `null` on takeaway rows **by design**; that is
+   not missing data.
+
+   **`shoofi.stores` has no `name` or `storeName` field - only `name_he` / `name_ar`.**
+   Resolve any store display name as `name_he || name_ar || appName`
+   (`services/exec-dashboard/store-registry.js` is the reference). Reading `store.storeName`
+   or `store.name` parses fine, yields `undefined`, and falls silently through to whatever
+   comes after the `||` - which is how the `storeName` frozen onto every feedback row came
+   to be the appName slug, and how the admin dashboards came to display
+   "pizza-bella-vitta" as a store. Historical rows still carry the slug, so resolve the
+   display name at **read** time rather than trusting what a row stored.
+
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
 - **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin
