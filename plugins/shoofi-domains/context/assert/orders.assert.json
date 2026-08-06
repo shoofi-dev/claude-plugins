@@ -17,6 +17,8 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
+        "utils/order-id.js",
+        "services/monitoring/centralized-flow-monitor.js",
         "docs/customer-orders-snapshot.md"
       ],
       "symbols": {
@@ -36,7 +38,8 @@
           "stockDecremented",
           "stockRestored"
         ],
-        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"],
+        "utils/order-id.js": ["generateOrderId", "getShortOrderId"]
       },
       "patterns": [
         {
@@ -93,6 +96,26 @@
           "file": "routes/order.js",
           "regex": "originalOrderDate",
           "desc": "/update-delay shifts orderDate and preserves the original (ref §5)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const newOrderId = generatedOrderId;",
+          "desc": "order number is stored untruncated — re-adding a split() here recreates the collisions (CORE invariant 10)"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "newOrderId: full, originalOrderId: full",
+          "desc": "twin sides store the full order number too (CORE invariant 10)"
+        },
+        {
+          "file": "utils/sms.js",
+          "regex": "getShortOrderId\\(orderId\\)",
+          "desc": "delivery-company SMS derives its short number from the last group, not index [2] (CORE invariant 10)"
+        },
+        {
+          "file": "services/monitoring/centralized-flow-monitor.js",
+          "regex": "orderId: getId\\(orderId\\)",
+          "desc": "orderFlowEvents.orderId is the Mongo _id while orderNumber is the display ID — the naming inversion in CORE invariant 10"
         }
       ]
     },

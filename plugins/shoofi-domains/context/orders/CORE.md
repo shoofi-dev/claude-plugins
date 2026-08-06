@@ -61,6 +61,27 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    "Is this order for a later day?" must therefore test **both**, **truthily** — as the server
    does (`routes/order.js`: `$or: [{isFutureOrder:{$ne:true}},{isFutureOrder:{$exists:false}}]`).
    Testing `isFutureOrder` alone silently misses every ramadan order.
+10. **The order number is a lookup key in shared DBs — never shorten it.** `orderId` is the
+    full `xxxx-xxxxxx-xxxx` produced by `utils/order-id.js` (`generateOrderId`), and
+    `originalOrderId` is the same value. Those 14 digits are the whole uniqueness guarantee:
+    `order-id` encodes the ms timestamp + a random pad digit through `node-fpe`, which is a
+    **monoalphabetic substitution cipher with no positional diffusion**, so any subset of the
+    groups carries far less entropy than its digit count suggests. Keeping only groups 1 and 3
+    (`xxxx-xxxx`) — as order creation did until `fix/HIGH-RISK-order-id-collisions` — leaves
+    ~5e7 effective values and **collides in production**: at 129,589 orders there were 8
+    same-store and 187 cross-store duplicate order numbers. That matters because the order
+    number is a **lookup key**, several times in central DBs with no `appName` filter:
+    `delivery-company.book-delivery.bookId` (= the store order's `orderId`; 86 duplicate
+    groups, some spanning two stores) read/written by `routes/order-amend.js` and
+    `services/delivery/book-delivery.js`; `shoofi.customersFeedback.orderId`
+    (`routes/customer-feedback.js`); `shoofi.orderFlowEvents.orderNumber`
+    (`services/monitoring/centralized-flow-monitor.js`); plus
+    `routes/admin/order-monitoring.js`, `routes/delivery/orders.js` and
+    `utils/twin-order-visibility.js`. Use `getShortOrderId()` when a human needs a short form
+    to quote — it returns the **last** group and must never become a key.
+    **Naming trap:** in `shoofi.orderFlowEvents` the fields are inverted from every other
+    collection — `orderId` is the Mongo `_id` (`getId(orderId)`) and `orderNumber` is the
+    display ID (`centralized-flow-monitor.js:38-40`).
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
