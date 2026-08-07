@@ -12,6 +12,9 @@
         "routes/delivery/geography.js",
         "routes/driver-shift-manager.js",
         "routes/geo.js",
+        "services/driver-shift/shift-service.js",
+        "utils/driver-active-hours.js",
+        "utils/crons/driver-shift-cron.js",
         "services/delivery/assignDriver.js",
         "services/delivery/book-delivery.js",
         "services/delivery/delayed-assignment.js",
@@ -28,6 +31,12 @@
           "supportedAreas"
         ],
         "services/delivery/driver-status-service.js": ["setDriverActiveStatus"],
+        "services/driver-shift/shift-service.js": [
+          "getPermanentDriverSlotsForDay",
+          "assignPermanentDriversToShifts",
+          "dayTimeSlots"
+        ],
+        "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
         "services/delivery/book-delivery.js": ["originalBookId"]
       },
@@ -66,6 +75,21 @@
           "file": "services/delivery/delayed-assignment.js",
           "regex": "\\.add\\(parseInt\\(area\\?\\.maxETA \\|\\| 30\\), 'minutes'\\)",
           "desc": "the pending path's || 30 fallback rescues null/undefined/empty maxETA but not a non-numeric string - the asymmetry with the immediate path is the point"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "endHour\\s*\\+=\\s*24",
+          "desc": "business day crosses midnight; every slot is stored under the STARTING date"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "getPermanentDriverSlotsForDay",
+          "desc": "single per-weekday resolver; iterating the flat timeSlots over-books every weekday"
+        },
+        {
+          "file": "utils/driver-active-hours.js",
+          "regex": "WORKING_START_HOUR",
+          "desc": "the one correct business-day window ([D 09:00, D+1 02:00]); feeds the paid guarantee"
         }
       ]
     },
