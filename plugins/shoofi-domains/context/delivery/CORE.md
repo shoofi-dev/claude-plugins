@@ -90,20 +90,25 @@ normalize (`getId()` / `.toString()`).
   it now matches the server. Server `consts/consts.js` is the single source of truth.
 - **Awareness:** a legacy `updateDelivery` path uses different status literals; `driver-inactivate-cron`
   is currently disabled (commented out in `app.js`).
-- **KNOWN BROKEN (Aug 2026 audit) — invariant 8 is violated in these places, fixes in flight.**
-  Don't re-derive; check whether the fix landed before investigating:
-  `routes/delivery/company.js` (the `update-active-status` shift guard — reads the next night's
-  slot after midnight, and falls through to ALLOW when no slot matches);
-  `utils/crons/driver-shift-cron.js` (same lookup, so the midnight deactivation silently
-  no-ops; also can't fire at 02:00-08:00, and its 00:45 reminder tick burns
-  `shiftStartNotifiedAt` on the wrong night's booking);
-  `routes/driver-shift-manager.js` `isShiftInProgress`;
-  `utils/driver-active-hours.js` `shiftWindows` (never rolls the *start* forward, so tail slots
-  resolve 24 h early and score 0 minutes) and the `$or: [{date}, {date: nextDate, startTime
-  < '09:00'}]` in `utils/crons/driver-daily-hours.js` + `routes/driver-reports.js`, whose
-  comment about overnight slots being dated D+1 is **false**;
-  `ShiftsCalendar.tsx` day/list view + both Excel exports (lexicographic sort floats the tail
-  to the top). The **grid** view and the driver app's `shifts.tsx` are correct — copy those.
+- **FIXED (Aug 2026):** invariant 8 was violated in six places — the
+  `update-active-status` guard, both `driver-shift-cron` passes,
+  `isShiftInProgress`, `checkBookingConflict`, `shiftWindows`, and the false
+  `$or` in `driver-daily-hours` + `driver-reports`. All now go through
+  **`utils/shift-time.js`**, the single business-day helper. Use it; never
+  re-derive a slot window locally.
+- **BY DESIGN — fail-closed is deliberately scoped.** The guard refuses (and the
+  cron deactivates) when no slot covers "now", but ONLY when the day has slots
+  AND `isWithinBusinessDay`. Two escapes, both load-bearing: outside 09:00–02:00
+  the template produces no slots by design, so blocking there would be a lockout
+  with no booking path out of it; and a day with NO slots means the area does not
+  run on the shift system, where an hourly sweep would switch off drivers who
+  never had a shift to miss. The guard and the cron share the predicate so they
+  cannot disagree.
+- **STILL BROKEN (client side):** `ShiftsCalendar.tsx` day/list view and both
+  Excel exports sort `startTime` lexicographically, floating the tail to the top;
+  and both `getBusinessDayStartHour` copies INFER the start hour from the loaded
+  week instead of reading `timeSlotTemplate.startHour`, so a sparse day reorders
+  the board. The grid view and the driver app's `shifts.tsx` are correct.
 - **BY DESIGN so far — money is NOT affected by the above.** The min-hourly guarantee is
   computed from `inWorkingHoursMinutes` (`workingHoursWindow` = `[D 09:00, D+1 02:00]`, the one
   correct business-day implementation in the codebase). `inShiftMinutes` is display-only —
