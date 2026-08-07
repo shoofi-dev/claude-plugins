@@ -59,6 +59,23 @@ normalize (`getId()` / `.toString()`).
    Querying `delivery-company.bookDelivery` directly returns **zero documents silently**
    (Mongo just reports an empty collection), so a read-only investigation looks like "no twin
    deliveries exist". Check the binding in that file before querying production by hand.
+8. **A shift `date` is a business-day LABEL, not a wall-clock date.** The day runs
+   `driverShiftConfig.timeSlotTemplate.startHour → endHour` — **09:00 → 02:00** in prod for
+   every live area. Generation rolls `endHour += 24` and stores *every* slot of that day,
+   including the `00:00`/`01:00` tail, under the **starting** date
+   (`services/driver-shift/shift-service.js`). So `{date:"2026-08-06", startTime:"00:00"}`
+   means **midnight on 7 Aug**, and each date holds exactly `[00:00, 01:00, 09:00 … 23:00]`.
+   Never key "now" with `moment().format('YYYY-MM-DD')` and never compare bare `HH:mm` —
+   after midnight both silently read the *following* night's slots. Corollary:
+   `endTime <= startTime` is legal (`"23:00"→"00:00"`; `"24:00"` also exists in older data),
+   so any `end > start` assertion or lexicographic `HH:mm` compare is a bug.
+9. **Permanent drivers are per-weekday.** `dayTimeSlots[].dayOfWeek` is authoritative; the flat
+   `timeSlots` array is the **union across all weekdays** and is meaningless without
+   `daysOfWeek` beside it. Always resolve through
+   `ShiftService.getPermanentDriverSlotsForDay(permDriver, dayOfWeek)` — iterating `timeSlots`
+   alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
+   the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
+   `dayOfWeek: 1`.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
@@ -73,6 +90,31 @@ normalize (`getId()` / `.toString()`).
   it now matches the server. Server `consts/consts.js` is the single source of truth.
 - **Awareness:** a legacy `updateDelivery` path uses different status literals; `driver-inactivate-cron`
   is currently disabled (commented out in `app.js`).
+- **KNOWN BROKEN (Aug 2026 audit) — invariant 8 is violated in these places, fixes in flight.**
+  Don't re-derive; check whether the fix landed before investigating:
+  `routes/delivery/company.js` (the `update-active-status` shift guard — reads the next night's
+  slot after midnight, and falls through to ALLOW when no slot matches);
+  `utils/crons/driver-shift-cron.js` (same lookup, so the midnight deactivation silently
+  no-ops; also can't fire at 02:00-08:00, and its 00:45 reminder tick burns
+  `shiftStartNotifiedAt` on the wrong night's booking);
+  `routes/driver-shift-manager.js` `isShiftInProgress`;
+  `utils/driver-active-hours.js` `shiftWindows` (never rolls the *start* forward, so tail slots
+  resolve 24 h early and score 0 minutes) and the `$or: [{date}, {date: nextDate, startTime
+  < '09:00'}]` in `utils/crons/driver-daily-hours.js` + `routes/driver-reports.js`, whose
+  comment about overnight slots being dated D+1 is **false**;
+  `ShiftsCalendar.tsx` day/list view + both Excel exports (lexicographic sort floats the tail
+  to the top). The **grid** view and the driver app's `shifts.tsx` are correct — copy those.
+- **BY DESIGN so far — money is NOT affected by the above.** The min-hourly guarantee is
+  computed from `inWorkingHoursMinutes` (`workingHoursWindow` = `[D 09:00, D+1 02:00]`, the one
+  correct business-day implementation in the codebase). `inShiftMinutes` is display-only —
+  payload, PDF column, tooltip — so the shift bugs need **no settlement backfill**. Separately,
+  `DriverPayments.tsx` computes its *own* per-calendar-day guarantee from a midnight-split
+  `activeMinutes`; that one can move a payout and is tracked separately.
+- **DEAD CONFIG:** `ShiftService.isBookingWindowOpen` is hard `return true`, so
+  `bookingWindow.opensDayOfWeek` / `opensForWeekOffset` do nothing, and
+  `bookingClosesHoursBefore` is stored and admin-editable but read by **no server code**.
+  Real gating today is `cityAreas.bookingDisabledWeeks`. There is also no waiting-list
+  promotion anywhere — `waitingList` is only pushed, pulled and displayed.
 
 ## Recipe — change assignment or coverage
 1. State which of **pickup-zone / dropoff-geometry / `supportedCities` / `supportedAreas` /
