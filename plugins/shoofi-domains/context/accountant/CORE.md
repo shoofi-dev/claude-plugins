@@ -42,15 +42,37 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 ## Invariants — never weaken
 1. **The transfer formula** (`generateStoreReportData` in `routes/payments/admin-reports.js`):
    `totalForTransfer = creditCardRevenue + driveInCreditCard − totalOutcomes`;
-   `balance = totalForTransfer` (÷ VAT multiplier if `businessType === 'exempt'`).
+   `balance = totalForTransfer` — **no VAT adjustment, for any `businessType`**.
    `totalForInvoice = creditCardRevenue + driveInCreditCard`.
+   **`exempt` (עוסק פטור) does NOT mean ÷1.18.** Such a store charges no VAT, so the
+   collected price has no VAT component to strip — ₪100 taken on the card is ₪100 owed.
+   The store invoices Shoofi for that same undivided amount (`vatType: 'NON'`, docType
+   300 receipt, `routes/hyp.js` create-store-invoice), so payment and tax document
+   reconcile. **They move together or not at all** — dividing one and not the other
+   leaves the store paid ~15% off what its own document says.
+   (Changed 2026-08-03; both were previously ÷1.18. `routes/driver-reports.js` still
+   applies the old ÷1.18 rule to exempt **delivery companies** — deliberately left
+   pending a separate decision, so the two payout paths currently disagree.)
 2. **`actualDriverPayment` cash-vs-card branch** (`routes/driver-reports.js`): CARD → full
    `effectiveDeliveryFee`; CASH + coupon → the coupon-covered amount; **CASH, no coupon → 0**.
    A bug here **double-pays a driver who already pocketed the cash**.
-3. **Commission base is the PRE-discount price** (`originalOrderPrice || orderPrice`) so
-   coupons can't erode Shoofi's cut. Store commission is **tiered**
+3. **Commission base is the FINAL items price actually charged** — `order.orderPrice`,
+   after the store's own product discounts. Store commission is **tiered**
    (`calculateCommissionTiered`, from `store.accounting.contract.commissionTiers`); the flat
    15% in dashboards is **not** the authoritative settlement number.
+   `stores-export-new` carries both `totalRevenueCreditCard/Cash` (= what Shoofi captured)
+   and `totalProductDiscount*` (= `originalPrice − orderPrice`). **The product discount is
+   reported for visibility only** — it enters neither `revenueForCommission` nor
+   `totalIncomes` / `totalForTransfer` / `totalForInvoice`. A store discounting its own
+   items therefore reduces Shoofi's cut proportionally, and that is intended.
+   Still **inside** the commission base: coupon money Shoofi reimburses to the store
+   (`totalCustomerSpecificCoupons`), Shoofi compensations, and drive-in. Coins are
+   commissioned separately at `coinsCommissionPercent`.
+   *History — do not "restore" either half:* until 2026-08-03 revenue itself used the
+   pre-discount price, which overstated a discounting store's transfer and tax invoice;
+   that was fixed. The pre-discount **commission** base survived that fix and was then
+   dropped by owner decision on **2026-08-04** ("commission only from the final order
+   items price after discount").
 4. **VAT has ONE source of truth: `utils/vat.js`** (`VAT_RATE`, `VAT_MULTIPLIER`,
    `calculateVAT`, `withoutVAT`, `withoutVATIfExempt`). **Never re-introduce a `0.18`/`1.18`
    literal** — divergent rounding points silently skew payouts.

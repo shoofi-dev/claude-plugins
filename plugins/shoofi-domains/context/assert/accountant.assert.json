@@ -46,6 +46,21 @@
           "desc": "CORE money formula: transfer is credit-card revenue minus outcomes"
         },
         {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "const balance\\s*=\\s*totalForTransfer",
+          "desc": "the bank transfer is the raw transfer amount — no ÷1.18 for exempt stores, whose prices carry no VAT (must stay in step with totalForInvoice in routes/hyp.js)"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "revenueForCommission\\s*=\\s*totalRevenue\\s*\\+\\s*totalCustomerSpecificCoupons\\s*\\+\\s*totalShoofiCompensations\\s*\\+\\s*driveInTotal\\s*;",
+          "desc": "commission is charged on the FINAL items price charged — productDiscounts must NOT be added back here (owner decision 2026-08-04), while reimbursed coupons, Shoofi compensations and drive-in stay in"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "totalRevenueCreditCard\\s*\\+=\\s*chargedOrderPrice",
+          "desc": "card revenue is the price actually charged, not the pre-discount list price"
+        },
+        {
           "file": "routes/driver-reports.js",
           "regex": "actualDriverPayment",
           "desc": "cash-vs-card driver payout branch"
