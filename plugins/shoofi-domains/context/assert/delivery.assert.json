@@ -90,6 +90,11 @@
           "file": "utils/driver-active-hours.js",
           "regex": "WORKING_START_HOUR",
           "desc": "the one correct business-day window ([D 09:00, D+1 02:00]); feeds the paid guarantee"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "areaQuery\\.isActive = true",
+          "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
         }
       ]
     },
