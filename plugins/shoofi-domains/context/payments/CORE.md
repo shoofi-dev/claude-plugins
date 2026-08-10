@@ -61,6 +61,46 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    failed with `"תאריך תוקף לא במבנה תקין ,expirationDate"` until the same lookup was ported
    into `twin-payment-service.js`. **When you change charge routing, provider selection or a
    charge guard, apply it in both places — or say in the PR why the twin path doesn't need it.**
+9. **The per-order customer document follows the STORE's VAT status.** A store that is
+   עוסק פטור (`accounting.bankAccount.businessType === 'exempt'`) charges no VAT, so its
+   sale may not be documented with any. The flag is read with `isVatExempt`
+   (`utils/vat.js`), which checks **both** the per-tenant `store {id:1}` doc and the
+   `shoofi.stores` registry entry because production stores are inconsistent about which
+   one carries it. **Never make an exempt lookup able to fail a charge** — it swallows its
+   errors and falls back to "not exempt", which errs toward a visible, correctable VAT
+   document rather than an under-declared one.
+   Consequence: **a twin group may not mix an exempt store with a regular one** — enforced
+   in `twin-eligibility.js` at discovery and `rejectMixedVatPair` in `routes/twin-order.js`
+   at place time, which is the one that protects the charge since eligibility is never
+   re-run.
+10. **Invoicing is MANUAL and split per revenue owner — behind a flag.**
+   Historically each gateway issued the document itself during the charge (HYP
+   `SendHesh`/`EZ.*`, ZCredit `ZCreditInvoiceReceipt`), giving one document per charge for
+   the whole amount. With `invoiceConfig.manualInvoicesEnabled` on
+   (`services/payments/invoice-config.js`: env kill → global → per-store, all three must
+   allow it), the charge carries **no** invoice parameters and
+   `services/payments/order-invoices.js` issues the documents afterwards through EZcount
+   `createDoc` (`utils/hyp.createCustomerInvoice`), one per revenue owner:
+   | | delivery | no delivery |
+   |---|---|---|
+   | regular order | 2 (store + delivery) | 1 (store) |
+   | twin order | 3 (store + store + delivery) | 2 (store + store) |
+   Split is `total − shippingPrice` per store, `shippingPrice` for delivery, and the twin
+   combination fee rides on the delivery document. **Shoofi issues every one of them** —
+   `createInvoiceOnBehalf` needs a store connected to HYP and none are — so the real seller
+   is named as free text. Store documents follow invariant 9; the DELIVERY document is
+   Shoofi's own revenue and always carries VAT.
+   ⚠️ **The documents MUST sum to the amount charged** (`reconcileToCharge`). A customer
+   adding up their documents and getting a different number than their card statement is
+   the failure this whole module is shaped around; the planners are total-driven for that
+   reason, never item-driven.
+   ⚠️ Under the OLD path both gateways read line prices as **VAT-INCLUSIVE**, so zeroing
+   VAT drops the VAT line without changing the total. Do not "correct" that into adding VAT
+   on top.
+   ⚠️ The document is issued at **capture**, never at authorization — a J5 hold is not a
+   sale — and never fails the order: failures land on `order.invoices[]` and are retried by
+   `utils/crons/invoice-retry-cron.js`, which is deliberately **not** gated on the flag so
+   a rollback cannot strand a customer who paid while it was on.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.
@@ -75,6 +115,19 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 - **Flagged, needs verdict:** `updateCCPayment` references an undefined `orderId` in its
   background block; `refundPartial`'s ZCredit field shape is unverified across terminals
   (sandbox first).
+- **RESOLVED by manual invoicing:** the exempt document's TITLE used to be unfixable —
+  neither gateway publishes a per-transaction document-type parameter, so `EZ.type` and
+  ZCredit's `Type` were guesses that could reject a live charge. Issuing the document
+  ourselves makes it a documented `createDoc` field: 320 (חשבונית מס/קבלה) normally, 400
+  (קבלה) when exempt — `customerDocType` in `order-invoices.js`. The old gateway path still
+  cannot set it, which is one more reason the flag is the direction of travel.
+- **UNVERIFIED against a real document:** the local HYP test masof (`0010332520`) has the
+  EZcount **invoicing module disabled** — charges return no `Hesh` field and every
+  `PrintHesh` link answers "קובץ PDF חתום עדיין לא הופק במערכת". Live local runs therefore
+  prove the request payloads and nothing about the rendered document. Before trusting
+  either path in production, confirm on a masof with invoicing enabled that: the exempt
+  document is titled קבלה with no VAT line, and the document total equals the amount
+  charged.
 - **`hyp_enabled` is a PLATFORM tokenization switch, NOT a chargeability gate.** It lives on the
   `app-name: "shoofi"` config document and is served through `SHOOFI_CONFIG_PUBLIC_FIELDS`
   (`routes/store.js`), alongside rollout flags like `isTwinEnabledForAll`. It has **zero**

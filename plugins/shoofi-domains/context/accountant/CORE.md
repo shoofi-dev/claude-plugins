@@ -74,8 +74,15 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    dropped by owner decision on **2026-08-04** ("commission only from the final order
    items price after discount").
 4. **VAT has ONE source of truth: `utils/vat.js`** (`VAT_RATE`, `VAT_MULTIPLIER`,
-   `calculateVAT`, `withoutVAT`, `withoutVATIfExempt`). **Never re-introduce a `0.18`/`1.18`
-   literal** — divergent rounding points silently skew payouts.
+   `calculateVAT`, `withoutVAT`, `withoutVATIfExempt`, `isVatExempt`). **Never re-introduce
+   a `0.18`/`1.18` literal** — divergent rounding points silently skew payouts.
+   `isVatExempt(...storeDocs)` is the one way to ask whether a business is עוסק פטור: it
+   reads `accounting.bankAccount.businessType` off **either** the per-tenant `store {id:1}`
+   doc or the `shoofi.stores` registry entry, because production stores are inconsistent
+   about which one carries it. Do not re-inline the `businessType === 'exempt'` comparison.
+   **Exempt is no longer a settlement-only concern:** since 2026-08-09 the per-order
+   CUSTOMER document follows it too (zero VAT on both gateways) — that half belongs to the
+   `payments` domain, invariant 9. A change to what `exempt` means now moves two systems.
 5. **Report guards must stay on:** duplicate + **overlap across ALL statuses** (a sent report
    blocks a new overlapping one), orders-closed, and compensations-approved.
    **Delete is deliberately NOT status-gated** — a report can be sent and only then found
