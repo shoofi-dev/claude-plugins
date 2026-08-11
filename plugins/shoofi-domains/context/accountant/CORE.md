@@ -118,5 +118,6 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 
 ## Definition of done
 Inherit `_shared-guardrails.md` §7, plus: preserve the transfer formula, the cash-vs-card
-branch, the pre-discount commission base, and invoice idempotency guards. When in doubt on
+branch, the **final-items-price** commission base (invariant 3 — *not* the pre-discount one,
+dropped by owner decision 2026-08-04), and invoice idempotency guards. When in doubt on
 real money, **stop and ask**.
