@@ -20,6 +20,8 @@
           "getFullDiscountMatrix",
           "effectiveDeliveryFee",
           "couponDeliveryPortion",
+          "couponDeliverySplit",
+          "isPercentageStoreDeliveryCoupon",
           "calculateCommission",
           "getDateRange"
         ],
@@ -64,6 +66,16 @@
           "file": "routes/driver-reports.js",
           "regex": "actualDriverPayment",
           "desc": "cash-vs-card driver payout branch"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "if\\s*\\(storeDiscount\\s*&&\\s*!isSpecificToCustomers\\s*&&\\s*appliedCoupon\\.coupon\\?\\.discountType\\s*!==\\s*'full_discount'\\)",
+          "desc": "CORE invariant 7: the store is billed a coupon's nominal storeDiscount whenever it is not customer-specific and not full_discount — the gate is blind to discountType, so a delivery coupon lands here too"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "discountAmount\\s*=\\s*\\(storeDiscount\\s*/\\s*100\\)\\s*\\*\\s*orderPrice",
+          "desc": "CORE invariant 7: a percentage-type coupon bills the store a percentage of the ITEMS subtotal even when its discountType is 'delivery' — so that share is not attributable to the delivery fee"
         },
         {
           "file": "routes/admin/masav.js",

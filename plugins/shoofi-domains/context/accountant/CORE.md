@@ -91,6 +91,34 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `true`), or the regenerated report silently drops those amounts.
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
+7. **A store's coupon cost (`reportData.campaigns`) is the coupon's NOMINAL
+   `storeDiscount`, never the waiver the customer actually got**, and the gate that
+   decides it is **blind to `discountType`** (`routes/payments/admin.js:1135-1142`,
+   feeding `totalAppliedCouponsSum` → `campaignsTotal` → `campaigns`):
+   `if (storeDiscount && !isSpecificToCustomers && discountType !== 'full_discount')`.
+   Three consequences that keep getting rediscovered:
+   - **No cap against the thing discounted.** `storeDiscount: 20` on a ₪10 shipping fee
+     bills the store ₪20, even though `appliedCoupon.discountAmount` was capped at ₪10
+     when the coupon was applied. Any read-time "who paid for this" derivation therefore
+     produces a small **negative** Shoofi share on such orders. That is real over-billing
+     surfacing — **do not clamp it at zero**, which only hides it.
+   - **A `percentage`-type coupon is billed as `(storeDiscount / 100) * orderPrice`**,
+     where `orderPrice` is the **items subtotal** (`originalOrderPrice` — no shipping, no
+     drive-in) — *even when the coupon's `discountType` is `delivery`*. So a delivery
+     coupon's store share is not necessarily a delivery amount at all and cannot be
+     attributed to the fee. `lib/payments/calc.js` counts those rather than guessing
+     (`isPercentageStoreDeliveryCoupon`), and leaves them in Shoofi's share.
+   - **The row pushed at `:1145` carries no items/delivery split** (unlike the
+     `full_discount` rows at `:1236`), so `campaignsList` is not splittable for
+     `delivery`/`order_items` coupons. `full_discount` is the **only** coupon type with a
+     stored 2×2 split (`getFullDiscountMatrix`); everything else must be re-derived from
+     the order at read time — see `couponDeliverySplit` in `lib/payments/calc.js`.
+   `campaigns` is an **outcome** feeding `totalOutcomes` → `totalForTransfer`, so this is
+   live money. Do not "fix" the percentage base as a side effect of another change — it
+   moves what stores are charged. **Ask.**
+   *(Do not mirror `admin.js:907-944` either — that is the legacy `/stores-export`
+   endpoint, which bills `storeDiscount` for every coupon including customer-specific and
+   `full_discount`. Settlement uses `/stores-export-new`.)*
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
