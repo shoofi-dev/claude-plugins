@@ -87,6 +87,27 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **`minDrivers` is the requirement; `maxDrivers` is the booking ceiling.** Shift capacity is
+    sized in `ShiftService.computeCapacity` (`services/driver-shift/shift-service.js`) as
+    `minDrivers = ceil(avgOrders / ordersPerDriver) × (1 + driverCalculationBuffer/100)`, with
+    `maxDrivers = ceil(minDrivers × 1.2)` — headroom for over-booking against no-shows, **not**
+    a second estimate of demand. Every consumer must read `minDrivers` as "required"
+    (`services/exec-dashboard/delivery-metrics.js` and the `ShiftsCalendarGridView` cells both
+    do); sizing anything off `maxDrivers` silently asks for 20% more staff than the operator
+    configured, on every slot of every day. `minDriversCap`/`maxDriversCap`, when set, **replace**
+    the computed values outright rather than clamping them.
+11. **Shift demand comes from the stores' own `orders`, and the divisor is per WEEKDAY, not per
+    slot.** `PeakHourDetectionService.detectPeakHours`
+    (`services/driver-shift/peak-hour-detection.js`) sums `<appName>.orders` with
+    `order.receipt_method: "DELIVERY"` and status in `["2","3","10","11","12"]`, across the
+    **live** stores whose pickup zone is in the area — not from `book-delivery`, so demand no
+    company covered still counts. `avgOrders` divides that by `areaActiveDates.size`: the number
+    of dates in the lookback window on which the AREA traded at all on that weekday, **one
+    number shared by every slot**. A divisor computed per slot yields "orders per
+    day-that-had-orders", which flattens the daily curve and overstates the quietest hours worst
+    — it doubled every morning slot in production until 2026-08-12. Twin orders are deliberately
+    **not** deduped: a twin is two `book-delivery` rows on the same driver, so counting two
+    matches how throughput is measured on the other side.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`

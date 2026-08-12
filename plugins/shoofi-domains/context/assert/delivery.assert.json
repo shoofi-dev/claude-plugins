@@ -21,7 +21,9 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "services/driver-shift/peak-hour-detection.js",
+        "services/exec-dashboard/delivery-metrics.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -34,7 +36,13 @@
         "services/driver-shift/shift-service.js": [
           "getPermanentDriverSlotsForDay",
           "assignPermanentDriversToShifts",
-          "dayTimeSlots"
+          "dayTimeSlots",
+          "computeCapacity"
+        ],
+        "services/driver-shift/peak-hour-detection.js": [
+          "areaActiveDates",
+          "storeIsLive",
+          "storeIsInCities"
         ],
         "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
@@ -85,6 +93,26 @@
           "file": "services/driver-shift/shift-service.js",
           "regex": "getPermanentDriverSlotsForDay",
           "desc": "single per-weekday resolver; iterating the flat timeSlots over-books every weekday"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "minDrivers\\s*=\\s*baseDrivers",
+          "desc": "minDrivers IS the requirement (volume/ordersPerDriver plus the configured buffer); it is not shaded down, and maxDrivers is the 1.2x booking ceiling above it"
+        },
+        {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "required\\s*=\\s*shift\\.minDrivers",
+          "desc": "every consumer reads minDrivers as 'required' - sizing off maxDrivers asks for 20% more staff than configured"
+        },
+        {
+          "file": "services/driver-shift/peak-hour-detection.js",
+          "regex": "const totalDays = areaActiveDates\\.size",
+          "desc": "the demand divisor is the dates the AREA traded on that weekday, ONE number for every slot; a per-slot divisor gives 'orders per day-that-had-orders' and doubles the quiet hours"
+        },
+        {
+          "file": "services/driver-shift/peak-hour-detection.js",
+          "regex": "isCoomingSoon",
+          "desc": "demand counts LIVE stores only, matching store-registry.js including the misspelling"
         },
         {
           "file": "utils/driver-active-hours.js",
