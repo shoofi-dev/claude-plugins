@@ -61,6 +61,21 @@
           "desc": "card revenue is the price actually charged, not the pre-discount list price"
         },
         {
+          "file": "routes/payments/admin.js",
+          "regex": "driveInPrice\\s*=\\s*order\\.driveInPrice\\s*\\|\\|\\s*order\\.driveInPricing\\?\\.price",
+          "desc": "drive-in is INSIDE the commission base and is read with this fallback chain — older orders carry only the nested driveInPricing form"
+        },
+        {
+          "file": "lib/payments/calc.js",
+          "regex": "Number\\(delivery\\?\\.order\\?\\.shippingPrice\\)",
+          "desc": "shippingPrice is the COURIER's money (effectiveDeliveryFee) and is OUTSIDE the store commission base — if this moves into routes/payments/admin.js's revenue build, the base and every report on it is wrong"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "shippingPrice",
+          "desc": "order.total is built from orderPrice + shippingPrice + driveIn − coupon − coins, so it is never a commission base — reports must sum orderPrice + driveIn instead"
+        },
+        {
           "file": "routes/driver-reports.js",
           "regex": "actualDriverPayment",
           "desc": "cash-vs-card driver payout branch"

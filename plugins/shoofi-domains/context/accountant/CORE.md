@@ -66,8 +66,23 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `totalIncomes` / `totalForTransfer` / `totalForInvoice`. A store discounting its own
    items therefore reduces Shoofi's cut proportionally, and that is intended.
    Still **inside** the commission base: coupon money Shoofi reimburses to the store
-   (`totalCustomerSpecificCoupons`), Shoofi compensations, and drive-in. Coins are
-   commissioned separately at `coinsCommissionPercent`.
+   (`totalCustomerSpecificCoupons`), Shoofi compensations, and drive-in — the latter read
+   as `order.driveInPrice || order.driveInPricing?.price` (`routes/payments/admin.js`
+   `stores-export-new`), the fallback chain older documents need. Coins are commissioned
+   separately at `coinsCommissionPercent`.
+   **Outside it: `shippingPrice`.** The delivery fee is the courier's money — it is
+   `effectiveDeliveryFee` in `lib/payments/calc.js`, settled in `routes/driver-reports.js`,
+   and carries its own commission computed from the delivery documents, not from the order.
+   It appears nowhere in `stores-export-new` or `revenueForCommission`. The corollary is
+   the one that keeps getting got wrong: **`order.total` is never a commission base.**
+   `calculateTotal` (`utils/order-pricing.js`) builds it as
+   `orderPrice + shippingPrice + driveInPrice − coupon − coins + twin combination fee`,
+   so summing it is wrong in four directions at once, not just by the delivery fee. Any
+   report answering "what is Shoofi's commission calculated on" sums
+   `orderPrice + driveIn`; `total` answers a different question (what the customer paid).
+   Measured over 2026-07 across the 160 live stores the two differ by ~9%
+   (₪1,555,939 vs ₪1,416,511). The exec dashboard shipped summing `total` and was
+   corrected in `services/exec-dashboard/orders-metrics.js` (`commissionBaseOf`).
    *History — do not "restore" either half:* until 2026-08-03 revenue itself used the
    pre-discount price, which overstated a discounting store's transfer and tax invoice;
    that was fixed. The pre-discount **commission** base survived that fix and was then
