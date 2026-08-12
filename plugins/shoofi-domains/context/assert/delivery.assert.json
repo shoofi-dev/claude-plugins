@@ -95,6 +95,11 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "\\$set:\\s*\\{\\s*isPeakHour:\\s*[^,]+,\\s*peakHourScore:\\s*[^,]+,\\s*updatedAt:\\s*new Date\\(\\)\\s*\\}",
+          "desc": "the existing-shift branch of generateShifts re-sets ONLY isPeakHour/peakHourScore/updatedAt - capacity (minDrivers/maxDrivers) is written once at creation and never recomputed, so any sizing change needs an in-place backfill. If this pattern stops matching, capacity may now be refreshed and CORE.md invariant 10 needs re-checking."
         }
       ]
     },

@@ -87,6 +87,19 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **A shift's capacity is written once, at creation, and never recomputed.** When
+    `generateShifts` finds a shift already exists for `{date, startTime, endTime, cityAreaId}`
+    it updates only `isPeakHour`, `peakHourScore` and `updatedAt`, then `continue`s
+    (`services/driver-shift/shift-service.js`) — `minDrivers`/`maxDrivers` are never revisited.
+    So a change to the sizing formula, to `ordersPerDriver` / `driverCalculationBuffer`, or to
+    `minDriversCap` / `maxDriversCap` takes effect only for shifts created **afterwards**, and
+    re-running generation over dates that already have slots will **not** correct them. Any
+    sizing fix needs an explicit in-place backfill of `driverShifts` — an update rather than
+    delete-and-regenerate, because future shifts already carry `bookedDrivers`. This is easy
+    to miss because the symptom is silent: `minDrivers` is the required-headcount contract
+    downstream (`services/exec-dashboard/delivery-metrics.js` reads it as `required` for gap
+    and fill-rate), so a stale, too-small value reports a *healthy* fill rate rather than a
+    missing driver.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
