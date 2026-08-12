@@ -75,7 +75,7 @@
         {
           "file": "routes/payments/admin.js",
           "regex": "discountAmount\\s*=\\s*\\(storeDiscount\\s*/\\s*100\\)\\s*\\*\\s*orderPrice",
-          "desc": "CORE invariant 7: a percentage-type coupon bills the store a percentage of the ITEMS subtotal even when its discountType is 'delivery' — couponDeliverySplit deliberately diverges and takes the share off the delivery waiver instead (owner ruling 2026-08-12)"
+          "desc": "CORE invariant 7: a percentage-type coupon bills the store a percentage of the ITEMS subtotal even when its discountType is 'delivery' — couponDeliverySplit deliberately diverges and takes the share off order.shippingPrice instead (owner ruling 2026-08-12)"
         },
         {
           "file": "routes/admin/masav.js",
