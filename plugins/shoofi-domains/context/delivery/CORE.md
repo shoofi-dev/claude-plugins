@@ -36,6 +36,25 @@ has **BOTH** `supportedCities` (permission) **AND** `supportedAreas` (the wired 
 **fully replaces** company coverage.
 **ID trap:** `area.cityId` is a **string**, cities/`supportedCities` are **ObjectIds** — always
 normalize (`getId()` / `.toString()`).
+**Name collision — `supportedCities` means two different things in two different collections.**
+The one above is on `delivery-company.store` (a delivery **company**) and is a *permission*.
+The identically-named field on the **central `shoofi.stores`** doc (a **merchant**) is not a
+permission at all: it is **derived from the shop's own location** — the `cities` polygons its
+map pin falls inside, via `POST /api/delivery/cities/by-location`
+(`routes/delivery/geography.js:750`, a `$geoIntersects` at `:760`), written read-only by the
+admin form (`shoofi-delivery-web/src/views/admin/stores/StoreForm.tsx` — "the checkboxes are
+read-only, users move the map pin instead"). So on a merchant it identifies the store's own
+**pickup zone(s)**, and it is the only link from an order to a zone: both shift demand
+(`services/driver-shift/peak-hour-detection.js`) and `orders-time-slots`
+(`routes/analytics.js`) attribute a store's orders to a region by intersecting this field with
+`cityAreas.cityIds`. Two consequences for anything aggregating orders by zone or region:
+overlapping polygons mean a store can legitimately carry **several** zones — including two in
+the *same* region — so a per-zone loop must de-duplicate its store set or it double-counts;
+and a store with the field **empty** (a pin outside every polygon, or a store predating the
+geo-derivation) is attributable to no zone at all. Treating that empty case as "matches every
+zone" — the shape `if (store.supportedCities?.length > 0) { filter }` produces — silently adds
+its full order volume to every region on the map. `routes/analytics.js` has the correct
+fallback: empty `supportedCities` falls back to `store.cityId`, and no match means excluded.
 **`isActive` trap — an area is dispatchable only on a STRICT `true`.** `findBestAreaForLocation`
 builds `areaQuery.isActive = true` (`services/delivery/assignDriver.js`), and the coverage-alert
 and store-availability crons filter the same way. But **`POST /api/delivery/area/add` never sets

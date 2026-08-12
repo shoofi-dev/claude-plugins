@@ -21,7 +21,9 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "services/driver-shift/peak-hour-detection.js",
+        "routes/analytics.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -38,7 +40,8 @@
         ],
         "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "services/delivery/book-delivery.js": ["originalBookId"],
+        "services/driver-shift/peak-hour-detection.js": ["supportedCities"]
       },
       "patterns": [
         {
@@ -95,6 +98,16 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "routes/delivery/geography.js",
+          "regex": "api/delivery/cities/by-location",
+          "desc": "the geo lookup that DERIVES a merchant's shoofi.stores.supportedCities from its map pin - which is why that field is a PICKUP zone, not a delivery permission like the identically-named field on delivery-company.store"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "store\\.cityId && cityIdsToFilter\\.includes",
+          "desc": "the correct region store filter: empty supportedCities falls back to store.cityId, and no match means EXCLUDED - not 'matches every zone', which would add the store's whole order volume to every region"
         }
       ]
     },
@@ -122,6 +135,16 @@
           "file": "screens/delivery-driver/index.tsx",
           "regex": "twinAssignmentMode",
           "desc": "twin pairs collapse into TwinOrderCard unless mode is split"
+        }
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": ["src/views/admin/stores/StoreForm.tsx"],
+      "patterns": [
+        {
+          "file": "src/views/admin/stores/StoreForm.tsx",
+          "regex": "delivery/cities/by-location",
+          "desc": "a merchant's supportedCities is written read-only from the map pin, never chosen by hand - if this moves, the 'derived from location' claim in CORE.md needs re-checking"
         }
       ]
     },
