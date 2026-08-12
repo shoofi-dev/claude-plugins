@@ -93,6 +93,16 @@
           "file": "routes/order.js",
           "regex": "originalOrderDate",
           "desc": "/update-delay shifts orderDate and preserves the original (ref §5)"
+        },
+        {
+          "file": "consts/consts.js",
+          "regex": "PICKED_UP:\\s*\"10\"",
+          "desc": "PICKED_UP is an order STATUS - the driver collecting from the restaurant - NOT a receipt method (CORE invariant 10)"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "receipt_method:\\s*receiptMethod\\s*\\|\\|\\s*'DELIVERY'",
+          "desc": "the only server-side write of receipt_method; everywhere else the client value is stored verbatim and unvalidated (CORE invariant 10)"
         }
       ]
     },
@@ -128,6 +138,16 @@
           "file": "components/checkout/FutureOrderPicker.tsx",
           "regex": "MAX_RAMADAN_DAYS_AHEAD",
           "desc": "ramadan-iftar orders can be days ahead without isFutureOrder"
+        },
+        {
+          "file": "consts/shared.ts",
+          "regex": "driveIn:\\s*\"DRIVEIN\"",
+          "desc": "DRIVEIN carries no underscore - routes/analytics.js matches DRIVE_IN and counts 0 (CORE invariant 10)"
+        },
+        {
+          "file": "stores/cart/index.ts",
+          "regex": "receipt_method:\\s*\"DELIVERY\"\\s*\\|\\s*\"TAKEAWAY\"\\s*\\|\\s*\"DRIVEIN\"\\s*\\|\\s*\"TABLE\"",
+          "desc": "the complete receipt_method union - there is no PICKUP (CORE invariant 10)"
         }
       ]
     },
