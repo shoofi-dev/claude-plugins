@@ -21,7 +21,8 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "services/exec-dashboard/delivery-metrics.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -30,15 +31,26 @@
           "supportedCities",
           "supportedAreas"
         ],
-        "services/delivery/driver-status-service.js": ["setDriverActiveStatus"],
+        "services/delivery/driver-status-service.js": [
+          "setDriverActiveStatus"
+        ],
         "services/driver-shift/shift-service.js": [
           "getPermanentDriverSlotsForDay",
           "assignPermanentDriversToShifts",
           "dayTimeSlots"
         ],
-        "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
-        "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "utils/driver-active-hours.js": [
+          "workingDayBounds",
+          "workingHoursWindow",
+          "shiftWindows"
+        ],
+        "services/delivery/delayed-assignment.js": [
+          "isPendingAssignment",
+          "assignDriverAt"
+        ],
+        "services/delivery/book-delivery.js": [
+          "originalBookId"
+        ]
       },
       "patterns": [
         {
@@ -95,6 +107,21 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "bookId:\\s*order\\.orderId",
+          "desc": "bookDelivery.bookId is the customer-facing order.orderId, not the delivery _id - safe to print and to join back to orders.orderId"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "bookId:\\s*insertRetsult\\?\\.insertedId\\.toString\\(\\)",
+          "desc": "the ONLY site writing a non-order-number bookId; it sits in /api/order/book-custom-delivery, which throws on an undefined `order` before booking, so it never runs - if this line moves or the throw is fixed, downstream code that treats bookId as an order number needs revisiting"
+        },
+        {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "bookId:\\s*row\\.bookId\\s*\\|\\|\\s*null",
+          "desc": "exec-dashboard late-orders drill returns bookId, nullable - the admin UI must render it, not use it as a fallback for a missing store name"
         }
       ]
     },
@@ -126,7 +153,10 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "hooks/useAvailableDrivers.ts"],
+      "files": [
+        "consts/shared.ts",
+        "hooks/useAvailableDrivers.ts"
+      ],
       "patterns": [
         {
           "file": "consts/shared.ts",

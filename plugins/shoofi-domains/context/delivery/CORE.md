@@ -87,6 +87,18 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **`bookDelivery.bookId` is the customer-facing ORDER NUMBER, not the delivery's `_id`.**
+    It is copied from `order.orderId` at every live write — partner-accept
+    (`routes/order.js:5545`), plus the re-book and twin paths (`:4668`, `:5947`, `:6245`) — so
+    it is safe to print to a human and to join back to `orders.orderId`. The one site that
+    assigns something else, `bookId: insertRetsult?.insertedId.toString()` in
+    `/api/order/book-custom-delivery` (`routes/order.js:5621`), is **unreachable**: the same
+    object literal reads `order.app_language`, and no `order` binding exists in that handler,
+    so it throws into the surrounding catch and returns 400 before
+    `deliveryService.bookDelivery` is ever called. Ad-hoc "custom" deliveries therefore never
+    reach the delivery company at all, and no ObjectId-shaped `bookId` is being written today.
+    Do not defend downstream code against one — but `bookId` IS nullable on older rows, and
+    `services/exec-dashboard/delivery-metrics.js:205` projects it as `row.bookId || null`.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
