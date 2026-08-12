@@ -61,6 +61,22 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    "Is this order for a later day?" must therefore test **both**, **truthily** — as the server
    does (`routes/order.js`: `$or: [{isFutureOrder:{$ne:true}},{isFutureOrder:{$exists:false}}]`).
    Testing `isFutureOrder` alone silently misses every ramadan order.
+10. **`order.order.receipt_method` is client-written, unvalidated, and there is no
+    `PICKUP`.** The set is `DELIVERY` | `TAKEAWAY` | `DRIVEIN` (**no underscore**) | `TABLE`,
+    declared per repo in `consts/shared.ts` `SHIPPING_METHODS` — `shoofi-shoofir` and
+    `shoofi-delivery-web` omit `driveIn`, the same drift as `ORDER_STATUS`. `routes/order.js`
+    spreads `...parsedBodey.order` straight into `orderDoc.order`, so the server **never
+    normalises, uppercases or whitelists** it; the only server-side write is
+    `twin-order.js` (`receipt_method: receiptMethod || 'DELIVERY'`). **`TAKEAWAY` is the one
+    and only self-collection method** — a literal `"PICKUP"` is written by no client and
+    stored on no order. `PICKED_UP` here means the **driver collecting from the restaurant**
+    (`ORDER_STATUS.PICKED_UP = "10"`, `consts/consts.js`), which is how it keeps getting
+    mistaken for one. So anything grouping by receipt method must tolerate an unknown key and
+    must **not** offer a pickup bucket. Both mistakes are live: the growth dashboard carries a
+    `PICKUP: "איסוף עצמי"` slice that can never receive a count
+    (`shoofi-delivery-web/src/views/admin/growth/RevenueAnalytics.tsx`), and
+    `routes/analytics.js` matches `"DRIVE_IN"` with an underscore, so the store-stats
+    `driveInOrders` is permanently 0 for every store.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
