@@ -104,10 +104,17 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      surfacing — **do not clamp it at zero**, which only hides it.
    - **A `percentage`-type coupon is billed as `(storeDiscount / 100) * orderPrice`**,
      where `orderPrice` is the **items subtotal** (`originalOrderPrice` — no shipping, no
-     drive-in) — *even when the coupon's `discountType` is `delivery`*. So a delivery
-     coupon's store share is not necessarily a delivery amount at all and cannot be
-     attributed to the fee. `lib/payments/calc.js` counts those rather than guessing
-     (`isPercentageStoreDeliveryCoupon`), and leaves them in Shoofi's share.
+     drive-in) — *even when the coupon's `discountType` is `delivery`*. So what the
+     store report charges for a percentage delivery coupon is not a delivery amount.
+     **A percentage `storeDiscount` means a SHARE, not an amount** (owner ruling,
+     2026-08-12): the delivery fee differs from city to city, so the same coupon must
+     cost the store more where the fee is higher, which a fixed shekel value cannot
+     express. `couponDeliverySplit` (`lib/payments/calc.js`) therefore takes that
+     percentage off the **delivery waiver**, and **deliberately diverges from
+     `:1137-1138` for these coupons**. `isPercentageStoreDeliveryCoupon` counts them so
+     the divergence is measurable (`percentageShareCoupons` on the exec-dashboard month
+     detail) rather than invisible. Fixing the report's base to match is a **live
+     billing change** — it moves what stores are charged, and belongs to its own ticket.
    - **The row pushed at `:1145` carries no items/delivery split** (unlike the
      `full_discount` rows at `:1236`), so `campaignsList` is not splittable for
      `delivery`/`order_items` coupons. `full_discount` is the **only** coupon type with a
