@@ -68,17 +68,21 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     **monoalphabetic substitution cipher with no positional diffusion**, so any subset of the
     groups carries far less entropy than its digit count suggests. Keeping only groups 1 and 3
     (`xxxx-xxxx`) — as order creation did until `fix/HIGH-RISK-order-id-collisions` — leaves
-    ~5e7 effective values and **collides in production**: at 129,589 orders there were 8
-    same-store and 187 cross-store duplicate order numbers. That matters because the order
-    number is a **lookup key**, several times in central DBs with no `appName` filter:
-    `delivery-company.book-delivery.bookId` (= the store order's `orderId`; 86 duplicate
-    groups, some spanning two stores) read/written by `routes/order-amend.js` and
+    ~5e7 effective values. Measured through the real generator, 200,000 full IDs collide 0
+    times and the truncated form collides ~400 (independently reproduced: 417 and 391). That
+    matters because the order number is a **lookup key**, several times in central DBs with
+    no `appName` filter:
+    `delivery-company.book-delivery.bookId` (= the store order's `orderId`, and that
+    collection is shared by every store) read/written by `routes/order-amend.js` and
     `services/delivery/book-delivery.js`; `shoofi.customersFeedback.orderId`
     (`routes/customer-feedback.js`); `shoofi.orderFlowEvents.orderNumber`
     (`services/monitoring/centralized-flow-monitor.js`); plus
     `routes/admin/order-monitoring.js`, `routes/delivery/orders.js` and
     `utils/twin-order-visibility.js`. Use `getShortOrderId()` when a human needs a short form
-    to quote — it returns the **last** group and must never become a key.
+    to quote — it returns the **last** group and must never become a key. Creation is safe
+    either way: the `book-delivery` insert-time dedupe keys on the full `originalBookId`; the
+    exposure is on the update/read side. One length constraint: `lib/common.js` `getId()`
+    treats any 24-character string as an ObjectId, so an order number must never be 24 chars.
     **Naming trap:** in `shoofi.orderFlowEvents` the fields are inverted from every other
     collection — `orderId` is the Mongo `_id` (`getId(orderId)`) and `orderNumber` is the
     display ID (`centralized-flow-monitor.js:38-40`).

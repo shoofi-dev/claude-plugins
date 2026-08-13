@@ -106,7 +106,11 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 
 ## 5. Data model — the join map (memorize the snapshot trap)
 - **Store `<app>.orders`** = authoritative. Join key `_id` (ObjectId). Display
-  `orderId` (`"8475-2384"`), `originalOrderId` (`"8475-570235-2384"`).
+  `orderId` and `originalOrderId`, both `"8475-570235-2384"` for orders created
+  after `fix/HIGH-RISK-order-id-collisions`. Orders created BEFORE it have a
+  truncated 9-char `orderId` (`"8475-2384"`) alongside the full `originalOrderId`
+  — that short form was a **defect, not a format** (CORE invariant 10), so do not
+  reproduce it or treat 9 characters as the shape to match.
 - **`shoofi.customers.orders[]`** = a **write-once snapshot with NO status field.**
   `{ orderId(ObjectId→orders._id), appName, created, total, orderIdNumber(=orders.orderId),
   originalOrderId, ... }`. **NEVER infer status/completion/revenue from it** — join
