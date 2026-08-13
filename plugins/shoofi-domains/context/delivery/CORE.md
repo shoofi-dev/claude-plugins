@@ -98,6 +98,27 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    not how long service was down. `computeStoppages`
    (`services/exec-dashboard/delivery-metrics.js`) counted rows and put 1,718 "outages" on the
    exec dashboard. The **per-area** grain is the one place the fan-out is correct.
+11. **The nightly close-everything / open-everything is manual, and nothing marks it as
+   routine.** Ops shut every area at the end of the night and reopen them in the morning by
+   clicking `bulk-toggle-areas` once per region. Those rows are byte-identical in shape to a
+   real incident: `source: "admin_web"`, `resumeKind: "manual"`, a named human actor, and the
+   same generated `reason` string that every bulk toggle gets
+   (`services/delivery/availability-status-service.js`). There is **no scheduled-close flag to
+   filter on** — any "exclude the routine close" logic has to be a time rule. The 08:00
+   `utils/crons/delivery-support-auto-open.js` is not it: it only ever touches
+   `shoofi.store {id:1}.delivery_support` and records a **platform**-scope row, never an area
+   (0 non-`area` rows in the whole trace as of 2026-08-13). Observed spread of the manual
+   toggles across August 2026: closes **01:43–02:03**, reopens **08:53–09:15**, which is why
+   `SHIFT_EDGE_GRACE_MIN` (`utils/business-day.js`) trims 30 minutes off each edge of the
+   operating window before measuring downtime.
+12. **The 09:00→02:00 operating window is uniform today by coincidence, not by construction.**
+   `delivery-company.driver-shift-config` holds exactly two docs — one per live region — and
+   both read `timeSlotTemplate: { startHour: 9, endHour: 2 }` (production, 2026-08-13), which
+   is what `OPERATING_HOURS_START/END` in `utils/business-day.js` mirror. But **neither code
+   path that creates a config defaults to those values**: `services/driver-shift/shift-service.js`
+   auto-creates `9→24` and the `models/DriverShift.js` constructor defaults to `8→22`. A third
+   region added later gets `9→24` silently, and every shift-hours assumption — including the
+   exec dashboard's — is wrong for it without a single error.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`

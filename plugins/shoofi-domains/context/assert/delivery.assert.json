@@ -23,7 +23,10 @@
         "docs/delivery-areas-model.md",
         "services/database/DatabaseInitializationService.js",
         "services/delivery/availability-status-service.js",
-        "services/exec-dashboard/delivery-metrics.js"
+        "services/exec-dashboard/delivery-metrics.js",
+        "utils/business-day.js",
+        "utils/crons/delivery-support-auto-open.js",
+        "services/driver-shift/shift-service.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -49,6 +52,11 @@
         "services/exec-dashboard/delivery-metrics.js": [
           "computeStoppages",
           "operatingMinutesOfUnion"
+        ],
+        "utils/business-day.js": [
+          "OPERATING_HOURS_START",
+          "OPERATING_HOURS_END",
+          "SHIFT_EDGE_GRACE_MIN"
         ]
       },
       "patterns": [
@@ -116,6 +124,21 @@
           "file": "services/exec-dashboard/delivery-metrics.js",
           "regex": "ev\\.correlationId\\s*\\|\\|",
           "desc": "stoppages are counted per switch-off (grouped by correlationId), not per trace row"
+        },
+        {
+          "file": "utils/business-day.js",
+          "regex": "SHIFT_EDGE_GRACE_MIN\\s*=\\s*30",
+          "desc": "the shift-changeover band the nightly close/open is excluded by - ops toggle between 01:43-02:03 and 08:53-09:15"
+        },
+        {
+          "file": "utils/crons/delivery-support-auto-open.js",
+          "regex": "delivery_support",
+          "desc": "the 08:00 auto-open touches the platform switch only, never areas - it is NOT the nightly area reopen"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "endHour:\\s*24",
+          "desc": "shift-config auto-create defaults to 9->24, NOT the 9->2 both live regions actually run - a new region breaks the operating-window assumption"
         }
       ]
     },
