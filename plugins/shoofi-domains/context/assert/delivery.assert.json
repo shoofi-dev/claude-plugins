@@ -13,6 +13,7 @@
         "routes/driver-shift-manager.js",
         "routes/geo.js",
         "services/driver-shift/shift-service.js",
+        "services/driver-shift/peak-hour-detection.js",
         "utils/driver-active-hours.js",
         "utils/crons/driver-shift-cron.js",
         "services/delivery/assignDriver.js",
@@ -85,6 +86,31 @@
           "file": "services/driver-shift/shift-service.js",
           "regex": "getPermanentDriverSlotsForDay",
           "desc": "single per-weekday resolver; iterating the flat timeSlots over-books every weekday"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "static computeCapacity",
+          "desc": "the ONLY place minDrivers/maxDrivers are derived from demand; the grid's x/y reads the stored result, not a live calculation"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "minDriversCap !== null",
+          "desc": "minDriversCap is a hard OVERRIDE of the computed value, not a floor - an area that sets it shows a constant on every slot"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "existing\\.capacityOverridden",
+          "desc": "regeneration re-levels existing shifts EXCEPT hand-edited ones; there is no cron, so nothing else ever moves a stored minDrivers"
+        },
+        {
+          "file": "services/driver-shift/peak-hour-detection.js",
+          "regex": "const totalDays = areaActiveDates\\.size",
+          "desc": "one whole-day divisor shared by all 24 slots - not per-slot days-with-orders, which overstates quiet hours"
+        },
+        {
+          "file": "services/driver-shift/peak-hour-detection.js",
+          "regex": "now\\.clone\\(\\)\\.startOf\\('day'\\)",
+          "desc": "the lookback window ends at local midnight, exclusive - the day in progress counted as a full day in the divisor while supplying orders only to the hours already elapsed, so the same week sized differently depending on when Generate was pressed"
         },
         {
           "file": "utils/driver-active-hours.js",

@@ -87,6 +87,28 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **The `x/y` on the shifts grid is a STORED number, not a live calculation.**
+    `driverShifts.minDrivers` is written once, at generation, by
+    `ShiftService.computeCapacity` (`services/driver-shift/shift-service.js`):
+    `min = ceil(ceil(avgOrders / ordersPerDriver) × (1 + driverCalculationBuffer/100))`,
+    `max = ceil(min × 1.2)` (a booking ceiling, not a second estimate of demand).
+    `avgOrders` comes from `PeakHourDetectionService.detectPeakHours`
+    (`services/driver-shift/peak-hour-detection.js`), which counts **orders in the
+    stores' own DBs** — `status ∈ {2,3,10,11,12}`, `order.receipt_method:"DELIVERY"`,
+    stores placed by `supportedCities`/`cityId` in the area's pickup zones and filtered
+    to live ones — and divides by `areaActiveDates.size`, the count of **whole** days
+    in the lookback on which that weekday traded at all. One divisor for all 24 slots.
+    Consequences a fresh read misses: nothing re-levels by itself (there is **no cron**;
+    `POST /admin/shifts/generate` is the only writer), so a corrected formula does not
+    move a row already on the calendar; `copy-week` carries the source week's numbers
+    over verbatim; a hand edit sets `capacityOverridden` and is never re-levelled; and
+    `minDriversCap` is a **hard override**, not a floor — set it and the whole formula
+    is bypassed. To check a displayed cell without touching the calendar, call
+    `POST /api/driver-shift-manager/config/detect-peak-hours` with the `cityAreaId` and
+    a `dayOfWeek` — it runs the identical code path. **The measurement window is whole
+    days only** (`endDate = now.startOf('day')`, exclusive): the day in progress used to
+    count as a full day in the divisor while supplying orders only to the hours already
+    elapsed, so the same week sized differently depending on when Generate was pressed.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
