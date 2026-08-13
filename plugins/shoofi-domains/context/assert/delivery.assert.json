@@ -126,6 +126,11 @@
           "desc": "stoppages are counted per switch-off (grouped by correlationId), not per trace row"
         },
         {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "minutes = operatingMinutesOfUnion\\(countedIntervals\\)",
+          "desc": "stoppage MINUTES are the wall-clock union ACROSS switch-offs, not their sum - closing the platform is one click per region, so concurrent actions overlap"
+        },
+        {
           "file": "utils/business-day.js",
           "regex": "SHIFT_EDGE_GRACE_MIN\\s*=\\s*30",
           "desc": "the shift-changeover band the nightly close/open is excluded by - ops toggle between 01:43-02:03 and 08:53-09:15"

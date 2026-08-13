@@ -98,6 +98,17 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    not how long service was down. `computeStoppages`
    (`services/exec-dashboard/delivery-metrics.js`) counted rows and put 1,718 "outages" on the
    exec dashboard. The **per-area** grain is the one place the fan-out is correct.
+   **Grouping by `correlationId` is necessary but not sufficient: one `correlationId` is one
+   *region click*, not one operator intent.** The admin screen toggles a single region at a
+   time (`selectedCityAreaId`, `shoofi-delivery-web`
+   `src/views/admin/settings/ShoofiSettings.tsx`), so "close the platform for the night" is
+   always **two** clicks and therefore two `correlationId`s, consistently ~2 seconds apart —
+   7 such pairs out of the 17 switch-offs in August 2026. Duration must be unioned **across**
+   switch-offs as well as within one, or the total is still area-weighted at a coarser grain:
+   300 minutes summed for August 2026 against 182 of real wall-clock. Counting the actions
+   separately is right (two regions is two decisions); adding their minutes is not (it was one
+   interruption) — so `count` and `minutes` are deliberately different units in
+   `computeStoppages`, and the widget's minutes are not the sum of its events.
 11. **The nightly close-everything / open-everything is manual, and nothing marks it as
    routine.** Ops shut every area at the end of the night and reopen them in the morning by
    clicking `bulk-toggle-areas` once per region. Those rows are byte-identical in shape to a
