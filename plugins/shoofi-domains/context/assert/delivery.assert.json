@@ -21,7 +21,9 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "services/delivery/availability-status-service.js",
+        "services/exec-dashboard/delivery-metrics.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -38,7 +40,16 @@
         ],
         "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "services/delivery/book-delivery.js": ["originalBookId"],
+        "services/delivery/availability-status-service.js": [
+          "recordBulkAreaTransitions",
+          "correlationId",
+          "affectedAreas"
+        ],
+        "services/exec-dashboard/delivery-metrics.js": [
+          "computeStoppages",
+          "operatingMinutesOfUnion"
+        ]
       },
       "patterns": [
         {
@@ -95,6 +106,16 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/delivery/availability-status-service.js",
+          "regex": "correlationId:\\s*groupId",
+          "desc": "a bulk area toggle stamps every row it writes with ONE correlationId - one click, ~100 trace rows"
+        },
+        {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "ev\\.correlationId\\s*\\|\\|",
+          "desc": "stoppages are counted per switch-off (grouped by correlationId), not per trace row"
         }
       ]
     },

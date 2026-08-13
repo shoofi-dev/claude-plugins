@@ -87,6 +87,17 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **`delivery-availability-events` is written per AREA, not per switch-off.** A "close the
+   city" click is one `updateMany` that fans out to one trace row *per area under the region*
+   — `recordBulkAreaTransitions` (`services/delivery/availability-status-service.js`) loops
+   the affected areas and inserts a row each, all sharing one **`correlationId`**. In prod the
+   two regions closed nightly expand to **99 and 104 areas**, so 17 admin clicks in August 2026
+   wrote **1,718 rows**. Anything counting outages must group by `correlationId` (falling back
+   to `_id` for the single-area endpoint, which writes none) and take the **union** of the
+   grouped intervals for duration — summing row durations measures how many areas went down,
+   not how long service was down. `computeStoppages`
+   (`services/exec-dashboard/delivery-metrics.js`) counted rows and put 1,718 "outages" on the
+   exec dashboard. The **per-area** grain is the one place the fan-out is correct.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
