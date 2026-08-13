@@ -88,6 +88,16 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
 
+10. **`minDriversCap`/`maxDriversCap` REPLACE the computed capacity — they do not bound it.**
+    `ShiftService.computeCapacity` assigns `minDrivers = minDriversCap` outright when the field
+    is set (`services/driver-shift/shift-service.js`), and the admin form is explicit about it:
+    the placeholder reads **"אופציונלי - דורס את החישוב"**. So a cap of 1 pins the entire region
+    to one driver a slot and `ordersPerDriver` stops doing anything at all. منطقة الطيبه sets
+    `minDriversCap: 1` / `maxDriversCap: 3`, and **775 of its 786 slots since July 2026 carry
+    `minDrivers: 1`**; منطقة كفر قاسم, with both caps `null`, ranges 1–15 across the day. Read
+    the caps out of `delivery-company.driver-shift-config` BEFORE investigating the demand
+    model — "I changed ordersPerDriver and nothing moved" is this field, not the aggregation.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
   is the **GLOBAL master switch** for the delivery-company/driver integration — when off,

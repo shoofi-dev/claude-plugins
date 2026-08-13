@@ -95,6 +95,11 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "minDrivers\\s*=\\s*minDriversCap",
+          "desc": "minDriversCap REPLACES the computed capacity rather than bounding it - a cap of 1 pins the whole region to one driver a slot and ordersPerDriver stops mattering"
         }
       ]
     },
