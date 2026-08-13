@@ -41,6 +41,11 @@
       },
       "patterns": [
         {
+          "file": "services/coupons/coupon-usage.js",
+          "regex": "insertCouponUsageDocs\\(shoofiDB, withBreakdown, order, new Date\\(\\)\\)",
+          "desc": "the reconcile path writes couponUsages.usedAt as a BSON Date while routes/order.js writes an offset string - the field is mixed-type, and a Mongo bound of one type silently matches none of the other"
+        },
+        {
           "file": "routes/payments/admin-reports.js",
           "regex": "totalForTransfer\\s*=\\s*creditCardRevenue",
           "desc": "CORE money formula: transfer is credit-card revenue minus outcomes"

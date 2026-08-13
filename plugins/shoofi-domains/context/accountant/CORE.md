@@ -92,6 +92,19 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
 
+7. **`shoofi.couponUsages.usedAt` is stored as BOTH a string and a Date, and Mongo
+   comparisons are TYPE-BRACKETED.** The order paths write an offset string
+   (`routes/order.js:2469` — `moment().utcOffset(offsetHours).format()`); the amendment
+   reconcile path writes a real Date (`services/coupons/coupon-usage.js:241` —
+   `insertCouponUsageDocs(..., new Date())`). Production holds **15,800 strings and 3,879
+   Dates**. A `$gte`/`$lte` bound of one type matches **none** of the other type — it does
+   not skew the number, it silently omits that whole population. Any window over `usedAt`
+   needs `$or` of both bounds until the field is normalised. The same trap bites the other
+   way round on `shoofi.compensations.createdAt`, which is a real Date
+   (`routes/shoofi-admin.js:2748`): the growth snapshot bounded it with ISO strings and
+   matched **zero** rows for years — 204 items worth ₪19,022 in July 2026 alone reported as
+   nothing. Check `$type` before writing any date window in this domain.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
