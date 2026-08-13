@@ -108,6 +108,35 @@ All of these are **known and accepted for now**. They are scheduled work, not di
   registration, but the server routes on **`app-type`**, so the token lands correctly on
   `delivery-company.customers`. (Leftovers: an unused `db` variable in that handler, and a
   misleading header that *would* become a bug if the handler ever routed on `app-name`.)
+  **Scope — this verdict covers the `app-name` HEADER on identity calls, and nothing else.**
+  It does not bless `shoofi` as an appName generally: where an appName is a **store
+  selector**, `shoofi` is always wrong. See customer feedback below.
+
+## Customer feedback — `appName` arrives in the BODY and names a store
+`POST /api/customer-feedback/submit` (`routes/customer-feedback.js`) does **not** read the
+`app-name` header. It takes `appName` from the **request body**, uses it as a store selector,
+and freezes a `storeName` onto the row at write time — so a wrong value here is wrong forever
+in both admin screens, which display the stored string rather than re-resolving it. Three
+traps:
+- **`shoofi` and `delivery-company` are system databases, not stores** (`lib/db.js`
+  short-circuits them in `getOrInitializeDb`). `req.app.db['shoofi']` is a real, truthy handle,
+  so a bad appName sends a store's `orderId` into the **central** DB instead of failing — a
+  cross-tenant read that returns null and silently costs the row its `receiptMethod`,
+  `orderCreatedAt` and order-derived customer details.
+- **The client gets that appName from a push payload.** `utils/crons/feedback-notification-cron.js`
+  sends the "rate your order" push with routing `appName: "shoofi"` and the real store inside
+  `data`. `services/notification/notification-service.js` builds the payload with the routing
+  name LAST, so it overwrote `data.appName` and every rating came back tagged `shoofi`
+  (introduced 2026-08-01 by `22af4dec`; fixed by
+  `fix/push-payload-appname-clobbered-by-routing-app`). `data.appName` must win over the
+  envelope one — they name different things.
+- **Never resolve a store label inline.** Use `getStoreDisplayNames` (`utils/store-display-name.js`);
+  `shoofi.stores` has no `storeName` or `name` field, only `name_ar` / `name_he`.
+Repairing a mislabelled row: join on `orderObjectId` (the store-DB `_id`) across live stores.
+**Not** on `orderId` — the human order number is not unique across stores.
+
+- **KNOWN:** the endpoint is unauthenticated and trusts a client-supplied `appName`. Part of the
+  parked identity-adjacent surface above — do not widen it, and do not add auth unasked.
 
 ## Recipe — touching an auth or identity path
 1. State **which of the four app-types** your change affects — they all share these endpoints.

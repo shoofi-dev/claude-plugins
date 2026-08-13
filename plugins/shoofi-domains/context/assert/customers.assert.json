@@ -18,12 +18,23 @@
         "utils/customer-orders.js",
         "docs/customer-orders-snapshot.md",
         "routes/order.js",
-        "package.json"
+        "package.json",
+        "utils/store-display-name.js",
+        "utils/crons/feedback-notification-cron.js",
+        "services/notification/notification-service.js"
       ],
       "symbols": {
-        "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
-        "utils/auth-service.js": ["generateJWT", "toAuthJSON"],
-        "utils/app-name-helper.js": ["getCustomerAppName"],
+        "services/database/DatabaseInitializationService.js": [
+          "store-users",
+          "persistent-alerts"
+        ],
+        "utils/auth-service.js": [
+          "generateJWT",
+          "toAuthJSON"
+        ],
+        "utils/app-name-helper.js": [
+          "getCustomerAppName"
+        ],
         "utils/customer-orders.js": [
           "COMPLETED_STATUSES",
           "CANCELLED_STATUSES",
@@ -38,7 +49,14 @@
           "attributeCustomerToReferrer",
           "recordFirstOrderForReferrer"
         ],
-        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store"]
+        "routes/customer.js": [
+          "validateAuthCode",
+          "authCode",
+          "switch-store"
+        ],
+        "utils/store-display-name.js": [
+          "getStoreDisplayNames"
+        ]
       },
       "patterns": [
         {
@@ -110,11 +128,34 @@
           "file": "routes/order.js",
           "regex": "created: moment\\(new Date\\(\\)\\)\\.utcOffset\\(offsetHours\\)\\.format\\(\\)",
           "desc": "orders.created - and the customers.orders[] snapshot of it - is an ISO string with an Israel offset, the opposite type from customers.created on the same document"
+        },
+        {
+          "file": "routes/customer-feedback.js",
+          "regex": "getStoreDisplayNames\\(shoofiDb, appName\\)",
+          "desc": "feedback resolves the store label via the shared helper; shoofi.stores has no storeName/name field"
+        },
+        {
+          "file": "routes/customer-feedback.js",
+          "regex": "SYSTEM_DBS",
+          "desc": "shoofi/delivery-company are system DBs - a body appName must never reach req.app.db as if it were a store"
+        },
+        {
+          "file": "services/notification/notification-service.js",
+          "regex": "data\\?\\.appName \\|\\| appName",
+          "desc": "data.appName (the STORE) wins over the routing appName in a push payload - see customers CORE, customer feedback"
+        },
+        {
+          "file": "utils/crons/feedback-notification-cron.js",
+          "regex": "appName: item\\.appName",
+          "desc": "the feedback push carries the real store inside data; the envelope appName is the routing app"
         }
       ]
     },
     "shoofi-partner": {
-      "files": ["stores/auth/index.ts", "stores/user-details/index.tsx"],
+      "files": [
+        "stores/auth/index.ts",
+        "stores/user-details/index.tsx"
+      ],
       "patterns": [
         {
           "file": "stores/auth/index.ts",
