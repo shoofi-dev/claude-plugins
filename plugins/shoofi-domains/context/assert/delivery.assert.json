@@ -21,7 +21,10 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "services/delivery/availability-status-service.js",
+        "utils/business-day.js",
+        "services/exec-dashboard/delivery-metrics.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -30,15 +33,30 @@
           "supportedCities",
           "supportedAreas"
         ],
-        "services/delivery/driver-status-service.js": ["setDriverActiveStatus"],
+        "services/delivery/driver-status-service.js": [
+          "setDriverActiveStatus"
+        ],
         "services/driver-shift/shift-service.js": [
           "getPermanentDriverSlotsForDay",
           "assignPermanentDriversToShifts",
           "dayTimeSlots"
         ],
-        "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
-        "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "utils/driver-active-hours.js": [
+          "workingDayBounds",
+          "workingHoursWindow",
+          "shiftWindows"
+        ],
+        "services/delivery/delayed-assignment.js": [
+          "isPendingAssignment",
+          "assignDriverAt"
+        ],
+        "services/delivery/book-delivery.js": [
+          "originalBookId"
+        ],
+        "services/delivery/availability-status-service.js": [
+          "recordAvailabilityTransition",
+          "recordBulkAreaTransitions"
+        ]
       },
       "patterns": [
         {
@@ -95,6 +113,26 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/delivery/availability-status-service.js",
+          "regex": "DISPATCH_BLOCKING:\\s*\"dispatch_blocking\"",
+          "desc": "only dispatch_blocking rows are outages; cityArea/parentCity flips are visibility_only"
+        },
+        {
+          "file": "services/delivery/availability-status-service.js",
+          "regex": "correlationId: groupId",
+          "desc": "a bulk region toggle writes one row per area, all sharing one correlationId - group by it before counting events"
+        },
+        {
+          "file": "utils/business-day.js",
+          "regex": "function isRoutineNightlyClosure",
+          "desc": "the classifier that keeps the nightly ~02:00 close / ~09:00 reopen out of outage counts"
+        },
+        {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "isRoutineNightlyClosure",
+          "desc": "the stoppage widget excludes the ritual; counting raw rows read 1,718 outages in one week"
         }
       ]
     },
@@ -126,7 +164,10 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "hooks/useAvailableDrivers.ts"],
+      "files": [
+        "consts/shared.ts",
+        "hooks/useAvailableDrivers.ts"
+      ],
       "patterns": [
         {
           "file": "consts/shared.ts",

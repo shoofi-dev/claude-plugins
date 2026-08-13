@@ -48,6 +48,27 @@ scope documents above it — `cityAreas.isActive` and `parentCities.isActive` re
 `{$ne: false}`, so absent means active *there*. Same field name, opposite default, one collection
 apart. Anything reasoning about whether an area was serving must use `isActive === true`.
 
+## ⚠️ The availability trace — the nightly ritual is most of it
+`delivery-company.delivery-availability-events` records every stop/resume of an area, region,
+town or the platform switch, written through the one chokepoint
+`services/delivery/availability-status-service.js`. **There is no backfill** — history starts
+the day it deployed (2026-08-05), so an empty earlier month is missing instrumentation, not calm.
+Only `effect: "dispatch_blocking"` rows are outages (scopes `area` and `platform`); `cityArea`
+and `parentCity` flips are `visibility_only` and stopped no deliveries.
+
+**Support closes delivery in EVERY area at ~02:00 and opens it again at ~09:00**, by hand and a
+little either side of the hour, so the collection's normal content is one row per active area
+per night — ~200 a night against a handful of real incidents a month. Anything counting rows
+here is counting the ritual: the exec dashboard's stoppage widget read **1,718 "outages" for its
+first week** before it excluded them. Classify with `isRoutineNightlyClosure`
+(`utils/business-day.js`) — routine is a close within tolerance of 02:00 **and** a reopen within
+tolerance of 09:00, both ends, so a blip that closed and reopened before 02:00 is still an outage
+and a morning nobody opened still counts.
+
+**One operator click ≠ one row.** The bulk region toggle writes one row per area it took down,
+all sharing a `correlationId` (`recordBulkAreaTransitions`, same file). Group by it before
+counting events, or one click reads as ~200 outages.
+
 ## Invariants — never weaken
 1. **`DELIVERY_STATUS` is authoritative in `consts/consts.js`**: `1` waiting-approve → `2`
    approved → `3` collected/pickup → `4` delivered; `5` waiting-in-store; cancels `-1` driver,
