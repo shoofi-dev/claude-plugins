@@ -91,6 +91,19 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `true`), or the regenerated report silently drops those amounts.
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
+7. **The business DAY and the business MONTH are cut at different hours, deliberately.**
+   In `utils/business-day.js` the operational day runs **07:00 → 07:00** Israel
+   (`DAY_BOUNDARY_HOUR = 7`, line 40) while a month ends at **04:30 on the 1st**
+   (`MONTH_BOUNDARY_HOUR`/`MONTH_BOUNDARY_MINUTE`, lines 49-50 — the comment above them
+   says the mismatch is what the spec reads). One number does not cover both, and a
+   recipe that names only 04:30 will bucket days wrong. Consequence: activity between
+   04:30 and 07:00 on the 1st counts towards the **new month** while still belonging to
+   the **last business day of the old one**, so exactly one day per month straddles a
+   month window's edge. Anything that reads a month window and then re-buckets it into
+   days must **add** the two sides of that seam, never overwrite one with the other —
+   see `mergeDailyRevenue` in `services/exec-dashboard/orders-metrics.js`. Always go
+   through `businessDayKey` / `businessMonthKey`; never re-derive either cutoff inline
+   (including in a Mongo `$group`, which also drifts by an hour at the DST seams).
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized

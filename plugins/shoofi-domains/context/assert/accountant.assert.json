@@ -12,6 +12,7 @@
         "routes/hyp.js",
         "lib/payments/calc.js",
         "utils/vat.js",
+        "utils/business-day.js",
         "utils/greeninvoice.js",
         "utils/invoice-provider.js"
       ],
@@ -74,6 +75,16 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "utils/business-day.js",
+          "regex": "const DAY_BOUNDARY_HOUR\\s*=\\s*7\\s*;",
+          "desc": "CORE §7: the business DAY is cut at 07:00 Israel — distinct from the 04:30 month cut, and one number does not cover both"
+        },
+        {
+          "file": "utils/business-day.js",
+          "regex": "const MONTH_BOUNDARY_HOUR\\s*=\\s*4\\s*;[\\s\\S]*?const MONTH_BOUNDARY_MINUTE\\s*=\\s*30\\s*;",
+          "desc": "CORE §7: the business MONTH is cut at 04:30 on the 1st, deliberately NOT at DAY_BOUNDARY_HOUR — hence the one day a month that straddles a month window's edge"
         }
       ]
     }
