@@ -74,6 +74,11 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "const commissionBase\\s*=\\s*order\\.originalOrderPrice\\s*\\|\\|\\s*order\\.orderPrice",
+          "desc": "CORE known-status: summaries still adds product discounts back into the commission base, unlike revenueForCommission in admin-reports.js — flagged as an open divergence, so this pattern going away means it was resolved and the doc must be updated"
         }
       ]
     }

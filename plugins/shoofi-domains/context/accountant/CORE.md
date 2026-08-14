@@ -104,6 +104,16 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 - **OPEN — flagged, needs a decision:** `reset-invoice` only clears the *local* invoice fields;
   it does **not** cancel the document at GreenInvoice/HYP, so a following `create-invoice`
   issues a **second** invoice. Do not silently change behavior — ask.
+- **OPEN — the 2026-08-04 commission-base decision was not applied everywhere.**
+  `routes/payments/summaries.js` still computes `const commissionBase =
+  order.originalOrderPrice || order.orderPrice || 0` in **two** places (lines 237 and 446),
+  i.e. it adds store-funded product discounts back into the base — the exact thing
+  invariant 3 says was dropped. The authoritative settlement path
+  (`revenueForCommission`, `routes/payments/admin-reports.js:990`) does not. So for any
+  store that discounts its own items, the summaries screens report a **higher**
+  commission than the store's actual report, and the two will never reconcile. Do not
+  "fix" either side on sight: confirm first whether summaries is meant to follow
+  settlement or is deliberately a gross-of-discount view.
 - **Awareness:** MASAV is **decoupled** from the reports — payout amounts are re-keyed into an
   Excel by a human; there is no automated report→MASAV link. Hardcoded GreenInvoice
   `businessId`/`itemId` constants exist.
