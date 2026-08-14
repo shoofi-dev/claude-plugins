@@ -151,22 +151,32 @@ let a person confirm, and **make the unconfirmed state visible** in every output
 This is the same pattern the Slack bridge uses for skills: written, run, shown to a human, and
 only their "yes" puts it on the fast path. A rejected one is demoted instantly.
 
-### 3.1 Block before you compare
-Do **not** compare every competitor store against every store of ours. The largest lever on
-name-matching accuracy is not a cleverer algorithm — it is a **smaller candidate pool**.
+### 3.1 Blocking — and the veto it must never have
+> ⚠️ **Corrected against production, 2026-08-14.** The original design blocked candidates by a
+> 2 km geo radius. That was **actively destructive** and has been removed. Do not reinstate it.
 
-- **The primary block is `supportedCities`, not geo** — because only about one store in five
-  has a `location`, and there is no 2dsphere index on the registry to `$near` against (§2).
-  Map the competitor's town to the `delivery-company.cities` zone ids that cover it and take
-  our live stores serving them. Handle the mixed ObjectId/string trap when you do.
-- **Tira Eat** → *additionally* narrow to our stores within **2 km** of `latitude`/`longitude`,
-  **for the subset that has a `location`**. Doing this as a `$near` requires creating a
-  2dsphere index on `shoofi.stores.location` first; until then, compute Haversine in memory
-  over the town-blocked candidate set, which is small enough. Stores with no `location` stay in
-  the candidate set on the town block alone — a missing coordinate must never *exclude* one of
-  our stores.
-- **Haat** → we know which **area** we queried the store list from, so candidates are our live
-  stores in that town. Haat gives no coordinates, so there is nothing better.
+**Geo must never gate candidacy.** A 2 km radius vetoed our `greg` against Tira Eat's `greg`
+(~13 km apart), and `b-fresh`, `tortilla`, `el-patron` and `pizza-fix` with it — exact name
+matches, all discarded before the name comparison ever ran. Turning it off took the match count
+from 2 to 11 on the same data. The principle it broke: geo is **corroboration**. It may raise a
+candidate's confidence and may never create one — and giving it a veto over candidacy is the
+same error in reverse. Our coordinate comes from an admin form and theirs from their own
+geocoder; neither is good enough to throw away an identical name.
+
+**There is also no numeric propose-floor.** The **tier** is the only gate; `score` orders the
+review queue and nothing else. A floor of 0.5 was tried and removed: a *perfect* same-script
+name with no phone and no coordinates scores 0.35 by construction, so the floor made name-only
+matching impossible — and would have left **Haat**, which publishes neither signal, unable to
+produce a single proposal, ever. If a tier rule is too loose, tighten the **rule**.
+
+What blocking is still right:
+- **`supportedCities`** (the town) is the intended primary block, once someone defines what
+  "the towns we deliver in" means (§6.2). Handle the mixed ObjectId/string trap.
+- **Nothing else, at this size.** 160 stores × 77 competitors is ~12k string comparisons.
+  Blocking exists for scale; there is none to solve yet. If that changes, use a radius wide
+  enough to cover the whole operating region, not a neighbourhood.
+- A store of ours with **no `location` is never excluded** by any geo step — a gap in our own
+  data must not read as "we don't carry this store".
 - Never propose a link to a store that fails `LIVE_STORE_FILTER` (mock / invisible /
   coming-soon).
 
@@ -263,6 +273,19 @@ review queue.
 | `weak` | same-script name ≥ 0.85 alone; or cross-script name ≥ 0.85; or ambiguous phone; or name ≥ 0.7 with geo < 150 m |
 | — | anything below → no proposal; the row stays unmatched |
 
+**The tier is the gate. There is no score threshold on top of it** — see §3.1.
+
+### 3.3a A third category the first design missed: same brand, different branch
+Production surfaced a case that is neither "carried" nor "not carried": an **exact** name match
+**~13 km away**. We carry `greg`, `b-fresh`, `el-patron`, `tortilla` and `pizza-fix` in **Kfar
+Qasem** (lat ~32.11); Tira Eat lists the same brands in **Tira/Taybeh** (lat ~32.23). Same
+business, different branch — so *we carry the brand but not that location*, which is a real and
+actionable finding in its own right and must not be filed as either extreme.
+
+Nothing needs building for this yet: `evidence.distanceMeters` is on every row, so a reviewer
+seeing `name 1.0 + 13,426 m` can read it correctly. Say it in the brief rather than collapsing
+it into the coverage count.
+
 **Haat can only ever reach `weak` or `probable`-by-name.** A Haat link therefore
 **never auto-confirms** — it rests on name plus a free-text address, and that is not enough to
 put a number in front of a person unchallenged.
@@ -274,9 +297,18 @@ above a floor (≥ 0.4) so that a shared phone at a shared address (two kiosks i
 court) still can't slip through.
 
 It is recorded as **`confirmedBy: 'auto:v1'`**, never as a person, so every machine decision is
-auditable and reversible in bulk when the rule changes. **Recommendation: ship it behind a
-flag, default OFF for the first run**, so a human first eyeballs the list of links it *would*
-have confirmed. See §6 Q1 — this is a human's decision, not the agent's.
+auditable and reversible in bulk when the rule changes. Shipped behind a flag, **default OFF**
+(§6.1).
+
+> **Observation from the first production run — for a human to rule on, not the agent.** As
+> specified, the rule auto-confirms **nothing**, including the two cases that are most
+> obviously right. Both of our exact phone overlaps with Tira Eat (`סנושי || טייבה` ↔ `snooshy`
+> at 1 m; `אצה` ↔ `atza-sushi-bar` at 5 m) are flagged `phoneAmbiguous`, because **we** run two
+> branches on one number (`snooshy` + `snooshy-kfar-qasim`). That is the ambiguity rule working
+> exactly as intended — the number identifies the brand — and the geo then resolves the branch
+> at 1 m, which is precisely the pairing §3.2B argues is safe. So the strictness may be one
+> notch too tight. It costs nothing today because the flag is off. **Do not loosen it without
+> a human decision.**
 
 ### 3.5 The write rules that make §3.0 true
 1. **An automated run may never set or change `appName` or `status` on a row that is
@@ -396,6 +428,22 @@ One caveat: `no-match` is **terminal but revisitable** — when we onboard a new
   load-bearing. Anything that writes belongs in `shoofi-server`, never in the bridge.
 - **KNOWN PROBLEM, not yours to fix here:** the Haat bearer token is committed in
   `shoofi-delivery-web`. Do not spread it; flag it, don't paper over it.
+- **What the first production run actually measured (2026-08-14, read-only).** 160 live stores
+  of ours vs 77 Tira Eat stores. Useful as a baseline, and as the reason two design rules
+  changed:
+  - **Our phone data is good and the ambiguity rule is behaving.** 156/160 carry a phone (after
+    the per-tenant fan-out — the registry's own `phone` is empty on *all* 160, confirming §2);
+    149 distinct numbers; only 7 numbers appear twice, and every one of those pairs is the same
+    brand in two towns (`snooshy` + `snooshy-kfar-qasim`, `sea-world` + `olamhayam`, …).
+  - **Exact phone overlap with Tira Eat is tiny: 2 numbers.** Phone will not carry this
+    matching on its own. Name does most of the work, which is why §3.1 matters so much.
+  - **Tira Eat writes a missing location as `0,0`.** Both values are finite, so a naive
+    `isFinite` check persists a Point 3,700 km off Africa that looks like real evidence. Null
+    Island is now treated as absent.
+  - **Cross-script false positives are real and visible**, exactly as §3.2C warned:
+    `RUYA → torta`, `שווארמה א.ס → abuissa-grills`, `LA TOAST → royal-toast` all scored ≥0.85 on
+    the skeleton. They land as `weak` and go to a human, which is the design working — but do
+    not be surprised by junk in the queue, and never quote a `*` match as fact.
 - **Defects found while grounding this doc, deliberately left alone** (other domains' code —
   hand off, do not fix from here): `store.name` is read off registry docs in
   `services/delivery/RestaurantAvailabilityService.js` and `routes/delivery/admin.js` and is
