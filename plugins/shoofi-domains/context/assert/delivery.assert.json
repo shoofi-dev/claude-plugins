@@ -21,7 +21,8 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "services/exec-dashboard/delivery-metrics.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -38,7 +39,8 @@
         ],
         "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "services/delivery/book-delivery.js": ["originalBookId"],
+        "services/exec-dashboard/delivery-metrics.js": ["computeShiftWeek", "minDrivers", "bookedDrivers"]
       },
       "patterns": [
         {
@@ -95,6 +97,26 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "\\.filter\\(\\(d\\) => d\\.status === \"booked\"\\)",
+          "desc": "shift fill rate counts only booked drivers - cancelled bookings stay in bookedDrivers[]"
+        },
+        {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "const required = shift\\.minDrivers",
+          "desc": "the exec dashboard's 'required' is minDrivers, never maxDrivers (that is the booking ceiling)"
+        },
+        {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "gap: Math\\.max\\(0, required - booked\\.length\\)",
+          "desc": "per-slot gap is the only honest shortfall; the day percentage sums across regions and slots"
+        },
+        {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "fillRate: required > 0 \\?",
+          "desc": "fillRate is null (not 0) when nothing is required - render a dash, not a red zero"
         }
       ]
     },

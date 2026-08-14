@@ -87,6 +87,19 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **"אחוז איוש" is `enrolled / minDrivers`, and the per-day figure sums across regions AND
+    slots.** `computeShiftWeek` (`services/exec-dashboard/delivery-metrics.js`) counts only
+    `bookedDrivers[].status === "booked"` — cancelled bookings stay in the array and would
+    inflate every rate — over **`minDrivers`**, never `maxDrivers`. `maxDrivers` is the booking
+    *ceiling* (room to over-book against no-shows, `services/driver-shift/shift-service.js`) and
+    is carried separately as `capacity`; a previous 0.8x/1.2x shading was removed precisely
+    because reading the wrong one left the exec dashboard and the shifts grid 50% apart. **Over
+    100% is normal, not a bug** — drivers self-book up to `maxDrivers`. The day figure is a
+    plain sum over every slot of every `cityAreaId`, so **a day can read 135% and still have an
+    unmanned evening slot in one region**: the only honest per-day shortfall is `Σ shifts[].gap`
+    (`max(0, required - enrolled)`, per slot), which is what the dashboard day row shows. And
+    `fillRate` is **`null`, not `0`, when `required === 0`** — render it as a dash; "no
+    requirement modelled" and "nobody signed up" are different facts.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
