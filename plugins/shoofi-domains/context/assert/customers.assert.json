@@ -18,6 +18,8 @@
         "utils/customer-orders.js",
         "docs/customer-orders-snapshot.md",
         "routes/order.js",
+        "scripts/backfill-customer-feedback-store.js",
+        "services/exec-dashboard/customer-metrics.js",
         "package.json"
       ],
       "symbols": {
@@ -110,6 +112,21 @@
           "file": "routes/order.js",
           "regex": "created: moment\\(new Date\\(\\)\\)\\.utcOffset\\(offsetHours\\)\\.format\\(\\)",
           "desc": "orders.created - and the customers.orders[] snapshot of it - is an ISO string with an Israel offset, the opposite type from customers.created on the same document"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "db\\.customersFeedback = db\\.collection\\('customers-feedback'\\)",
+          "desc": "the accessor name is not the collection name - a raw-driver script asking for 'customersFeedback' gets a silently empty collection"
+        },
+        {
+          "file": "routes/customer-feedback.js",
+          "regex": "orderObjectId: orderObjectId \\? getId\\(orderObjectId\\) : null",
+          "desc": "the real order key on a feedback row is orderObjectId, a nullable ObjectId stored beside the store-local human orderId - look up with orderObjectId + appName, never with orderId alone"
+        },
+        {
+          "file": "services/exec-dashboard/customer-metrics.js",
+          "regex": "orderObjectId: 1",
+          "desc": "a UI reading customers-feedback must project orderObjectId - the low-ratings panel shipped without it and so could not link to the order it was reporting"
         }
       ]
     },

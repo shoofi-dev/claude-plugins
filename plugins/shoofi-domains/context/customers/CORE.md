@@ -91,6 +91,27 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    (`lib/common.js`). Any new `createdBy`-style provenance must be read from `req.auth` and
    never from the request body; `routes/team-tasks.js` is the reference implementation.
 
+8. **Customer order feedback is CENTRAL, and `orderId` is not a key there.** Ratings live in
+   the `shoofi` DB as `customers-feedback` — bound as `db.customersFeedback`
+   (`services/database/DatabaseInitializationService.js`), so the **accessor name is not the
+   collection name**: a raw-driver script asking for `"customersFeedback"` gets a silently
+   empty collection. One row carries both scores (`orderRating` = the store, `deliveryRating`
+   = the courier leg, `null` for takeaway) and **two different order identifiers**
+   (`routes/customer-feedback.js`): `orderId` is the store-local human number ("3889-9498")
+   and `orderObjectId` is the order's real `_id` in the store DB, stored as an **ObjectId**
+   and nullable for clients that never sent it. Because the collection is central and the
+   human number is only unique per store, **two stores genuinely collide on `orderId`** — it
+   has already caused a duplicate-409 that locked one store's customers out of rating and a
+   cron that never asked others to rate at all, both now commented in-line at the top of
+   `routes/customer-feedback.js`. **Display `orderId`; look up with `orderObjectId` +
+   `appName`, never with `orderId` alone.** Anything reading this collection for a UI must
+   project `orderObjectId` — the exec dashboard's low-ratings panel shipped without it and so
+   could not link to the order it was complaining about
+   (`services/exec-dashboard/customer-metrics.js`, `computeRatings`). `appName` is required
+   on write but still only as good as the client sent it, so a row can point at a dead store
+   or a system DB; the write path guards the latter and
+   `scripts/backfill-customer-feedback-store.js` repairs both.
+
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
 - **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin
