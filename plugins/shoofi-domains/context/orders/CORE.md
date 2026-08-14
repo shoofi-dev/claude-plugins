@@ -62,6 +62,19 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    does (`routes/order.js`: `$or: [{isFutureOrder:{$ne:true}},{isFutureOrder:{$exists:false}}]`).
    Testing `isFutureOrder` alone silently misses every ramadan order.
 
+10. **A business day's order counts are not final when the day ends.** The stuck-order
+    fixer (`utils/crons/fix-stuck-orders.js`, `cron.schedule("0 7 * * *")`) flips orders left
+    in status `"1"` to `2`/`3` with `statusUpdateReason: "Auto-fixed stuck order from past
+    day"` — but it matches `created: { $lt: todayString }`, and `todayString` is
+    `startOf("day")`, i.e. the **calendar** day, while a business day runs 07:00→07:00
+    (`utils/business-day.js`). A business day's 00:00–07:00 tail is therefore only swept by
+    the sweep *after* the one that closes it, ~24h later. Until then those orders sit in
+    `"1"`, which is counted by neither the completed nor the cancelled bucket
+    (`services/exec-dashboard/orders-metrics.js`). **Any per-day order analytics must treat
+    the most recently ended business day as provisional and biased low** — averaging or
+    extrapolating from it under-counts. The exec snapshot cron compounds it by running at
+    03:40, before that morning's sweep.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
   cross-check is intentionally disabled. Leave it.

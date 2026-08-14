@@ -17,7 +17,9 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
-        "docs/customer-orders-snapshot.md"
+        "docs/customer-orders-snapshot.md",
+        "utils/crons/fix-stuck-orders.js",
+        "utils/business-day.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -36,7 +38,9 @@
           "stockDecremented",
           "stockRestored"
         ],
-        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+        "utils/customer-orders.js": [
+          "getSuccessfulOrdersByCustomerIds"
+        ]
       },
       "patterns": [
         {
@@ -93,6 +97,21 @@
           "file": "routes/order.js",
           "regex": "originalOrderDate",
           "desc": "/update-delay shifts orderDate and preserves the original (ref §5)"
+        },
+        {
+          "file": "utils/crons/fix-stuck-orders.js",
+          "regex": "cron\\.schedule\\(\"0 7 \\* \\* \\*\"",
+          "desc": "the stuck-order sweep runs at 07:00 - CORE invariant 10 dates the settling lag from it"
+        },
+        {
+          "file": "utils/crons/fix-stuck-orders.js",
+          "regex": "created:\\s*\\{\\s*\\$lt:\\s*todayString\\s*\\}",
+          "desc": "the sweep bounds on the CALENDAR day, not the 07:00 business day - this mismatch is why a business day's 00:00-07:00 tail settles ~24h late (CORE invariant 10)"
+        },
+        {
+          "file": "utils/crons/fix-stuck-orders.js",
+          "regex": "startOf\\(\"day\"\\)",
+          "desc": "todayString is midnight-based; if this becomes business-day-based the settling lag in CORE invariant 10 disappears"
         }
       ]
     },
@@ -132,7 +151,10 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "stores/orders/index.tsx"],
+      "files": [
+        "consts/shared.ts",
+        "stores/orders/index.tsx"
+      ],
       "patterns": [
         {
           "file": "consts/shared.ts",
