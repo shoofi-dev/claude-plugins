@@ -1,0 +1,9 @@
+{
+  "name": "shoofi-operators",
+  "description": "Operator ('department head') subagents for the Shoofi platform — Class B. They own a BUSINESS FUNCTION rather than a slice of code: they feed on data and the outside world and ship decisions, alerts, briefs and drafts, never product code. Their gate is human approval, not tests. First: competitive-intel (Haat / Tira Eat coverage and price gaps).",
+  "author": {
+    "name": "shoofi-dev"
+  },
+  "homepage": "https://github.com/shoofi-dev/claude-plugins",
+  "keywords": ["shoofi", "subagents", "operators", "competitive-intel", "business", "brief"]
+}
