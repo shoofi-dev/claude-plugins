@@ -18,6 +18,8 @@
         "utils/customer-orders.js",
         "docs/customer-orders-snapshot.md",
         "routes/order.js",
+        "routes/leads.js",
+        "bin/update-leads-from-new-customers.js",
         "package.json"
       ],
       "symbols": {
@@ -110,6 +112,21 @@
           "file": "routes/order.js",
           "regex": "created: moment\\(new Date\\(\\)\\)\\.utcOffset\\(offsetHours\\)\\.format\\(\\)",
           "desc": "orders.created - and the customers.orders[] snapshot of it - is an ISO string with an Israel offset, the opposite type from customers.created on the same document"
+        },
+        {
+          "file": "bin/update-leads-from-new-customers.js",
+          "regex": "status: 'converted'",
+          "desc": "leads.status 'converted' is set from the SIGNUP alone by the nightly customer-to-lead matcher - it never looks at orders, so a converted lead may have bought nothing"
+        },
+        {
+          "file": "routes/leads.js",
+          "regex": "lead\\.status === 'pending' && ordersCount > 0",
+          "desc": "the second, order-aware writer of 'converted' - two writers with different meanings is why the leads funnel over-reports first purchase"
+        },
+        {
+          "file": "routes/leads.js",
+          "regex": "ordersCount = customer\\.orders\\.length",
+          "desc": "leads.ordersCount/lastOrderDate/isExistingCustomer are derived from the status-less customers.orders[] snapshot, so declined checkouts count as orders"
         }
       ]
     },

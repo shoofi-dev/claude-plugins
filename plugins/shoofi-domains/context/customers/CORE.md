@@ -91,6 +91,21 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    (`lib/common.js`). Any new `createdBy`-style provenance must be read from `req.auth` and
    never from the request body; `routes/team-tasks.js` is the reference implementation.
 
+8. **`shoofi.leads.status: "converted"` means "signed up", NOT "ordered".** Two independent
+   writers set it and they mean different things. The nightly
+   `bin/update-leads-from-new-customers.js` matches yesterday's new `shoofi.customers` docs to
+   leads by phone and sets `status: 'converted'` on the strength of the **signup alone** — it
+   never looks at orders. `routes/leads.js` separately auto-promotes `pending → converted` only
+   when `ordersCount > 0`. So a `converted` lead may have placed zero orders, and the leads
+   funnel over-reports first-purchase conversion. Confirmed on real data: a lead with
+   `status: "converted"` whose customer doc had **no order in any store DB**.
+   The same enrichment block writes `ordersCount` / `lastOrderDate` / `isExistingCustomer` from
+   **`customers.orders[]`** — the status-less, never-charged-inclusive snapshot of invariant 5 —
+   so `leads.ordersCount` counts declined checkouts as orders. It also only runs when that
+   enrichment path is hit, which is why `isExistingCustomer: false` and `status: "converted"`
+   routinely coexist on the same lead. **For "did this lead actually buy", ignore all four
+   fields and join the store `orders` collections.**
+
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
 - **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin
