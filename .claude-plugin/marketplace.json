@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "Claude Code plugins for the Shoofi platform (5 repos). Distributes shared skills and domain-owner subagents so local sessions AND cloud routines/Slack agents can use them across every repo.",
-    "version": "1.3.0"
+    "version": "1.4.0"
   },
   "plugins": [
     {
@@ -17,6 +17,11 @@
       "name": "shoofi-domains",
       "source": "./plugins/shoofi-domains",
       "description": "Domain-owner subagents — one full-stack 'employee' per territory: menu-catalog, orders, payments (money in), accountant (money out/settlement), delivery, customers. Each loads a human-reviewed context doc (CORE + reference), inherits the shared safety constitution, and ships work as PRs. Includes docs-check, a drift checker that fails the build when a doc stops matching the code."
+    },
+    {
+      "name": "shoofi-operators",
+      "source": "./plugins/shoofi-operators",
+      "description": "Operator ('department head') subagents — Class B. They own a BUSINESS FUNCTION rather than a slice of code: they feed on data and the outside world and ship decisions, alerts, briefs and drafts, never product code. Their gate is human approval, not tests. First operator: competitive-intel (Haat / Tira Eat coverage and price gaps, and the competitor-store to our-store matching everything else depends on)."
     }
   ]
 }

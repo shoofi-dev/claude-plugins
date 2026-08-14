@@ -10,7 +10,8 @@ copy-pasting into each repo.
 | Plugin | Provides | What it does |
 |--------|----------|--------------|
 | `shoofi-testing` | `/shoofi-testing:cover-changes`, `/shoofi-testing:local-app-e2e` | **cover-changes**: after finishing a feature/bug, generates the tests covering the changed flow across the repo(s) it touched; bootstraps each repo's test infra (best-fit runner) on first use. **local-app-e2e**: stands up the local stack (Mongo + server on :1111) and drives the customer/partner/driver app through its real UI on an iOS simulator with Maestro. |
-| `shoofi-domains` | `menu-catalog`, `orders`, `payments`, `accountant`, `delivery`, `customers` subagents | Domain-owner "employees" — one per territory, **full-stack across all 5 repos** by default. Each loads the shared constitution + its human-reviewed context doc and ships work as PRs you review. Ships `docs-check`, a drift checker.|
+| `shoofi-domains` | `menu-catalog`, `orders`, `payments`, `accountant`, `delivery`, `customers` subagents | **Class A — code owners.** Domain "employees" — one per territory, **full-stack across all 5 repos** by default. Each loads the shared constitution + its human-reviewed context doc and ships work as PRs you review. Ships `docs-check`, a drift checker.|
+| `shoofi-operators` | `competitive-intel` subagent | **Class B — operators ("department heads").** Own a *business function* rather than a slice of code: they feed on data and the outside world and ship decisions, alerts, briefs and drafts — **never product code**. Gate is **human approval**, not tests. |
 
 ### `shoofi-domains` — the domain-owner model
 
@@ -37,6 +38,21 @@ Each domain has `context/<domain>/CORE.md` (**always read** — scope, invariant
 verdicts, recipes) and `reference.md` (depth, loaded on demand). See
 `plugins/shoofi-domains/README.md` for the full model and the `docs-check` drift checker.
 
+### `shoofi-operators` — the department-head model (Class B)
+
+Where a Class A agent owns a slice of the **codebase**, a Class B operator owns a **business
+function**. It feeds on data and the outside world, its brain is a mission + playbook rather
+than a code map, and it ships **decisions, alerts, briefs and drafts — never product code**.
+Its gate is a **human's approval**, not lint and tests. When an operator needs code written, it
+writes the spec and hands it to the owning Class A agent.
+
+| Operator | Owns |
+|---|---|
+| `competitive-intel` | Haat + Tira Eat — the coverage gap ("who's open on them and closed on us"), price gaps, menu coverage, promos, ratings, and the competitor↔our-store matching everything else depends on |
+
+Planned: `social-media`, `marketing-growth`, `merchant-success`, `retention-crm`,
+`bizops-brief`, `support-cx`. See `plugins/shoofi-operators/README.md`.
+
 ## Layout
 
 ```
@@ -55,6 +71,10 @@ plugins/
     context/<domain>/reference.md        #   read on demand
     context/assert/<domain>.assert.json  #   machine-checkable claims
     scripts/docs-check.js                # drift checker (zero deps)
+  shoofi-operators/
+    agents/competitive-intel.md          # Class B operator: mission, hard limits, hand-offs
+    context/competitive-intel/CORE.md    #   always read: competitor endpoints + field lists,
+                                         #   the matching design, the mapping collection
 ```
 
 ## Setup — per developer, once
@@ -67,7 +87,11 @@ plugins **enabled**:
   "extraKnownMarketplaces": {
     "shoofi": { "source": { "source": "github", "repo": "shoofi-dev/claude-plugins" } }
   },
-  "enabledPlugins": { "shoofi-testing@shoofi": true, "shoofi-domains@shoofi": true }
+  "enabledPlugins": {
+    "shoofi-testing@shoofi": true,
+    "shoofi-domains@shoofi": true,
+    "shoofi-operators@shoofi": true
+  }
 }
 ```
 
@@ -76,9 +100,10 @@ plugins **enabled**:
 
 ```bash
 claude plugin marketplace update shoofi       # refresh the marketplace cache first
-claude plugin install shoofi-domains@shoofi --scope project
-claude plugin install shoofi-testing@shoofi  --scope project
-claude plugin list                            # both should appear, enabled
+claude plugin install shoofi-domains@shoofi   --scope project
+claude plugin install shoofi-testing@shoofi   --scope project
+claude plugin install shoofi-operators@shoofi --scope project
+claude plugin list                            # all three should appear, enabled
 ```
 
 **Restart Claude Code afterwards** — agents and skills are picked up at session start.
