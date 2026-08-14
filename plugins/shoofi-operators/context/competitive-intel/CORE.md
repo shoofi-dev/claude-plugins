@@ -102,13 +102,15 @@ Fields relevant to matching:
 
 | Field | Notes |
 |---|---|
-| `appName` | **The primary key everything joins on.** |
-| `name_ar`, `name_he` | ⚠️ **There is NO `name` field.** Only these two, snake_case. `utils/store-display-name.js` (`getStoreDisplayNames`) is the one right way to read them — it accepts `nameAR`/`nameHE` camel variants only as a fallback and degrades to `appName`. `services/exec-dashboard/store-registry.js` carries the same warning. Do **not** write `store.name`. |
-| `phone` | Present, but defaults to `''` on create — **treat empty as absent, not as a non-match.** |
-| `address` | Free text, defaults to `''`. |
-| `location` | GeoJSON `{ type: 'Point', coordinates: [lng, lat] }` — but written **conditionally**, only when the admin supplied lat/lng. **Not reliably populated.** A store with no `location` cannot be geo-matched; that is a data gap, not a mismatch. |
-| `supportedCities` | `ObjectId[]` into the `cities` collection. ⚠️ In the delivery model a **`cities` doc is a pickup *zone*, not a town** — `parent-cities` is the town. See `shoofi-server/docs/delivery-areas-model.md`; delegate to `shoofi-domains:delivery` before reasoning about coverage. |
-| `business_visible`, `isMockStore`, `isCoomingSoon` | The live-store filter. Mirror `LIVE_STORE_FILTER` in `services/exec-dashboard/store-registry.js` (`isCoomingSoon` — the double "o" is the real field name). |
+| `appName` | **The primary key everything joins on** — it is literally the tenant's Mongo database name (`lib/db.js`). ⚠️ **Uniqueness is NOT enforced**: there is no index on `appName` at all, and the main `store/add` path has no duplicate check (only `create-from-mock` does). De-facto unique; do not model a foreign key on a constraint the database isn't holding. |
+| `name_ar`, `name_he` | ⚠️ **There is NO `name` field** — none of the three write paths in `routes/shoofi-admin.js` ever writes one. But **`storeName` DOES exist on legacy docs**, and those legacy docs carry *no* `name_ar`/`name_he` at all — so a matcher that reads only the snake_case pair silently drops them. **Always resolve names through `getStoreDisplayNames(shoofiDb, appName)`** (`utils/store-display-name.js`) — it is the only place handling all three shapes (`name_ar`/`name_he` → `nameAR`/`nameHE` → `storeName` → `appName`). Never read `store.name`; several call sites do and always log `undefined`. |
+| `phone` | ⚠️ **On the registry this is effectively dead** — written as `phone: phone \|\| ''` and observed non-empty in *zero* sampled docs. The **authoritative** phone is on the per-tenant `<appName>.store { id: 1 }` doc; the resolution order the platform uses is `storeData.phone \|\| store.phone \|\| ''` (`/api/shoofiAdmin/store/status`). **Do not source phone from the registry** — see §3.2A, this makes the strongest matching signal a per-store fan-out. (Unrelated, easy to confuse: `storePhone`/`waSupportPhone`/`shoofiSupportPhone` are on the *platform config* doc `shoofi.store`, not a store's phone.) |
+| `address` | Free text, defaults to `''` — observed non-empty in zero sampled docs. Useless for matching. |
+| `location` | GeoJSON `{ type: 'Point', coordinates: [lng, lat] }`, but written **conditionally** (`...(location ? { location } : {})`) — observed on roughly **1 in 5** stores. ⚠️ **There is no 2dsphere index on it**, and no code anywhere runs `$near`/`$geoWithin` against the registry — it is only ever used as the *input point* for geo queries on other collections. A geo block therefore needs that index created first (§3.1). A store with no `location` cannot be geo-matched; that is a data gap, not a mismatch. There is also an `ipadLocation` Point, and the *operational* geo point is duplicated on the per-tenant doc and can drift. |
+| `supportedCities` | `ObjectId[]` into **`delivery-company.cities`** (not `shoofi.cities`, which is empty). ⚠️ Three traps: (a) in the delivery model a **`cities` doc is a pickup *zone*, not a town** — `parent-cities` is the town; (b) the array is **mixed BSON types** — a couple of legacy docs hold strings, which an `$in` of ObjectIds silently misses; (c) it is a **many-valued serving list, not a home town** — the "exactly one supportedCity per store" cleanup is still in flight (`/api/delivery/admin/stores/sync-supported-cities/preview`). Do not build a 1:1 store→town mapping on it yet. Delegate to `shoofi-domains:delivery`. |
+| `business_visible`, `isMockStore`, `isCoomingSoon` | The live-store filter. Reuse `LIVE_STORE_FILTER` / `getLiveStores` from `services/exec-dashboard/store-registry.js` verbatim (`isCoomingSoon` — the double "o" is the real field name). Note `business_visible` is **absent** on some docs — absent must read as not-visible, which is what that filter already does. |
+| `_id` | Stable ObjectId; `storeReports.storeId` and `routes/hyp.js` join on it. Carry it alongside `appName` on a mapping row, mirroring what `getLiveStores` returns. |
+| — | **No slug, no business/tax id, no external URL on the registry.** The tax id is `accounting.bankAccount.companyId` on the **per-tenant** doc — the closest thing to a real-world business identifier, and HYP already uses it to group sibling stores under one legal entity. Not available for matching without a fan-out. |
 
 ### 2a. ⚠️ Our open/closed state is NOT on the registry, and NOT stored at all
 `openHours` and `isStoreClose` live on the **per-tenant `<appName>.store { id: 1 }`** document,
@@ -121,10 +123,19 @@ Two consequences the flagship question runs straight into:
   databases**, not one registry query. Mirror `services/exec-dashboard/store-registry.js` —
   it exists precisely to do that correctly (lazy-init every store, and report
   `unavailableStores` instead of silently returning a smaller number).
-- **There is no history of when we were open — on either side.** So "they were open and we
-  were closed" can only ever be answered *for right now*, at the moment you ask. Any
-  historical claim requires snapshots, which do not exist yet and are out of scope. **Say this
-  in every brief that touches open/closed.**
+- **There is effectively no history of when we were open — on either side.** So "they were
+  open and we were closed" can only ever be answered *for right now*, at the moment you ask.
+  Any historical claim requires snapshots, which do not exist yet and are out of scope. **Say
+  this in every brief that touches open/closed.**
+
+  Two near-misses that look like history and are not:
+  - `store-update-history` (per-tenant, written by `POST /api/store/update`) logs
+    `isStoreClose` / `openHours` / `business_visible` changes with old and new values. It is an
+    **edit log, not a state timeline** — it only fires when a human or API edits the doc, so it
+    never records "closed because we fell outside `openHours`", which is most closures.
+  - A persisted `isOpen` exists on the per-tenant doc (written by
+    `utils/crons/store-auto-close.js`), but **no read path uses it** — `routes/store.js`
+    recomputes and overwrites it in the response. Treat it as vestigial; never read it.
 
 ---
 
@@ -144,9 +155,16 @@ only their "yes" puts it on the fast path. A rejected one is demoted instantly.
 Do **not** compare every competitor store against every store of ours. The largest lever on
 name-matching accuracy is not a cleverer algorithm — it is a **smaller candidate pool**.
 
-- **Tira Eat** → candidates are our live stores within **2 km** of `latitude`/`longitude`
-  (a `$near` on `shoofi.stores.location`, needs a 2dsphere index; stores with no `location`
-  fall back to the town block below).
+- **The primary block is `supportedCities`, not geo** — because only about one store in five
+  has a `location`, and there is no 2dsphere index on the registry to `$near` against (§2).
+  Map the competitor's town to the `delivery-company.cities` zone ids that cover it and take
+  our live stores serving them. Handle the mixed ObjectId/string trap when you do.
+- **Tira Eat** → *additionally* narrow to our stores within **2 km** of `latitude`/`longitude`,
+  **for the subset that has a `location`**. Doing this as a `$near` requires creating a
+  2dsphere index on `shoofi.stores.location` first; until then, compute Haversine in memory
+  over the town-blocked candidate set, which is small enough. Stores with no `location` stay in
+  the candidate set on the town block alone — a missing coordinate must never *exclude* one of
+  our stores.
 - **Haat** → we know which **area** we queried the store list from, so candidates are our live
   stores in that town. Haat gives no coordinates, so there is nothing better.
 - Never propose a link to a store that fails `LIVE_STORE_FILTER` (mock / invisible /
@@ -154,17 +172,26 @@ name-matching accuracy is not a cleverer algorithm — it is a **smaller candida
 
 ### 3.2 The signals
 
-**A. Phone — Tira only. The strongest single signal, with one trap.**
+**A. Phone — Tira only. The strongest single signal, with two traps.**
 Normalise both sides to E.164 digits: strip everything non-digit, drop a leading `+`, map a
 leading `0` to `972`, and collapse `00972`/`972` to `972`. Compare the canonical strings.
 
-*The trap:* **a phone number is not unique.** A chain shares one number across branches, and a
-small business may list the owner's mobile. So:
+⚠️ **Trap one — our phone is not where you'd expect it.** `shoofi.stores.phone` is written as
+`phone || ''` and is empty in practice; the real number is on the **per-tenant
+`<appName>.store { id: 1 }`** doc (§2). So the strongest signal we have costs a **fan-out
+across per-store databases**, the same as open/closed. Build the phone index once per proposal
+run using the `services/exec-dashboard/store-registry.js` fan-out pattern (lazy-init every
+store, report `unavailableStores` rather than silently matching fewer) — do not re-read it per
+candidate. **A store whose DB was unreachable is "phone unknown", never "phone mismatch".**
+
+⚠️ **Trap two — a phone number is not unique.** A chain shares one number across branches, and
+a small business may list the owner's mobile. So:
 - exact match, and the normalised number matches **exactly one** of our stores **and exactly
   one** competitor store → **strong**;
 - exact match but the number is **shared** by more than one store on either side → **weak**,
   and flag it `phoneAmbiguous: true`. Never let an ambiguous phone carry a link on its own.
-- our `phone` is `''` → **absent**, contributes nothing. It is not evidence against a link.
+- our phone is `''` / missing / the store DB was unreachable → **absent**, contributes nothing.
+  It is not evidence against a link.
 
 **B. Geo — Tira only. Never a primary signal.**
 Haversine between `shoofi.stores.location.coordinates` `[lng, lat]` and Tira's
@@ -198,7 +225,8 @@ Normalise before comparing:
    entire distinguishing name.
 
 Then compare, and take the **maximum** over every pairing:
-- our `name_he` and `name_ar` (there is no `name` — §2) and the `appName` slug itself, which is
+- **every name `getStoreDisplayNames` can produce for us** — `name_he`, `name_ar`, and on
+  legacy docs `storeName` (there is no `name` — §2) — plus the `appName` slug itself, which is
   often a latinised store name and is worth trying;
 - against Tira's `nameHebInner`, `nameHebOuter`, `nameUnique`, and `searchTags[]`;
 - against Haat's `name` (and `namesDictionary` ar/he/en once you're inside a menu).
@@ -285,7 +313,9 @@ tenant DB from here.
   externalLocation: { type: 'Point', coordinates: [lng, lat] } | null,   // Tira only
   externalArea:  string | null,        // Haat areaId/name the store was listed under
 
-  appName:       string | null,        // our store, once linked
+  appName:       string | null,        // our store, once linked — the natural key
+  storeId:       ObjectId | null,      // the registry `_id`, carried alongside: `appName` has
+                                       //   no unique index (§2), so keep the stable id too
   status:        'unmatched' | 'proposed' | 'confirmed' | 'rejected' | 'no-match',
   tier:          'strong' | 'probable' | 'weak' | null,
   signals:       ['phone' | 'geo' | 'name' | 'manual'],   // ALL that supported it, not one
@@ -323,34 +353,72 @@ Collapsing them makes the opportunity list indistinguishable from the reject bin
 One caveat: `no-match` is **terminal but revisitable** — when we onboard a new store, every
 `no-match` row should be re-scored against it, because the answer may have just changed.
 
+### 4b. How to build it in `shoofi-server` (the repo's conventions, verified)
+- **Register the collection and its indexes in
+  `services/database/DatabaseInitializationService.js`**, with the `createIndex` calls **inside
+  the `if (databaseName === 'shoofi')` guard**. That guard is load-bearing: without it the
+  collection is created — empty — in *every tenant database*. Handle is camelCase
+  (`db.competitorStores`), collection name kebab-case (`competitor-stores`).
+- **Mirror `routes/team-tasks.js` + `services/team-tasks/`.** It is the newest purpose-built
+  central-only collection and the right template: `const db = req.app.db["shoofi"]` (bracket
+  form) in thin handlers, logic in `services/`, an admin-role guard, a `unique, sparse` index
+  used to make seeding idempotent, and real coverage in `test/integration/`. Its header states
+  the rule outright: *all data lives in the central `shoofi` DB, never a per-store DB.*
+- **Reuse, don't re-derive:** `LIVE_STORE_FILTER` and `getLiveStores` from
+  `services/exec-dashboard/store-registry.js`, and its fan-out rule — never write
+  `if (!req.app.db[appName]) continue;` before `getOrInitializeDb`, because that guard defeats
+  the lazy loader and silently drops stores created after the container booted.
+- Services take `appDb` as a parameter and do `appDb["shoofi"]` internally. Never pass `req`
+  into a service.
+
 ---
 
 ## 5. Known status (human-confirmed — do NOT "fix")
-- **Corrections to the original brief, verified in code on 2026-08-14** — these are the ground
-  truth, the brief was wrong:
-  - `shoofi.stores` has **no `name` field**, only `name_ar` / `name_he`
-    (`utils/store-display-name.js`).
+- **Corrections to the original brief, verified against `shoofi-server` on 2026-08-14** — these
+  are the ground truth, the brief was wrong. Do not "restore" any of them:
+  - `shoofi.stores` has **no `name` field** — but legacy docs do carry **`storeName`**, and
+    those same docs carry no `name_ar`/`name_he`. Always go through `getStoreDisplayNames`.
   - `openHours` / `isStoreClose` are **not** on `shoofi.stores` — they are on the per-tenant
     `<appName>.store { id: 1 }` doc, so any open/closed comparison is a **per-store DB
     fan-out**.
-  - `shoofi.stores.location` is written **conditionally** and is not reliably populated.
+  - **`phone` is the same story** — the registry's is empty in practice; the real one is
+    per-tenant. Our strongest matching signal is a fan-out, not a registry read.
+  - `shoofi.stores.location` is written **conditionally**, populated on roughly 1 store in 5,
+    and has **no 2dsphere index**. Geo cannot be the primary block.
+  - `appName` has **no unique index** and the main create path has no duplicate check.
+  - `supportedCities` holds **mixed ObjectId/string** values and is a many-valued serving list,
+    not a home town; the one-town-per-store cleanup is still in flight.
 - **BY DESIGN, do not "fix":** our own open/closed state is computed per request and never
-  persisted. There is therefore no history on either side of the comparison. That is a known
-  gap; snapshots are a **later task**, deliberately not built yet.
+  persisted as a timeline. There is therefore no usable history on either side of the
+  comparison (§2a covers the two near-misses that are not it). That is a known gap; snapshots
+  are a **later task**, deliberately not built yet.
 - **BY DESIGN:** the Slack bridge's database credential is **read-only**, and that is
   load-bearing. Anything that writes belongs in `shoofi-server`, never in the bridge.
 - **KNOWN PROBLEM, not yours to fix here:** the Haat bearer token is committed in
   `shoofi-delivery-web`. Do not spread it; flag it, don't paper over it.
+- **Defects found while grounding this doc, deliberately left alone** (other domains' code —
+  hand off, do not fix from here): `store.name` is read off registry docs in
+  `services/delivery/RestaurantAvailabilityService.js` and `routes/delivery/admin.js` and is
+  always `undefined`; and `utils/crons/store-auto-close.js` calls
+  `clearExploreCacheForStore(storeData)` where the in-scope variable is `store`, so every
+  auto-close throws and the explore cache is never cleared.
 
-## 6. Open questions — a human decides these, not you
-Until they are answered, do not implement past them; ask.
-1. **Auto-confirm or never?** Is `confirmedBy: 'auto:v1'` (phone + geo < 150 m) acceptable, or
-   must every link have a person's name on it? *(Recommendation: allow it, flag-gated, default
-   off for the first run.)*
-2. **Scope of stores.** Every competitor store in the country, or only towns we deliver in?
-3. **Where a human confirms.** A new admin screen in `shoofi-delivery-web`, a Slack flow, or a
-   script for now?
-4. **`no-match` vs `rejected`** — confirmed as distinct? *(Recommendation: yes — see §4a.)*
+## 6. Decisions on record (human-confirmed 2026-08-14 — do NOT re-litigate)
+1. **Auto-confirm: allowed, narrowly, and flag-gated.** Tier `strong` only — unambiguous phone
+   **and** geo < 150 m **and** name above the 0.4 floor, Tira Eat only. Recorded as
+   `confirmedBy: 'auto:v1'`. **Default OFF for the first run**: the run reports what it *would*
+   have confirmed, a human eyeballs that list, and only then is the flag turned on.
+2. **Scope: collect country-wide, match and brief only over towns we deliver in.** Tira's whole
+   country list is one call, so the extra rows are nearly free — and the out-of-town rows are
+   the expansion map. ⚠️ *"Towns we deliver in" is not yet cleanly defined* — coverage is keyed
+   on delivery **pickup zones**, and the one-town-per-store cleanup is in flight (§2). Get the
+   definition from `shoofi-domains:delivery`; do not invent one.
+3. **Confirmation surface: a script now, an admin screen next.** A CLI that prints the queue
+   ordered by `score` with the near-miss `candidates`, taking confirm / reject / no-match. The
+   endpoints are identical either way, so this validates the matching against real data before
+   any UI is built.
+4. **`no-match` stays distinct from `rejected`** — §4a stands. `no-match` is the acquisition
+   list and must be re-scored whenever we onboard a new store.
 
 ## 7. Explicitly out of scope right now
 No scheduled collectors or crons. No competitor snapshots or history. No menu scraping, no
