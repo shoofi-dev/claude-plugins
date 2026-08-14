@@ -87,6 +87,29 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **`driver-daily-hours` mixes two time conventions in one document, and it is the only
+    per-hour occupancy record on the platform.** Handle `db.driverDailyHours` → collection
+    **`driver-daily-hours`** (`DatabaseInitializationService.js:71`), written nightly at 03:15
+    by `utils/crons/driver-daily-hours.js`. Three things to get right before querying it:
+    - **`date` is a 09:00→09:00 working-day LABEL in Israel local time** (`workingDayBounds`,
+      `utils/driver-active-hours.js:102-105`) — the same business-day idea as invariant 8, and
+      **not** the exec dashboard's 07:00 day or its 04:30-on-the-1st month cut
+      (`utils/business-day.js:40,49-50`). Filtering `date` inside any other window puts your
+      numerator and denominator on different calendars. Use `date` as a ±1-day pre-filter and
+      clip on the interval instants.
+    - **`activePeriods[].start/end` are UTC `Z` strings** — `s.toISOString()`,
+      `utils/driver-active-hours.js:149` — alone among the `delivery-company` timestamps in not
+      carrying an Israel offset (`bookDelivery.created`, `driverStatusHistory.timestamp` and
+      the rest are `+03:00`). Bucket through `Asia/Jerusalem`; never compare them
+      lexicographically against an offset string.
+    - **the per-period `minutes` is `moment.diff(..., 'minutes')` and truncates**, as does
+      `overlapMinutes` (`utils/driver-active-hours.js:89-99`) — it sums truncated per-interval
+      diffs. Any threshold finer than a whole minute must be computed from `start`/`end`.
+    Also: a driver-day with `activeMinutes <= 0` is **not written at all**
+    (`driver-daily-hours.js:81`), so an absent row is "no data", never a zero — and history
+    only starts **2026-05-29**. Reuse `utils/driver-active-hours.js` rather than re-deriving
+    intervals from `driver-status-history`: it encodes the equal-second ON/OFF tie-break and
+    the same-instant OFF→ON collapse (`:19-43`), which `growth-snapshots.js` does not.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`

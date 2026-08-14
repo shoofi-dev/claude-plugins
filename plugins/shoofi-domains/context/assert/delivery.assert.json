@@ -15,6 +15,7 @@
         "services/driver-shift/shift-service.js",
         "utils/driver-active-hours.js",
         "utils/crons/driver-shift-cron.js",
+        "utils/crons/driver-daily-hours.js",
         "services/delivery/assignDriver.js",
         "services/delivery/book-delivery.js",
         "services/delivery/delayed-assignment.js",
@@ -36,7 +37,13 @@
           "assignPermanentDriversToShifts",
           "dayTimeSlots"
         ],
-        "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
+        "utils/driver-active-hours.js": [
+          "workingDayBounds",
+          "workingHoursWindow",
+          "shiftWindows",
+          "overlapMinutes",
+          "computeDayBuckets"
+        ],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
         "services/delivery/book-delivery.js": ["originalBookId"]
       },
@@ -90,6 +97,26 @@
           "file": "utils/driver-active-hours.js",
           "regex": "WORKING_START_HOUR",
           "desc": "the one correct business-day window ([D 09:00, D+1 02:00]); feeds the paid guarantee"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "db\\.driverDailyHours\\s*=\\s*db\\.collection\\('driver-daily-hours'\\)",
+          "desc": "db.driverDailyHours is bound to the hyphenated driver-daily-hours collection"
+        },
+        {
+          "file": "utils/driver-active-hours.js",
+          "regex": "const \\[start, end\\] = workingDayBounds\\(date\\)|workingDayBounds\\(date\\)",
+          "desc": "driverDailyHours.date is a 09:00->09:00 working-day label, not a calendar date and not the exec dashboard's 07:00 day"
+        },
+        {
+          "file": "utils/driver-active-hours.js",
+          "regex": "start: s\\.toISOString\\(\\), end: e\\.toISOString\\(\\), minutes: e\\.diff\\(s, 'minutes'\\)",
+          "desc": "activePeriods[] start/end are UTC Z strings inside an Israel-offset collection, and `minutes` truncates - any sub-minute threshold must come from start/end"
+        },
+        {
+          "file": "utils/crons/driver-daily-hours.js",
+          "regex": "if \\(buckets\\.activeMinutes <= 0\\) continue",
+          "desc": "a driver-day with no active minutes is never written - an absent row is no data, not a zero"
         },
         {
           "file": "services/delivery/assignDriver.js",
