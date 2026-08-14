@@ -14,6 +14,7 @@
         "routes/geo.js",
         "services/driver-shift/shift-service.js",
         "utils/driver-active-hours.js",
+        "utils/crons/driver-daily-hours.js",
         "utils/crons/driver-shift-cron.js",
         "services/delivery/assignDriver.js",
         "services/delivery/book-delivery.js",
@@ -95,6 +96,31 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "driverDailyHours\\s*=\\s*[^;]*['\"]driver-daily-hours['\"]",
+          "desc": "db.driverDailyHours binds to the hyphenated collection driver-daily-hours (the camelCase twin exists and is empty)"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "driverStatusHistory\\s*=\\s*[^;]*['\"]driver-status-history['\"]",
+          "desc": "db.driverStatusHistory binds to the hyphenated collection driver-status-history"
+        },
+        {
+          "file": "utils/crons/driver-daily-hours.js",
+          "regex": "activePeriods:\\s*buckets\\.intervals",
+          "desc": "driver-daily-hours.activePeriods[] is computeDayBuckets' intervals - the only per-hour driver-occupancy source in the platform"
+        },
+        {
+          "file": "utils/driver-active-hours.js",
+          "regex": "intervals:\\s*intervals\\.map",
+          "desc": "the {start,end,minutes} period shape is built here as ISO-Z strings"
+        },
+        {
+          "file": "utils/crons/driver-daily-hours.js",
+          "regex": "activeMinutes\\s*<=\\s*0",
+          "desc": "days with no active minutes are skipped entirely - an absent driver-daily-hours doc is not a zero"
         }
       ]
     },

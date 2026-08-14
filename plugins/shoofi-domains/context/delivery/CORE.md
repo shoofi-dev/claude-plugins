@@ -70,6 +70,11 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    Querying `delivery-company.bookDelivery` directly returns **zero documents silently**
    (Mongo just reports an empty collection), so a read-only investigation looks like "no twin
    deliveries exist". Check the binding in that file before querying production by hand.
+   The driver-hours trio hyphenates the same way and its camelCase twins physically exist and
+   are empty: `db.driverStatusHistory` → **`driver-status-history`**, `db.driverDailyHours` →
+   **`driver-daily-hours`**, `db.driverShifts` → **`driver-shifts`**
+   (`services/database/DatabaseInitializationService.js:64,70,71`). `driverLocationHistory`
+   is the exception — camelCase really is its collection name (`:52`).
 8. **A shift `date` is a business-day LABEL, not a wall-clock date.** The day runs
    `driverShiftConfig.timeSlotTemplate.startHour → endHour` — **09:00 → 02:00** in prod for
    every live area. Generation rolls `endHour += 24` and stores *every* slot of that day,
@@ -87,6 +92,27 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **Only `isActive` is historized, and `driverDailyHours.activePeriods[]` is the ONLY
+   per-hour occupancy source.** `isAvailable` (raw `updateOne` in `routes/delivery/driver.js`)
+   and `isOnline` (rewritten on every location ping, `routes/delivery/driver.js`) keep **no
+   trail** — current value only. Every hours figure in the platform therefore replays
+   `driver-status-history`, whose `timestamp` is an **offset string** (`+03:00` summer,
+   `+02:00` winter — lexicographic ranges break across that boundary). The precomputed
+   roll-up is `driver-daily-hours`, one doc per driver per **09:00→09:00** business day, and
+   its `activePeriods[]` (`{start,end,minutes}`, UTC-`Z` strings; built as `intervals` by
+   `computeDayBuckets` in `utils/driver-active-hours.js` and stored under that name by
+   `utils/crons/driver-daily-hours.js`) is the only field anywhere that can answer "how many minutes was this driver connected
+   during hour H". Three things it does not announce: activity outside 09:00 D → 09:00 D+1 is
+   **clipped away**; a day with `activeMinutes <= 0` is **not written at all** (absent ≠ zero,
+   `utils/crons/driver-daily-hours.js`); and a driver who never toggles OFF is credited to the
+   day boundary, which inflates "connected" for anyone leaving the app on overnight. Coverage
+   starts where the 03:15 cron/backfill ran (`utils/crons/driver-daily-hours.js`, `backfill`);
+   earlier periods must be rebuilt from `driver-status-history`. Join types differ:
+   `driverDailyHours.driverId` and `bookDelivery.driver._id` are **ObjectIds**, while
+   `driverShifts.bookedDrivers[].driverId` and `driverLocationHistory.driverId` are **strings**.
+   To place a completed trip in a clock hour use `bookDelivery.completedAt` (a BSON **Date**);
+   `created`/`expectedDeliveryAt` are offset **strings** and `created` is booking time, which
+   is nonetheless what every existing report windows on.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
