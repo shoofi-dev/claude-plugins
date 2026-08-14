@@ -21,7 +21,10 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "services/delivery/availability-status-service.js",
+        "services/exec-dashboard/delivery-metrics.js",
+        "utils/business-day.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -38,7 +41,14 @@
         ],
         "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "services/delivery/book-delivery.js": ["originalBookId"],
+        "services/delivery/availability-status-service.js": [
+          "recordAvailabilityTransition",
+          "recordBulkAreaTransitions",
+          "rawDurationMinutes"
+        ],
+        "utils/business-day.js": ["isRoutineNightlyClosure", "operatingMinutesBetween"],
+        "services/exec-dashboard/delivery-metrics.js": ["computeStoppages", "listAreaStoppageEvents"]
       },
       "patterns": [
         {
@@ -95,6 +105,31 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "db\\.deliveryAvailabilityEvents\\s*=\\s*db\\.collection\\('delivery-availability-events'\\)",
+          "desc": "the outage trace is the hyphenated delivery-availability-events; the camelCase name is only the JS handle"
+        },
+        {
+          "file": "services/delivery/availability-status-service.js",
+          "regex": "startedAt:\\s*now",
+          "desc": "startedAt/endedAt are written as real BSON Dates, not this platform's offset strings - a Date bound is correct here"
+        },
+        {
+          "file": "services/delivery/availability-status-service.js",
+          "regex": "VISIBILITY_ONLY:\\s*\"visibility_only\"",
+          "desc": "region/town flips are traced but tagged visibility_only, so they never appear in any outage report"
+        },
+        {
+          "file": "utils/business-day.js",
+          "regex": "ROUTINE_CLOSE_TOLERANCE_MIN\\s*=\\s*60",
+          "desc": "the nightly ~02:00/~09:00 close/reopen is excluded from outage reports within +/-60 min - a zero on the dashboard does not mean nothing was switched off"
+        },
+        {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "isRoutineNightlyClosure",
+          "desc": "the routine filter is applied by the stoppage reports, not by the trace itself; the trace keeps every row"
         }
       ]
     },

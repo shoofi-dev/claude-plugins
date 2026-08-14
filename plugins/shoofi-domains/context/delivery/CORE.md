@@ -80,7 +80,26 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    after midnight both silently read the *following* night's slots. Corollary:
    `endTime <= startTime` is legal (`"23:00"→"00:00"`; `"24:00"` also exists in older data),
    so any `end > start` assertion or lexicographic `HH:mm` compare is a bug.
-9. **Permanent drivers are per-weekday.** `dayTimeSlots[].dayOfWeek` is authoritative; the flat
+9. **"When was delivery switched off?" has exactly one answer: `delivery-availability-events`.**
+   Every `isActive` flip that can block dispatch is traced there by
+   `recordAvailabilityTransition` / `recordBulkAreaTransitions`
+   (`services/delivery/availability-status-service.js`) — one open row per area, closed with
+   `endedAt` + `rawDurationMinutes` on resume. No other collection records it; the area
+   document itself only knows its current state. **`startedAt`/`endedAt` are real BSON
+   `Date`s** — the exception to this platform's offset-string convention, so a `$gte: new
+   Date(...)` is correct here and a lexicographic string bound is not. Nothing was
+   backfilled: the history starts at that service's deploy.
+   **Reading it: a zero does not mean nothing was switched off.** Every report over the trace
+   filters twice — `effect: "dispatch_blocking"` only (region/town flips are logged
+   `visibility_only` and never surface), then the routine nightly close/reopen (~02:00/~09:00,
+   ±60 min) is dropped by `isRoutineNightlyClosure` (`utils/business-day.js`) and minutes are
+   clipped to the 09:00→02:00 operating window
+   (`services/exec-dashboard/delivery-metrics.js:computeStoppages`). An outage that started and
+   ended overnight is legitimately absent from the exec dashboard while sitting in the trace.
+   Query the collection directly, not the dashboard, when the question is "did anyone touch
+   this area at all". In `mongosh` it is **`delivery-availability-events`** (hyphenated); the
+   `deliveryAvailabilityEvents` camelCase name is only the JS handle (invariant 7 again).
+10. **Permanent drivers are per-weekday.** `dayTimeSlots[].dayOfWeek` is authoritative; the flat
    `timeSlots` array is the **union across all weekdays** and is meaningless without
    `daysOfWeek` beside it. Always resolve through
    `ShiftService.getPermanentDriverSlotsForDay(permDriver, dayOfWeek)` — iterating `timeSlots`
