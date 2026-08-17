@@ -77,6 +77,16 @@
           "desc": "the pending path's || 30 fallback rescues null/undefined/empty maxETA but not a non-numeric string - the asymmetry with the immediate path is the point"
         },
         {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "useDelayedAssignment:\\s*false",
+          "desc": "the CODE default is off and the code window is 10; production overrides both from delivery-company.delivery-config {type:'driver-assignment'} with true / 15. If this literal ever changes, the CORE note about reading the DB document rather than the constant needs rechecking"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "assignmentWindowMinutes,\\s*'minutes'\\)",
+          "desc": "dispatch is scheduled at pickupTime minus assignmentWindowMinutes - the same quantity the late-delivery grace measures from the other end"
+        },
+        {
           "file": "services/driver-shift/shift-service.js",
           "regex": "endHour\\s*\\+=\\s*24",
           "desc": "business day crosses midnight; every slot is stored under the STARTING date"
