@@ -21,7 +21,10 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "utils/crons/growth-snapshots.js",
+        "lib/churn-360/signals.js",
+        "routes/analytics.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -30,15 +33,26 @@
           "supportedCities",
           "supportedAreas"
         ],
-        "services/delivery/driver-status-service.js": ["setDriverActiveStatus"],
+        "services/delivery/driver-status-service.js": [
+          "setDriverActiveStatus"
+        ],
         "services/driver-shift/shift-service.js": [
           "getPermanentDriverSlotsForDay",
           "assignPermanentDriversToShifts",
           "dayTimeSlots"
         ],
-        "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
-        "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "utils/driver-active-hours.js": [
+          "workingDayBounds",
+          "workingHoursWindow",
+          "shiftWindows"
+        ],
+        "services/delivery/delayed-assignment.js": [
+          "isPendingAssignment",
+          "assignDriverAt"
+        ],
+        "services/delivery/book-delivery.js": [
+          "originalBookId"
+        ]
       },
       "patterns": [
         {
@@ -95,6 +109,16 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "eventType === .status_change. && ev\\.status === .3.",
+          "desc": "the real store-ready source is orderFlowEvents status 3, keyed by orderNumber === bookDelivery.bookId - NOT a bookDelivery.storeReadyAt field, which nothing writes"
+        },
+        {
+          "file": "utils/crons/growth-snapshots.js",
+          "regex": "storeReadyAt",
+          "desc": "the surviving storeReadyAt locals here read order.completedAt / orderFlowEvents, never bookDelivery.storeReadyAt (0 of 82,414 rows) - if a bookDelivery read reappears, the net-of-kitchen-delay lie is back"
         }
       ]
     },
@@ -126,7 +150,10 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "hooks/useAvailableDrivers.ts"],
+      "files": [
+        "consts/shared.ts",
+        "hooks/useAvailableDrivers.ts"
+      ],
       "patterns": [
         {
           "file": "consts/shared.ts",
