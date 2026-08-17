@@ -87,6 +87,23 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **`bookDelivery.pickupTime` is an `"HH:mm"` string that legitimately exceeds 24 — never
+   wrap it at midnight.** It is a wall-clock label with no date, and every reader that turns it
+   back into an instant anchors it to the row's own `created` date with moment's `.set({hour})`
+   (`utils/crons/delivery-pickup-checker.js`) or `Date#setHours`
+   (`shoofi-shoofir/screens/delivery-driver/index.tsx`) — both of which roll hour 24 over to
+   the next day. So `"24:05"` resolves **correctly** to 00:05 tomorrow, while a normalized
+   `"00:05"` resolves to 00:05 **today**, ~24h in the past, and makes the pickup checker fire an
+   immediate "pickup late by ~1435 minutes" push to the driver and the store. `POST
+   /api/order/update-delay` (`routes/order.js`) produces these values by adding `delayMinutes`
+   with no `% 1440`, and that is deliberate. Note the same `>24:00` convention in shift data
+   (invariant 8) — it is a house style, not a bug. Two knock-on effects to know rather than
+   "fix" here: `moment("24:05","HH:mm")` is **invalid**, so
+   `services/delivery/delayed-assignment.js`'s same-store bonus silently never applies to such a
+   row; and the zero-ETA sentinel at `services/exec-dashboard/delivery-metrics.js` compares
+   `expectedDeliveryAt.format("HH:mm")` (which can only ever emit `00:05`) against the stored
+   `pickupTime`, so it stops matching after any cross-midnight shift. Normalizing `pickupTime`
+   properly means giving the field a real date or fixing those readers — not a modulo.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`

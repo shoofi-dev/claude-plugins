@@ -21,7 +21,10 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "utils/crons/delivery-pickup-checker.js",
+        "services/exec-dashboard/delivery-metrics.js",
+        "routes/order.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -95,6 +98,26 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "\\.format\\(\"HH:mm\"\\)",
+          "desc": "pickupTime is stored as a bare HH:mm wall-clock label carrying no date"
+        },
+        {
+          "file": "utils/crons/delivery-pickup-checker.js",
+          "regex": "hour: Number\\(pickupHour\\)",
+          "desc": "readers re-anchor pickupTime to the row's own created date via moment .set({hour}), which rolls hour 24 into the next day - this is what makes a '24:05' pickupTime resolve correctly and a wrapped '00:05' resolve ~24h in the past"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "Math\\.floor\\(totalMinutes / 60\\)",
+          "desc": "update-delay adds delayMinutes to pickupTime with NO % 1440 - the >24:00 output is deliberate, see delivery CORE invariant 10"
+        },
+        {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "m\\.format\\(\"HH:mm\"\\) === pickupTime",
+          "desc": "the zero-ETA sentinel is exact string equality against pickupTime, so it can never match a >24:00 pickup value"
         }
       ]
     },
