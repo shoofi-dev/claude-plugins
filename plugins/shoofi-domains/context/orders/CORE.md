@@ -61,6 +61,23 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    "Is this order for a later day?" must therefore test **both**, **truthily** — as the server
    does (`routes/order.js`: `$or: [{isFutureOrder:{$ne:true}},{isFutureOrder:{$exists:false}}]`).
    Testing `isFutureOrder` alone silently misses every ramadan order.
+10. **A store delay ACCUMULATES the live fields and freezes the originals ONCE — and
+    `delayMinutes` is never a running total.** `POST /api/order/update-delay`
+    (`routes/order.js`) writes three preserve-once fields (`order.originalOrderDate`, and on the
+    `bookDelivery` row `originalPickupTime` + `originalExpectedDeliveryAt`, each written as
+    `existing || current`) beside three that accumulate (`orderDate`, `pickupTime`,
+    `expectedDeliveryAt`). `delayMinutes` on **both** documents is overwritten with the LAST
+    declared delay: after 10 then 10 it reads `10`, not `20`. Total accumulated delay is only
+    recoverable by diffing an original against its live twin — anything summing `delayMinutes`
+    is wrong on every twice-delayed order.
+    Two consequences that have already caused bugs, both in reporting rather than here:
+    (a) `pickupTime` is deliberately **not** wrapped at 24, so `"24:05"` is a real stored value
+    and a `HH:mm` parser that rejects it discards the row; (b) a promise and a pickup clock must
+    be compared **within the same era** — the frozen promise against the frozen clock, or the
+    live against the live. Mixing them makes a zero-minute ETA sentinel
+    (`services/delivery/late-delivery.js`) look like a genuine promise and vice versa, which is
+    exactly what `originalExpectedDeliveryAt` exists to prevent. Delivery owns the reading rule;
+    orders owns the fields, and this is the contract between them.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
