@@ -19,6 +19,8 @@
         "services/delivery/book-delivery.js",
         "services/delivery/delayed-assignment.js",
         "services/delivery/driver-status-service.js",
+        "services/delivery/late-delivery.js",
+        "routes/twin-order.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
         "services/database/DatabaseInitializationService.js"
@@ -95,6 +97,36 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "if \\(isPendingAssignment\\) \\{[\\s\\S]{0,200}assignedAt",
+          "desc": "admin reassign writes assignedAt ONLY in the isPendingAssignment branch - the regular-reassign path leaves the FIRST courier's dispatch in place"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "reassignmentMetadata\\s*[:=]\\s*\\{[\\s\\S]{0,120}previousDriver:",
+          "desc": "admin single reassign records the previous courier as reassignmentMetadata.previousDriver (ObjectId)"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "previousDriverId:",
+          "desc": "bulk admin dispatch spells the same field previousDriverId - a second key readers must cover"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "assignedAt: new Date\\(\\)",
+          "desc": "the twin path writes assignedAt as a BSON Date while every other writer writes a moment offset string - assignedAt is mixed-type and must never be range-queried"
+        },
+        {
+          "file": "services/delivery/late-delivery.js",
+          "regex": "PREVIOUS_DRIVER_KEYS",
+          "desc": "the one normalised list of the three keys the previous courier is written under"
+        },
+        {
+          "file": "services/delivery/late-delivery.js",
+          "regex": "function dispatchInstantOf",
+          "desc": "reassignedAt first, assignedAt only as fallback - the order that makes it 'this courier's dispatch'"
         }
       ]
     },

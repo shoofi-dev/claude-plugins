@@ -87,6 +87,46 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **`assignedAt` is NOT rewritten by the reassign path you reach for first.**
+    `POST /api/delivery/admin/reassign` writes it only inside the `isPendingAssignment`
+    branch (`routes/delivery/admin.js:200-218`); the `else` — "Regular reassignment", the
+    path **3,680 of 3,735** completed Jun-Aug reassignments took — writes `reassignedAt` and
+    `reassignmentMetadata` and leaves `assignedAt` alone. So on almost every reassigned
+    delivery `assignedAt` still holds the **first** courier's dispatch, not the current
+    one's. The two paths that *do* overwrite it are the bulk admin dispatch
+    (`routes/delivery/driver.js:375`) and twin manual assign (`routes/twin-order.js:1624`).
+    Anything asking "when did *this* courier get the job" must read `reassignedAt` first and
+    fall back to `assignedAt`, never the other way round — grepping for `assignedAt` writers
+    finds `driver.js:375` and suggests the opposite conclusion.
+    Two shape facts that travel with it: `assignedAt` is **mixed BSON** — a moment offset
+    string on 20,640 completed Jun-Aug rows and a real `Date` on 990 (twin path) — so read it
+    through `momentTZ.tz(...)` in JS and **never range-query it**, which silently matches
+    nothing; and it is absent from most of the 82k-row collection but present on
+    **21,630/21,643 (99.9%)** of *completed* rows, so sizing it over the whole collection
+    reads as "three quarters of deliveries have no dispatch instant" and is wrong for every
+    reporting window. `assignDriverAt` is scheduled intent, not a dispatch — `assignedAt`
+    precedes it on 59.7% of rows.
+11. **There is no reassignment history.** Every reassign is a `$set` overwrite on the one
+    `book-delivery` document — no array, no log collection — so only the most recent previous
+    courier survives, and on a job passed A → B → C you can charge B and cannot see A. The
+    previous courier is written under **three** different keys by three writers:
+    `reassignmentMetadata.previousDriver` (`routes/delivery/admin.js:212`),
+    `reassignmentMetadata.previousDriverId` (`routes/delivery/driver.js:375`), and
+    `assignmentMetadata.previousDriver` (`routes/twin-order.js:1624`, which writes **no**
+    `reassignedAt` at all — the timestamp falls back to
+    `assignmentMetadata.manuallyAssignedAt`, a BSON `Date`). All three hold an **ObjectId**,
+    sitting next to a **string** `reassignedBy`. Read all three or twin reassignments become
+    invisible; `services/delivery/late-delivery.js` normalises them (`PREVIOUS_DRIVER_KEYS`,
+    `reassignmentOf`, `previousDriverIdOf`) and is the one place to reuse. Two guards that
+    matter: a `reassignedAt` earlier than the row's own `created` is an artefact of the `$set`
+    overwrite on re-booked documents (**4,292 rows**) and is no usable signal; and **757 of
+    9,991** reassignments hand the job back to the *same* driver — a company admin who also
+    drives — so "went to a different courier" is a condition to test, not an assumption.
+    A previous courier's **name** exists nowhere on the delivery, only their ObjectId:
+    resolve it from `delivery-company.customers` by `_id` and ship a fallback label, because
+    a handful are deleted drivers. Never use the embedded `driver.fullName` snapshot for it —
+    it names whoever finished the job, and it drifts (one courier in Jun-Aug is stored as both
+    "עומר" and "עיסה עומר").
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
