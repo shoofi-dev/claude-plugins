@@ -56,6 +56,16 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
 2. **Assignment idempotency:** de-dupe on `originalBookId`; the pending→assigned claim is an
    atomic `updateOne({isPendingAssignment:true})` (`matchedCount===0` = another container won).
    Never bypass either.
+   **`bookId` is NOT a key — it is `originalBookId` with its discriminating segment removed.**
+   Order creation generates `"1276-521495-3749"` and then keeps only segments [0] and [2] for
+   `order.orderId` (`routes/order.js`), so `bookId` is `"1276-3749"`: the middle,
+   timestamp-derived part is dropped. `bookDelivery` is one collection shared by **every**
+   store, so collisions are cross-tenant. Resolve a delivery by `originalBookId` (or by the
+   `_id` you already read), fall back to `bookId` only for display or as a last resort — the
+   ladder in `routes/twin-order.js` is the reference. **Never `updateOne({bookId})`**: a handler
+   that reads by `originalBookId` and writes by `bookId` can write one store's delay onto
+   another store's delivery. Same hazard for any `findOne({bookId})` that decides which driver
+   gets a push.
 3. **Never write `customers.isActive` directly** — always `setDriverActiveStatus`
    (`services/delivery/driver-status-service.js`), which writes `driverStatusHistory` in
    lock-step and pushes a websocket update. Direct writes create phantom history.

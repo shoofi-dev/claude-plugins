@@ -21,7 +21,9 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "routes/order.js",
+        "routes/twin-order.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -38,7 +40,8 @@
         ],
         "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "services/delivery/book-delivery.js": ["originalBookId"],
+        "routes/twin-order.js": ["originalBookId"]
       },
       "patterns": [
         {
@@ -95,6 +98,11 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const newOrderId = `\\$\\{idPart1\\}-\\$\\{idPart2\\}`",
+          "desc": "order.orderId (= bookDelivery.bookId) keeps only segments [0] and [2] of originalOrderId, dropping the discriminating middle part - so bookId is a lossy substring of originalBookId and is never safe as a write key"
         }
       ]
     },

@@ -37,6 +37,10 @@ if it supports **BOTH** `store.supportedCities` (ObjectId[] — permission) **AN
 ## 2. bookDelivery lifecycle & DELIVERY_STATUS
 `delivery-company.bookDelivery`, one per delivery. `bookId = order.orderId`,
 `originalBookId = order.originalOrderId` (set at partner-accept, `order.js`).
+The two are **not interchangeable**: `order.orderId` is `originalOrderId` split on `-` with
+only segments [0] and [2] kept, so `bookId` is the same id minus its discriminating middle
+segment — `"1276-521495-3749"` → `"1276-3749"`. Lookups and especially **writes** must key on
+`originalBookId` or `_id`; see CORE invariant 2.
 **Status constants are authoritative in `consts/consts.js`** (`DELIVERY_STATUS`):
 `1` WAITING_FOR_APPROVE → `2` APPROVED → `3` COLLECTED_FROM_RESTAURANT (pickup) →
 `4` DELIVERED; `5` WAITING_IN_STORE; cancels `-1` by-driver, `-2` by-store, `-3` by-admin.
