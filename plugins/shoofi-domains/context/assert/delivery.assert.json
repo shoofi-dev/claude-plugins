@@ -18,6 +18,7 @@
         "services/delivery/assignDriver.js",
         "services/delivery/book-delivery.js",
         "services/delivery/delayed-assignment.js",
+        "services/delivery/late-delivery.js",
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
@@ -38,7 +39,13 @@
         ],
         "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "services/delivery/book-delivery.js": ["originalBookId"],
+        "services/delivery/late-delivery.js": [
+          "LATE_DELIVERY_PROJECTION",
+          "classifyDelivery",
+          "isExcludedLateReassignment",
+          "excluded_late_reassignment"
+        ]
       },
       "patterns": [
         {
@@ -65,6 +72,21 @@
           "file": "services/database/DatabaseInitializationService.js",
           "regex": "db\\.bookDelivery\\s*=\\s*db\\.collection",
           "desc": "db.bookDelivery is bound to the hyphenated book-delivery collection"
+        },
+        {
+          "file": "services/delivery/late-delivery.js",
+          "regex": "LATE_THRESHOLD_MIN\\s*=\\s*1;",
+          "desc": "late means one WHOLE minute past the promise, truncated - 59 seconds is not late"
+        },
+        {
+          "file": "services/delivery/late-delivery.js",
+          "regex": "DEFAULT_PICKUP_GRACE_MIN\\s*=\\s*15;",
+          "desc": "the reassignment grace window is 15 minutes before promised pickup, not 10 - every report inherits this default unless it passes pickupGraceMin"
+        },
+        {
+          "file": "services/delivery/late-delivery.js",
+          "regex": "Math\\.trunc\\(actual\\.diff\\(promised\\) / 60000\\)",
+          "desc": "the delay is TRUNCATED over the raw millisecond diff, never rounded - Math.round disagrees by a minute on half the rows"
         },
         {
           "file": "services/delivery/book-delivery.js",

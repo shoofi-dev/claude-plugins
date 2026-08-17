@@ -87,6 +87,25 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **"Late delivery" has ONE definition and it lives in `services/delivery/late-delivery.js`.**
+   `classifyDelivery` puts every completed row in exactly one of four buckets —
+   `unmeasurable`, `excluded_late_reassignment`, `late`, `on_time`. Late is
+   `Math.trunc((completedAt − expectedDeliveryAt) / 60000) >= LATE_THRESHOLD_MIN`, and
+   `LATE_THRESHOLD_MIN` is **1**: one whole minute, truncated, so 59 seconds is not late.
+   `DEFAULT_PICKUP_GRACE_MIN` is **15** — a delivery reassigned to a *different* courier no
+   earlier than 15 minutes before the promised pickup, and before the promise came due, is
+   held out of that courier's score. **The exclusion needs a previous driver**
+   (`reassignmentOf` returns null without one), so it never fires on a first assignment out of
+   the pending queue and a courier handed a brand-new job minutes before pickup is charged in
+   full. Never re-implement any of this inline, and never project `assignmentMetadata: 1`
+   wholesale to reach it — use `LATE_DELIVERY_PROJECTION`.
+11. **Both exclusion buckets have to leave the DENOMINATOR, not just the numerator.** A report
+   that filters its late count through `classifyDelivery` but takes its per-driver total from
+   the raw row set understates every courier, and understates most for the couriers who
+   inherit the most reassignments — the opposite of what the exclusion is for — and its
+   drill-down can no longer be reconciled with the headline by adding up.
+   `routes/analytics.js:1264-1268` counts `totalDeliveries` outside the bucket branch and does
+   exactly this, so the driver table on the delivery-stats screen is understated today.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
