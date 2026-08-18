@@ -44,6 +44,26 @@ boundary and say so in the PR.
 - **BY DESIGN:** translations resolve to the **central** DB — UI labels are global/platform-wide,
   not per-store. Do **not** re-route them to `app-name`.
 - **FACT (not a bug):** `supportedCategoryIds` are strings (invariant 5).
+- **FACT — availability has NO history. Only the current boolean is knowable.** "This product has
+  been out of stock for 3 months" cannot be computed from existing data, and a request for it
+  should be answered with that rather than with an estimate. Four independent reasons, all
+  current: (1) there is no product-history collection —
+  `services/database/DatabaseInitializationService.js` lists every collection and none exists;
+  (2) the three availability toggles do **not** write `updatedAt` (`routes/product.js:1264`
+  isInStore, `:1310` quantity, `:1351` isHidden) — only the full-product-edit handler does
+  (`:516`), so `updatedAt` dates the last *edit*, not the last flip; (3) the admin audit
+  middleware returns early unless `app-type === 'shoofi-admin'`
+  (`middleware/admin-audit-middleware.js:40`), and store owners toggle stock from
+  **shoofi-partner**, so no audit row is ever written for the case anyone cares about — and
+  `update/quantity` / `update/isHidden` are not in `AUDIT_ROUTE_MAP` either; (4) `outOfStoreUntil`
+  is forward-looking and the 07:00 cron `$unset`s it on expiry
+  (`utils/crons/products-in-store-update.js:91-93`).
+  What you **can** offer instead: the decoded *reason* — `outOfStockByQuantity` ⇒ auto,
+  `outOfStoreUntil` ⇒ temporary, neither ⇒ manually switched off, plus the owner's free-text
+  `notInStoreDescriptionAR/HE` — and `max(orders.created)` for that `item_id` as a "last sold"
+  floor. Making the duration real needs a new `isInStoreChangedAt` stamp on the three toggles, or
+  extending the audit middleware past the `shoofi-admin` gate; both are catalog changes, neither
+  has been done.
 - **Backlog (confirmed, safe to act on when asked):**
   1. `GET /api/menu` and `POST /api/menu/refresh` build the menu **differently** — `refresh` is a
      real admin-triggered action that re-caches under the same key, so clicking it degrades the

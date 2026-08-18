@@ -37,6 +37,16 @@
           "file": "routes/product.js",
           "regex": "outOfStockByQuantity",
           "desc": "stock invariant field"
+        },
+        {
+          "file": "middleware/admin-audit-middleware.js",
+          "regex": "app-type'\\] !== 'shoofi-admin'",
+          "desc": "the gate that keeps partner-app stock toggles out of the audit log (doc CORE: availability has no history)"
+        },
+        {
+          "file": "utils/crons/products-in-store-update.js",
+          "regex": "outOfStoreUntil",
+          "desc": "forward-looking temporary-unavailability field, unset on expiry (doc CORE: availability has no history)"
         }
       ]
     }
