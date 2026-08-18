@@ -21,7 +21,9 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "services/delivery/late-delivery.js",
+        "services/exec-dashboard/delivery-metrics.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -38,7 +40,16 @@
         ],
         "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "services/delivery/book-delivery.js": ["originalBookId"],
+        "services/delivery/late-delivery.js": [
+          "classifyDelivery",
+          "accountableDriverId",
+          "summarizeLateDeliveries"
+        ],
+        "services/exec-dashboard/delivery-metrics.js": [
+          "computeLateDeliveries",
+          "resolveCourierNames"
+        ]
       },
       "patterns": [
         {
@@ -95,6 +106,16 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/delivery/late-delivery.js",
+          "regex": "accountableDriverId",
+          "desc": "every per-courier delivery table keys on the courier the delay is CHARGED to, not on the delivery's own driver._id"
+        },
+        {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "resolveCourierNames",
+          "desc": "courier names come from the delivery-company.customers registry - the embedded driver.fullName drifts and splits one courier into two rows"
         }
       ]
     },

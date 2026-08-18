@@ -87,6 +87,23 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **Per-courier delivery metrics key on `accountableDriverId`, never on `driver._id`.**
+    `classifyDelivery` (`services/delivery/late-delivery.js`) returns it for the `on_time`
+    bucket as well as for `late`, and `null` for both excluded buckets — so a per-courier
+    numerator *and* its denominator both come out of the single pass the month totals are
+    computed in. That is what `computeLateDeliveries`
+    (`services/exec-dashboard/delivery-metrics.js`) builds `lateCourierRoster` from:
+    `measurableCount` and `latePercent` keyed on who is *charged*, plus `completedCount`
+    keyed on who actually drove. Keying the table on `driver._id` instead counts a
+    re-attributed job against the courier the rule just excused, and the rows then cannot
+    be reconciled against the month's own late %. The courier's **name** has the same
+    rule with the opposite answer: resolve it from the `delivery-company.customers`
+    registry via `resolveCourierNames`, never from the embedded `driver.fullName`. That
+    snapshot is written at assignment time and drifts — one production courier is stored
+    as both "עומר" and "עיסה עומר" — so a table built off it splits one person into two
+    rows, and a re-attributed row carries the previous courier's ObjectId with no name on
+    it at all. `computeActiveCouriers` in the same file *does* use the embedded name, by
+    design; never merge its rows into a roster built the correct way.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
