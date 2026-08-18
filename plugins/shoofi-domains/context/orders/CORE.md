@@ -62,6 +62,51 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    does (`routes/order.js`: `$or: [{isFutureOrder:{$ne:true}},{isFutureOrder:{$exists:false}}]`).
    Testing `isFutureOrder` alone silently misses every ramadan order.
 
+## Where an order that never happened lives
+**There is no server-side cart.** The cart is MobX + AsyncStorage in
+`shoofi-app/stores/cart/index.ts` and nothing about it reaches the server until submit, so
+"the customer built a cart and left" exists ONLY as events in central **`shoofi.apps-logs`**
+(written by `routes/app-logs.js`). Three layers answer "abandoned", an order of magnitude
+apart — always establish which is meant:
+
+1. **Blocked before submit** — `checkout_validation_failed`, `properties.step` ∈
+   {`store_closed`, `store_closed_select_time`, `shipping_method_invalid`, `address_invalid`,
+   `payment_method_invalid`, `car_details_missing`, `future_order_date_missing`}, from
+   `shoofi-app/hooks/checkout/use-checkout-validate.ts`. **"Store closed" and "no delivery
+   available" create NO order document at all** — this is their only record anywhere. The
+   top-level failure in `screens/checkout/index.tsx` sends no `step`, so ~half the rows have
+   none; bucket them rather than dropping them.
+2. **Submitted and never paid** — status `"0"` order rows, per store DB. See the
+   `FAILED_PAYMENT_STATUS` note; that is the only layer carrying an issuer reason.
+3. **Never reached checkout** — `page_viewed` with `properties.page_name` ∈
+   {`ProductAddToCart`, `Cart`} and no `order_submit_success`. Add-to-cart uses
+   `trackPageView`, not `trackEvent`, so it is a `page_viewed` row and easy to miss.
+
+Traps that cost a day if you meet them cold:
+- **`apps-logs.created` is a real BSON `Date`** — the exact opposite of `orders.created`. One
+  query cannot span both, and mixing them matches nothing and raises nothing.
+- **The only indexes are `_id` and `{userId, created}`.** A match on `created` alone is a full
+  scan of a ~4.6 GB collection. Bound `_id` instead (`ObjectId.createFromTime`, widened by a
+  minute and re-filtered on `created`) — index-covered, and roughly 50× faster.
+- **No TTL and no retention job**, so history is complete back to the first event on
+  **2026-02-06**. Anything earlier is *no data*, not zero — report it as null.
+- **No `appName` field on the document**, so a per-store split is impossible from this data.
+  `app_type` is always `"shoofi-shopping"`: the partner and driver apps do not log at all.
+- **The launch event is not a usable "app open".** `ota_check_started` (`trigger: "launch"`,
+  `shoofi-app/hooks/useOTAUpdates.ts`) fires before `userDetailsStore` hydrates, so ~99% of
+  launch rows carry `userId: null`, and it only exists from 2026-07-29. Count *any* event for
+  activity instead.
+- **`user_visit_id` IS a stable identity** — the `device-id` header, generated once into
+  AsyncStorage — measured at 97.9% one device per customer. Do not confuse it with
+  `orders.deviceId`, which prefers the per-order `unique_hash` and churns every order.
+- **`POST /api/app-logs/insert` is unauthenticated and takes `userId` from the body.** A
+  product metric, never an auditable one.
+- Logging is killable per store via `isAppLogsEnabled`, and the collection handle is bound to
+  `db.driversBonuses` by `DatabaseInitializationService` — always use
+  `db.collection('apps-logs')` explicitly.
+
+Worked example: `services/exec-dashboard/engagement-metrics.js`.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
   cross-check is intentionally disabled. Leave it.
