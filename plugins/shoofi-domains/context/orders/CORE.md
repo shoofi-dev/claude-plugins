@@ -63,6 +63,20 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    Testing `isFutureOrder` alone silently misses every ramadan order.
 
 ## Known status (human-confirmed — do NOT "fix")
+- **FACT — the cancellation status does NOT name the actor, and two of the four "who cancelled"
+  statuses are never written.** Measured across all 245 store databases (2026-08-18):
+  `7` CANCELLED_BY_ADMIN 3,071 rows, `4` CANCELLED 65, `5` REJECTED 18, and **`8`
+  CANCELLED_BY_CUSTOMER and `9` CANCELLED_BY_DRIVER are ZERO**. `8`/`9` appear only in read-side
+  status lists (`routes/order.js:5029-5030`); no server path and no live client writes them. Any
+  "cancelled by customer" tile built on `8` will render a permanent 0 and read as a bug.
+  Nor is `4` the store's fault, though it is easy to assume so: `routes/order.js:5773-5777` maps
+  it to `"system"`, the Apple-Pay terms branch (`routes/order.js:2471-2479`) flips **never-charged**
+  `status:"0"` orders into it, and the partner's own advance button on a `PICKED_UP`(`10`) order
+  sends it (`shoofi-partner/stores/orders/index.tsx:278-280`) — i.e. a *fulfilled* order landing in
+  the cancelled bucket. **`5` REJECTED is the only store-attributable cancellation.**
+  For the actual actor prefer `updatedBySource` (`routes/order.js:5002-5005`, e.g.
+  `"shoofi_support"`), remembering it postdates most of the data — it is present on roughly a third
+  of cancellations and absent on everything older.
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
   cross-check is intentionally disabled. Leave it.
 - **BY DESIGN:** fraud **rejection** is intentionally off — risky orders route to

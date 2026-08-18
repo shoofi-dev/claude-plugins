@@ -50,6 +50,16 @@
           "desc": "the store-owner new-order alert is delegated to utils/persistent-alerts.js, not sent through services/notification directly"
         },
         {
+          "file": "routes/order.js",
+          "regex": "partner_reject",
+          "desc": "REJECTED(5) is the only store-attributable cancellation; CANCELLED(4) falls through to \"system\" (doc CORE: the cancellation status does not name the actor)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "\"updatedBySource\"",
+          "desc": "the whitelisted field that does record the acting human, unlike the status (doc CORE: cancellation actor)"
+        },
+        {
           "file": "utils/crons/persistent-alerts-cron.js",
           "regex": "cron\\.schedule\\('\\*/1 \\* \\* \\* \\*'",
           "desc": "the store-alert reminder cron runs every minute - if this interval changes, the reminder cadence in reference.md is wrong"
