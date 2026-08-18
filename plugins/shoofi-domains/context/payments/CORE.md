@@ -106,6 +106,21 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.
   HYP tokenization does not store CVV; this resolves as ZCredit is retired. **Do not
   independently rip out CVV handling.**
+- **⚠️ The stored card is not the only copy — the ORDER carries one too, with the terminal
+  password beside it.** `processCreditCardPayment` (`routes/order.js`) builds `paymentPayload`
+  with `Password: zdCreditCredentials.credentials_password` and `CVV: paymentData.cvv`, then
+  persists it verbatim as `paymentData.payload` on the **success return, the failure return
+  and the exception return** alike. It lands on the order as `ccPaymentRefData.payload`.
+  Measured 2026-08-18: **27,960 orders across 152 live stores** carry it, 27,767 of them with
+  both a `CVV` and a `Password` key. `redactPaymentSecrets` (`routes/order.js`) sanitises only
+  `order.paymentData` and **does not reach `ccPaymentRefData`**, and no read path projects it
+  away — `POST /api/order/admin/all-orders` returns whole order documents in both its
+  cross-store and single-store branches, so it is served to the admin dashboard today.
+  Not a migration artefact that ages out: the ZCredit charge path still writes it on every
+  charge. Fixing it is a money-file change and a human decision (draft HIGH-RISK PR, and a
+  backfill is a separate question) — **but any NEW reader of `orders` must project
+  `ccPaymentRefData` leaf by leaf and never select the parent object.**
+  `services/exec-dashboard/orders-metrics.js` `ORDER_PROJECTION` is the worked example.
 - **CONFIRMED — remove (backlog):** `hyp-test-soft` debug endpoint in `routes/hyp-pay.js`
   (charges 1 NIS with a saved token) should not exist in prod. Money file → draft HIGH-RISK PR,
   confirm nothing calls it.
