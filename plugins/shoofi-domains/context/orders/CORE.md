@@ -61,6 +61,19 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    "Is this order for a later day?" must therefore test **both**, **truthily** — as the server
    does (`routes/order.js`: `$or: [{isFutureOrder:{$ne:true}},{isFutureOrder:{$exists:false}}]`).
    Testing `isFutureOrder` alone silently misses every ramadan order.
+10. **A checkout that fails client-side validation leaves NO order document — the only
+    trace is `shoofi.apps-logs`.** `useCheckoutValidate` (`shoofi-app/hooks/checkout/
+    use-checkout-validate.ts`) runs store-open → shipping-method → address →
+    payment-method → drive-in-car checks **before** `submitOrder`, and each failure emits
+    `checkout_validation_failed` with a `step` (`store_closed`, `shipping_method_invalid`,
+    `address_invalid`, `payment_method_invalid`, `car_details_missing`) next to
+    `checkout_attempt` (which carries the basket: `total_price`, `items_price`,
+    `shipping_price`, `store_name`). So status `"0"` is **not** the whole abandonment
+    story — `"0"` starts at `submitOrder`, i.e. only after validation passed. `apps-logs`
+    docs are `{event_type, app_type, created, userId, user_visit_id, properties}`;
+    **`userId` is the `shoofi.customers._id` as a string**, and `created` is a real Date
+    (the opposite of `orders.created`). Answering "why didn't this customer order?" means
+    reading this funnel, not the `orders` collections.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant

@@ -101,9 +101,20 @@
         "consts/shared.ts",
         "stores/cart/index.ts",
         "screens/checkout/index.tsx",
-        "components/checkout/FutureOrderPicker.tsx"
+        "components/checkout/FutureOrderPicker.tsx",
+        "hooks/checkout/use-checkout-validate.ts"
       ],
       "patterns": [
+        {
+          "file": "hooks/checkout/use-checkout-validate.ts",
+          "regex": "checkout_validation_failed",
+          "desc": "checkout drop-offs are logged to shoofi.apps-logs and create no order document (CORE invariant 10)"
+        },
+        {
+          "file": "hooks/checkout/use-checkout-validate.ts",
+          "regex": "step:\\s*\"payment_method_invalid\"",
+          "desc": "the validation-failure reasons carry a step field - if these strings change, the funnel breakdown in CORE invariant 10 is wrong"
+        },
         {
           "file": "consts/shared.ts",
           "regex": "ORDER_STATUS",
