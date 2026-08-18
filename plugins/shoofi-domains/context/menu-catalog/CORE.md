@@ -39,6 +39,15 @@ boundary and say so in the PR.
 5. **`supportedCategoryIds` are STRINGS**, compared via `{$toString:'$_id'}`. Don't switch to
    ObjectId comparison without a data migration.
 6. **Product ordering** comes from `categoryOrders[categoryId]`, falling back to legacy `order`.
+7. **`order.items[].item_id` is a STRING; `products._id` is an ObjectId.** The cart serialises the
+   product `_id` through JSON (`shoofi-app/stores/cart/index.ts:186`), so joining orders back to
+   products needs an explicit cast — `routes/order.js:386` does `ObjectId(id)`,
+   `utils/order-pricing.js:242` does `getId(id)`. A `$lookup` or `$in`/`$nin` on the raw values
+   matches **nothing and raises no error**. Harmless-looking in the usual direction, and
+   catastrophic in the anti-join direction: "which products never sold" compares `products`
+   against the sold set, so a missed cast returns the store's **entire catalogue** as never-sold —
+   which looks exactly like a working panel. Compare as strings (`{$toString:'$_id'}`) or cast
+   every id. Same shape as invariant 5, different collection.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** translations resolve to the **central** DB — UI labels are global/platform-wide,

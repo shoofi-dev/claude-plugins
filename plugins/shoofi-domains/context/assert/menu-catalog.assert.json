@@ -37,6 +37,16 @@
           "file": "routes/product.js",
           "regex": "outOfStockByQuantity",
           "desc": "stock invariant field"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "itemIds\\.map\\(",
+          "desc": "order item_id -> products._id needs an explicit ObjectId cast (doc CORE invariant 7)"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "ids\\.map\\(",
+          "desc": "the getId() cast on order item ids (doc CORE invariant 7)"
         }
       ]
     }
