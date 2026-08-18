@@ -43,6 +43,37 @@ boundary and say so in the PR.
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** translations resolve to the **central** DB — UI labels are global/platform-wide,
   not per-store. Do **not** re-route them to `app-name`.
+- ⚠️ **…but the READ and the WRITES resolve it differently, so a translation added from the
+  partner app is silently lost.** `GET /api/getTranslations` reads
+  `req.headers['shoofi']` (`routes/translations.js:7`) — a header literally named `shoofi`,
+  which no client sends, so it always falls through to the central DB. The add/update/delete
+  handlers read `req.headers['app-name'] || 'shoofi'` (`routes/translations.js:36,79,117`).
+  `shoofi-delivery-web` hardcodes `'app-name': 'shoofi'` on writes
+  (`src/views/admin/translations/TranslationsList.tsx:104,121,128`) so its admin screen is
+  correct; the partner app's translations store does **not**
+  (`shoofi-partner/stores/translations/index.tsx:43-56,67-80,91-104`), so the interceptor
+  fills the header from the selected store and the write creates a per-store `translations`
+  collection the read never looks at. **Add UI strings from the admin web, never from the
+  partner app's edit-translations screen.** Verified 2026-08-18: of 278 databases, exactly
+  one has a `translations` collection (`shoofi`, 1036 docs), so nobody has tripped it yet.
+- **FACT — a missing translation key renders as the key, in every language.** i18next is
+  initialised with `resources`/`lng`/`interpolation` only — **no `fallbackLng`**
+  (`shoofi-partner/translations/i18n.ts`), and the server echoes the key when a row's value is
+  empty (`element.ar || element.key`, `routes/translations.js:18-19`). Two consequences worth
+  knowing before adding UI strings: a new slug shipped ahead of its DB row shows the slug to
+  users (so add the row first, or pass a `defaultValue`), and the widespread trick of using
+  the **Arabic text itself as the key** reads fine but is **not language-aware** — there is no
+  `he` row for an Arabic-prose key, so a Hebrew user sees Arabic.
+- **FACT (dead code, leave it):** `shoofi-partner/translations/languages/ar.json` and `he.json`
+  are **not** the live strings. `translations/index-x.ts` loads them into a variable it never
+  uses and exports a bare `{}` with no `.t()`; its four importers reference the symbol only on
+  the import line. The server-fetched set is the only real mechanism.
+- **Document shape** for `shoofi.translations`: `{ key, ar, he }` (+ `createdAt`/`updatedAt`,
+  added by the handler). Verified across all 1036 docs — **no `en` field on any of them**, and
+  the server builds only `arTranslations`/`heTranslations`, so English is not representable
+  without a multi-repo change. Note the add endpoint does not upsert or check uniqueness, and
+  the build loop is last-write-wins over `{createdAt:-1, _id:1}` — the 865 rows with no
+  `createdAt` sort last, so a legacy duplicate beats a newly added one.
 - **FACT (not a bug):** `supportedCategoryIds` are strings (invariant 5).
 - **Backlog (confirmed, safe to act on when asked):**
   1. `GET /api/menu` and `POST /api/menu/refresh` build the menu **differently** — `refresh` is a

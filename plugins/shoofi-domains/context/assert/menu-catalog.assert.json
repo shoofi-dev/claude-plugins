@@ -37,6 +37,16 @@
           "file": "routes/product.js",
           "regex": "outOfStockByQuantity",
           "desc": "stock invariant field"
+        },
+        {
+          "file": "routes/translations.js",
+          "regex": "req\\.headers\\['shoofi'\\]",
+          "desc": "the GET resolves the central DB via a header literally named 'shoofi' while the writes use 'app-name' — the mismatch that loses partner-app translation writes (doc CORE)"
+        },
+        {
+          "file": "routes/translations.js",
+          "regex": "element\\.ar \\|\\| element\\.key",
+          "desc": "an empty value echoes the key; with no fallbackLng client-side a missing key renders as the key (doc CORE)"
         }
       ]
     }
