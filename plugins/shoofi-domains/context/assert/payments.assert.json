@@ -14,7 +14,8 @@
         "lib/schemas/creditCard.json",
         "services/twin-order/twin-payment-service.js",
         "routes/twin-order.js",
-        "routes/store.js"
+        "routes/store.js",
+        "services/database/DatabaseInitializationService.js"
       ],
       "symbols": {
         "utils/hyp-pay.js": [
@@ -75,6 +76,26 @@
           "file": "routes/store.js",
           "regex": "hyp_enabled",
           "desc": "platform tokenization rollout flag — NOT read by any charge path"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "apple-pay-sessions",
+          "desc": "real collection name behind the db.applePaySessions handle"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "save-apple-pay-session",
+          "desc": "the only per-basket payment session write (wallet path only)"
+        },
+        {
+          "file": "routes/hyp-pay.js",
+          "regex": "hypTokenSessions",
+          "desc": "card-add session collection - not a checkout/basket session"
+        },
+        {
+          "file": "routes/hyp-pay.js",
+          "regex": "hyp-create-session",
+          "desc": "hypPaySessions writer - endpoint exists but has never run in production"
         }
       ]
     },

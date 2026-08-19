@@ -143,6 +143,24 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
   semantics are a reconstruction, not recovered intent. **Do not wire it up; deletion or a
   corrected signature is a human decision.**
 
+- **Only ONE of the three "session" collections is a checkout session.**
+  `apple-pay-sessions` is the only per-basket payment session — created at
+  `routes/order.js:2403` with `totalPrice`/`orderId`, and its `invalidated` status
+  (`routes/order.js:2398-2401`) is a RETRY marker, not an abandonment, so count distinct
+  `customerId`, never rows. The handle `db.applePaySessions` is bound to the hyphenated
+  name (`services/database/DatabaseInitializationService.js:81`), so a mongosh query on
+  `applePaySessions` returns 0 rows silently instead of erroring.
+  `hypPaySessions` (`routes/hyp-pay.js:104`, HYP hosted pay-for-an-order) **has never
+  existed in production** — the namespace was never created, so that flow has never run;
+  do not build a query on it. `hypTokenSessions` (`routes/hyp-pay.js:504`) is a
+  **card-add** session with no amount and no basket: a declined card-add is redirected to
+  the SUCCESS url with a non-approving `CCode` and that branch only logs a warn
+  (`routes/hyp-pay.js:656-664`), so `error`/`failed` are never written and there is no
+  cron or TTL — its `pending` rows are permanent, not in-flight.
+  WARNING: **a card checkout (HYP token or ZCredit CC) writes no session row at all.** The
+  first server artefact is the order document, created at status `"0"` before the charge.
+  Any "reached payment" figure built on session collections is wallet-only.
+
 ## Recipe — touching a charge path
 1. Identify which of the three paths you're in (CC / HYP token / digital-wallet) and say so in
    the PR. Prefer HYP (migration direction).

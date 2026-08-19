@@ -110,8 +110,12 @@ queue retries every **15s** (max 10). → **Store/settlement tax invoices are th
 
 ## 7. Data model (central `shoofi` unless noted)
 - `store {id:1}.credentials` — the platform payment creds (§1).
-- `applePaySessions`, `hypPaySessions`, `hypTokenSessions` — session state machines
-  (`pending` → `verified`/`order_created`/`payment_verified` → `completed`/`failed`).
+- `apple-pay-sessions` — the ONLY per-basket payment session (`pending` →
+  `invalidated`/`order_created`/`payment_verified` → `completed`). The db handle is
+  `db.applePaySessions` but the collection is hyphenated
+  (`services/database/DatabaseInitializationService.js:81`).
+- `hypTokenSessions` — a CARD-ADD session, no amount and no basket
+  (`routes/hyp-pay.js:504`). `hypPaySessions` does not exist. See CORE Known status.
 - `creditCards` (§4), `couponUsages`, `customerCoins`, `storeReports`,
   `amazonconfigs {app: hyp|invoiceProvider|greeninvoice|amazon}`, `stores` (has `hyp{}`).
 - Per-store `orders.ccPaymentRefData` — the union payment record (ZCredit vs HYP shapes) +
