@@ -61,6 +61,18 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    "Is this order for a later day?" must therefore test **both**, **truthily** — as the server
    does (`routes/order.js`: `$or: [{isFutureOrder:{$ne:true}},{isFutureOrder:{$exists:false}}]`).
    Testing `isFutureOrder` alone silently misses every ramadan order.
+10. **`__unspecified__` in the abandoned-cart block reasons is a duplicate, not a cause.**
+   Every failing branch of `shoofi-app/hooks/checkout/use-checkout-validate.ts` emits its own
+   `checkout_validation_failed` carrying a `step`, and then
+   `shoofi-app/screens/checkout/index.tsx` fires a **second, step-less** one whenever the hook
+   returns false. Reasons are `$addToSet`-folded per session
+   (`shoofi-server/services/exec-dashboard/engagement-metrics.js`, `UNSPECIFIED_STEP`), so a
+   blocked session carries **both** its real step and `__unspecified__` — expect
+   `__unspecified__` to be roughly equal to `abandonedByStage.blocked`, and the whole map to
+   sum to about **2×** it. The map is a **multiset, not a partition**: never present that row
+   as a failure cause of its own, and never sum the rows. Reasons are recorded **only** when
+   `blocked` is the session's winning stage, so a session that was blocked and then abandoned
+   in the wallet contributes its reason to nothing.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant

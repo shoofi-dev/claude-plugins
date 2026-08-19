@@ -17,6 +17,7 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
+        "services/exec-dashboard/engagement-metrics.js",
         "docs/customer-orders-snapshot.md"
       ],
       "symbols": {
@@ -93,6 +94,21 @@
           "file": "routes/order.js",
           "regex": "originalOrderDate",
           "desc": "/update-delay shifts orderDate and preserves the original (ref §5)"
+        },
+        {
+          "file": "services/exec-dashboard/engagement-metrics.js",
+          "regex": "UNSPECIFIED_STEP = \"__unspecified__\"",
+          "desc": "the bucket the step-less validation event lands in (CORE invariant 10)"
+        },
+        {
+          "file": "services/exec-dashboard/engagement-metrics.js",
+          "regex": "\\$addToSet",
+          "desc": "block reasons are a per-session set, so one session contributes one count per distinct reason - the map is a multiset, not a partition (CORE invariant 10)"
+        },
+        {
+          "file": "services/exec-dashboard/engagement-metrics.js",
+          "regex": "stage\\.key === \"blocked\"",
+          "desc": "reasons are recorded only when blocked is the session's winning stage (CORE invariant 10)"
         }
       ]
     },
@@ -101,7 +117,8 @@
         "consts/shared.ts",
         "stores/cart/index.ts",
         "screens/checkout/index.tsx",
-        "components/checkout/FutureOrderPicker.tsx"
+        "components/checkout/FutureOrderPicker.tsx",
+        "hooks/checkout/use-checkout-validate.ts"
       ],
       "patterns": [
         {
@@ -128,6 +145,16 @@
           "file": "components/checkout/FutureOrderPicker.tsx",
           "regex": "MAX_RAMADAN_DAYS_AHEAD",
           "desc": "ramadan-iftar orders can be days ahead without isFutureOrder"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "trackEvent\\(\"checkout_validation_failed\"",
+          "desc": "the second, step-less validation event fired on every failing branch - this is what makes abandonedBlockReasons.__unspecified__ a duplicate of the specific step (CORE invariant 10). If it ever gains a `step`, the doc's 2x claim is wrong."
+        },
+        {
+          "file": "hooks/checkout/use-checkout-validate.ts",
+          "regex": "step: \"payment_method_invalid\"",
+          "desc": "the per-branch validation events that carry a step, alongside the step-less one (CORE invariant 10)"
         }
       ]
     },
