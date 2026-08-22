@@ -62,6 +62,25 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    does (`routes/order.js`: `$or: [{isFutureOrder:{$ne:true}},{isFutureOrder:{$exists:false}}]`).
    Testing `isFutureOrder` alone silently misses every ramadan order.
 
+10. **Customer ratings live in central `shoofi.customers-feedback`, never in the store DB.**
+    `db.customersFeedback` is only a JS accessor bound to that hyphenated name
+    (`services/database/DatabaseInitializationService.js`); a collection literally named
+    `customersFeedback` **also exists in production and is empty**, so raw-driver or mongosh
+    code that asks for it gets zero rows and no error. One document per order
+    (`orderObjectId`, unique) carries **two independent scores** — `orderRating` (the store)
+    and `deliveryRating` (the courier, `null` on takeaway/drive-in) — and they must never be
+    merged: production holds genuine `orderRating: 1` with `deliveryRating: 5`. `comment` is
+    always present and is `""` when the customer left none, so filter it with `$ne: ""`, not
+    `$exists`. **`createdAt` is a real BSON Date**, unlike `orders.created` — a window built
+    as offset strings matches nothing here and reports a rated store as unrated. The rating
+    prompt is scheduled only on completion and only for a **registered** customer
+    (`routes/order.js` for non-delivery, `routes/delivery/orders.js` on driver completion,
+    both into `shoofi.pending-feedback-notifications`), so ratings are a sample of orders and
+    never all of them — say so on any surface that averages them. `POST /api/customer-feedback/list`
+    has **no auth middleware and no store filter**: never point a store-facing surface at it;
+    scope reads by `appName` behind `requireStoreMembership()` (see
+    `services/store-analytics/reviews.js` for the store-scoped read).
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
   cross-check is intentionally disabled. Leave it.

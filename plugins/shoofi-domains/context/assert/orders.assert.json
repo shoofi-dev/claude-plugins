@@ -17,7 +17,9 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
-        "docs/customer-orders-snapshot.md"
+        "docs/customer-orders-snapshot.md",
+        "routes/customer-feedback.js",
+        "services/database/DatabaseInitializationService.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -36,7 +38,9 @@
           "stockDecremented",
           "stockRestored"
         ],
-        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+        "utils/customer-orders.js": [
+          "getSuccessfulOrdersByCustomerIds"
+        ]
       },
       "patterns": [
         {
@@ -93,6 +97,31 @@
           "file": "routes/order.js",
           "regex": "originalOrderDate",
           "desc": "/update-delay shifts orderDate and preserves the original (ref §5)"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "customersFeedback = db\\.collection\\('customers-feedback'\\)",
+          "desc": "db.customersFeedback is an accessor for the hyphenated customers-feedback collection - the camelCase one exists in prod and is empty (CORE invariant 10)"
+        },
+        {
+          "file": "routes/customer-feedback.js",
+          "regex": "orderRating: Number\\(orderRating\\)",
+          "desc": "the store's score and the courier's are two separate fields on one document; orderRating is the store's (CORE invariant 10)"
+        },
+        {
+          "file": "routes/customer-feedback.js",
+          "regex": "deliveryRating: deliveryRating \\? Number\\(deliveryRating\\) : null",
+          "desc": "deliveryRating is null on takeaway/drive-in - never merge it into a store rating (CORE invariant 10)"
+        },
+        {
+          "file": "routes/customer-feedback.js",
+          "regex": "createdAt: new Date\\(\\)",
+          "desc": "reviews carry a real BSON Date, unlike orders.created which is an offset string (CORE invariant 10)"
+        },
+        {
+          "file": "routes/customer-feedback.js",
+          "regex": "comment: comment \\|\\| \"\"",
+          "desc": "comment is always present and is \"\" when empty - filter with $ne: \"\", not $exists (CORE invariant 10)"
         }
       ]
     },
@@ -132,7 +161,10 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "stores/orders/index.tsx"],
+      "files": [
+        "consts/shared.ts",
+        "stores/orders/index.tsx"
+      ],
       "patterns": [
         {
           "file": "consts/shared.ts",
