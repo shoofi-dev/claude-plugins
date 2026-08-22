@@ -67,6 +67,11 @@
           "desc": "db.bookDelivery is bound to the hyphenated book-delivery collection"
         },
         {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "db\\.driverShifts\\s*=\\s*db\\.collection\\('driver-shifts'\\)",
+          "desc": "db.driverShifts is bound to the hyphenated driver-shifts collection - no camelCase twin exists on disk, so a hand query on driverShifts returns 0 rather than erroring"
+        },
+        {
           "file": "services/delivery/book-delivery.js",
           "regex": "\\.add\\(parseInt\\(result\\.area\\?\\.maxETA\\), 'minutes'\\)",
           "desc": "the immediate-assignment path adds maxETA with NO fallback - a missing or non-numeric value is a silent no-op, so expectedDeliveryAt comes out equal to pickupTime rather than invalid"

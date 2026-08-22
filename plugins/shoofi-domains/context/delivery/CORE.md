@@ -70,6 +70,11 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    Querying `delivery-company.bookDelivery` directly returns **zero documents silently**
    (Mongo just reports an empty collection), so a read-only investigation looks like "no twin
    deliveries exist". Check the binding in that file before querying production by hand.
+   **Shifts are the same trap:** `db.driverShifts` is the collection **`driver-shifts`**
+   (`DatabaseInitializationService.js:64`), and `driverShiftConfig` is **`driver-shift-config`**
+   (`:65`). Unlike `bookDelivery` there is no empty camelCase twin on disk — a hand query on
+   `delivery-company.driverShifts` still returns 0 rather than erroring, and the collection
+   holds ~7.9k documents. Same rule, same silence.
 8. **A shift `date` is a business-day LABEL, not a wall-clock date.** The day runs
    `driverShiftConfig.timeSlotTemplate.startHour → endHour` — **09:00 → 02:00** in prod for
    every live area. Generation rolls `endHour += 24` and stores *every* slot of that day,
