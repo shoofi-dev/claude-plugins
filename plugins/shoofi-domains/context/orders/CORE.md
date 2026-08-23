@@ -103,9 +103,29 @@ created, nothing errors, and the value is simply gone.
      in the checkout screen. Failure mode: works everywhere, missing only on twin orders.
    - Decide explicitly whether it also belongs in the `customers.orders[]` snapshot (usually
      **no** — the snapshot is deliberately minimal and never updated).
-   - If support must be able to edit it later, it also needs adding to
-     `ALLOWED_ORDER_UPDATE_FIELDS` — `/api/order/update` drops unknown keys with only a
-     `console.warn` and still returns **200**.
+   - If support must be able to edit it later, note that `ALLOWED_ORDER_UPDATE_FIELDS` is a
+     **top-level key whitelist** and cannot express a nested `order.<field>` path. Widening it
+     means adding `"order"`, which `test/integration/order-update-whitelist.js` explicitly
+     forbids (it would let any caller overwrite `order.items`). A nested field therefore needs
+     its **own endpoint**, not an entry in that Set. `/api/order/update` also drops unknown
+     keys with only a `console.warn` and still returns **200**, so a wrong guess here fails
+     silently.
+   - ⚠️ **An editable field must be edited on BOTH twin legs.** The twin trap is not only a
+     write-time problem — it bites again on every later mutation. A twin basket is two order
+     documents, and `shoofi-shoofir/components/delivery-driver/TwinOrderCard.tsx` renders the
+     value as `primary || secondary`. So a support tool that edits one leg leaves the *other*
+     leg's stale value on the courier's screen, and the agent is told it succeeded. For a
+     field whose whole point is correcting or removing something (an abusive note, a phoned-in
+     correction) that is the failure the tool existed to prevent. Resolve the peer through
+     **`shoofi.twinOrderGroups`** (`services/twin-order/twin-group-service.js: getGroup`) — it
+     is the only source carrying the peer's `orderObjectId` **and** `appName`.
+     `order.twinGroup.peerOrderId` is the **display** id and cannot safely address a document:
+     `generateUniqueOrderId` (`routes/order.js`) builds it from timestamp+random and then keeps
+     only 2 of its 3 segments, with **no uniqueness index** behind it. The same rule applies to
+     any join into `delivery-company.bookDelivery`, which is **one collection spanning every
+     tenant** — matching on `bookId` alone can hit another store's delivery. Join on the
+     ObjectId; use `bookId` only paired with `appName`. Report an unresolvable peer; never
+     guess.
 3. **Consumers** — partner display, driver app, admin monitoring, as needed. **The driver app
    and the support delivery board both read through an explicit projection whitelist**
    (`routes/delivery/orders.js`, `routes/analytics.js`) — see `delivery/CORE.md` invariant 10.

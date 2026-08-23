@@ -30,7 +30,9 @@
         "routes/twin-order.js": ["buildSkeletonOrder"],
         "services/twin-order/twin-group-service.js": [
           "cascadeCancel",
-          "degradeToSingle"
+          "degradeToSingle",
+          "getGroup",
+          "orderObjectId"
         ],
         "utils/order-stock.js": [
           "decrementOrderStock",
@@ -105,6 +107,11 @@
           "file": "routes/twin-order.js",
           "regex": "function buildSkeletonOrder",
           "desc": "the twin path never goes through /api/order/create - this hard-coded builder silently drops any order field it does not name (recipe step 2)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const generateUniqueOrderId",
+          "desc": "the DISPLAY orderId is timestamp+random with a segment discarded and no uniqueness index - never join bookDelivery (one cross-tenant collection) on bookId alone, and never resolve a twin peer by peerOrderId (recipe step 2)"
         },
         {
           "file": "routes/translations.js",
