@@ -104,10 +104,28 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
     `services/delivery/driver-load.js`.** Both engines and
     `availability-status-service.js` import it; never re-derive any of the three inline.
     - **In-flight is `["1","2","3","5"]`.** `"5"` (WAITING_IN_STORE, `consts/consts.js`) is
-      carried work — the driver is standing in the restaurant holding the order and goes back
-      to `"3"` afterwards (`routes/delivery/orders.js`). Both engines used to count only
-      `["1","2","3"]`, so a driver waiting in two stores scored as fully idle while every
-      other screen showed him busy.
+      carried work — the driver is standing in the restaurant *waiting for the food* and moves
+      forward to `"3"` once he has it (`routes/delivery/orders.js`). Both engines used to
+      count only `["1","2","3"]`, so a driver waiting in two stores scored as fully idle while
+      every other screen showed him busy.
+    - **In-flight ≠ collected. Only `"3"` means the courier has the food.**
+      `UNCOLLECTED_ORDER_STATUSES = ["1","2","5"]`: `"1"` he has not accepted, `"2"` he is
+      driving to the store, `"5"` he is standing in it empty-handed. A courier on `"1"/"2"/"5"`
+      is **stalled, not busy** — give him a second pickup and both orders run late, which is
+      why `getUncollectedPenalty` charges for each one. The distinction has exactly one
+      writer: `POST /api/delivery/driver/order/start` sets `status:"3"` **and** stamps
+      `startedAt` (`routes/delivery/orders.js`). Two consequences worth knowing before you
+      rely on either field: the admin-web `POST /api/delivery/update` path can move a row to
+      `"3"` **without** writing `startedAt`, so `startedAt` is not guaranteed present on a
+      collected row; and `/start` has no status guard on its filter, so a repeat call
+      overwrites `startedAt` and can drag a `"4"` DELIVERED row back to `"3"`. Prefer
+      `status === "3"` as the collected test and treat `startedAt` as best-effort.
+    - **A courier holding `maxConcurrentOrders` (default 2) is skipped while anyone below the
+      cap exists**, however close he is — `isWithinConcurrencyCap`, sorted on ahead of the
+      score. It is a sort TIER, never a filter: the immediate engine never inserts a
+      `bookDelivery` row for a delivery it fails to assign (`services/delivery/book-delivery.js`)
+      and has no retry, so anything that can empty the candidate list strands the order
+      permanently. Over-cap couriers stay in the list, last.
     - **`maxOrdersByAdmin` is NOT a literal cap.** Every admin write path stores `null` when
       the cap field is left blank (`routes/delivery/driver.js`, `routes/delivery/company.js`),
       and one of them stored `0`; 116 of 238 driver records in production carry `null` or `0`.

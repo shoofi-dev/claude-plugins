@@ -32,20 +32,34 @@
           "supportedCities",
           "supportedAreas"
         ],
-        "services/delivery/driver-status-service.js": ["setDriverActiveStatus"],
+        "services/delivery/driver-status-service.js": [
+          "setDriverActiveStatus"
+        ],
         "services/driver-shift/shift-service.js": [
           "getPermanentDriverSlotsForDay",
           "assignPermanentDriversToShifts",
           "dayTimeSlots"
         ],
-        "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
-        "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"],
+        "utils/driver-active-hours.js": [
+          "workingDayBounds",
+          "workingHoursWindow",
+          "shiftWindows"
+        ],
+        "services/delivery/delayed-assignment.js": [
+          "isPendingAssignment",
+          "assignDriverAt"
+        ],
+        "services/delivery/book-delivery.js": [
+          "originalBookId"
+        ],
         "services/delivery/driver-load.js": [
           "ACTIVE_ORDER_STATUSES",
           "getDriverCapacity",
           "driverHasCapacity",
-          "getOrderPenalty"
+          "getOrderPenalty",
+          "UNCOLLECTED_ORDER_STATUSES",
+          "getUncollectedPenalty",
+          "isWithinConcurrencyCap"
         ]
       },
       "patterns": [
@@ -138,6 +152,26 @@
           "file": "services/delivery/availability-status-service.js",
           "regex": "IN_FLIGHT_DELIVERY_STATUSES = ACTIVE_ORDER_STATUSES",
           "desc": "availability and dispatch share one in-flight list - they drifted apart once already"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "UNCOLLECTED_ORDER_STATUSES = \\[\"1\", \"2\", \"5\"\\]",
+          "desc": "only \"3\" COLLECTED_FROM_RESTAURANT means the courier has the food; \"5\" WAITING_IN_STORE is a PRE-pickup state (CORE.md invariant 11)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "function getUncollectedPenalty",
+          "desc": "a courier still holding an uncollected pickup is stalled, not busy - handing him a second store makes both late (49.3% of production assignments did this)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "function isWithinConcurrencyCap",
+          "desc": "the 2-order cap is a sort TIER not a filter - emptying the candidate list strands the order because the immediate engine has no pending row to retry from"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "startedAt: new Date\\(\\)",
+          "desc": "the ONE place pickup is recorded; delivery status \"3\" is written alongside it and nowhere else stamps it"
         }
       ]
     },
@@ -169,7 +203,10 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "hooks/useAvailableDrivers.ts"],
+      "files": [
+        "consts/shared.ts",
+        "hooks/useAvailableDrivers.ts"
+      ],
       "patterns": [
         {
           "file": "consts/shared.ts",
