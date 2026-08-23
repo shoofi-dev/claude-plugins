@@ -59,7 +59,9 @@
           "getOrderPenalty",
           "UNCOLLECTED_ORDER_STATUSES",
           "getUncollectedPenalty",
-          "isWithinConcurrencyCap"
+          "isWithinConcurrencyCap",
+          "isDriverAssignable",
+          "MIN_ASSIGNABLE_CAPACITY"
         ]
       },
       "patterns": [
@@ -136,7 +138,7 @@
         {
           "file": "services/delivery/driver-load.js",
           "regex": "function getDriverCapacity",
-          "desc": "maxOrdersByAdmin is null/0 for a blank cap on 116 of 238 driver records; comparing it literally excludes IDLE drivers from the candidate set"
+          "desc": "blank/0/null maxOrdersByAdmin returns 0 = SWITCHED OFF (product decision 2026-08-23, reverses the earlier \"blank means no cap\"); a stored 1 is raised to 2; role admin is exempt"
         },
         {
           "file": "services/delivery/driver-load.js",
@@ -187,6 +189,21 @@
           "file": "routes/delivery/orders.js",
           "regex": "startedAt: new Date\\(\\)",
           "desc": "the ONE place pickup is recorded; delivery status \"3\" is written alongside it and nowhere else stamps it"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "function isDriverAssignable",
+          "desc": "the switched-off test, applied at the eligibility stage - expressing it as zero capacity lets the engines' \"nobody left, take everybody\" fallback resurrect him (CORE.md invariant 11)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "MIN_ASSIGNABLE_CAPACITY = 2",
+          "desc": "a stored courier limit of 1 is raised to 2 - one order is not worth dispatching a courier for on its own"
+        },
+        {
+          "file": "routes/delivery/company.js",
+          "regex": "maxOrdersByAdmin !== undefined",
+          "desc": "the order limit is an off-switch, so it must only be written when the caller sent it; unconditional writes turned the driver-app profile save into a self-deactivation"
         }
       ]
     },

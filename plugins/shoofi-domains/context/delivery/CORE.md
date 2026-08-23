@@ -126,12 +126,30 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
       `bookDelivery` row for a delivery it fails to assign (`services/delivery/book-delivery.js`)
       and has no retry, so anything that can empty the candidate list strands the order
       permanently. Over-cap couriers stay in the list, last.
-    - **`maxOrdersByAdmin` is NOT a literal cap.** Every admin write path stores `null` when
-      the cap field is left blank (`routes/delivery/driver.js`, `routes/delivery/company.js`),
-      and one of them stored `0`; 116 of 238 driver records in production carry `null` or `0`.
-      Compared directly, `0 < null` and `0 < 0` are false, so the filter dropped **idle**
-      drivers out of the candidate set and the order went to a loaded one. Always read it
-      through `getDriverCapacity` — blank means no cap.
+    - **A blank `maxOrdersByAdmin` means the courier is SWITCHED OFF.** Product decision
+      2026-08-23. `0`, `null`, `""` and absent all mean the same thing: dispatch never uses
+      him, not even when the fleet is short. Read it through `getDriverCapacity`, which
+      returns `0` for those and raises a stored `1` to `MIN_ASSIGNABLE_CAPACITY` (2) — one
+      order is not worth dispatching a courier for on its own.
+      Three things that follow, each of which has already bitten:
+      - **Test the exclusion with `isDriverAssignable` at the ELIGIBILITY stage**, beside
+        `isActive` / `driverAcceptsStore` — never as "capacity is 0". Both engines end their
+        capacity filter with *if nobody is left, consider everybody*, so a zero capacity is
+        resurrected one line later, precisely in the shortage the rule exists for.
+      - **Company admins are exempt** (`role === "admin"` → `Infinity`). Manual-admin routing
+        (invariant 6) hands the delivery to an admin, and those records have never carried a
+        courier limit; applying the rule to them kills that routing mode silently.
+      - **Every write of this field must be presence-guarded.** It is an off-switch now, so an
+        unconditional `maxOrdersByAdmin ? Number(...) : null` turns any partial save into a
+        deactivation. `routes/delivery/company.js` did exactly that, and the driver's own
+        profile screen in `shoofi-shoofir` posts there without the field — a courier editing
+        his plate number deactivated himself. Same trap, same shape, as the `isActive`
+        coercion that invariant 3 exists to prevent.
+      Scale: 116 of 238 production driver records are blank, and 89 of 172 delivery companies
+      have no driver with a limit set. This rule needs a backfill before it reaches production.
+      Note `services/delivery/availability.js` (the checkout "does this store deliver" probe)
+      and `utils/crons/delivery-coverage-alert-cron.js` still count a switched-off courier as
+      coverage — latent only because both also require `isActive`.
     - **The effective ceiling is the LOWER of the two limits, and a per-driver limit set
       ABOVE the platform cap buys nothing extra.** `isWithinConcurrencyCap` requires
       `held < maxConcurrentOrders` **and** `held < getDriverCapacity(driver)`. 28 of the 238
