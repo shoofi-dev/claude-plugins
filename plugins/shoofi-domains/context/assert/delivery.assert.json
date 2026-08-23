@@ -95,6 +95,16 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "useDelayedAssignment:\\s*false",
+          "desc": "the code default is OFF but production's delivery-config doc sets it true - the scored path, not assignBestDeliveryDriver, is what actually runs (CORE.md invariant 10)"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "config\\.useDelayedAssignment \\|\\| isTwin",
+          "desc": "the single branch deciding pending-vs-immediate; with the prod flag on the left side is always true, so every order takes the scored path"
         }
       ]
     },

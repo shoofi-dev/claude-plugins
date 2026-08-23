@@ -87,6 +87,18 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **The SCORED path is the live one — `assignBestDeliveryDriver` is effectively dead.**
+    `DEFAULT_CONFIG.useDelayedAssignment` is `false` in code
+    (`services/delivery/delayed-assignment.js:19`), but production overrides it: the
+    `delivery-company.delivery-config {type:'driver-assignment'}` doc carries
+    `useDelayedAssignment: true` (set 2026-01-17). `book-delivery.js:62-63` reads
+    `config.useDelayedAssignment || isTwin`, so **every** order pends and is assigned by
+    `assignDriverByScore` — not just twins. Across 120 days of `book-delivery`,
+    `assignmentMetadata.assignmentMethod` was `score-based` on 12,963 assignments against
+    **37** carrying no metadata at all, and the immediate path is the only one that writes
+    none. Tuning `findAllMatchingDrivers`' load-sort therefore changes almost nothing; the
+    behaviour anyone reports comes from `findScoredDrivers`. Read the config doc before
+    trusting the code default.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
