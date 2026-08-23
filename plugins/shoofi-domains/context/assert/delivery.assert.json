@@ -18,6 +18,8 @@
         "services/delivery/assignDriver.js",
         "services/delivery/book-delivery.js",
         "services/delivery/delayed-assignment.js",
+        "services/delivery/driver-load.js",
+        "services/delivery/availability-status-service.js",
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
@@ -30,15 +32,37 @@
           "supportedCities",
           "supportedAreas"
         ],
-        "services/delivery/driver-status-service.js": ["setDriverActiveStatus"],
+        "services/delivery/driver-status-service.js": [
+          "setDriverActiveStatus"
+        ],
         "services/driver-shift/shift-service.js": [
           "getPermanentDriverSlotsForDay",
           "assignPermanentDriversToShifts",
           "dayTimeSlots"
         ],
-        "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
-        "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "utils/driver-active-hours.js": [
+          "workingDayBounds",
+          "workingHoursWindow",
+          "shiftWindows"
+        ],
+        "services/delivery/delayed-assignment.js": [
+          "isPendingAssignment",
+          "assignDriverAt"
+        ],
+        "services/delivery/book-delivery.js": [
+          "originalBookId"
+        ],
+        "services/delivery/driver-load.js": [
+          "ACTIVE_ORDER_STATUSES",
+          "getDriverCapacity",
+          "driverHasCapacity",
+          "getOrderPenalty",
+          "UNCOLLECTED_ORDER_STATUSES",
+          "getUncollectedPenalty",
+          "isWithinConcurrencyCap",
+          "isDriverAssignable",
+          "MIN_ASSIGNABLE_CAPACITY"
+        ]
       },
       "patterns": [
         {
@@ -95,6 +119,91 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "useDelayedAssignment:\\s*false",
+          "desc": "the code default is OFF but production's delivery-config doc sets it true - the scored path, not assignBestDeliveryDriver, is what actually runs (CORE.md invariant 10)"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "config\\.useDelayedAssignment \\|\\| isTwin",
+          "desc": "the single branch deciding pending-vs-immediate; with the prod flag on the left side is always true, so every order takes the scored path"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "ACTIVE_ORDER_STATUSES = \\[\"1\", \"2\", \"3\", \"5\"\\]",
+          "desc": "in-flight includes \"5\" WAITING_IN_STORE - dropping it makes a driver holding orders inside a store score as fully idle (CORE.md invariant 11)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "function getDriverCapacity",
+          "desc": "blank/0/null maxOrdersByAdmin returns 0 = SWITCHED OFF (product decision 2026-08-23, reverses the earlier \"blank means no cap\"); a stored 1 is raised to 2; role admin is exempt"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "function getOrderPenalty",
+          "desc": "extrapolates past the top orderPenalties rung; a Math.min(count,4) clamp makes the 5th order onward free and load stops mattering"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "for \\(const delivery of pendingDeliveries\\)",
+          "desc": "the pending tick runs SEQUENTIALLY so each assignment sees the previous one's status:1 write; Promise.allSettled here re-creates the burst pile-up"
+        },
+        {
+          "file": "services/delivery/availability-status-service.js",
+          "regex": "IN_FLIGHT_DELIVERY_STATUSES = ACTIVE_ORDER_STATUSES",
+          "desc": "availability and dispatch share one in-flight list - they drifted apart once already"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "UNCOLLECTED_ORDER_STATUSES = \\[\"1\", \"2\", \"5\"\\]",
+          "desc": "only \"3\" COLLECTED_FROM_RESTAURANT means the courier has the food; \"5\" WAITING_IN_STORE is a PRE-pickup state (CORE.md invariant 11)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "function getUncollectedPenalty",
+          "desc": "a courier still holding an uncollected pickup is stalled, not busy - handing him a second store makes both late (49.3% of production assignments did this)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "function isWithinConcurrencyCap",
+          "desc": "the 2-order cap is a sort TIER not a filter - emptying the candidate list strands the order because the immediate engine has no pending row to retry from"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "held < getConcurrencyCap\\(config\\) && held < getDriverCapacity\\(driver\\)",
+          "desc": "the effective ceiling is the LOWER of the platform cap and maxOrdersByAdmin - 28 of 238 drivers are set above 2 and must NOT get a 3rd order out of it (CORE.md invariant 11)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "if \\(!a\\.withinConcurrencyCap\\) \\{",
+          "desc": "in a shortage the scored engine ranks the over-cap group by activeOrderCount, not score - on score alone the closest courier collects every overflow order"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "!a\\.withinConcurrencyCap && a\\.activeOrderCount !== b\\.activeOrderCount",
+          "desc": "same shortage rule in the immediate engine: past the cap, total load outranks pickup progress"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "startedAt: new Date\\(\\)",
+          "desc": "the ONE place pickup is recorded; delivery status \"3\" is written alongside it and nowhere else stamps it"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "function isDriverAssignable",
+          "desc": "the switched-off test, applied at the eligibility stage - expressing it as zero capacity lets the engines' \"nobody left, take everybody\" fallback resurrect him (CORE.md invariant 11)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "MIN_ASSIGNABLE_CAPACITY = 2",
+          "desc": "a stored courier limit of 1 is raised to 2 - one order is not worth dispatching a courier for on its own"
+        },
+        {
+          "file": "routes/delivery/company.js",
+          "regex": "maxOrdersByAdmin !== undefined",
+          "desc": "the order limit is an off-switch, so it must only be written when the caller sent it; unconditional writes turned the driver-app profile save into a self-deactivation"
         }
       ]
     },
@@ -126,7 +235,10 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "hooks/useAvailableDrivers.ts"],
+      "files": [
+        "consts/shared.ts",
+        "hooks/useAvailableDrivers.ts"
+      ],
       "patterns": [
         {
           "file": "consts/shared.ts",

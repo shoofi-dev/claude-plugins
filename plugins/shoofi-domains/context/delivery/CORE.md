@@ -87,6 +87,97 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **The SCORED path is the live one — `assignBestDeliveryDriver` is effectively dead.**
+    `DEFAULT_CONFIG.useDelayedAssignment` is `false` in code
+    (`services/delivery/delayed-assignment.js:19`), but production overrides it: the
+    `delivery-company.delivery-config {type:'driver-assignment'}` doc carries
+    `useDelayedAssignment: true` (set 2026-01-17). `book-delivery.js:62-63` reads
+    `config.useDelayedAssignment || isTwin`, so **every** order pends and is assigned by
+    `assignDriverByScore` — not just twins. Across 120 days of `book-delivery`,
+    `assignmentMetadata.assignmentMethod` was `score-based` on 12,963 assignments against
+    **37** carrying no metadata at all, and the immediate path is the only one that writes
+    none. Tuning `findAllMatchingDrivers`' load-sort therefore changes almost nothing; the
+    behaviour anyone reports comes from `findScoredDrivers`. Read the config doc before
+    trusting the code default.
+
+11. **Driver load, capacity and the order penalty have ONE definition:
+    `services/delivery/driver-load.js`.** Both engines and
+    `availability-status-service.js` import it; never re-derive any of the three inline.
+    - **In-flight is `["1","2","3","5"]`.** `"5"` (WAITING_IN_STORE, `consts/consts.js`) is
+      carried work — the driver is standing in the restaurant *waiting for the food* and moves
+      forward to `"3"` once he has it (`routes/delivery/orders.js`). Both engines used to
+      count only `["1","2","3"]`, so a driver waiting in two stores scored as fully idle while
+      every other screen showed him busy.
+    - **In-flight ≠ collected. Only `"3"` means the courier has the food.**
+      `UNCOLLECTED_ORDER_STATUSES = ["1","2","5"]`: `"1"` he has not accepted, `"2"` he is
+      driving to the store, `"5"` he is standing in it empty-handed. A courier on `"1"/"2"/"5"`
+      is **stalled, not busy** — give him a second pickup and both orders run late, which is
+      why `getUncollectedPenalty` charges for each one. The distinction has exactly one
+      writer: `POST /api/delivery/driver/order/start` sets `status:"3"` **and** stamps
+      `startedAt` (`routes/delivery/orders.js`). Two consequences worth knowing before you
+      rely on either field: the admin-web `POST /api/delivery/update` path can move a row to
+      `"3"` **without** writing `startedAt`, so `startedAt` is not guaranteed present on a
+      collected row; and `/start` has no status guard on its filter, so a repeat call
+      overwrites `startedAt` and can drag a `"4"` DELIVERED row back to `"3"`. Prefer
+      `status === "3"` as the collected test and treat `startedAt` as best-effort.
+    - **A courier holding `maxConcurrentOrders` (default 2) is skipped while anyone below the
+      cap exists**, however close he is — `isWithinConcurrencyCap`, sorted on ahead of the
+      score. It is a sort TIER, never a filter: the immediate engine never inserts a
+      `bookDelivery` row for a delivery it fails to assign (`services/delivery/book-delivery.js`)
+      and has no retry, so anything that can empty the candidate list strands the order
+      permanently. Over-cap couriers stay in the list, last.
+    - **A blank `maxOrdersByAdmin` means the courier is SWITCHED OFF.** Product decision
+      2026-08-23. `0`, `null`, `""` and absent all mean the same thing: dispatch never uses
+      him, not even when the fleet is short. Read it through `getDriverCapacity`, which
+      returns `0` for those and raises a stored `1` to `MIN_ASSIGNABLE_CAPACITY` (2) — one
+      order is not worth dispatching a courier for on its own.
+      Three things that follow, each of which has already bitten:
+      - **Test the exclusion with `isDriverAssignable` at the ELIGIBILITY stage**, beside
+        `isActive` / `driverAcceptsStore` — never as "capacity is 0". Both engines end their
+        capacity filter with *if nobody is left, consider everybody*, so a zero capacity is
+        resurrected one line later, precisely in the shortage the rule exists for.
+      - **Company admins are exempt** (`role === "admin"` → `Infinity`). Manual-admin routing
+        (invariant 6) hands the delivery to an admin, and those records have never carried a
+        courier limit; applying the rule to them kills that routing mode silently.
+      - **Every write of this field must be presence-guarded.** It is an off-switch now, so an
+        unconditional `maxOrdersByAdmin ? Number(...) : null` turns any partial save into a
+        deactivation. `routes/delivery/company.js` did exactly that, and the driver's own
+        profile screen in `shoofi-shoofir` posts there without the field — a courier editing
+        his plate number deactivated himself. Same trap, same shape, as the `isActive`
+        coercion that invariant 3 exists to prevent.
+      Scale: 116 of 238 production driver records are blank, and 89 of 172 delivery companies
+      have no driver with a limit set. This rule needs a backfill before it reaches production.
+      Note `services/delivery/availability.js` (the checkout "does this store deliver" probe)
+      and `utils/crons/delivery-coverage-alert-cron.js` still count a switched-off courier as
+      coverage — latent only because both also require `isActive`.
+    - **The effective ceiling is the LOWER of the two limits, and a per-driver limit set
+      ABOVE the platform cap buys nothing extra.** `isWithinConcurrencyCap` requires
+      `held < maxConcurrentOrders` **and** `held < getDriverCapacity(driver)`. 28 of the 238
+      driver records are set above 2 (nineteen 3s, eight 4s, one 5) and they are
+      disproportionately the couriers who actually work, so this is the branch most
+      production drivers hit. A limit above the cap changes exactly one thing: it decides
+      who can absorb the **overflow**. `driverHasCapacity` (the hard filter, per-driver limit
+      only) keeps such a courier in the candidate list, so when nobody is below the cap the
+      3rd order can land on him; a courier at his own limit is dropped even then. Raising a
+      driver's admin limit is therefore not a way to give him more concurrent work — only
+      `delivery-config.maxConcurrentOrders` does that.
+    - **Inside the over-cap group, order by total load — not by score, not by pickup
+      progress.** Both comparators (`byConcurrencyTierThenScore`, `assignDriver.byDriverLoad`)
+      switch keys once every candidate is past the cap. On score alone a courier holding 4 on
+      the store's doorstep (~16.5) beats one holding 2 four kilometres out (~17.0), because
+      the order penalty tops out near the distance weight — so the closest courier collected
+      every overflow order and drifted to six. Pickup progress is the right question for a
+      legitimate 2nd order; for an illegitimate 3rd the only fair question is who is carrying
+      the least.
+    - **The `orderPenalties` table stops at 4.** `getOrderPenalty` extrapolates past the top
+      rung at the table's own last marginal step. A `Math.min(count, 4)` clamp makes the 5th
+      order onward free, and at weight `distanceToStore: 3.0` a free order is worth 5 km of
+      distance — that is how a driver holding 11 deliveries kept winning.
+    - **`processPendingAssignments` is SEQUENTIAL on purpose.** A successful assignment writes
+      `status: "1"`, which is exactly what the next delivery in the tick reads as driver load.
+      `Promise.allSettled` over the tick meant every delivery scored against the same
+      pre-batch state and one driver near the store took the whole burst. Do not re-parallelise
+      it.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
