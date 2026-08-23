@@ -72,12 +72,52 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
   store-accept runs after the 200 response so failures never reach the client.
 
 ## Recipe — add a field to an order, end-to-end
-1. **Customer app** — add it where the cart payload is built (`stores/cart` `getCartData`).
-2. **Server** — accept it in the `orderDoc` build inside `POST /api/order/create`. Decide
-   explicitly whether it also belongs in the `customers.orders[]` snapshot (usually **no** —
-   the snapshot is deliberately minimal and never updated).
-3. **Consumers** — partner display, driver app, admin monitoring, as needed.
-4. **Verify** — `npm run lint` (0 errors), `npm run routes:check` if routes moved, tests via
+**There are two independent order-creation paths and the twin one drops anything you don't
+name.** Every step below has a place where a missing line fails *silently* — the order is
+created, nothing errors, and the value is simply gone.
+
+1. **Customer app — TWO places, not one.**
+   - `hooks/checkout/use-checkout-submit.ts`: the `TPropsCheckoutSubmit` type + the block for
+     the relevant shipping method, and every `checkoutSubmitOrder` call site in
+     `screens/checkout/index.tsx` (there are **three** — the ZCredit Apple Pay pre-create, the
+     main submit, and the HYP wallet sheet; missing one loses the field for that payment
+     method only).
+   - `stores/cart` `getCartData`: it builds `finalOrder` **field by field, with no spread of
+     the caller's object**. A field set in the submit hook and not named here is dropped on
+     the floor for every single-store order while the UI keeps working perfectly.
+   - If the field must survive tapping a twin store, add it to `saveCheckoutSnapshot` /
+     restore and to `TwinCheckoutSnapshot` in `stores/twin-order`.
+2. **Server — TWO routes.**
+   - `POST /api/order/create` (`routes/order.js`): `orderDoc` is `{...parsedBodey}` with a
+     nested `order: {...parsedBodey.order}`, so an unknown field arrives **automatically** and
+     with **no validation of any kind** (there is no Joi/celebrate/express-validator in this
+     repo). Name it explicitly anyway so the contract is greppable, and sanitize it — for
+     unbounded customer text, clamp server-side and `delete` the raw value off `parsedBodey`
+     first, or the spread re-adds it behind your back.
+   - `POST /api/twin-order/place` and `/api/twin-order/digital-place-pending`
+     (`routes/twin-order.js`): these **never touch `/api/order/create`**. `buildSkeletonOrder`
+     is a hard-coded destructured parameter list producing a hard-coded `orderDoc` whose
+     nested `order` carries only `items`, `payment_method`, `receipt_method`, `address`,
+     `geo_positioning`. Anything else is **silently absent**. Add it to the builder and to all
+     **four** call sites (two per route, one per leg), and to both `sidePayloadShared` builders
+     in the checkout screen. Failure mode: works everywhere, missing only on twin orders.
+   - Decide explicitly whether it also belongs in the `customers.orders[]` snapshot (usually
+     **no** — the snapshot is deliberately minimal and never updated).
+   - If support must be able to edit it later, it also needs adding to
+     `ALLOWED_ORDER_UPDATE_FIELDS` — `/api/order/update` drops unknown keys with only a
+     `console.warn` and still returns **200**.
+3. **Consumers** — partner display, driver app, admin monitoring, as needed. **The driver app
+   and the support delivery board both read through an explicit projection whitelist**
+   (`routes/delivery/orders.js`, `routes/analytics.js`) — see `delivery/CORE.md` invariant 10.
+   The admin order-detail modal is unprojected, so it will show your field while those two show
+   nothing; do not take the modal working as proof the field shipped.
+4. **Copy** — app/driver translations are **DB-backed** (`GET /api/getTranslations` → central
+   `shoofi.translations`); `translations/languages/*.json` in the repos are vestigial. A key
+   with no row renders as the raw key string. **he + ar only, default ar — there is no
+   English**, so a single i18next `defaultValue` shows the wrong language to half the users.
+   Resolve the fallback per language and pass it as the default. `shoofi-delivery-web` has no
+   i18n at all — hardcoded Hebrew.
+5. **Verify** — `npm run lint` (0 errors), `npm run routes:check` if routes moved, tests via
    the `shoofi-testing` cover-changes skill. **One PR per repo**, cross-linked.
 
 ## Definition of done

@@ -17,7 +17,8 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
-        "docs/customer-orders-snapshot.md"
+        "docs/customer-orders-snapshot.md",
+        "routes/translations.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -26,6 +27,7 @@
           "finalizeApplePayOrder",
           "verifiedAppName"
         ],
+        "routes/twin-order.js": ["buildSkeletonOrder"],
         "services/twin-order/twin-group-service.js": [
           "cascadeCancel",
           "degradeToSingle"
@@ -93,6 +95,21 @@
           "file": "routes/order.js",
           "regex": "originalOrderDate",
           "desc": "/update-delay shifts orderDate and preserves the original (ref §5)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "ALLOWED_ORDER_UPDATE_FIELDS",
+          "desc": "/api/order/update drops unknown keys with only a console.warn and still returns 200 - a new field is not editable by support unless it is added here (recipe step 2)"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "function buildSkeletonOrder",
+          "desc": "the twin path never goes through /api/order/create - this hard-coded builder silently drops any order field it does not name (recipe step 2)"
+        },
+        {
+          "file": "routes/translations.js",
+          "regex": "arTranslations",
+          "desc": "app + driver i18n is DB-backed and ships he + ar ONLY - a new key with no row renders as the raw key, and one i18next defaultValue shows the wrong language to half the users (recipe step 4)"
         }
       ]
     },
@@ -101,8 +118,12 @@
         "consts/shared.ts",
         "stores/cart/index.ts",
         "screens/checkout/index.tsx",
-        "components/checkout/FutureOrderPicker.tsx"
+        "components/checkout/FutureOrderPicker.tsx",
+        "hooks/checkout/use-checkout-submit.ts"
       ],
+      "symbols": {
+        "hooks/checkout/use-checkout-submit.ts": ["TPropsCheckoutSubmit"]
+      },
       "patterns": [
         {
           "file": "consts/shared.ts",
