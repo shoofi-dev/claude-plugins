@@ -18,6 +18,8 @@
         "services/delivery/assignDriver.js",
         "services/delivery/book-delivery.js",
         "services/delivery/delayed-assignment.js",
+        "services/delivery/driver-load.js",
+        "services/delivery/availability-status-service.js",
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
@@ -38,7 +40,13 @@
         ],
         "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "services/delivery/book-delivery.js": ["originalBookId"],
+        "services/delivery/driver-load.js": [
+          "ACTIVE_ORDER_STATUSES",
+          "getDriverCapacity",
+          "driverHasCapacity",
+          "getOrderPenalty"
+        ]
       },
       "patterns": [
         {
@@ -105,6 +113,31 @@
           "file": "services/delivery/book-delivery.js",
           "regex": "config\\.useDelayedAssignment \\|\\| isTwin",
           "desc": "the single branch deciding pending-vs-immediate; with the prod flag on the left side is always true, so every order takes the scored path"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "ACTIVE_ORDER_STATUSES = \\[\"1\", \"2\", \"3\", \"5\"\\]",
+          "desc": "in-flight includes \"5\" WAITING_IN_STORE - dropping it makes a driver holding orders inside a store score as fully idle (CORE.md invariant 11)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "function getDriverCapacity",
+          "desc": "maxOrdersByAdmin is null/0 for a blank cap on 116 of 238 driver records; comparing it literally excludes IDLE drivers from the candidate set"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "function getOrderPenalty",
+          "desc": "extrapolates past the top orderPenalties rung; a Math.min(count,4) clamp makes the 5th order onward free and load stops mattering"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "for \\(const delivery of pendingDeliveries\\)",
+          "desc": "the pending tick runs SEQUENTIALLY so each assignment sees the previous one's status:1 write; Promise.allSettled here re-creates the burst pile-up"
+        },
+        {
+          "file": "services/delivery/availability-status-service.js",
+          "regex": "IN_FLIGHT_DELIVERY_STATUSES = ACTIVE_ORDER_STATUSES",
+          "desc": "availability and dispatch share one in-flight list - they drifted apart once already"
         }
       ]
     },

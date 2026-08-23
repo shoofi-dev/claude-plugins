@@ -100,6 +100,30 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
     behaviour anyone reports comes from `findScoredDrivers`. Read the config doc before
     trusting the code default.
 
+11. **Driver load, capacity and the order penalty have ONE definition:
+    `services/delivery/driver-load.js`.** Both engines and
+    `availability-status-service.js` import it; never re-derive any of the three inline.
+    - **In-flight is `["1","2","3","5"]`.** `"5"` (WAITING_IN_STORE, `consts/consts.js`) is
+      carried work — the driver is standing in the restaurant holding the order and goes back
+      to `"3"` afterwards (`routes/delivery/orders.js`). Both engines used to count only
+      `["1","2","3"]`, so a driver waiting in two stores scored as fully idle while every
+      other screen showed him busy.
+    - **`maxOrdersByAdmin` is NOT a literal cap.** Every admin write path stores `null` when
+      the cap field is left blank (`routes/delivery/driver.js`, `routes/delivery/company.js`),
+      and one of them stored `0`; 116 of 238 driver records in production carry `null` or `0`.
+      Compared directly, `0 < null` and `0 < 0` are false, so the filter dropped **idle**
+      drivers out of the candidate set and the order went to a loaded one. Always read it
+      through `getDriverCapacity` — blank means no cap.
+    - **The `orderPenalties` table stops at 4.** `getOrderPenalty` extrapolates past the top
+      rung at the table's own last marginal step. A `Math.min(count, 4)` clamp makes the 5th
+      order onward free, and at weight `distanceToStore: 3.0` a free order is worth 5 km of
+      distance — that is how a driver holding 11 deliveries kept winning.
+    - **`processPendingAssignments` is SEQUENTIAL on purpose.** A successful assignment writes
+      `status: "1"`, which is exactly what the next delivery in the tick reads as driver load.
+      `Promise.allSettled` over the tick meant every delivery scored against the same
+      pre-batch state and one driver near the store took the whole burst. Do not re-parallelise
+      it.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
   is the **GLOBAL master switch** for the delivery-company/driver integration — when off,
