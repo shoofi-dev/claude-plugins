@@ -132,6 +132,25 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
       Compared directly, `0 < null` and `0 < 0` are false, so the filter dropped **idle**
       drivers out of the candidate set and the order went to a loaded one. Always read it
       through `getDriverCapacity` — blank means no cap.
+    - **The effective ceiling is the LOWER of the two limits, and a per-driver limit set
+      ABOVE the platform cap buys nothing extra.** `isWithinConcurrencyCap` requires
+      `held < maxConcurrentOrders` **and** `held < getDriverCapacity(driver)`. 28 of the 238
+      driver records are set above 2 (nineteen 3s, eight 4s, one 5) and they are
+      disproportionately the couriers who actually work, so this is the branch most
+      production drivers hit. A limit above the cap changes exactly one thing: it decides
+      who can absorb the **overflow**. `driverHasCapacity` (the hard filter, per-driver limit
+      only) keeps such a courier in the candidate list, so when nobody is below the cap the
+      3rd order can land on him; a courier at his own limit is dropped even then. Raising a
+      driver's admin limit is therefore not a way to give him more concurrent work — only
+      `delivery-config.maxConcurrentOrders` does that.
+    - **Inside the over-cap group, order by total load — not by score, not by pickup
+      progress.** Both comparators (`byConcurrencyTierThenScore`, `assignDriver.byDriverLoad`)
+      switch keys once every candidate is past the cap. On score alone a courier holding 4 on
+      the store's doorstep (~16.5) beats one holding 2 four kilometres out (~17.0), because
+      the order penalty tops out near the distance weight — so the closest courier collected
+      every overflow order and drifted to six. Pickup progress is the right question for a
+      legitimate 2nd order; for an illegitimate 3rd the only fair question is who is carrying
+      the least.
     - **The `orderPenalties` table stops at 4.** `getOrderPenalty` extrapolates past the top
       rung at the table's own last marginal step. A `Math.min(count, 4)` clamp makes the 5th
       order onward free, and at weight `distanceToStore: 3.0` a free order is worth 5 km of

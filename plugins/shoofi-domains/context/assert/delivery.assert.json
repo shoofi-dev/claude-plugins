@@ -169,6 +169,21 @@
           "desc": "the 2-order cap is a sort TIER not a filter - emptying the candidate list strands the order because the immediate engine has no pending row to retry from"
         },
         {
+          "file": "services/delivery/driver-load.js",
+          "regex": "held < getConcurrencyCap\\(config\\) && held < getDriverCapacity\\(driver\\)",
+          "desc": "the effective ceiling is the LOWER of the platform cap and maxOrdersByAdmin - 28 of 238 drivers are set above 2 and must NOT get a 3rd order out of it (CORE.md invariant 11)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "if \\(!a\\.withinConcurrencyCap\\) \\{",
+          "desc": "in a shortage the scored engine ranks the over-cap group by activeOrderCount, not score - on score alone the closest courier collects every overflow order"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "!a\\.withinConcurrencyCap && a\\.activeOrderCount !== b\\.activeOrderCount",
+          "desc": "same shortage rule in the immediate engine: past the cap, total load outranks pickup progress"
+        },
+        {
           "file": "routes/delivery/orders.js",
           "regex": "startedAt: new Date\\(\\)",
           "desc": "the ONE place pickup is recorded; delivery status \"3\" is written alongside it and nowhere else stamps it"
