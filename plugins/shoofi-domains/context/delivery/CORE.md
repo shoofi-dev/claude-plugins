@@ -87,6 +87,19 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **The two human-facing delivery read paths project an explicit WHITELIST.** `bookDelivery`
+    embeds the *whole* order document (`{...deliveryData}` with `order,` in it —
+    `services/delivery/book-delivery.js`, `delayed-assignment.js: createPendingDelivery`), so a
+    new order field lands on `bookDelivery.order.…` for free and looks done. It is then
+    silently dropped on the way **out**: `POST /api/delivery/list`
+    (`routes/delivery/orders.js` — feeds the driver app) and `POST /api/analytics/deliveries`
+    (`routes/analytics.js` — feeds the support board) both list the embedded order leaf by leaf
+    (`'order.order.address': 1`, `'order.order.payment_method': 1`, …). A field missing from
+    those objects reaches the client as `undefined` with **no error anywhere** — it renders as
+    nothing, in prod, and looks like a UI bug. Adding anything a driver or support must see
+    means adding the dotted key to **both**. (`GET /api/delivery/order/:id` and
+    `POST /api/delivery/driver/nearby-orders` are unprojected and need no change, which makes
+    the failure look intermittent if you test through the wrong one.)
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`

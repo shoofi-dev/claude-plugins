@@ -21,7 +21,8 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "routes/analytics.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -95,6 +96,21 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "'order\\.order\\.address':\\s*1",
+          "desc": "the driver-app list projects the embedded order LEAF BY LEAF - a new order field is dropped to undefined unless its dotted key is added here"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "'order\\.orderId':\\s*1",
+          "desc": "the support board's deliveries projection is the same leaf-by-leaf whitelist - a nested order field has to be named in BOTH read paths, not just the driver one"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "\\.\\.\\.deliveryData",
+          "desc": "bookDelivery embeds the WHOLE order document, which is why a new order field arrives for free on the way in and only fails on the way out"
         }
       ]
     },
