@@ -61,6 +61,20 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    "Is this order for a later day?" must therefore test **both**, **truthily** — as the server
    does (`routes/order.js`: `$or: [{isFutureOrder:{$ne:true}},{isFutureOrder:{$exists:false}}]`).
    Testing `isFutureOrder` alone silently misses every ramadan order.
+10. **The order doc can never say where the courier is.** Two independent state machines: the
+    STORE drives `order.status`, the COURIER drives `bookDelivery.status`, and **no delivery
+    transition ever writes the order doc** — statuses `10`/`11`/`12` are dead enum values
+    nothing writes (the order-side `case "11"` in `routes/order.js` is commented out). For a
+    DELIVERY order, `3` means "that kitchen finished", never "a courier has it".
+    `GET /api/order/customer-active-orders` (`routes/order.js`) returns plain order docs with
+    **no delivery data attached**; the consumer app gets the bookDelivery doc from a separate
+    `GET /api/delivery/book/:bookId` (`routes/delivery/admin.js` — full document, no
+    projection) which `shoofi-app/stores/orders/index.tsx` `getDeliveryByBookId` polls every
+    30s per delivery order. Only `bookDelivery.status` `3` = COLLECTED_FROM_RESTAURANT means
+    collected (it sets `startedAt`); `4` = DELIVERED. **Never answer "has the courier taken
+    it?" from `isReadyForPickup` / `readyForPickupAt`** — those mean the store finished, and
+    that gap is a median 4 min, p90 14 min wide. Twin orders: each leg has its **own**
+    bookDelivery doc keyed on its own `orderId`, so a twin side must be asked separately.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant

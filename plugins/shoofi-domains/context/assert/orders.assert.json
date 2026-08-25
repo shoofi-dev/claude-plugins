@@ -13,6 +13,7 @@
         "services/twin-order/twin-group-service.js",
         "services/twin-order/twin-payment-service.js",
         "consts/consts.js",
+        "routes/delivery/admin.js",
         "utils/order-stock.js",
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
@@ -93,12 +94,28 @@
           "file": "routes/order.js",
           "regex": "originalOrderDate",
           "desc": "/update-delay shifts orderDate and preserves the original (ref §5)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "/api/order/customer-active-orders",
+          "desc": "the consumer tracking feed - returns plain order docs with NO delivery data attached (CORE invariant 10)"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "/api/delivery/book/:bookId",
+          "desc": "the only route by which the consumer app learns the courier's state; if it gains a projection, the app's tracking display breaks (CORE invariant 10)"
+        },
+        {
+          "file": "consts/consts.js",
+          "regex": "COLLECTED_FROM_RESTAURANT:\\s*\"3\"",
+          "desc": "bookDelivery status 3 is the ONLY signal that the courier took the order (CORE invariant 10)"
         }
       ]
     },
     "shoofi-app": {
       "files": [
         "consts/shared.ts",
+        "stores/orders/index.tsx",
         "stores/cart/index.ts",
         "screens/checkout/index.tsx",
         "components/checkout/FutureOrderPicker.tsx"
@@ -128,6 +145,11 @@
           "file": "components/checkout/FutureOrderPicker.tsx",
           "regex": "MAX_RAMADAN_DAYS_AHEAD",
           "desc": "ramadan-iftar orders can be days ahead without isFutureOrder"
+        },
+        {
+          "file": "stores/orders/index.tsx",
+          "regex": "getDeliveryByBookId",
+          "desc": "the client half of CORE invariant 10 - the courier's state reaches the customer only through this separate fetch, never through the order doc"
         }
       ]
     },
