@@ -39,6 +39,31 @@
           "desc": "stock invariant field"
         }
       ]
+    },
+    "shoofi-app": {
+      "files": [
+        "screens/menu/menu.tsx",
+        "screens/menu/components/AllCategoriesList.tsx",
+        "screens/menu/components/GeneralCategoriesList.tsx",
+        "screens/menu/components/LastOrderQuickAdd.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "screens/menu/menu.tsx",
+          "regex": "!generalCategories \\?",
+          "desc": "CORE: the customer menu's two asymmetric render branches"
+        },
+        {
+          "file": "screens/menu/menu.tsx",
+          "regex": "ListHeaderComponent",
+          "desc": "CORE: header carousels mount on the AllCategoriesList branch only"
+        },
+        {
+          "file": "screens/menu/menu.tsx",
+          "regex": "onHeightChange",
+          "desc": "CORE: a header carousel must report its height for the chip probe"
+        }
+      ]
     }
   }
 }

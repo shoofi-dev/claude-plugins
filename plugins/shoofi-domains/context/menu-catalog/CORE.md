@@ -53,6 +53,17 @@ boundary and say so in the PR.
      test after.
 - **Recorded risk, not yours to fix:** the server trusts client-sent extras prices (no server-side
   recompute). Any fix lives in the order-create path — hand off.
+- **FACT — the customer menu has TWO render branches and they are not symmetric.**
+  `shoofi-app/screens/menu/menu.tsx` renders `AllCategoriesList` (a virtualized FlatList that
+  owns scrolling) when the store has no `generalCategories`, and a plain `ScrollView` +
+  `GeneralCategoriesList` when `store.hasGeneralCategories` is true. Anything mounted above
+  the products has to be added to **both**, or it is silently missing for a chunk of the
+  estate — which is exactly the state "order again" (`LastOrderQuickAdd`) is in: it lives only
+  in the first branch's `ListHeaderComponent`. So "it renders on the menu" is never verified
+  on a single store; check one of each. A header carousel also has to report its measured
+  height back up (`onHeightChange`), because that height feeds the sticky category-chip probe
+  and the chip-jump scroll offset — get it wrong and the highlighted chip drifts out of sync
+  with the rows without anything erroring.
 
 ## Recipe — add/modify a product field
 1. Server: accept + persist it in the product insert/update handlers (`routes/product.js`).
