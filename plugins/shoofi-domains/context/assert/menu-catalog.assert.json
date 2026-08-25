@@ -39,6 +39,29 @@
           "desc": "stock invariant field"
         }
       ]
+    },
+    "shoofi-app": {
+      "files": [
+        "stores/extras/index.ts",
+        "components/extras-controls/ExtrasSection.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "stores/extras/index.ts",
+          "regex": "extra\\.required \\|\\| true",
+          "desc": "CORE invariant 7: `required` is dead — every single extra is required"
+        },
+        {
+          "file": "stores/extras/index.ts",
+          "regex": "extra\\.type === \"single\" && !val",
+          "desc": "CORE invariant 7: an unanswered single extra fails validation"
+        },
+        {
+          "file": "components/extras-controls/ExtrasSection.tsx",
+          "regex": "\"single\" \\| \"multi\" \\| \"counter\" \\| \"pizza-topping\" \\| \"weight\"",
+          "desc": "CORE invariant 7: the five extra types"
+        }
+      ]
     }
   }
 }

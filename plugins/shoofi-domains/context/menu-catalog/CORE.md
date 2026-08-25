@@ -39,6 +39,17 @@ boundary and say so in the PR.
 5. **`supportedCategoryIds` are STRINGS**, compared via `{$toString:'$_id'}`. Don't switch to
    ObjectId comparison without a data migration.
 6. **Product ordering** comes from `categoryOrders[categoryId]`, falling back to legacy `order`.
+7. **Every `single` extra is required — `extra.required` is dead.** The client-side gate
+   (`shoofi-app/stores/extras/index.ts`, `ExtrasStore.validate`) runs its body under
+   `if (extra.required || true)`, so the flag decides nothing and any `type: "single"` extra
+   with no selection fails validation. A product carrying one can therefore **never** be added
+   to the cart from a shortcut — a carousel, a quick-add button, a deep link — without the
+   product screen answering it first; do that and the cart holds a line the kitchen and the
+   checkout price differently. The five types are `single | multi | counter | pizza-topping |
+   weight` (`shoofi-app/components/extras-controls/ExtrasSection.tsx`). `weight` is the trap
+   inside the trap: it **passes** validation, on its `defaultValue`, so a weight-priced product
+   added without a selection silently prices at the default weight. Treat `weight` as needing
+   the product screen too.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** translations resolve to the **central** DB — UI labels are global/platform-wide,
