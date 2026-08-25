@@ -95,6 +95,11 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "\\{ projection: \\{ status: 1, appName: 1 \\} \\}",
+          "desc": "the IMMEDIATE engine sees only status+appName of a courier's in-flight orders, while the scored path fetches the full bookDelivery document with no projection - a scoring term reading any other field is a silent no-op here (CORE.md invariant 10)"
         }
       ]
     },

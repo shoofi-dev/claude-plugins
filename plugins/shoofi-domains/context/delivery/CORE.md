@@ -87,6 +87,20 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **The two dispatch engines see different shapes of a courier's in-flight work, and only
+    one of them can read anything new.** The **scored** path fetches them with **no
+    projection** — `deliveryDB.bookDelivery.find({"driver._id", status:{$in: ACTIVE_ORDER_STATUSES}})`
+    in `services/delivery/delayed-assignment.js` — so every element of `activeOrders` is the
+    **full `bookDelivery` document**: `expectedDeliveryAt`, `customerLocation`, `pickupTime`,
+    `appName`, `status` are all there for free. The **immediate** engine
+    (`services/delivery/assignDriver.js`) projects `{status: 1, appName: 1}` and nothing else.
+    So a new scoring term that reads any other field works on the scored path and is a
+    **silent no-op** on the immediate one until that projection is widened — a grep for the
+    field name shows both engines "using" `activeOrders` and hides the asymmetry completely.
+    Two consequences worth holding on to: the scored path is what actually runs in production,
+    so the asymmetry survives untested; and because the full document is already in hand
+    there, adding a term that reads a new field there costs **no extra query** — the reason to
+    hesitate is never performance, only whether the field is trustworthy on old rows.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
