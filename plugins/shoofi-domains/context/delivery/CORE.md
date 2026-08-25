@@ -87,6 +87,21 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **`calculateDriverScore` returns its shape TWICE — the `catch` block is a hand-maintained
+    mirror of the success path.** The `score: 9999` fallback in
+    `services/delivery/delayed-assignment.js` repeats every field the happy path returns,
+    including a full literal `scoreBreakdown: { distance: 0, orders: 0, … }`. Add a scoring
+    term to the sum and to the breakdown and forget the mirror, and any courier whose scoring
+    threw persists an `assignmentMetadata` with a **different set of keys** from every other
+    one — which the analysis tooling then reads as a zero rather than as an absence. It is
+    easy to miss because a grep for the new component's name finds the sum and the breakdown
+    and stops there; the mirror contains only `: 0`. This matters more than it looks:
+    `assignmentMetadata` is the persisted, non-inferred answer to "why was this driver
+    chosen", and it is the *only* such answer — `findScoredDrivers` strips `activeOrders`
+    off the candidate before returning it, so nothing downstream can recompute the inputs.
+    Corollary for the same reason: anything you want in `assignmentMetadata` has to come out
+    of `calculateDriverScore`'s return value; by the time `assignDriverByScore` builds the
+    blob, the driver's orders are gone.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`

@@ -95,6 +95,16 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "scoreBreakdown: \\{ distance: 0",
+          "desc": "calculateDriverScore's catch block is a hand-maintained MIRROR of its success return - a new scoring term added to the sum and the breakdown but not here makes a thrown score persist assignmentMetadata with a different key set (CORE.md invariant 10)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "const \\{ activeOrders, \\.\\.\\.driverWithoutActiveOrders \\} = driver",
+          "desc": "findScoredDrivers strips activeOrders off the candidate, so assignmentMetadata can only carry what calculateDriverScore returned - it cannot be recomputed later (CORE.md invariant 10)"
         }
       ]
     },
