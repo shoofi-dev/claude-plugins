@@ -37,6 +37,16 @@
           "file": "routes/product.js",
           "regex": "outOfStockByQuantity",
           "desc": "stock invariant field"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "\\$\\$categoryId.*supportedCategoryIds",
+          "desc": "CORE invariant 7: the menu reaches a product ONLY through a live categories doc, which is why 14.9% of products are orphaned off the menu. If this join moves or widens to general-categories, the orphan claim is stale."
+        },
+        {
+          "file": "routes/category.js",
+          "regex": "deleteOne|deleteMany|findOneAndDelete",
+          "desc": "CORE invariant 7: deleting a category never cleans up products pointing at it, which is where the dangling supportedCategoryIds come from. If a cleanup step appears here, the orphan population should shrink and the doc needs re-measuring."
         }
       ]
     }

@@ -39,6 +39,19 @@ boundary and say so in the PR.
 5. **`supportedCategoryIds` are STRINGS**, compared via `{$toString:'$_id'}`. Don't switch to
    ObjectId comparison without a data migration.
 6. **Product ordering** comes from `categoryOrders[categoryId]`, falling back to legacy `order`.
+7. **Being in `products` is NOT being on the menu.** `routes/menu.js` joins each product's
+   `supportedCategoryIds` against live `categories` only (`$in: ['$$categoryId',
+   '$supportedCategoryIds']`, categories filtered `isHidden: {$ne:true}`), and **20,547 products
+   — 14.9% of the platform, in 151 of 263 store DBs — reference no live category doc**, so they
+   are reachable from nothing. They are not `isHidden` and not out of stock; there is no flag for
+   this state, you have to compute it. Measured 2026-08-29: `amjadbutcher-taibe` 4,226 of 4,300,
+   `asado-steak-house` 4,226 of 4,390, `mini-market-jiousi` 619 of 9,137. Empty/missing
+   `supportedCategoryIds` is **0** platform-wide and so is "in hidden categories only" — the
+   orphan is always a *dangling* id, left behind because deleting a category never cleans up the
+   products pointing at it. Any "how is my catalog doing" count that walks `products` will be
+   dominated by these unless it says so. `general-categories` does not rescue them: `menu.js`
+   joins `categories` only, so the 341 products pointing solely at a general category are off the
+   menu exactly like the rest.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** translations resolve to the **central** DB — UI labels are global/platform-wide,
