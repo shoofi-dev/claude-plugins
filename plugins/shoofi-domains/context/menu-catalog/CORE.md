@@ -53,6 +53,20 @@ boundary and say so in the PR.
      test after.
 - **Recorded risk, not yours to fix:** the server trusts client-sent extras prices (no server-side
   recompute). Any fix lives in the order-create path — hand off.
+- **CONFIRMED DEFECT — copying a product between stores copies its category ids verbatim, and
+  they usually do not mean anything in the destination.** Both mock/template paths do it:
+  `routes/product.js` `create-from-mock` inherits `supportedCategoryIds` through a
+  `{...mockProduct}` spread, and `routes/shoofi-admin.js` `create-from-mock` (store) copies
+  products in a `try/catch` that is *independent* of the one that copies categories — so a
+  skipped or failed category step still copies every product. Neither validates the ids against
+  the destination. It works only because clones preserve `_id`; the moment the destination has
+  its own categories, every product copied in is born reachable from no menu (invariant 5's join
+  finds nothing) — not hidden, not out of stock, fully editable in the admin, and invisible to
+  every customer. **Anything that writes `supportedCategoryIds` from another store's data must
+  resolve them against the destination first — by id, falling back to the category NAME, which a
+  clone preserves even when the ids diverge.** Category *name* is the durable key here; the id is
+  not. Measured 2026-08-29 across 280 store DBs: 14,217 of the platform's 20,547 unreachable
+  products (69%) carry `mockStoreAppName`/`mockProductId`.
 
 ## Recipe — add/modify a product field
 1. Server: accept + persist it in the product insert/update handlers (`routes/product.js`).

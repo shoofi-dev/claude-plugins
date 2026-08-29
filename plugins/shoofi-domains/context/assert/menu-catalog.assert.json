@@ -37,6 +37,16 @@
           "file": "routes/product.js",
           "regex": "outOfStockByQuantity",
           "desc": "stock invariant field"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "create-from-mock",
+          "desc": "CORE known-status: the product-level mock copy, which inherits the SOURCE store's supportedCategoryIds. If this route is renamed or removed the doc's confirmed-defect entry needs re-checking."
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "mockProductId",
+          "desc": "CORE known-status: the store-level mock copy writes mockProductId on every copied product alongside the inherited category ids. 69% of the platform's unreachable products carry this field, which is what ties the population to this path."
         }
       ]
     }
