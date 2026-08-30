@@ -18,6 +18,7 @@
         "utils/customer-orders.js",
         "docs/customer-orders-snapshot.md",
         "routes/order.js",
+        "services/customer/customer-restriction-service.js",
         "package.json"
       ],
       "symbols": {
@@ -110,6 +111,36 @@
           "file": "routes/order.js",
           "regex": "created: moment\\(new Date\\(\\)\\)\\.utcOffset\\(offsetHours\\)\\.format\\(\\)",
           "desc": "orders.created - and the customers.orders[] snapshot of it - is an ISO string with an Israel offset, the opposite type from customers.created on the same document"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "\\$push: \\{[\\s\\S]{0,80}notes: \\{",
+          "desc": "customer notes are an embedded notes[] array on shoofi.customers - there is no notes collection, and routes/notes.js is an unrelated cityAreas announcement feature"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "notes/:noteId'[\\s\\S]{0,3000}isSystem: \\{ \\$ne: true \\}",
+          "desc": "a system (restriction) note cannot be deleted - the $pull filter carries the guard so the isSystem check and the write are one operation"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "\\.put\\(\"/api/customer/:customerId/block\", auth\\.required",
+          "desc": "block/unblock has its own authenticated route - it no longer rides on the mass-assigning POST /api/customer/update the customer app uses for profile edits"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "cash-restrict\", auth\\.required",
+          "desc": "the cash-restriction toggle is authenticated, so the system note it writes can name a real admin from req.auth"
+        },
+        {
+          "file": "services/customer/customer-restriction-service.js",
+          "regex": "\\$set: actionSpec\\.set,[\\s\\S]{0,120}\\$push: \\{ notes:",
+          "desc": "the restriction flag and its reason note are written in ONE updateOne - $set + $push cannot half-apply, so a block can never exist without the reason for it"
+        },
+        {
+          "file": "services/customer/customer-restriction-service.js",
+          "regex": "throw new RestrictionError\\(400, \"A reason is required\"\\)",
+          "desc": "a reason is mandatory for every block / unblock / cash-restrict change, enforced in the service because the admin web has two cash-toggle call sites"
         }
       ]
     },

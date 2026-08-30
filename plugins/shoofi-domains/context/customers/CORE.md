@@ -82,7 +82,7 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    (`utils/admin-auth-service.js`). **Nothing in the codebase ever assigns `req.user`** (v8
    dropped the v5 default), so every `req.user?.…` read is permanently `undefined` and silently
    falls through to its default: `routes/shoofi-admin.js` writes the literal `'admin'` for
-   `createdBy`/`approvedBy`, `routes/customer.js` writes `'Admin'` for `createdByName`,
+   `createdBy`/`approvedBy`, `routes/delivery/admin.js` writes `'Admin'` for `actor`,
    `routes/store.js` and `routes/delivery/company.js` skip their `if (req.user)` history-
    attribution blocks entirely, and `routes/notifications.js` falls back to a **client-supplied
    `user-id` header**. Those sites are pre-existing and out of scope unless the task names them
@@ -90,6 +90,33 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    serialises the ObjectId), so compare with `String(...)` or cast via `getId`
    (`lib/common.js`). Any new `createdBy`-style provenance must be read from `req.auth` and
    never from the request body; `routes/team-tasks.js` is the reference implementation.
+8. **Customer notes are an EMBEDDED `notes[]` array on the `shoofi.customers` document —
+   there is no notes collection.** A grep for "notes" lands first on `routes/notes.js` /
+   `db.notes` / the admin `/admin/notes` screen, which is an **unrelated** announcement-banner
+   feature keyed on `cityAreas`. The customer notes CRUD is four `auth.required` routes in
+   `routes/customer.js` (`GET/POST /api/customer/:customerId/notes`,
+   `PUT/DELETE .../notes/:noteId`). Two shapes to keep: `notes[]._id` is a **uuid string**, not
+   an ObjectId — the DELETE handler `$pull`s on it — and `notes[].createdAt` is a real BSON
+   `Date` (invariant 5's string/Date split applies here too).
+
+   **A note with `isSystem: true` is an audit record and must stay immutable.** The block and
+   cash-restriction routes write one on every change, via
+   `services/customer/customer-restriction-service.js`; the note PUT and DELETE handlers refuse
+   them with 403 and the `$pull` filter carries `isSystem: { $ne: true }` so the check and the
+   write are one operation. Do not add an override, and do not let the manual note form offer
+   the `restriction` category — a hand-written note there would look like an audit record
+   without being one.
+
+   **Restriction changes go through the service, never a bare `$set`.** `isBlocked` and
+   `cashRestricted` each have a dedicated route (`PUT /api/customer/:customerId/block`,
+   `PUT /api/customer/:customerId/cash-restrict`, both `auth.required`) that **requires a
+   `reason`** and writes the flag and its note in a **single `updateOne`** — `$set` + `$push`
+   cannot half-apply, so a flag can never end up without the reason for it. Enforcement is in
+   the service rather than the handlers because the admin web has two cash-toggle call sites.
+   Blocking also nulls `token` (immediate forced logout, per invariant 2); unblocking
+   deliberately does **not** restore it — the customer re-runs OTP. Blocking used to ride on
+   the mass-assigning `POST /api/customer/update`, which the customer app also uses for its own
+   profile edits; do not move it back there.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
