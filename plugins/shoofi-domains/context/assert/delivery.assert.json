@@ -21,7 +21,8 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "models/DriverShift.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -38,7 +39,8 @@
         ],
         "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
         "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "services/delivery/book-delivery.js": ["originalBookId"],
+        "models/DriverShift.js": ["waitingList", "isOnWaitingList", "hasDriver"]
       },
       "patterns": [
         {
@@ -95,6 +97,16 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "routes/driver-shift-manager.js",
+          "regex": "\\$pull:\\s*\\{\\s*waitingList:\\s*\\{\\s*driverId",
+          "desc": "taking a seat pulls the waiting entry in the SAME update as the $push - book, assign-driver and reassign-driver all do it; two updates leave a driver booked and waiting at once"
+        },
+        {
+          "file": "routes/driver-shift-manager.js",
+          "regex": "waitingListCount",
+          "desc": "the admin board counts drivers STILL waiting - an entry whose driver is already booked is filtered out, because the rows written before Aug 2026 are still in the documents"
         }
       ]
     },

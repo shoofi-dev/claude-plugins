@@ -88,6 +88,21 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
 
+10. **The shift waiting list is an embedded array, and nobody is on it and booked at once.**
+   `waitingList` lives on the shift document in `delivery-company.driver-shifts` (hyphenated;
+   the handle is `deliveryDb.driverShifts`) as
+   `{driverId, driverName, addedAt, status:'waiting'}` — declared in `models/DriverShift.js`.
+   There is **no waiting-list collection and no `isWaitingList` flag**, `'waiting'` is the only
+   status ever written, and `driverId` is a **string** while `customers._id` is an ObjectId, so
+   always compare `.toString()`. Every path that gives a driver a seat must `$pull` his waiting
+   entry **in the same update** as the `$push` — `/shifts/book`,
+   `admin/shifts/:id/assign-driver` and `admin/shifts/:id/reassign-driver` in
+   `routes/driver-shift-manager.js`. None of them did before Aug 2026, which left 99 entries
+   across 86 production shifts naming a driver already on the roster (74 of them from an admin
+   promoting off the list by hand). `GET /admin/shifts` therefore filters an entry out of
+   `waitingList`/`waitingListCount` when its driver is currently booked: the admin count means
+   "still waiting", not "ever asked". Nothing promotes off the list — see DEAD CONFIG below.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
   is the **GLOBAL master switch** for the delivery-company/driver integration — when off,
