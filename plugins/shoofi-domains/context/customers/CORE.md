@@ -118,6 +118,19 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    the mass-assigning `POST /api/customer/update`, which the customer app also uses for its own
    profile edits; do not move it back there.
 
+   **All six of these routes — block, cash-restrict and the four note routes — carry
+   `checkAdminRole(CUSTOMER_ADMIN_ROLES)` on top of `auth.required`, and must keep it.**
+   Per invariant 7's sibling rule in `utils/admin-role.js`, `auth.required` proves only that
+   *some* valid token was presented; admin and customer tokens share a signing secret, so a
+   customer's own token passes it. And a blocked customer can still obtain one — OTP login
+   never checks `isBlocked` (`routes/customer.js` `validateAuthCode`; `POST /api/customer/create`
+   returns `isBlocked` as a *payload field* and the apps self-enforce), so without the role gate
+   a blocked customer could call the block route and unblock themselves, with the audit note
+   naming them as the actor. `CUSTOMER_ADMIN_ROLES` lists **every** admin role deliberately: it
+   proves "this is an admin token", it is not a privilege level. **`viewer` is what the support
+   team carries** — narrowing the list is a product decision that locks real users out, not a
+   tightening you can make in passing.
+
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
 - **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin

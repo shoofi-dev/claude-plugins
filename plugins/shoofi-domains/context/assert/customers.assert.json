@@ -141,6 +141,16 @@
           "file": "services/customer/customer-restriction-service.js",
           "regex": "throw new RestrictionError\\(400, \"A reason is required\"\\)",
           "desc": "a reason is mandatory for every block / unblock / cash-restrict change, enforced in the service because the admin web has two cash-toggle call sites"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "customerId/block\", auth\\.required, checkAdminRole\\(CUSTOMER_ADMIN_ROLES\\)",
+          "desc": "auth.required alone is not an admin check - admin and customer tokens share a signing secret, and a blocked customer can still get a token, so without the role gate they could unblock themselves"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "CUSTOMER_ADMIN_ROLES = \\[[\\s\\S]{0,200}\"viewer\"",
+          "desc": "the customer-admin role list includes viewer on purpose - viewer is what the support team carries, so narrowing this list locks the heaviest users out of the block/notes screens"
         }
       ]
     },
