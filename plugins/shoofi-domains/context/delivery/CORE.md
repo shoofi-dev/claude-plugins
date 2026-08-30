@@ -97,6 +97,15 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
 - **BY DESIGN — keep it off:** the scored-assignment **recency filter is intentionally
   disabled** in `services/delivery/delayed-assignment.js` (stale-location drivers stay eligible
   so assignment isn't starved). Do not re-enable without an explicit task.
+- **The SCORED engine is the live one — `useDelayedAssignment` is `true` in production**
+  (`delivery-company.delivery-config {type:'driver-assignment'}`, with
+  `assignmentWindowMinutes: 15`). The `false` in `DEFAULT_CONFIG`
+  (`services/delivery/delayed-assignment.js`) is only the fallback when that row is missing, so
+  reading the code default and concluding "the immediate engine is live" is backwards. It
+  matters because the two engines rank differently: the scored one weighs distance, the
+  immediate one (`services/delivery/assignDriver.js`) **has no distance term at all** and
+  tie-breaks at random. Treat `assignDriver.js` as the untested emergency path, not as dead
+  code — flipping the flag during an incident silently drops proximity from dispatch.
 - **FIXED:** the partner app's `DELIVERY_STATUS` was off by one (showed "delivered" at pickup);
   it now matches the server. Server `consts/consts.js` is the single source of truth.
 - **Awareness:** a legacy `updateDelivery` path uses different status literals; `driver-inactivate-cron`

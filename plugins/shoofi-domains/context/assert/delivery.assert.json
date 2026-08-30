@@ -95,6 +95,11 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "useDelayedAssignment: config\\.useDelayedAssignment \\?\\? DEFAULT_CONFIG\\.useDelayedAssignment",
+          "desc": "the DB row wins over the code default - production has useDelayedAssignment true, so the SCORED engine is live despite DEFAULT_CONFIG saying false"
         }
       ]
     },

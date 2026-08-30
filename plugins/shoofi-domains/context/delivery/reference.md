@@ -59,7 +59,7 @@ at `maxOrdersByAdmin`, sorts ascending by load, **random tie-break**.
 route the order to a company **admin**, not a driver (`assignmentMethod:'manual-admin-routed'`).
 **Immediate vs delayed**: `book-delivery.js` picks delayed (`createPendingDelivery`,
 `isPendingAssignment:true`, `assignDriverAt = pickupTime − assignmentWindowMinutes`) when
-`config.useDelayedAssignment` (feature-flagged, default off) **or the order is a twin**
+`config.useDelayedAssignment` **or the order is a twin**
 (twins ALWAYS pend). The **assignment-scheduler** (60s, Redis-locked) processes due
 pendings; the claim is atomic (`updateOne {isPendingAssignment:true}` → `matchedCount===0`
 means another container won). Scored path (`delayed-assignment.js`) ranks by distance +
