@@ -91,6 +91,38 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    (`lib/common.js`). Any new `createdBy`-style provenance must be read from `req.auth` and
    never from the request body; `routes/team-tasks.js` is the reference implementation.
 
+8. **A store-user's `isAdmin` and `roles` do not distinguish anyone from anyone.** Both are
+   written verbatim from the request body by the storeUsers CRUD in `routes/customer.js`,
+   with no enum validation, and the admin form feeding it grants in bulk: its `isAdmin`
+   checkbox is commented out while the create default is `isAdmin: true`, and its
+   "בחר הכל" button ticks every role at once
+   (`shoofi-delivery-web/src/views/admin/stores/StoreUserForm.tsx`). Production, verified
+   2026-08-30: **409 of 409 store-user docs have `isAdmin: true`, 409 of 409 carry `all`,
+   and 348 (85%) carry `reports`** — across 130 stores that have more than one user. So
+   `isAdmin` means only "may use the partner app at all", and any *specific* role the bulk
+   grant includes is held by essentially every cashier. **Never gate a sensitive screen on
+   one of them**: that is exactly how the partner money screens (مستحقات / بيانات) ended up
+   readable by all staff. `owner` exists for that (added 2026-08-30, kept off the bulk
+   grant on purpose); an exclusive role you add later must be excluded there too, or it
+   decays into `reports` within a month.
+
+   **`all` is NOT a wildcard.** Every check on every side is a literal array-membership
+   test — `roles.indexOf(role)` in `shoofi-partner/stores/user-details/index.tsx`,
+   `roles.some(r => me.roles.includes(r))` in `shoofi-server/utils/store-membership.js` —
+   even though the admin list view renders an array containing `all` as "כל ההרשאות".
+
+   **Client and server disagree on a doc with no `roles` array.** The client **denies**
+   (`indexOf` on `undefined`); `requireStoreRole` **allows**, deliberately, for records
+   predating the array. Use **`requireStoreRoleStrict`** for anything exclusive — the
+   fail-open variant inverts an owner gate, admitting the emptiest records while denying
+   everyone who actually carries roles. No live doc is in that state today, so this bites
+   in review rather than in the data.
+
+   ⚠️ In Mongo the collection is **`shoofi.store-users`** (hyphenated). `db.storeUsers` in
+   server code is the handle registered by
+   `services/database/DatabaseInitializationService.js`; querying `storeUsers` directly in
+   mongosh returns **0 rows with no error**.
+
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
 - **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin

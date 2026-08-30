@@ -110,6 +110,26 @@
           "file": "routes/order.js",
           "regex": "created: moment\\(new Date\\(\\)\\)\\.utcOffset\\(offsetHours\\)\\.format\\(\\)",
           "desc": "orders.created - and the customers.orders[] snapshot of it - is an ISO string with an Israel offset, the opposite type from customers.created on the same document"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "isAdmin: req\\.body\\.isAdmin",
+          "desc": "store-user isAdmin is written verbatim from the request body with no validation - it is not a permission the server derives"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "roles: req\\.body\\.roles",
+          "desc": "store-user roles is an unvalidated pass-through - a new role needs no server diff, and equally nothing stops a bogus one"
+        },
+        {
+          "file": "utils/store-membership.js",
+          "regex": "requireStoreRoleStrict",
+          "desc": "the fail-CLOSED role gate - the only one an exclusive permission like owner may use; requireStoreRole admits a doc with no roles array by design"
+        },
+        {
+          "file": "utils/store-membership.js",
+          "regex": "OWNER: \"owner\"",
+          "desc": "owner is the exclusive store-user role gating the partner money screens - it must stay out of any bulk grant"
         }
       ]
     },
