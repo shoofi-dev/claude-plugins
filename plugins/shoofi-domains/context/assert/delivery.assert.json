@@ -95,6 +95,16 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "ACTIVE_ORDER_STATUSES\\s*=\\s*\\[\"1\", ?\"2\", ?\"3\", ?\"5\"\\]",
+          "desc": "dispatch load counts status 5 WAITING_IN_STORE as in-flight, not just 1/2/3"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "MIN_ASSIGNABLE_CAPACITY",
+          "desc": "a blank/0 maxOrdersByAdmin means the courier is switched OFF, not uncapped - and a stored 1 is raised to this floor"
         }
       ]
     },

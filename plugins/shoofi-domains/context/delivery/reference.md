@@ -53,8 +53,18 @@ pickup zone (`area.cityId`) + dropoff geometry.
 **Driver eligibility** (`findAllMatchingDrivers`): company must match BOTH `supportedAreas`
 (areaId) AND `supportedCities` (cityId); `personalSupportedAreas` overrides. Then a
 store allow/block list (`storeAssignmentMode`/`assignedStoreAppNames`).
-**Load/selection**: counts active `bookDelivery` (status `1,2,3`) per driver, drops those
-at `maxOrdersByAdmin`, sorts ascending by load, **random tie-break**.
+**Load/selection**: counts active `bookDelivery` per driver over statuses
+**`["1","2","3","5"]`** (`services/delivery/driver-load.js` `ACTIVE_ORDER_STATUSES` — `5`
+WAITING_IN_STORE counts as in-flight; a courier standing in a shop is carrying work).
+`maxOrdersByAdmin` is **not** a simple cap: a blank/`0`/`null` value means the courier is
+**switched OFF** (product decision 2026-08-23) and he is dropped at the *eligibility* stage
+where the "nobody has capacity, take everybody" fallback cannot undo it — `role:"admin"` is
+exempt, and a stored `1` is raised to `MIN_ASSIGNABLE_CAPACITY = 2`. Roughly half of
+production driver records carry blank/`0`, so this is the most likely reason a candidate pool
+comes back empty. On top of the per-driver cap there is a platform
+`maxConcurrentOrders` (default 2) and an uncollected-order penalty. The **random tie-break**
+is over the *full* ordering key (`withinConcurrencyCap`, `uncollectedOrderCount`,
+`activeOrderCount`), not over load alone.
 **Manual-admin routing**: companies with `isControlledByAdmin && manualAssignmentOnly`
 route the order to a company **admin**, not a driver (`assignmentMethod:'manual-admin-routed'`).
 **Immediate vs delayed**: `book-delivery.js` picks delayed (`createPendingDelivery`,
