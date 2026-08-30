@@ -95,6 +95,21 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "assignmentMethod: 'score-based'",
+          "desc": "the scored engine stamps assignmentMetadata.assignmentMethod - this is how an automatic allocation is told from a manual one"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "assignmentMethod: 'manual-admin-routed'",
+          "desc": "'manual-admin-routed' is the company routing rule and is still AUTOMATIC - only 'manual' + assignedBy:'admin' is a human"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "assignmentMethod: 'manual'",
+          "desc": "the admin endpoints are the only writers of the truly-manual marker"
         }
       ]
     },

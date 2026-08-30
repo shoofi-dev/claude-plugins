@@ -87,6 +87,20 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **Automatic vs manual assignment is read off `assignmentMetadata.assignmentMethod`, and
+    the field's ABSENCE is itself the signal.** The immediate engine inserts the booking with
+    the driver already on it and writes **no `assignmentMetadata` and no `assignedAt`**
+    (`services/delivery/book-delivery.js` — the string `assignmentMethod` does not appear in
+    that file at all), so a booking with no metadata is *automatic immediate*, not "unknown".
+    Everything else stamps itself: `'score-based'` and `'delayed-score-based'` (the scored
+    engine), `'twin_mirrored_from_peer'` / `'twin_mirrored_to_peer'`
+    (`services/delivery/delayed-assignment.js`), `'manual-admin-routed'` (the
+    `isControlledByAdmin && manualAssignmentOnly` routing rule of invariant 6 — **still
+    automatic**, no human is involved), and `'manual'` with `assignedBy: 'admin'` from the
+    admin endpoints (`routes/delivery/admin.js`, `routes/twin-order.js`). Only the last one is
+    a human. Corollary for any dispatch-timing metric: `assignedAt` is written **only** on the
+    delayed and manual paths, so an immediate-engine booking has no assignment instant at all
+    and its `created` is the assignment instant.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
