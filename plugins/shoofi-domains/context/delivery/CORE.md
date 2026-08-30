@@ -87,6 +87,21 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **The two late-delivery crons each send TWO notifications per delayed order, to different
+   people, from the same `if` block.** In both `utils/crons/delivery-pickup-checker.js` and
+   `utils/crons/delivery-completion-delay-checker.js` the first goes to the assigned **driver**
+   (`appName: 'delivery-company'`, `appType: 'shoofi-shoofir'`, recipient from
+   `deliveryDB.customers`) and the second, ~40 lines below, fans out to every **store user**
+   (`appName: order.appName`, `appType: 'shoofi-partner'`, recipients from
+   `shoofiDB.storeUsers`). A grep that finds one never surfaces the other, so a change made
+   "to the store notification" silently rewrites the driver's, and vice versa. Anything
+   touching these blocks must state which of the two recipients it affects.
+   Note also that `appName` here is **not always a store**: on the driver branch it is the
+   literal `'delivery-company'`, whose `store` collection holds the delivery COMPANIES (many
+   docs, no `{id:1}` singleton), and `services/delivery/book-delivery.js` defaults
+   `appName` to `'shoofi-app'`, which is not a store DB at all. Guard before treating
+   `appName` as one, and use `getOrInitializeDb` — neither cron ever loads a store DB, so the
+   handle may be absent on a container that has not served that store.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
