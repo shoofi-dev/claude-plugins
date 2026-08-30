@@ -17,9 +17,15 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
+        "services/notification/notification-service.js",
         "docs/customer-orders-snapshot.md"
       ],
       "symbols": {
+        "services/notification/notification-service.js": [
+          "sendWebSocketNotification",
+          "sendExpoPushNotification",
+          "sendFirebasePushNotification"
+        ],
         "routes/order.js": [
           "processCreditCardPayment",
           "processHypTokenPayment",
@@ -58,6 +64,11 @@
           "file": "utils/persistent-alerts.js",
           "regex": "//\\s*\\{ \"lastReminderSent\\._d\": \\{ \\$lt: oneMinuteAgo \\}",
           "desc": "the reminder throttle is still commented out, so reminderCount < 5 is the only brake - when this is uncommented the per-minute claim in reference.md must be corrected"
+        },
+        {
+          "file": "services/notification/notification-service.js",
+          "regex": "soundType",
+          "desc": "CORE invariant 10 - the alert sound is carried by soundType here; if it moves, the push-only claim needs re-checking"
         },
         {
           "file": "consts/consts.js",
@@ -132,12 +143,30 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "stores/orders/index.tsx"],
+      "files": [
+        "consts/shared.ts",
+        "stores/orders/index.tsx",
+        "utils/notification/index.ts",
+        "hooks/use-notifications.ts",
+        "components/global/FutureOrderReminderGlobal.tsx",
+        "components/global/DriveInArrivalGlobal.tsx",
+        "app.json"
+      ],
+      "symbols": {
+        "components/global/FutureOrderReminderGlobal.tsx": ["scheduleNotificationAsync"],
+        "components/global/DriveInArrivalGlobal.tsx": ["scheduleNotificationAsync"],
+        "hooks/use-notifications.ts": ["scheduleNotificationAsync"]
+      },
       "patterns": [
         {
           "file": "consts/shared.ts",
           "regex": "ORDER_STATUS",
           "desc": "client copy of order status enum (must track server)"
+        },
+        {
+          "file": "app.json",
+          "regex": "\"sounds\"",
+          "desc": "CORE invariant 10 - notification sounds are build-time resources listed here; an unlisted filename plays the device default silently"
         }
       ]
     }

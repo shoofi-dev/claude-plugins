@@ -61,6 +61,23 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    "Is this order for a later day?" must therefore test **both**, **truthily** — as the server
    does (`routes/order.js`: `$or: [{isFutureOrder:{$ne:true}},{isFutureOrder:{$exists:false}}]`).
    Testing `isFutureOrder` alone silently misses every ramadan order.
+10. **A store alert's SOUND is not decided in one place.** `soundType`
+   (`services/notification/notification-service.js`) reaches the **push payload only** — it is
+   injected into `pushData` inside the `channels.push` guard and read back in
+   `sendExpoPushNotification` / `sendFirebasePushNotification`. The **websocket frame never
+   carries it** (`sendWebSocketNotification` sends `{title, body, data, type, appName}`), and
+   the partner app raises its **own local notification** for the same events with the sound
+   chosen client-side — `shoofi-partner/utils/notification/index.ts` (30s unviewed-orders
+   poll), `components/global/FutureOrderReminderGlobal.tsx`,
+   `components/global/DriveInArrivalGlobal.tsx`, `hooks/use-notifications.ts` (live websocket
+   banner). A server-only change to `soundType` therefore changes **nothing a foregrounded
+   tablet plays**; alert-sound work is always a two-repo change.
+   Two more traps in the same area. Sounds are **build-time** resources, compiled from
+   `shoofi-partner/app.json`'s expo-notifications `sounds` array — an unlisted filename plays
+   the device default and reports no error anywhere, so a sound value must be validated
+   against that list, never free text. And on **Android 8+ the sound belongs to the
+   notification CHANNEL** and is fixed when the channel is created, so a payload `sound`
+   without a matching `channelId` is silently ignored.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
