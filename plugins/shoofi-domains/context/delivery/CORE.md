@@ -87,6 +87,20 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **Telemetry on the dispatch path must never be able to fail the dispatch.**
+    `centralizedFlowMonitor.trackOrderFlowEvent` **re-throws** when its insert fails
+    (`services/monitoring/centralized-flow-monitor.js` — `catch { logger.error(...); throw error }`),
+    and it is `await`ed with no local try/catch at `services/delivery/book-delivery.js` (both
+    the assigned and the assignment-failed branches) and twice in
+    `services/delivery/delayed-assignment.js`. The `delivery_driver_assigned` call is the
+    dangerous one: the driver has **already** been written onto the delivery and the pending
+    claim consumed by then, so a monitor failure jumps to the outer catch, returns
+    `{success:false, message:"Error assigning driver"}` and skips the driver's push — an
+    assigned delivery reported as failed, with a courier who was never told. Any new
+    monitoring, analytics or logging write you add to an assignment path must swallow its own
+    errors and return a result object (`services/delivery/availability-status-service.js` and
+    `services/delivery/assignment-decision-log.js` are the pattern), and must be written
+    **after** the atomic pending→assigned claim, never before it and never inside its filter.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`

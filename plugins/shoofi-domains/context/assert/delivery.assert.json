@@ -21,7 +21,8 @@
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "services/monitoring/centralized-flow-monitor.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -95,6 +96,16 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/monitoring/centralized-flow-monitor.js",
+          "regex": "Failed to track centralized flow event:', error\\);\\s*throw error;",
+          "desc": "the flow monitor RE-THROWS on a failed insert, and dispatch awaits it unguarded - a telemetry failure after the driver is written reports an assigned delivery as failed"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "eventType: 'delivery_driver_assigned'",
+          "desc": "the unguarded monitor call that runs AFTER the pending->assigned claim is consumed"
         }
       ]
     },
