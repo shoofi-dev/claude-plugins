@@ -80,6 +80,13 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    after midnight both silently read the *following* night's slots. Corollary:
    `endTime <= startTime` is legal (`"23:00"→"00:00"`; `"24:00"` also exists in older data),
    so any `end > start` assertion or lexicographic `HH:mm` compare is a bug.
+   **And `date` is stored as a `"YYYY-MM-DD"` STRING, not a BSON date** — all 8,267 documents
+   in `delivery-company.driver-shifts`, and the route builds its own windows as strings
+   (`query.date = { $gte: startDate, $lte: endDate }`, `routes/driver-shift-manager.js`). So a
+   date window must be built out of strings too: `{date: {$lt: new Date()}}` matches **nothing**
+   and returns an empty result rather than an error, which reads as "no shifts" instead of
+   "wrong type". Use `{date: {$lt: '2026-08-30'}}`, and remember the label is the business day
+   (above), not the calendar day the slot actually runs on.
 9. **Permanent drivers are per-weekday.** `dayTimeSlots[].dayOfWeek` is authoritative; the flat
    `timeSlots` array is the **union across all weekdays** and is meaningless without
    `daysOfWeek` beside it. Always resolve through

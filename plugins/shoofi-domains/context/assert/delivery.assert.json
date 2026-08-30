@@ -95,6 +95,11 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "routes/driver-shift-manager.js",
+          "regex": "query\\.date = \\{ \\$gte: startDate, \\$lte: endDate \\}",
+          "desc": "driverShifts.date is a YYYY-MM-DD STRING - every date window is built out of strings; a BSON date bound matches nothing and returns an empty list, not an error"
         }
       ]
     },
