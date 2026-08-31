@@ -104,6 +104,17 @@ All of these are **known and accepted for now**. They are scheduled work, not di
 - **KNOWN — to handle later:** several identity-adjacent endpoints (address CRUD,
   `search-customer`, storeUsers CRUD, `cash-restrict`) take IDs from the URL/body with no auth.
   **Never widen this surface further.**
+- **NOT a bug (verified):** the admin dashboard has **no i18n layer at all**.
+  `shoofi-delivery-web` has no `react-i18next` / `react-intl` in its `package.json` and **no
+  `src/translations/` directory**; every Hebrew string in it is a literal sitting in the
+  component (`src/views/admin/customers/CustomerSearch.tsx`), with RTL done by `dir="rtl"` on
+  the element and Tailwind `text-right`. **That repo's own `CLAUDE.md` claims strings live in
+  `src/translations/` — the line is stale and describes the three React Native apps.** Don't go
+  hunting for a translation file to add an admin string to, and don't introduce one in passing.
+  House convention for a labelled enum on these screens: an **ASCII snake_case code** is the
+  stored/API value, and a module-level `const` map of Hebrew labels lives next to the component
+  (`REASON_LABELS` in `src/views/admin/StoreDeliveryAvailabilityAlerts.tsx`), always read with a
+  `|| code` fallback so an unknown code renders as itself instead of blanking.
 - **NOT a bug (verified):** the driver app sends `app-name: 'shoofi'` on push-token
   registration, but the server routes on **`app-type`**, so the token lands correctly on
   `delivery-company.customers`. (Leftovers: an unused `db` variable in that handler, and a

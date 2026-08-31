@@ -126,13 +126,28 @@
     "shoofi-delivery-web": {
       "files": [
         "src/contexts/AdminAuthContext.tsx",
-        "src/utils/http-interceptor/index.ts"
+        "src/utils/http-interceptor/index.ts",
+        "src/views/admin/customers/CustomerSearch.tsx",
+        "src/views/admin/StoreDeliveryAvailabilityAlerts.tsx"
       ],
+      "symbols": {
+        "src/views/admin/StoreDeliveryAvailabilityAlerts.tsx": ["REASON_LABELS"]
+      },
       "patterns": [
         {
           "file": "src/utils/http-interceptor/index.ts",
           "regex": "Bearer",
           "desc": "admin uses Bearer (RN apps use 'Token')"
+        },
+        {
+          "file": "src/views/admin/customers/CustomerSearch.tsx",
+          "regex": "[\\u0590-\\u05FF]",
+          "desc": "admin Hebrew is a literal in the component - no i18n layer in the admin web"
+        },
+        {
+          "file": "src/views/admin/StoreDeliveryAvailabilityAlerts.tsx",
+          "regex": "\\|\\| a\\.reason",
+          "desc": "enum label maps are read with a || code fallback so unknown codes render"
         }
       ]
     }
