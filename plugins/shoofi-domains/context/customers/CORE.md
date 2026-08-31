@@ -90,6 +90,31 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    serialises the ObjectId), so compare with `String(...)` or cast via `getId`
    (`lib/common.js`). Any new `createdBy`-style provenance must be read from `req.auth` and
    never from the request body; `routes/team-tasks.js` is the reference implementation.
+8. **Account deletion writes TWO fields, and only one of them means anything afterwards.**
+   `POST /api/customer/delete` (`routes/customer.js`) soft-deletes with
+   `$set: { isDeleted: true, deletedAt: new Date() }` — routed by `app-type` like everything
+   else here, so it lands on `shoofi.customers`, `shoofi.storeUsers` or
+   `delivery-company.customers`. The two fields then diverge:
+   - **`deletedAt` is write-once.** It is set at exactly one place in the whole server and is
+     **never read and never unset**, so it is the only durable "this account asked to be
+     deleted" marker. It is a BSON `Date` — so comparing it against an order's `created`
+     (an offset string, see invariant 5) needs **both sides parsed to instants**, not a Mongo
+     range predicate and not a string compare.
+   - **`isDeleted` is reset to `false` on the next OTP REQUEST**, inside the create/login
+     handler's `$set: { ...customer, … isDeleted: false … }` (`routes/customer.js`) — *before*
+     any code is verified. Because that write is a whole-doc spread of a stale read,
+     `deletedAt` survives it untouched. So **`isDeleted: false` on a doc that has `deletedAt`
+     means "someone typed this phone into a login screen"**, not "the account is back". Do not
+     build a recovery or reactivation metric on it; join the store `orders` collections and
+     compare against `deletedAt` instead.
+
+   That same whole-doc-spread is why **per-customer admin state must never live on the customer
+   document**: six routes rewrite it wholesale from a stale in-memory read (`validateAuthCode`
+   via `toAuthJSON`, create/OTP, `update-name`, `update`, `update-plan`, `update-plan-branch`),
+   and `POST /api/customer/update` is `$set: { ...customer, ...body }` — a stale rewrite *and*
+   mass assignment. An admin write parked there is reverted by the next verification code the
+   customer asks for, silently and with no error anywhere. Use a sidecar collection keyed on
+   `customerId`; `shoofi.customer-deletion-cases` is the reference implementation.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:

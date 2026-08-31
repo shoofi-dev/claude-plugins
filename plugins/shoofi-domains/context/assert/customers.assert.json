@@ -57,6 +57,16 @@
           "desc": "partner identity collection"
         },
         {
+          "file": "routes/customer.js",
+          "regex": "isDeleted: true, deletedAt: new Date\\(\\)",
+          "desc": "the soft delete writes both fields together - deletedAt is a BSON Date and is the only durable marker"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "\\.\\.\\.customer,[^}]*isDeleted: false",
+          "desc": "the OTP-REQUEST handler resets isDeleted to false via a whole-doc spread of a stale read, leaving deletedAt intact - so isDeleted:false only means someone typed the phone into a login screen"
+        },
+        {
           "file": "utils/app-name-helper.js",
           "regex": "shoofi",
           "desc": "customers are central: getCustomerAppName always returns shoofi"
