@@ -102,6 +102,11 @@
           "desc": "the authenticated user is req.auth, never req.user - nothing in the codebase assigns req.user"
         },
         {
+          "file": "routes/auth.js",
+          "regex": "authorization\\.split\\(\" \"\\)\\[0\\] === \"Token\"",
+          "desc": "on the customer/partner/driver branch getTokenFromHeaders only returns a token for the literal 'Token ' prefix - a Bearer header falls through and returns undefined, so a valid JWT gets a bare 401"
+        },
+        {
           "file": "routes/customer.js",
           "regex": "created: new Date\\(\\)",
           "desc": "customers.created is a real BSON Date - a string bound will never match it"
@@ -110,6 +115,16 @@
           "file": "routes/order.js",
           "regex": "created: moment\\(new Date\\(\\)\\)\\.utcOffset\\(offsetHours\\)\\.format\\(\\)",
           "desc": "orders.created - and the customers.orders[] snapshot of it - is an ISO string with an Israel offset, the opposite type from customers.created on the same document"
+        }
+      ]
+    },
+    "shoofi-app": {
+      "files": ["utils/http-interceptor/index.ts"],
+      "patterns": [
+        {
+          "file": "utils/http-interceptor/index.ts",
+          "regex": "\"Token \" \\+ token",
+          "desc": "the customer app sends the 'Token ' prefix - the server's customer branch returns undefined for anything else"
         }
       ]
     },
