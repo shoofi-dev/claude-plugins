@@ -103,7 +103,24 @@ All of these are **known and accepted for now**. They are scheduled work, not di
 - **KNOWN:** `search-customer` projects `token` + `authCode` and has no auth.
 - **KNOWN — to handle later:** several identity-adjacent endpoints (address CRUD,
   `search-customer`, storeUsers CRUD, `cash-restrict`) take IDs from the URL/body with no auth.
-  **Never widen this surface further.**
+  **Never widen this surface further.** One of them is `GET /api/customer/:customerId`
+  (`routes/customer.js`, registered with no `auth.required` and no `checkAdminRole`) — see the
+  routing trap below before adding any new `/api/customer/…` GET.
+- **KNOWN — the `/api/customer/:customerId` catch-all shadows new routes.** `routes/customer.js`
+  is mounted early (`app.use("/", customer)` in `app.js`), and it registers the bare
+  `GET /api/customer/:customerId`. Express matches on mount order, so **any new
+  `GET /api/customer/<literal-word>` router mounted after it never runs**: the catch-all matches
+  first, `getId("<literal-word>")` returns the raw string (`lib/common.js` only builds an
+  ObjectId from 24 hex chars), the lookup misses, and the caller gets
+  **`404 {"message":"Customer not found"}`**. Not a 500, not a crash — a wrong answer that
+  reads as a data problem. Worse, the new route's `auth.required + checkAdminRole` never runs,
+  so nothing about the failure looks like a security issue. Two ways out, and pick
+  deliberately: mount the new router **above** `app.use("/", customer)` (keeps the URL; pin the
+  ordering with a source-level test, as `test/integration/customer-deletion-requests.js` does),
+  or give it a **top-level prefix outside `/api/customer/…`** — which is why
+  `routes/customer-referrals.js` and `routes/customer-campaigns.js` already live outside it.
+  PUT/POST/DELETE are unaffected: the catch-all is GET-only, and the sibling write routes all
+  require a literal second segment (`/block`, `/notes`, `/addresses`).
 - **NOT a bug (verified):** the driver app sends `app-name: 'shoofi'` on push-token
   registration, but the server routes on **`app-type`**, so the token lands correctly on
   `delivery-company.customers`. (Leftovers: an unused `db` variable in that handler, and a
@@ -116,6 +133,10 @@ All of these are **known and accepted for now**. They are scheduled work, not di
 3. Anything touching the JWT secret or token lifetime is a **planned migration with a
    logout blast-radius**, not a code fix — stop and ask.
 4. Re-read the output you're adding: no OTP/token/secret may appear in logs or responses.
+5. **Adding a `GET /api/customer/…` endpoint?** Check the mount order against
+   `app.use("/", customer)` in `app.js` first — the `:customerId` catch-all will silently 404
+   it and skip your auth gate (see Known status). Curl it, or pin the ordering in a test;
+   a passing unit test on the handler proves nothing about whether the route is reachable.
 
 ## Definition of done
 Inherit `_shared-guardrails.md` §7, plus the four recipe points above.

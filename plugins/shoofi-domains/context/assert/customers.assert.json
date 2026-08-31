@@ -18,6 +18,8 @@
         "utils/customer-orders.js",
         "docs/customer-orders-snapshot.md",
         "routes/order.js",
+        "app.js",
+        "lib/common.js",
         "package.json"
       ],
       "symbols": {
@@ -55,6 +57,16 @@
           "file": "routes/customer.js",
           "regex": "storeUsers",
           "desc": "partner identity collection"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "router\\.get\\('/api/customer/:customerId', async",
+          "desc": "the bare :customerId catch-all is GET-only and takes NO middleware - `async` straight after the path is what proves there is no auth.required/checkAdminRole on it"
+        },
+        {
+          "file": "app.js",
+          "regex": "app\\.use\\(\"/\", customer\\)",
+          "desc": "routes/customer.js is mounted at / - any new GET /api/customer/<literal> router mounted after this line is swallowed by the :customerId catch-all and 404s with its auth gate never running"
         },
         {
           "file": "utils/app-name-helper.js",
