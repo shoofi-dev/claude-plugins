@@ -78,6 +78,16 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    aligned to the later side. Breaking any of it splits a twin.
 6. **Manual-admin routing:** companies with `isControlledByAdmin && manualAssignmentOnly` route
    to a company **admin**, not a driver. Don't auto-assign them.
+   **`centralizedFlowMonitor.trackOrderFlowEvent` RETHROWS — always wrap it.** It logs and then
+   `throw error` (`services/monitoring/centralized-flow-monitor.js:63-66`), so an `await`ed call
+   with no local try/catch turns a monitoring failure into a 5xx on the dispatch route *after*
+   the `bookDelivery` write has committed — and skips everything after it, which on the reassign
+   routes is both driver notifications. The old driver is never told they lost the order, the new
+   one is never told they have it, and the database says they own it. It reads like fire-and-forget
+   telemetry and is not. Wrap every call in its own try/catch and place it **after** the
+   notifications, not before (`routes/delivery/admin.js` reassign is the worked example). This is
+   the delivery-side instance of the shared "a secondary feature must never fail the primary
+   flow" rule, and the one place the code does not enforce it for you.
 7. **Collection name ≠ property name:** `db.bookDelivery` is bound to the MongoDB collection
    **`book-delivery`** (hyphenated) — `services/database/DatabaseInitializationService.js:28`.
    Querying `delivery-company.bookDelivery` directly returns **zero documents silently**

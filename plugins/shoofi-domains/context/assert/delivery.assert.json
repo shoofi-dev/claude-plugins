@@ -26,7 +26,8 @@
         "routes/order.js",
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
-        "routes/analytics.js"
+        "routes/analytics.js",
+        "services/monitoring/centralized-flow-monitor.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -165,6 +166,11 @@
           "file": "utils/crons/growth-snapshots.js",
           "regex": "storeReadyAt",
           "desc": "the surviving storeReadyAt locals here read order.completedAt / orderFlowEvents, never bookDelivery.storeReadyAt (0 of 82,414 rows) - if a bookDelivery read reappears, the net-of-kitchen-delay lie is back"
+        },
+        {
+          "file": "services/monitoring/centralized-flow-monitor.js",
+          "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
+          "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
         }
       ]
     },
