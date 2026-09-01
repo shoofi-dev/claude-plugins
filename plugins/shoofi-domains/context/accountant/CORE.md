@@ -106,6 +106,57 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `true`), or the regenerated report silently drops those amounts.
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
+7. **A store's coupon cost (`reportData.campaigns`) is the coupon's NOMINAL
+   `storeDiscount`, never the waiver the customer actually got**, and the gate that
+   decides it is **blind to `discountType`** (`routes/payments/admin.js:1135-1142`,
+   feeding `totalAppliedCouponsSum` → `campaignsTotal` → `campaigns`):
+   `if (storeDiscount && !isSpecificToCustomers && discountType !== 'full_discount')`.
+   Three consequences that keep getting rediscovered:
+   - **No cap against the thing discounted.** `storeDiscount: 20` on a ₪10 shipping fee
+     bills the store ₪20, even though `appliedCoupon.discountAmount` was capped at ₪10
+     when the coupon was applied. Any read-time "who paid for this" derivation therefore
+     produces a small **negative** Shoofi share on such orders. That is real over-billing
+     surfacing — **do not clamp it at zero**, which only hides it.
+   - **A `percentage`-type coupon is billed as `(storeDiscount / 100) * orderPrice`**,
+     where `orderPrice` is the **items subtotal** (`originalOrderPrice` — no shipping, no
+     drive-in) — *even when the coupon's `discountType` is `delivery`*. So what the
+     store report charges for a percentage delivery coupon is not a delivery amount.
+     **A percentage `storeDiscount` means a SHARE, not an amount** (owner ruling,
+     2026-08-12): the delivery fee differs from city to city, so the same coupon must
+     cost the store more where the fee is higher, which a fixed shekel value cannot
+     express. `couponDeliverySplit` (`lib/payments/calc.js`) therefore takes that
+     percentage off **`order.shippingPrice`** — the same base `computeDiscountCap`
+     strikes a delivery coupon's own `value` against (`utils/coupon-discount.js:34-42`),
+     which is the exact parallel of `:1138` using `orderPrice` for an items coupon. NOT
+     off the waiver (that halves a partial discount's store share) and NOT off
+     `effectiveDeliveryFee` (a coupon can never touch the twin combination fee). It
+     **deliberately diverges from `:1137-1138` for these coupons**;
+     `isPercentageStoreDeliveryCoupon` counts them so the divergence is measurable
+     (`percentageShareCoupons` on the exec-dashboard month detail) rather than
+     invisible. Fixing the report's base to match is a **live billing change** — it
+     moves what stores are charged, and belongs to its own ticket.
+   - **`storeDiscount` carries two different units and no field says which.**
+     Shekels normally; percentage points when `type === 'percentage'`. There is no
+     validation bounding it to 0-100 in that case — `lib/schemas/newCoupon.json` sets
+     only `minimum: 0`, and `routes/coupon.js:1364` bounds the split only for
+     `fixed_amount`. **`splitType: 'percentage'` is the exception:** those coupons
+     resolve the share into shekels before the order is written
+     (`routes/coupon.js:48-74`, `:345`), so `storeDiscount` on the applied snapshot is
+     already an amount. Any reader dividing by 100 must exclude them or it bills ₪0.14
+     where the store owes ₪14. `splitType: 'percentage'` is also the built-for-purpose
+     way to express a varying-fee split — prefer it over `type: 'percentage'` when
+     configuring delivery campaigns.
+   - **The row pushed at `:1145` carries no items/delivery split** (unlike the
+     `full_discount` rows at `:1236`), so `campaignsList` is not splittable for
+     `delivery`/`order_items` coupons. `full_discount` is the **only** coupon type with a
+     stored 2×2 split (`getFullDiscountMatrix`); everything else must be re-derived from
+     the order at read time — see `couponDeliverySplit` in `lib/payments/calc.js`.
+   `campaigns` is an **outcome** feeding `totalOutcomes` → `totalForTransfer`, so this is
+   live money. Do not "fix" the percentage base as a side effect of another change — it
+   moves what stores are charged. **Ask.**
+   *(Do not mirror `admin.js:907-944` either — that is the legacy `/stores-export`
+   endpoint, which bills `storeDiscount` for every coupon including customer-specific and
+   `full_discount`. Settlement uses `/stores-export-new`.)*
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
