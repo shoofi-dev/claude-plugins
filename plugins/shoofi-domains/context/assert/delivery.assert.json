@@ -23,7 +23,10 @@
         "docs/delivery-areas-model.md",
         "services/database/DatabaseInitializationService.js",
         "services/delivery/late-delivery.js",
-        "routes/order.js"
+        "routes/order.js",
+        "utils/crons/growth-snapshots.js",
+        "lib/churn-360/signals.js",
+        "routes/analytics.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -142,6 +145,16 @@
           "file": "services/delivery/late-delivery.js",
           "regex": "delivery\\?\\.originalPickupTime \\|\\| delivery\\?\\.pickupTime",
           "desc": "the zero-minute-promise check reads the clock the promise was actually built from"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "eventType === .status_change. && ev\\.status === .3.",
+          "desc": "the real store-ready source is orderFlowEvents status 3, keyed by orderNumber === bookDelivery.bookId - NOT a bookDelivery.storeReadyAt field, which nothing writes"
+        },
+        {
+          "file": "utils/crons/growth-snapshots.js",
+          "regex": "storeReadyAt",
+          "desc": "the surviving storeReadyAt locals here read order.completedAt / orderFlowEvents, never bookDelivery.storeReadyAt (0 of 82,414 rows) - if a bookDelivery read reappears, the net-of-kitchen-delay lie is back"
         }
       ]
     },

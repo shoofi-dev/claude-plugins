@@ -111,6 +111,20 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
       `expectedDeliveryAt < created` as unmeasurable; it is impossible by construction.
     The shared reader that gets all of this right is `services/delivery/late-delivery.js`
     (`pickupInstantOf`, `parsePromisedEta`) — use it rather than re-deriving.
+11. **`bookDelivery.storeReadyAt` does not exist — nothing writes it, ever.** 0 of 82,414
+    production documents carry the field and no code in any Shoofi repo assigns it. It is not
+    legacy; it was never written. Three report consumers nonetheless read it off a delivery and
+    subtracted store-side delay from the courier’s lateness, so every published “delayed above
+    5 min, **net** of kitchen delay” number was gross and always had been — the subtraction
+    never once fired. The store-ready instant does exist, in `shoofi.orderFlowEvents` as
+    `{ eventType: "status_change", status: "3" }` keyed by
+    `orderNumber === bookDelivery.bookId` (`routes/analytics.js:1136-1154` does this
+    correctly). Removed from `utils/crons/growth-snapshots.js` and `lib/churn-360/signals.js`
+    in shoofi-server `fix/late-delivery-shared-rule`. **Generalise the lesson: before adding a
+    `bookDelivery.<field>` read, confirm something writes it.** `driver`, `company`, `area` and
+    `order` are whole embedded documents, so a wished-for or misspelled field reads as
+    `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
+    runs — which looks identical to a correction that is simply rare.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
