@@ -22,6 +22,8 @@
         "consts/consts.js",
         "docs/delivery-areas-model.md",
         "services/database/DatabaseInitializationService.js",
+        "services/delivery/late-delivery.js",
+        "routes/order.js",
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js"
@@ -52,6 +54,15 @@
         ],
         "services/delivery/book-delivery.js": [
           "originalBookId"
+        ],
+        "services/delivery/late-delivery.js": [
+          "LATE_THRESHOLD_MIN",
+          "DEFAULT_PICKUP_GRACE_MIN",
+          "LATE_DELIVERY_PROJECTION",
+          "pickupInstantOf",
+          "parsePromisedEta",
+          "reassignmentOf",
+          "classifyDelivery"
         ]
       },
       "patterns": [
@@ -109,6 +120,31 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "\\.format\\(\"HH:mm\"\\)",
+          "desc": "pickupTime is stored as a bare HH:mm wall clock, which wraps past midnight - it is not a timestamp"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "pickupTimeDate\\.format\\(\"HH:mm\"\\)",
+          "desc": "the pending path stores the same wrapping HH:mm clock"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "originalPickupTime",
+          "desc": "update-delay moves pickupTime and does NOT recompute expectedDeliveryAt, so the stored promise belongs to originalPickupTime"
+        },
+        {
+          "file": "services/delivery/late-delivery.js",
+          "regex": "if \\(pickup\\.isBefore\\(created\\)\\) pickup\\.add\\(1, \"day\"\\)",
+          "desc": "the midnight roll-forward: a pickup clock earlier than the booking means the next day (1,774 rows)"
+        },
+        {
+          "file": "services/delivery/late-delivery.js",
+          "regex": "delivery\\?\\.originalPickupTime \\|\\| delivery\\?\\.pickupTime",
+          "desc": "the zero-minute-promise check reads the clock the promise was actually built from"
         },
         {
           "file": "routes/analytics.js",
