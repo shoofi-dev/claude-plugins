@@ -90,6 +90,29 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    serialises the ObjectId), so compare with `String(...)` or cast via `getId`
    (`lib/common.js`). Any new `createdBy`-style provenance must be read from `req.auth` and
    never from the request body; `routes/team-tasks.js` is the reference implementation.
+8. **`deletedAt` is the deletion marker, NOT `isDeleted`.** Account deletion is soft:
+   `POST /api/customer/delete` writes `{isDeleted: true, deletedAt: new Date()}`
+   (`routes/customer.js`) and nothing ever purges the document. But the **OTP-*request***
+   handler rewrites the whole customer doc with
+   `$set: {...customer, authCode, token: null, isDeleted: false, language}` — **before any
+   code is verified** — so merely typing a phone into a login screen clears `isDeleted`
+   while `deletedAt` is left in place (it is never unset). Consequences:
+   - `isDeleted: false` does **not** mean "never asked to be deleted". Reading it alone
+     reports a deleted customer who touched a login screen as a clean active account.
+   - The deletion states are a **pair**, not a ternary: `(isBlocked, deletedAt, isDeleted)`
+     gives active / blocked / deleted / blocked+deleted / **active-after-deletion** /
+     blocked-after-deletion. A `isDeleted ? … : isBlocked ? … : 'active'` chain cannot
+     express a combination — blocking and deletion are independent flags. Both admin
+     surfaces derive from the pair: `deriveCustomerAccountStatus`
+     (`shoofi-delivery-web src/utils/customer-account-status.ts`) and `triedToLoginAgain`
+     (`services/customer-deletion/deletion-cases.js`).
+   - Records predating `deletedAt` carry only the flag, so `isDeleted: true` must still be
+     enough to read as deleted. Don't require `deletedAt` to reach that branch.
+   - The login checks that would reject a deleted account are **commented out**
+     (`routes/customer.js`) — deletion is a *request* a human works, not an enforced state.
+   Anything that reports deletion must carry **both** fields end to end.
+   (`GET /api/customer/:customerId` gained `deletedAt` in shoofi-server
+   `fix/HIGH-RISK-churn-360-account-status`; add the matching assert once that merges.)
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
