@@ -56,6 +56,19 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
 2. **Assignment idempotency:** de-dupe on `originalBookId`; the pending→assigned claim is an
    atomic `updateOne({isPendingAssignment:true})` (`matchedCount===0` = another container won).
    Never bypass either.
+   **Delayed assignment is ON in production, and the window is 15 — not the code's 10.**
+   `DEFAULT_CONFIG` in `services/delivery/delayed-assignment.js:17-19` says
+   `useDelayedAssignment: false, assignmentWindowMinutes: 10`; both are overridden by
+   `delivery-company.delivery-config {type:'driver-assignment'}`, which holds
+   `{useDelayedAssignment: true, assignmentWindowMinutes: 15}`. Read the DB document, never
+   the constant. Consequence: the platform is *designed* to dispatch at `pickupTime − 15`
+   (`delayed-assignment.js:483-485`), so "this courier only got twelve minutes' notice" is
+   normal operation rather than an anomaly — 559 of 4,957 completed deliveries in 1–17 Aug
+   2026 reached their first courier under ten minutes before pickup. Any rule that measures
+   notice-before-pickup from the other end (the late-delivery grace,
+   `services/delivery/late-delivery.js`) is measuring the same quantity as
+   `assignmentWindowMinutes` and moves as a step function of it: the lever for that
+   population is the config value, not the report.
 3. **Never write `customers.isActive` directly** — always `setDriverActiveStatus`
    (`services/delivery/driver-status-service.js`), which writes `driverStatusHistory` in
    lock-step and pushes a websocket update. Direct writes create phantom history.
@@ -97,6 +110,44 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+10. **`bookDelivery.pickupTime` is a wall-clock `"HH:mm"` string that wraps past midnight —
+    it is not a timestamp.** Both create paths write
+    `moment(...).utcOffset(offset).format("HH:mm")` (`services/delivery/book-delivery.js:104-113`,
+    `services/delivery/delayed-assignment.js:429-435`), and `format("HH:mm")` carries no date,
+    so a 23:50 booking with 25 ready-minutes stores `"00:15"` meaning **tomorrow**. In
+    production 82,414/82,414 rows are strings — never numeric, despite the numeric
+    `deliveryData.pickupTime` minutes the create paths receive and then overwrite — and **1,774
+    have a pickup clock earlier than their own `created` clock**. To get an instant, snap the
+    clock onto `created`’s date and **roll forward a day if it lands before `created`**, and sum
+    `hours*60 + minutes` rather than `set({hour})`, because `routes/order.js:6694` adds
+    `delayMinutes` with no mod-24 and has written `"24:00"`/`"24:06"` (3 rows). Two
+    consequences are already in the data:
+    - `originalPickupTime` (`"HH:mm"`, 823 rows, written only by
+      `POST /api/order/update-delay`, `routes/order.js:6690-6715`) moves `pickupTime` **without
+      recomputing `expectedDeliveryAt`**, so on those rows the stored promise still belongs to
+      the *original* clock. Any check comparing `expectedDeliveryAt` against a pickup clock must
+      use `originalPickupTime || pickupTime`.
+    - The immediate path re-parses the already-wrapped `"HH:mm"` back onto the booking’s own
+      date (`services/delivery/book-delivery.js:191-198`), which for a 23:50 booking lands
+      `expectedDeliveryAt` ~24 hours in the **past** — 284 production rows, 2025-07 to 2025-10,
+      none in 2026 (late-night orders now take the delayed path). Treat
+      `expectedDeliveryAt < created` as unmeasurable; it is impossible by construction.
+    The shared reader that gets all of this right is `services/delivery/late-delivery.js`
+    (`pickupInstantOf`, `parsePromisedEta`) — use it rather than re-deriving.
+11. **`bookDelivery.storeReadyAt` does not exist — nothing writes it, ever.** 0 of 82,414
+    production documents carry the field and no code in any Shoofi repo assigns it. It is not
+    legacy; it was never written. Three report consumers nonetheless read it off a delivery and
+    subtracted store-side delay from the courier’s lateness, so every published “delayed above
+    5 min, **net** of kitchen delay” number was gross and always had been — the subtraction
+    never once fired. The store-ready instant does exist, in `shoofi.orderFlowEvents` as
+    `{ eventType: "status_change", status: "3" }` keyed by
+    `orderNumber === bookDelivery.bookId` (`routes/analytics.js:1136-1154` does this
+    correctly). Removed from `utils/crons/growth-snapshots.js` and `lib/churn-360/signals.js`
+    in shoofi-server `fix/late-delivery-shared-rule`. **Generalise the lesson: before adding a
+    `bookDelivery.<field>` read, confirm something writes it.** `driver`, `company`, `area` and
+    `order` are whole embedded documents, so a wished-for or misspelled field reads as
+    `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
+    runs — which looks identical to a correction that is simply rare.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`

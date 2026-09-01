@@ -19,10 +19,15 @@
         "services/delivery/book-delivery.js",
         "services/delivery/delayed-assignment.js",
         "services/delivery/driver-status-service.js",
-        "services/monitoring/centralized-flow-monitor.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
-        "services/database/DatabaseInitializationService.js"
+        "services/database/DatabaseInitializationService.js",
+        "services/delivery/late-delivery.js",
+        "routes/order.js",
+        "utils/crons/growth-snapshots.js",
+        "lib/churn-360/signals.js",
+        "routes/analytics.js",
+        "services/monitoring/centralized-flow-monitor.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -31,15 +36,35 @@
           "supportedCities",
           "supportedAreas"
         ],
-        "services/delivery/driver-status-service.js": ["setDriverActiveStatus"],
+        "services/delivery/driver-status-service.js": [
+          "setDriverActiveStatus"
+        ],
         "services/driver-shift/shift-service.js": [
           "getPermanentDriverSlotsForDay",
           "assignPermanentDriversToShifts",
           "dayTimeSlots"
         ],
-        "utils/driver-active-hours.js": ["workingDayBounds", "workingHoursWindow", "shiftWindows"],
-        "services/delivery/delayed-assignment.js": ["isPendingAssignment", "assignDriverAt"],
-        "services/delivery/book-delivery.js": ["originalBookId"]
+        "utils/driver-active-hours.js": [
+          "workingDayBounds",
+          "workingHoursWindow",
+          "shiftWindows"
+        ],
+        "services/delivery/delayed-assignment.js": [
+          "isPendingAssignment",
+          "assignDriverAt"
+        ],
+        "services/delivery/book-delivery.js": [
+          "originalBookId"
+        ],
+        "services/delivery/late-delivery.js": [
+          "LATE_THRESHOLD_MIN",
+          "DEFAULT_PICKUP_GRACE_MIN",
+          "LATE_DELIVERY_PROJECTION",
+          "pickupInstantOf",
+          "parsePromisedEta",
+          "reassignmentOf",
+          "classifyDelivery"
+        ]
       },
       "patterns": [
         {
@@ -78,9 +103,14 @@
           "desc": "the pending path's || 30 fallback rescues null/undefined/empty maxETA but not a non-numeric string - the asymmetry with the immediate path is the point"
         },
         {
-          "file": "services/monitoring/centralized-flow-monitor.js",
-          "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
-          "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "useDelayedAssignment:\\s*false",
+          "desc": "the CODE default is off and the code window is 10; production overrides both from delivery-company.delivery-config {type:'driver-assignment'} with true / 15. If this literal ever changes, the CORE note about reading the DB document rather than the constant needs rechecking"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "assignmentWindowMinutes,\\s*'minutes'\\)",
+          "desc": "dispatch is scheduled at pickupTime minus assignmentWindowMinutes - the same quantity the late-delivery grace measures from the other end"
         },
         {
           "file": "services/driver-shift/shift-service.js",
@@ -101,6 +131,46 @@
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "\\.format\\(\"HH:mm\"\\)",
+          "desc": "pickupTime is stored as a bare HH:mm wall clock, which wraps past midnight - it is not a timestamp"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "pickupTimeDate\\.format\\(\"HH:mm\"\\)",
+          "desc": "the pending path stores the same wrapping HH:mm clock"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "originalPickupTime",
+          "desc": "update-delay moves pickupTime and does NOT recompute expectedDeliveryAt, so the stored promise belongs to originalPickupTime"
+        },
+        {
+          "file": "services/delivery/late-delivery.js",
+          "regex": "if \\(pickup\\.isBefore\\(created\\)\\) pickup\\.add\\(1, \"day\"\\)",
+          "desc": "the midnight roll-forward: a pickup clock earlier than the booking means the next day (1,774 rows)"
+        },
+        {
+          "file": "services/delivery/late-delivery.js",
+          "regex": "delivery\\?\\.originalPickupTime \\|\\| delivery\\?\\.pickupTime",
+          "desc": "the zero-minute-promise check reads the clock the promise was actually built from"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "eventType === .status_change. && ev\\.status === .3.",
+          "desc": "the real store-ready source is orderFlowEvents status 3, keyed by orderNumber === bookDelivery.bookId - NOT a bookDelivery.storeReadyAt field, which nothing writes"
+        },
+        {
+          "file": "utils/crons/growth-snapshots.js",
+          "regex": "storeReadyAt",
+          "desc": "the surviving storeReadyAt locals here read order.completedAt / orderFlowEvents, never bookDelivery.storeReadyAt (0 of 82,414 rows) - if a bookDelivery read reappears, the net-of-kitchen-delay lie is back"
+        },
+        {
+          "file": "services/monitoring/centralized-flow-monitor.js",
+          "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
+          "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
         }
       ]
     },
@@ -132,7 +202,10 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "hooks/useAvailableDrivers.ts"],
+      "files": [
+        "consts/shared.ts",
+        "hooks/useAvailableDrivers.ts"
+      ],
       "patterns": [
         {
           "file": "consts/shared.ts",
