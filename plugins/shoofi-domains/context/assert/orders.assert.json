@@ -108,6 +108,16 @@
           "file": "routes/order.js",
           "regex": "originalOrderDate",
           "desc": "/update-delay shifts orderDate and preserves the original (ref §5)"
+        },
+        {
+          "file": "routes/app-logs.js",
+          "regex": "created: new Date\\(\\)",
+          "desc": "apps-logs.created is a real BSON Date — the opposite of orders.created, which is an offset string (CORE: where an order that never happened lives)"
+        },
+        {
+          "file": "routes/app-logs.js",
+          "regex": "user_visit_id",
+          "desc": "the device-id header, the stable installation identity abandoned-cart sessions are keyed on — NOT orders.deviceId"
         }
       ]
     },
@@ -116,9 +126,15 @@
         "consts/shared.ts",
         "stores/cart/index.ts",
         "screens/checkout/index.tsx",
-        "components/checkout/FutureOrderPicker.tsx"
+        "components/checkout/FutureOrderPicker.tsx",
+        "hooks/checkout/use-checkout-validate.ts"
       ],
       "patterns": [
+        {
+          "file": "hooks/checkout/use-checkout-validate.ts",
+          "regex": "checkout_validation_failed",
+          "desc": "checkouts blocked client-side never reach the server as an order (CORE: where an order that never happened lives)"
+        },
         {
           "file": "consts/shared.ts",
           "regex": "ORDER_STATUS",

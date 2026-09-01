@@ -79,6 +79,74 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     exactly what `originalExpectedDeliveryAt` exists to prevent. Delivery owns the reading rule;
     orders owns the fields, and this is the contract between them.
 
+## Where an order that never happened lives
+**There is no server-side cart.** The cart is MobX + AsyncStorage in
+`shoofi-app/stores/cart/index.ts` and nothing about it reaches the server until submit, so
+"the customer built a cart and left" exists ONLY as events in central **`shoofi.apps-logs`**
+(written by `routes/app-logs.js`). Three layers answer "abandoned", an order of magnitude
+apart — always establish which is meant:
+
+1. **Blocked before submit** — `checkout_validation_failed`, `properties.step` ∈
+   {`store_closed`, `store_closed_select_time`, `shipping_method_invalid`, `address_invalid`,
+   `payment_method_invalid`, `car_details_missing`, `future_order_date_missing`}, from
+   `shoofi-app/hooks/checkout/use-checkout-validate.ts`. **"Store closed" and "no delivery
+   available" create NO order document at all** — this is their only record anywhere. The
+   top-level failure in `screens/checkout/index.tsx` sends no `step`, so ~half the rows have
+   none; bucket them rather than dropping them.
+2. **Submitted and never paid** — status `"0"` order rows, per store DB. See the
+   `FAILED_PAYMENT_STATUS` note; that is the only layer carrying an issuer reason.
+3. **Never reached checkout** — `page_viewed` with `properties.page_name` ∈
+   {`ProductAddToCart`, `Cart`} and no `order_submit_success`. Add-to-cart uses
+   `trackPageView`, not `trackEvent`, so it is a `page_viewed` row and easy to miss.
+
+Traps that cost a day if you meet them cold:
+- **`apps-logs.created` is a real BSON `Date`** — the exact opposite of `orders.created`. One
+  query cannot span both, and mixing them matches nothing and raises nothing.
+- **The only indexes are `_id` and `{userId, created}`.** A match on `created` alone is a full
+  scan of a ~4.6 GB collection. Bound `_id` instead (`ObjectId.createFromTime`, widened by a
+  minute and re-filtered on `created`) — index-covered, and roughly 50× faster.
+- **No TTL and no retention job**, so history is complete back to the first event on
+  **2026-02-06**. Anything earlier is *no data*, not zero — report it as null.
+- **No `appName` field on the document**, so a per-store split is impossible from this data.
+  `app_type` is always `"shoofi-shopping"`: the partner and driver apps do not log at all.
+- **The launch event is not a usable "app open".** `ota_check_started` (`trigger: "launch"`,
+  `shoofi-app/hooks/useOTAUpdates.ts`) fires before `userDetailsStore` hydrates, so ~99% of
+  launch rows carry `userId: null`, and it only exists from 2026-07-29.
+- **"Did they actually use it?" = did the device-day emit anything that is NOT `ota_*`.** The
+  OTA hook is the only writer in the client that is not a user action (it fires on mount and
+  on an `AppState` resume, then emits its check/download consequences). There is no background
+  execution path at all — no registered task, no headless JS, no silent-push handler, and the
+  server never sends `content-available` — so nothing runs while the app is away, and an
+  `ota_*`-only device-day is "came to the front, nothing was looked at". Note `page_viewed` is
+  NOT a clean "a screen rendered" proxy: `StoreSelectAuto` fires during boot with no screen,
+  `ProductAddToCart` is a button press, and `Menu1`/`Menu2` sit outside their `isFocused`
+  guard so they fire on blur too (`shoofi-app/screens/menu/menu.tsx`).
+- **`user_visit_id` IS a stable identity** — the `device-id` header, generated once into
+  AsyncStorage and **not cleared on logout** — measured at 97.9% one device per customer. Do
+  not confuse it with `orders.deviceId`, which prefers the per-order `unique_hash` and churns
+  every order.
+- **⚠️ `userId: null` does NOT mean "logged out"** — it means *we did not learn who this was*.
+  `userDetailsStore.userDetails` is in-memory only and filled by a network round-trip, so a
+  fully signed-in customer emits `userId: null` for a whole session in three cases: events
+  fired before that call returns; a token-hydration race where `authStore.isLoggedIn()` is
+  still false when `App.tsx`'s `prepare()` tests it, so `getUserDetails()` is never called at
+  all for that run; and a failed or timed-out call, which is **never retried**. So any
+  "anonymous" figure is an **upper bound**, and must be labelled in devices or sessions rather
+  than people. Resolve identity across the whole (device × business day) — if any event that
+  day carried a `userId`, the day is that customer — which drops measured anonymity from ~99%
+  on the launch event to ~12%. Keep it as a SET: a device can carry two customers in a day.
+- **Impersonation is invisible in this data.** A `master` operator can drive the app as a
+  customer (`shoofi-app/stores/auth/impersonation.ts`) and `trackEvent` sends no impersonation
+  marker, so those sessions are indistinguishable from the real customer's and inflate any
+  unique-user count.
+- **`POST /api/app-logs/insert` is unauthenticated and takes `userId` from the body.** A
+  product metric, never an auditable one.
+- Logging is killable per store via `isAppLogsEnabled`, and the collection handle is bound to
+  `db.driversBonuses` by `DatabaseInitializationService` — always use
+  `db.collection('apps-logs')` explicitly.
+
+Worked example: `services/exec-dashboard/engagement-metrics.js`.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
   cross-check is intentionally disabled. Leave it.
