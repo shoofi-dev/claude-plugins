@@ -56,6 +56,19 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
 2. **Assignment idempotency:** de-dupe on `originalBookId`; the pending→assigned claim is an
    atomic `updateOne({isPendingAssignment:true})` (`matchedCount===0` = another container won).
    Never bypass either.
+   **Delayed assignment is ON in production, and the window is 15 — not the code's 10.**
+   `DEFAULT_CONFIG` in `services/delivery/delayed-assignment.js:17-19` says
+   `useDelayedAssignment: false, assignmentWindowMinutes: 10`; both are overridden by
+   `delivery-company.delivery-config {type:'driver-assignment'}`, which holds
+   `{useDelayedAssignment: true, assignmentWindowMinutes: 15}`. Read the DB document, never
+   the constant. Consequence: the platform is *designed* to dispatch at `pickupTime − 15`
+   (`delayed-assignment.js:483-485`), so "this courier only got twelve minutes' notice" is
+   normal operation rather than an anomaly — 559 of 4,957 completed deliveries in 1–17 Aug
+   2026 reached their first courier under ten minutes before pickup. Any rule that measures
+   notice-before-pickup from the other end (the late-delivery grace,
+   `services/delivery/late-delivery.js`) is measuring the same quantity as
+   `assignmentWindowMinutes` and moves as a step function of it: the lever for that
+   population is the config value, not the report.
 3. **Never write `customers.isActive` directly** — always `setDriverActiveStatus`
    (`services/delivery/driver-status-service.js`), which writes `driverStatusHistory` in
    lock-step and pushes a websocket update. Direct writes create phantom history.
