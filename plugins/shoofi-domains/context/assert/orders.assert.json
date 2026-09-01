@@ -86,6 +86,21 @@
         },
         {
           "file": "routes/order.js",
+          "regex": "originalOrderDate:\\s*order\\.originalOrderDate \\|\\| order\\.orderDate",
+          "desc": "update-delay freezes the pre-delay order date ONCE while orderDate accumulates (CORE invariant 10)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "originalPickupTime:\\s*deliveryRecord\\.originalPickupTime \\|\\| deliveryRecord\\.pickupTime",
+          "desc": "same preserve-once idiom on the bookDelivery row; pickupTime itself accumulates and is NOT wrapped at 24"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "originalExpectedDeliveryAt =\\s*\\n?\\s*deliveryRecord\\.originalExpectedDeliveryAt \\|\\| deliveryRecord\\.expectedDeliveryAt",
+          "desc": "the frozen pre-shift promise - the operand services/delivery/late-delivery.js pairs with originalPickupTime to keep the zero-ETA sentinel readable after a delay"
+        },
+        {
+          "file": "routes/order.js",
           "regex": "updateData\\.startPreparingAt\\s*=",
           "desc": "future accept sets startPreparingAt and does NOT rewrite orderDate (ref §2)"
         },
