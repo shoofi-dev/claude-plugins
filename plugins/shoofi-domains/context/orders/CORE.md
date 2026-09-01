@@ -61,6 +61,19 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    "Is this order for a later day?" must therefore test **both**, **truthily** — as the server
    does (`routes/order.js`: `$or: [{isFutureOrder:{$ne:true}},{isFutureOrder:{$exists:false}}]`).
    Testing `isFutureOrder` alone silently misses every ramadan order.
+10. **`order.storeData` is client-supplied, and `storeData._id` is NOT the store registry
+    `_id`.** On the single-store path it arrives on the request body and is persisted by the
+    `{ ...parsedBodey }` spread (`routes/order.js`); only the twin path fills it server-side
+    from the tenant `db.store.findOne({id:1})` (`routes/twin-order.js`). Either way the `_id`
+    it carries belongs to the **per-tenant `store` collection**, which is a different document
+    from the central `shoofi.stores` registry doc — separate `_id`s, separate edit endpoints
+    (`/api/shoofiAdmin/store/update` vs `/api/shoofiAdmin/store/update/:id`). Checked against
+    production: 0 of 6 sampled stores had matching ids. To identify a store to a client,
+    resolve `appName` → `shoofi.stores` (one `find({appName:{$in:[...]}})`); the homepage
+    `storesMap` is keyed by that registry `_id`, so using `storeData._id` makes every join
+    miss silently. **Never return `storeData` verbatim** from a customer-facing endpoint
+    either: orders predating `sanitizeStoreForPublic` (`routes/store.js`) carry an
+    unsanitised store snapshot that can include `credentials`/`hyp`. Project leaf fields.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant

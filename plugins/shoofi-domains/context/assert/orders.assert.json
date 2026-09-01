@@ -17,7 +17,9 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
-        "docs/customer-orders-snapshot.md"
+        "docs/customer-orders-snapshot.md",
+        "routes/store.js",
+        "routes/shoofi-admin.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -93,6 +95,16 @@
           "file": "routes/order.js",
           "regex": "originalOrderDate",
           "desc": "/update-delay shifts orderDate and preserves the original (ref §5)"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "SENSITIVE_STORE_FIELDS",
+          "desc": "store docs are sanitised only on the way OUT of /api/store, so the storeData snapshot frozen onto older orders is unsanitised - CORE invariant 10 (never return order.storeData verbatim)"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "db\\.store\\.updateOne",
+          "desc": "the TENANT store doc is updated by its own _id, separately from the shoofi.stores registry doc - the two _ids differ (CORE invariant 10)"
         }
       ]
     },
