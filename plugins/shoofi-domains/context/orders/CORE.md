@@ -147,6 +147,58 @@ Traps that cost a day if you meet them cold:
 
 Worked example: `services/exec-dashboard/engagement-metrics.js`.
 
+## Where a customer's coins live — and why "balance" is the wrong question
+Loyalty coins are **central, not per-store**: one `shoofi.customer-coins` document per
+**(customerId, storeAppName)** pair, holding a running `balance`/`totalEarned`/`totalRedeemed`
+*and* the ledger itself in an embedded `transactions[]` array. The collection handle is
+`db.customerCoins` (`services/database/DatabaseInitializationService.js:77`) — a mongosh query
+on `db.customerCoins` hits a **different, empty collection and returns 0 rows silently**. The
+sibling handle `shoofi.coin-transactions` is registered and **does not exist in prod**; there is
+no separate ledger collection. `shoofi.customers.coins[]` does not exist either, which is why
+the growth "coins economy" widget reports 0 (`routes/growth-analytics.js`).
+
+`transactions[].type` ∈ `earn | redeem | expire | refund`. Traps:
+- **`balance` is stale-high — never serve it.** `expireCoins`
+  (`services/coins/coins-service.js`) has **no cron**; it is reachable only from the manual
+  `POST /api/admin/coins/expire`, and has effectively never run — `transactions[].expired` is
+  unset on every earn row in prod, and 15,821 documents currently hold lapsed-but-unburned
+  coins. The spendable figure is `computeAvailableBalance` in
+  **`services/coins/coin-buckets.js`** (pure, no DB, replays the ledger into expiry buckets).
+  Every read path already routes through it.
+- **`getAllCustomerCoins` is a WALLET view, not an earnings view.** It skips a store on
+  `!storeCoinsActive && availableBalance <= 0` and only pushes a row when
+  `availableBalance > 0`. A customer who earned at a store and spent it all produces **no
+  row**: 202 prod documents have `totalEarned > 0` with `balance <= 0`, and for one real
+  30-store customer it hides 11 of their 30 earning stores. For "which stores has this
+  customer earned at", filter `totalEarned > 0` and nothing else. (The admin
+  customer-details "coins" tab does this via `getCustomerEarnedCoinsByStore` /
+  `GET /api/admin/coins/customer/:id/earned`, added on branch
+  `feature/customer-coins-tab` — not on `main` at the time of writing.)
+- **`countDocuments({})` is not "customers with coins".** `getOrCreateCustomerCoins` inserts a
+  zeroed shell on *any* balance read, so ~13,781 of 42,706 prod documents are empty shells.
+- **`type: 'expire'` means two different things**, told apart only by `orderId`: non-null is a
+  **clawback** of that order's own earn (cancelled, or amended down — `refundCoins` /
+  `reconcileOrderCoins`); null is the expiry sweep. All 1,296 prod rows are clawbacks.
+  `totalEarned` is never decremented by one, so an "earned" list that ignores them shows a
+  cancelled order as coins the customer kept.
+- **`transactions[].orderId` is the human order number** (`"7882-4068"`), not an ObjectId, and
+  is **not unique** among earn rows — an upward amendment posts a second `earn` for the same
+  order.
+- **`expiresAt` is a real BSON `Date`** (null = never expires) — the opposite rule from
+  `orders.created`. `customerId` is an ObjectId in 42,706/42,706 prod docs.
+- **`coinsSettings` (`enabled`, `earnPercent`, `coinValue`, `expiryDays`) is on
+  `<appName>.store`, NOT on `shoofi.stores`.** Store names/logos come from `shoofi.stores` in
+  one query; the coin rate needs the per-store DB. Use `getOrInitializeDb`, **not** the local
+  `getStoreDB` helper in `coins-service.js` — that one falls back to the `shoofi` DB for a
+  store it cannot find and will report the *platform* store's coin settings as if they were
+  the store's own.
+- **No historical rate is recorded.** Only `redeem`/`refund` transactions persist a
+  `shekelValue`; an `earn` never does. Any shekel figure for earned coins is restated at the
+  store's *current* `coinValue`. Say so rather than implying it is what the coins were worth
+  at the time.
+- Twin orders earn on **both** legs (`routes/twin-order.js`), so one basket writes two earn
+  rows in two store documents.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
   cross-check is intentionally disabled. Leave it.

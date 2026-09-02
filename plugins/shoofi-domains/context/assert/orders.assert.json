@@ -17,7 +17,10 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
-        "docs/customer-orders-snapshot.md"
+        "docs/customer-orders-snapshot.md",
+        "services/coins/coins-service.js",
+        "services/coins/coin-buckets.js",
+        "services/database/DatabaseInitializationService.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -36,13 +39,43 @@
           "stockDecremented",
           "stockRestored"
         ],
-        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"],
+        "services/coins/coins-service.js": [
+          "getAllCustomerCoins",
+          "getOrCreateCustomerCoins",
+          "expireCoins",
+          "getStoreDB"
+        ],
+        "services/coins/coin-buckets.js": [
+          "computeCoinBuckets",
+          "computeAvailableBalance"
+        ]
       },
       "patterns": [
         {
           "file": "consts/consts.js",
           "regex": "ORDER_STATUS",
           "desc": "authoritative order status enum"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "db\\.customerCoins = db\\.collection\\('customer-coins'\\)",
+          "desc": "the coins collection is really named customer-coins - the db.customerCoins handle is the only thing that maps it, so a mongosh query on the camelCase name silently returns 0 rows"
+        },
+        {
+          "file": "services/coins/coins-service.js",
+          "regex": "if \\(!storeCoinsActive && availableBalance <= 0\\) continue;",
+          "desc": "getAllCustomerCoins is a WALLET view that hides stores spent down to zero - if this guard goes, the CORE warning to use totalEarned > 0 for an earnings view is stale"
+        },
+        {
+          "file": "services/coins/coin-buckets.js",
+          "regex": "return Math\\.max\\(0, balance - expiredUnconsumed\\);",
+          "desc": "spendable balance is the ledger replay, not the stored balance pool - if this changes, so does every coins figure the docs describe"
+        },
+        {
+          "file": "services/coins/coin-buckets.js",
+          "regex": "tx\\.type === 'expire' && tx\\.orderId == null",
+          "desc": "an expire transaction is overloaded - orderId null is the sweep, non-null is a per-order clawback. This branch is the only thing that tells them apart"
         },
         {
           "file": "routes/order.js",
