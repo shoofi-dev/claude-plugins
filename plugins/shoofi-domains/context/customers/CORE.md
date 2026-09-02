@@ -91,6 +91,32 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    (`lib/common.js`). Any new `createdBy`-style provenance must be read from `req.auth` and
    never from the request body; `routes/team-tasks.js` is the reference implementation.
 
+8. **`isBlocked` / `cashRestricted` are THREE-state, and the only record of who/why/when
+   is a note.** Unblocking `$set`s the flag to `false` — it never `$unset`s it
+   (`services/customer/customer-restriction-service.js`), so `shoofi.customers` holds `true`,
+   `false` **and field-absent** at once. Only `isBlocked: true` means blocked;
+   `{ isBlocked: { $exists: true } }` returns every customer who was ever unblocked as well,
+   and `{ isBlocked: false }` misses the majority who were never touched. The "not blocked"
+   test used across the codebase is `{ isBlocked: { $ne: true } }` (`lib/churn-360/compute.js`,
+   `routes/growth-analytics.js`).
+
+   **There is no `blockReason`, `blockedAt` or `blockedBy` field, and no audit collection.**
+   The reason, the admin and the timestamp live in a single `isSystem: true` entry pushed into
+   `customers.notes[]` in the *same* `updateOne` as the flag — `category: "restriction"`,
+   `source: "block" | "unblock" | "cash_restrict" | "cash_unrestrict"`, with `createdAt` a real
+   BSON `Date` (unlike `orders.created`). `applyCustomerRestriction` is the **only** writer of
+   either flag in the whole server; the fraud engine (`routes/order-fraud-detector.js`) and
+   `shoofi.fraudChecks` only ever *read* `isBlocked` to score an order, so **every**
+   `isBlocked: true` is a human click, never an automated flag.
+
+   ⚠️ **A missing note means "old block", not "no reason".** The reason became mandatory only
+   on 2026-08-30; before that, blocking rode on the mass-assigning `POST /api/customer/update`
+   and wrote nothing. Derive a block date from the note rather than adding a field — a new
+   `blockedAt` is equally empty for every pre-existing row, so it buys nothing retroactively.
+   Restriction notes are refused by the note edit/delete handlers (403), so surface the reason
+   **read-only**; an agent who tries to fix a typo in one otherwise gets an error they cannot
+   explain.
+
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
 - **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin

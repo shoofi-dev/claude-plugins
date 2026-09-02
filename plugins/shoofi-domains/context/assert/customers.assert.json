@@ -18,12 +18,22 @@
         "utils/customer-orders.js",
         "docs/customer-orders-snapshot.md",
         "routes/order.js",
-        "package.json"
+        "package.json",
+        "services/customer/customer-restriction-service.js",
+        "lib/churn-360/compute.js"
       ],
       "symbols": {
-        "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
-        "utils/auth-service.js": ["generateJWT", "toAuthJSON"],
-        "utils/app-name-helper.js": ["getCustomerAppName"],
+        "services/database/DatabaseInitializationService.js": [
+          "store-users",
+          "persistent-alerts"
+        ],
+        "utils/auth-service.js": [
+          "generateJWT",
+          "toAuthJSON"
+        ],
+        "utils/app-name-helper.js": [
+          "getCustomerAppName"
+        ],
         "utils/customer-orders.js": [
           "COMPLETED_STATUSES",
           "CANCELLED_STATUSES",
@@ -38,7 +48,16 @@
           "attributeCustomerToReferrer",
           "recordFirstOrderForReferrer"
         ],
-        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store"]
+        "routes/customer.js": [
+          "validateAuthCode",
+          "authCode",
+          "switch-store"
+        ],
+        "services/customer/customer-restriction-service.js": [
+          "RESTRICTION_ACTIONS",
+          "applyCustomerRestriction",
+          "buildRestrictionNote"
+        ]
       },
       "patterns": [
         {
@@ -110,11 +129,39 @@
           "file": "routes/order.js",
           "regex": "created: moment\\(new Date\\(\\)\\)\\.utcOffset\\(offsetHours\\)\\.format\\(\\)",
           "desc": "orders.created - and the customers.orders[] snapshot of it - is an ISO string with an Israel offset, the opposite type from customers.created on the same document"
+        },
+        {
+          "file": "services/customer/customer-restriction-service.js",
+          "regex": "set: \\{ isBlocked: false \\}",
+          "desc": "unblocking $sets the flag to false and never $unsets it - so isBlocked is three-state (true / false / absent) and only === true means blocked"
+        },
+        {
+          "file": "lib/churn-360/compute.js",
+          "regex": "isBlocked: \\{ \\$ne: true \\}",
+          "desc": "the codebase-wide 'not blocked' test is $ne true, not $exists or false - because of the three states above"
+        },
+        {
+          "file": "services/customer/customer-restriction-service.js",
+          "regex": "RESTRICTION_NOTE_CATEGORY = \"restriction\"",
+          "desc": "the reason/who/when for a block lives in a customers.notes[] entry under category 'restriction' - there is no blockReason or blockedAt field"
+        },
+        {
+          "file": "services/customer/customer-restriction-service.js",
+          "regex": "isSystem: true",
+          "desc": "restriction notes are system notes, and the note edit/delete handlers 403 those - the reason is an immutable audit record, surface it read-only"
+        },
+        {
+          "file": "services/customer/customer-restriction-service.js",
+          "regex": "\\$set: actionSpec\\.set,[\\s\\S]{0,80}\\$push: \\{ notes:",
+          "desc": "the flag and its reason are written in ONE updateOne, so they can never diverge - do not split them into two writes"
         }
       ]
     },
     "shoofi-partner": {
-      "files": ["stores/auth/index.ts", "stores/user-details/index.tsx"],
+      "files": [
+        "stores/auth/index.ts",
+        "stores/user-details/index.tsx"
+      ],
       "patterns": [
         {
           "file": "stores/auth/index.ts",
