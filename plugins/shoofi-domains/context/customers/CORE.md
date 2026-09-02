@@ -117,6 +117,19 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    **read-only**; an agent who tries to fix a typo in one otherwise gets an error they cannot
    explain.
 
+   ⚠️ **The two restrictions write TWO INDEPENDENT notes — never read only the newest.** Block
+   and cash are separate `RESTRICTION_ACTIONS` entries, so a customer who is both blocked and
+   cash blocked has one `source: "block"` note *and* one `source: "cash_restrict"` note. Reading
+   `notes[]` with `{ $slice: 1 }` — tempting, since the `$push` uses `$position: 0` — silently
+   returns whichever was written last and drops the other reason entirely. Project `notes` whole
+   and pick the newest note **per source pair**; it is cheap, because these notes are rare (50
+   notes across all 125 restricted customers, at most 2 each; platform-wide maximum is 4).
+
+   Within a pair, rank by `createdAt` rather than by array position, and check which end you
+   landed on: if the newest of `block`/`unblock` is the **`unblock`**, then the flag being `true`
+   was not set through the service, so there is **no current reason** — showing the reason from a
+   block that was already lifted is worse than showing nothing.
+
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
 - **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin

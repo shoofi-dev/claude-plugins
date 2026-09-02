@@ -154,6 +154,16 @@
           "file": "services/customer/customer-restriction-service.js",
           "regex": "\\$set: actionSpec\\.set,[\\s\\S]{0,80}\\$push: \\{ notes:",
           "desc": "the flag and its reason are written in ONE updateOne, so they can never diverge - do not split them into two writes"
+        },
+        {
+          "file": "services/customer/customer-restriction-service.js",
+          "regex": "block: \\{[\\s\\S]{0,200}cash_restrict: \\{",
+          "desc": "block and cash are two independent actions, so a customer restricted both ways has TWO restriction notes - reading notes[] with $slice 1 silently drops one of the two reasons"
+        },
+        {
+          "file": "services/customer/customer-restriction-service.js",
+          "regex": "\\$push: \\{ notes: \\{ \\$each: \\[note\\], \\$position: 0 \\} \\}",
+          "desc": "notes are pushed at position 0, which is what makes $slice 1 look safe - rank the per-source pair by createdAt instead, and treat a newest 'unblock' as no current reason rather than reusing the lifted block's reason"
         }
       ]
     },
