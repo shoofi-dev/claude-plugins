@@ -113,6 +113,11 @@
           "desc": "orders.created - and the customers.orders[] snapshot of it - is an ISO string with an Israel offset, the opposite type from customers.created on the same document"
         },
         {
+          "file": "routes/order.js",
+          "regex": "const \\{ addresses: _addresses, \\.\\.\\.customerWithoutAddresses \\} = customer;",
+          "desc": "CORE invariant 8: order creation rewrites the WHOLE customer document from a read taken ~25 awaits earlier, and excludes only `addresses` - so the embedded notes[] array is replaced wholesale and any note added in that window is destroyed silently. If notes is ever destructured out here too, the invariant's warning needs rewriting"
+        },
+        {
           "file": "routes/customer.js",
           "regex": "\\$push: \\{[\\s\\S]{0,80}notes: \\{",
           "desc": "customer notes are an embedded notes[] array on shoofi.customers - there is no notes collection, and routes/notes.js is an unrelated cityAreas announcement feature"

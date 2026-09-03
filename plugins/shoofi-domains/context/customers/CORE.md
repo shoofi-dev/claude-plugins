@@ -99,6 +99,32 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    an ObjectId — the DELETE handler `$pull`s on it — and `notes[].createdAt` is a real BSON
    `Date` (invariant 5's string/Date split applies here too).
 
+   **⚠️ A NOTE CAN BE DESTROYED SILENTLY, AND `notes[]` MUST NOT BE BUILT ON.** Because it is
+   embedded, it is caught by every whole-document rewrite of the customer — and there are
+   seven. The worst is **order creation**: `routes/order.js` reads the customer, does ~25
+   awaits of real work (coins, stock, coupon issuance *with an SMS send*, the order insert,
+   fraud checks), then writes back `$set: { ...customerWithoutAddresses, orders: [...] }`.
+   **Only `addresses` is destructured out — `notes` rides along**, so the array is replaced
+   with a snapshot read seconds earlier and anything added in that window is gone. The six in
+   `routes/customer.js` (OTP-request, OTP-verify, update-name, `/api/customer/update`, …) do
+   the same with a shorter window; note that OTP-verify's runs through
+   `utils/auth-service.js` `toAuthJSON`, which re-spreads the user, so the window there spans
+   a JWT mint and its own DB round-trip.
+
+   The loss is conditional in the way that hides it: `$set` only touches `notes` when the read
+   document **had** the key, so **a customer's FIRST note always survives and every note after
+   it is at risk**. The feature reads as working. It also silently clobbers the `isSystem`
+   block/cash-restriction audit notes below.
+
+   Consequences for any new work: **do not park a note-like history on the customer document**
+   — put it in its own collection, one document per entry, as
+   `services/customer-case-notes/case-notes.js` does for the churn-360 and deletion-request
+   work queues. And note the notes API has **no bulk read**, so a "latest note + count" column
+   on any list screen is one request per row unless you build one. Fixing `notes[]` properly
+   means converting those seven whole-document rewrites into targeted `$set`s, which crosses
+   into `routes/order.js` (do-not-touch, and the `orders` domain's) — a bigger change than
+   whatever feature surfaced it, so scope it deliberately rather than as a side effect.
+
    **A note with `isSystem: true` is an audit record and must stay immutable.** The block and
    cash-restriction routes write one on every change, via
    `services/customer/customer-restriction-service.js`; the note PUT and DELETE handlers refuse
