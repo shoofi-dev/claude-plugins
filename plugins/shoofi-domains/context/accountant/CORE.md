@@ -106,6 +106,39 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `true`), or the regenerated report silently drops those amounts.
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
+   **A driver report carries UP TO TWO company invoices, and absence is not failure.**
+   `POST /api/hyp/admin/driver-reports/:reportId/create-company-invoice`
+   (`routes/hyp.js:3555`) issues both on the company's behalf, onto three *different*
+   field prefixes on the same `shoofi.driver-reports` doc — easy to invert:
+   - `hypCompanyInvoice*` — invoice 1, credit card (`אשראי`), only when
+     `reportData.earningsByCreditCard > 0` (`:3638`).
+   - `hypCompanyAdditionsInvoice*` — invoice 2, coupons/bonuses/compensations, only when
+     `totalCompensations + totalBonuses − totalDriverCharges + earningsByCoupons +
+     totalMinGuaranteeTopUp > 0` (`:3603-3608`). Note `totalMinGuaranteeTopUp`: the older
+     `invoiceAmountAbove9999` filter omits it, so the two disagree.
+   - `hypInvoice*` — Shoofi → company, a different direction entirely, and **unreachable
+     from the admin web** (no call site).
+   Both ≤ 0 → HTTP 400 and **no invoice at all** (`:3610`), which is correct, not a miss.
+   So "missing an invoice" is always **expected-and-absent**; a bare
+   `{hypCompanyInvoicePdfLink: {$exists: false}}` flags every quiet month — 341 of 341
+   reports vs the 38 genuinely missed (2026-09-03). One definition lives in
+   `utils/driver-invoice-status.js` (a Mongo `$expr` and plain JS, tested against each
+   other) and backs `?missingInvoice=` on `GET /api/driver-reports/admin/reports` —
+   reuse it rather than re-deriving the amounts.
+   There is **no GreenInvoice path for driver reports**; `greenInvoiceUrl`/`greenInvoiceId`
+   are written only on `storeReports`, which is why `.../send-invoice`
+   (`routes/driver-reports.js:1551`) gates on a field that never exists and is dead — the
+   live send is `routes/hyp.js:4004`.
+   **`invoiceSent` / `invoiceReceived` are NOT invoice records** — they are manual
+   accountant checkboxes toggled by `PUT .../update-status`. Never read either as
+   "an invoice exists".
+   **OPEN — partial creation is a dead end.** Both HYP calls run before the single `$set`
+   (`:3718`), and the create guard rejects when **either** link already exists (`:3565`).
+   If invoice 1 succeeds and invoice 2 throws, nothing persists — the report looks
+   untouched while HYP already holds invoice 1, and a retry re-issues it. Persisted the
+   other way round, the missing invoice can never be created from the UI at all.
+   Production had 0 such rows at 2026-09-03 (341 reports). Do not "fix" this by loosening
+   the guard — ask.
 7. **A store's coupon cost (`reportData.campaigns`) is the coupon's NOMINAL
    `storeDiscount`, never the waiver the customer actually got**, and the gate that
    decides it is **blind to `discountType`** (`routes/payments/admin.js:1135-1142`,

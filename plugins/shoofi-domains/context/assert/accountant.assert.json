@@ -13,7 +13,8 @@
         "lib/payments/calc.js",
         "utils/vat.js",
         "utils/greeninvoice.js",
-        "utils/invoice-provider.js"
+        "utils/invoice-provider.js",
+        "utils/driver-invoice-status.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -39,7 +40,15 @@
           "generateStoreReportData",
           "totalForTransfer"
         ],
-        "utils/invoice-provider.js": ["getActiveProvider"]
+        "utils/invoice-provider.js": [
+          "getActiveProvider"
+        ],
+        "utils/driver-invoice-status.js": [
+          "buildMissingInvoiceExpr",
+          "getInvoiceStatus",
+          "getExpectedInvoiceAmounts",
+          "MISSING_INVOICE_MODES"
+        ]
       },
       "patterns": [
         {
@@ -101,6 +110,26 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "additionsAmount\\s*=\\s*compensations\\s*\\+\\s*bonuses\\s*-\\s*driverCharges\\s*\\+\\s*coupons\\s*\\+\\s*minGuarantee",
+          "desc": "invoice 2 of a driver report (coupons/bonuses/compensations) is issued on exactly this total — utils/driver-invoice-status.js mirrors it for the missingInvoice filter, so if a term moves here the filter starts calling reports missing that never owed an invoice (note minGuarantee, which the older invoiceAmountAbove9999 filter omits)"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "if\\s*\\(creditCardAmount\\s*<=\\s*0\\s*&&\\s*additionsAmount\\s*<=\\s*0\\)",
+          "desc": "both amounts non-positive means NO invoice is produced at all, which is correct rather than a miss — this is why \"missing an invoice\" must be expected-and-absent, never a bare $exists check on the pdf link"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "if\\s*\\(report\\.hypCompanyInvoicePdfLink\\s*\\|\\|\\s*report\\.hypCompanyAdditionsInvoicePdfLink\\)",
+          "desc": "create-company-invoice refuses when EITHER of the two links already exists, so a report with one invoice issued and the other still owed cannot be completed from the admin UI (and the list's create button must be hidden for it)"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "buildMissingInvoiceExpr\\(req\\.query\\.missingInvoice\\)",
+          "desc": "the missing-invoice filter on the driver reports list is served from the shared definition in utils/driver-invoice-status.js, not an inline query — keep it that way so the filter and the per-row invoiceStatus badge cannot disagree"
         }
       ]
     }
