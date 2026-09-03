@@ -157,6 +157,19 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    *(Do not mirror `admin.js:907-944` either — that is the legacy `/stores-export`
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
+8. **`createCouponFromTemplate` writes a WHITELIST, not your template**
+   (`routes/coupon.js`, the `couponDoc` literal). Every field it emits is named
+   explicitly; the only extras that survive are `isFreeDelivery`, `createdBy` and
+   `options.campaignId`, each behind its own opt-in spread so existing callers' documents
+   stay byte-for-byte what they were. A marker field put on the template — `source`,
+   `churnGift`, a ticket id — is dropped **silently**, and the coupon it mints is then
+   indistinguishable from every other customer-specific one: there is no field to filter
+   on and no error to notice. This matters here because every admin-issued giveaway
+   (compensations, campaigns, win-backs) goes through this function, and "how much did we
+   hand out through X" is a settlement question. If a caller needs its coupons traceable,
+   either extend that literal deliberately or record the **code** on the caller's own
+   document — `routes/admin/coupon-campaigns.js` keeps it on `campaignPhones.couponCode`,
+   the churn-360 gift keeps it on `churn-support-cases.giftCoupon`.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
