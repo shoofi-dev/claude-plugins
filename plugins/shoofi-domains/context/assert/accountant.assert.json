@@ -93,6 +93,26 @@
           "desc": "CORE invariant 7: a percentage-type coupon bills the store a percentage of the ITEMS subtotal even when its discountType is 'delivery' — couponDeliverySplit deliberately diverges and takes the share off order.shippingPrice instead (owner ruling 2026-08-12)"
         },
         {
+          "file": "routes/hyp.js",
+          "regex": "const\\s+totalForInvoice\\s*=\\s*creditCardRevenue\\s*\\+\\s*driveInCreditCard\\s*;",
+          "desc": "CORE invariant 8: the store->Shoofi credit-card invoice is issued for creditCardRevenue + driveInCreditCard, and is refused when that sum is <= 0 — so a period with no card revenue is NOT missing an invoice, it was never meant to have one"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "const\\s+totalForInvoice\\s*=\\s*reportData\\.totalOutcomes\\s*\\|\\|\\s*0\\s*;",
+          "desc": "CORE invariant 8: the Shoofi->store commission invoice is issued for totalOutcomes and refused when it is <= 0 — 'missing' must mean expected-and-absent, never bare absence"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "greenInvoiceId:\\s*invoiceResult\\.invoiceId",
+          "desc": "CORE invariant 8: the GreenInvoice era marks the commission invoice with greenInvoiceId and never writes invoiceProvider — any presence check must OR greenInvoiceId with hypInvoicePdfLink or it reports every GreenInvoice-era report as missing"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "if\\s*\\(!report\\.hypStoreInvoicePdfLink\\)",
+          "desc": "CORE invariant 8: send-invoice refuses to send unless BOTH invoices exist, so a report with only one is silently stuck and needs surfacing"
+        },
+        {
           "file": "routes/admin/masav.js",
           "regex": "CP862|cp862",
           "desc": "MASAV DOS-Hebrew encoding"

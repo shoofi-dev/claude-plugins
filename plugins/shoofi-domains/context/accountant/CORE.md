@@ -157,6 +157,26 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    *(Do not mirror `admin.js:907-944` either — that is the legacy `/stores-export`
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
+8. **"Does this report have its invoice?" — two markers per side, and `invoiceProvider`
+   is not one of them.** A `shoofi.store-reports` doc carries up to two tax documents, in
+   opposite directions: store→Shoofi credit-card sales (`hypStoreInvoicePdfLink`, HYP
+   only) and Shoofi→store commission and fees (`greenInvoiceId` **or**
+   `hypInvoicePdfLink`, depending on the era it was issued in). The commission side
+   **must OR both fields** — `invoiceProvider` is written only by the HYP path
+   (`routes/hyp.js`), so it is absent on every GreenInvoice-era report and a check keyed
+   off it reports them all as missing (387 of 1211 in production).
+   **"Missing" is EXPECTED-and-absent, never bare absence.** Each create endpoint refuses
+   a zero-amount document: commission needs `reportData.totalOutcomes > 0`
+   (`routes/payments/admin-reports.js` create-invoice, `routes/hyp.js`), credit-card needs
+   `creditCardRevenue + driveInCreditCard > 0` (`routes/hyp.js` create-store-invoice).
+   Counting bare absence flags every quiet period as a missed invoice (306 rows vs 197 in
+   production) and invites force-issuing a bogus tax document. The rule lives once in
+   `utils/store-report-invoice-status.js`, with `utils/driver-invoice-status.js` as its
+   delivery-company twin — reuse them rather than re-deriving.
+   **Nothing is persisted when a create call fails**, and cancel/reset `$unset` the fields
+   again, so missed, failed and cancelled-not-reissued are indistinguishable. Absence
+   answers "which are missing", never "why". Note `send-invoice` (`routes/hyp.js`) refuses
+   to send unless **both** exist, so a one-sided report is silently stuck.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
