@@ -13,7 +13,8 @@
         "lib/payments/calc.js",
         "utils/vat.js",
         "utils/greeninvoice.js",
-        "utils/invoice-provider.js"
+        "utils/invoice-provider.js",
+        "utils/invoice-allocation.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -39,7 +40,12 @@
           "generateStoreReportData",
           "totalForTransfer"
         ],
-        "utils/invoice-provider.js": ["getActiveProvider"]
+        "utils/invoice-provider.js": ["getActiveProvider"],
+        "utils/invoice-allocation.js": [
+          "INVOICE_ALLOCATION_THRESHOLD",
+          "INVOICE_ALLOCATION_THRESHOLD_GROSS",
+          "requiresAllocationNumber"
+        ]
       },
       "patterns": [
         {
@@ -91,6 +97,21 @@
           "file": "routes/payments/admin.js",
           "regex": "discountAmount\\s*=\\s*\\(storeDiscount\\s*/\\s*100\\)\\s*\\*\\s*orderPrice",
           "desc": "CORE invariant 7: a percentage-type coupon bills the store a percentage of the ITEMS subtotal even when its discountType is 'delivery' — couponDeliverySplit deliberately diverges and takes the share off order.shippingPrice instead (owner ruling 2026-08-12)"
+        },
+        {
+          "file": "utils/invoice-allocation.js",
+          "regex": "INVOICE_ALLOCATION_THRESHOLD_GROSS\\s*=\\s*\\n?\\s*INVOICE_ALLOCATION_THRESHOLD\\s*\\*\\s*VAT_MULTIPLIER",
+          "desc": "CORE invariant 8: the allocation ceiling is stated BEFORE VAT and converted once — if this becomes a bare literal, the gate silently starts blocking gross amounts ~18% too early again"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "requiresAllocationNumber\\(totalForInvoice,\\s*isExempt\\)",
+          "desc": "CORE invariant 8: the create-store-invoice gate weighs totalForInvoice (credit-card + drive-in revenue, VAT-inclusive) through the shared pre-VAT helper — never the payout balance, and never a raw comparison against 4999"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "reportData\\.totalForInvoice'\\]\\s*=\\s*\\{\\s*\\$gt:\\s*INVOICE_ALLOCATION_THRESHOLD_GROSS",
+          "desc": "CORE invariant 8: the report-list filter must bound the SAME number the routes/hyp.js guard does, or the admin worklist lists stores the server will happily invoice"
         },
         {
           "file": "routes/admin/masav.js",

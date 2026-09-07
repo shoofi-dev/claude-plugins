@@ -157,6 +157,29 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    *(Do not mirror `admin.js:907-944` either — that is the legacy `/stores-export`
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
+8. **The tax-authority allocation gate weighs `totalForInvoice`, and the ceiling is
+   PRE-VAT** (`utils/invoice-allocation.js`, used by `routes/hyp.js`
+   create-store-invoice and by the report-list filter in
+   `routes/payments/admin-reports.js`). Two things people get wrong here:
+   - **It is not the payout.** The number compared is
+     `reportData.totalForInvoice = creditCardRevenue + driveInCreditCard` — gross of
+     commission, cash-free, and **not** `totalForTransfer`/`balance`, which is what the
+     "סכום להעברה" column and MASAV use. The store invoices Shoofi for exactly the
+     compared figure (`createInvoiceOnBehalf({ amount: totalForInvoice })`).
+   - **The stored figure is VAT-inclusive; the ceiling is not.** `totalForInvoice` is
+     what the customer was billed (`vat_type: 'INC'` in `utils/hyp.js`), while the
+     allocation ceiling (מספר הקצאה, currently **4999**) is defined on the amount
+     before tax. `requiresAllocationNumber` therefore bounds the gross value at
+     `4999 × 1.18 = 5898.82`, which is the same condition as `gross ÷ 1.18 > 4999` but
+     is a plain numeric bound, so the route guard and the Mongo filter cannot drift.
+     Comparing the gross figure directly against 4999 — as the code did until
+     2026-09-07 — blocks ~18% too early; it was holding 35 of the 211 over-ceiling
+     `shoofi.store-reports` rows for no reason.
+   The gate is **skipped entirely for `exempt`** stores (receipt, docType 300, never
+   needs allocation) and **fails open** if the EZcount distributor lookup throws. There
+   is deliberately **no equivalent gate on the delivery-company invoice route**
+   (`create-company-invoice`), and the driver-report list filter is labelled 4999 while
+   querying 9999 (`routes/driver-reports.js`) — both are known, neither is this rule.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
