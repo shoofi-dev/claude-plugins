@@ -64,6 +64,30 @@ boundary and say so in the PR.
   users (so add the row first, or pass a `defaultValue`), and the widespread trick of using
   the **Arabic text itself as the key** reads fine but is **not language-aware** — there is no
   `he` row for an Arabic-prose key, so a Hebrew user sees Arabic.
+- ⚠️ **…but a screen *full* of raw keys almost never means the rows are missing — it
+  means i18next never loaded at all.** The **entire** UI string set (962 rows, ~72KB) arrives
+  from one call at cold start, `GET /api/getTranslations`, and the client has no bundled copy
+  to fall back on — so that single request is a single point of failure for every word in the
+  three mobile apps. Field reports in 2026-08/09 from partner and driver users showed screens
+  of slugs (`pickup-time`, `price-details`, `order-list`, `order-status-assigned`,
+  `payment-method-card`); **all 21 of them had correct `ar` *and* `he` rows** in
+  `shoofi.translations`. Query the collection before seeding anything.
+  The two cases look alike and are told apart like this:
+  - **the whole screen is raw, yet some Arabic still renders** → total i18n failure. Every
+    survivor is an Arabic *literal hardcoded in the source* — `'شغال'` in
+    `shoofi-shoofir/components/delivery-driver/DeliveryDriverHeader.tsx:111`, `t("مفتوح")` in
+    `shoofi-partner/components/layout/header/header.tsx:910`, the local table in
+    `shoofi-partner/screens/admin/store-analytics/strings.ts` — not translations. That is what
+    makes a total outage read as a *partial* one in a screenshot, and it is the trap.
+  - **some `t()` keys on a screen resolve and others on the same screen do not** → genuinely
+    missing rows, i.e. the bullet above.
+  Cause of the 2026-08/09 reports, for reference: `.init()` lived *inside* `setTranslations`
+  (so until the payload landed there was no instance registered with react-i18next at all,
+  and in react-i18next 15 `useTranslation()` in that state returns a key-echoing `t` that
+  never subscribes), and the fetch's rejection was swallowed into a `console.log` — no cache,
+  no retry. Fix pushed 2026-09-07 as `fix/translations-load-cache-and-eager-i18n-init` on both
+  `shoofi-partner` and `shoofi-shoofir`; **unmerged at the time of writing**, so check before
+  assuming it is in the build a reporter is running.
 - **FACT (dead code, leave it):** `shoofi-partner/translations/languages/ar.json` and `he.json`
   are **not** the live strings. `translations/index-x.ts` loads them into a variable it never
   uses and exports a bare `{}` with no `.t()`; its four importers reference the symbol only on

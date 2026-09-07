@@ -49,6 +49,44 @@
           "desc": "an empty value echoes the key; with no fallbackLng client-side a missing key renders as the key (doc CORE)"
         }
       ]
+    },
+    "shoofi-partner": {
+      "files": [
+        "translations/i18n.ts",
+        "translations/index-x.ts",
+        "stores/translations/index.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "stores/translations/index.tsx",
+          "regex": "TRANSLATIONS_API\\.GET_TRANSLATIONS",
+          "desc": "the entire UI string set arrives from this one cold-start call and there is no bundled fallback, so a failed fetch shows raw keys app-wide (doc CORE)"
+        },
+        {
+          "file": "translations/index-x.ts",
+          "regex": "languages/ar\\.json",
+          "desc": "the bundled ar/he JSON is reachable only from this dead module, not from the live t() path (doc CORE)"
+        }
+      ]
+    },
+    "shoofi-shoofir": {
+      "files": [
+        "translations/i18n.ts",
+        "translations/index-x.ts",
+        "stores/translations/index.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "stores/translations/index.tsx",
+          "regex": "TRANSLATIONS_API\\.GET_TRANSLATIONS",
+          "desc": "the entire UI string set arrives from this one cold-start call and there is no bundled fallback, so a failed fetch shows raw keys app-wide (doc CORE)"
+        },
+        {
+          "file": "translations/index-x.ts",
+          "regex": "languages/ar\\.json",
+          "desc": "the bundled ar/he JSON is reachable only from this dead module, not from the live t() path (doc CORE)"
+        }
+      ]
     }
   }
 }
