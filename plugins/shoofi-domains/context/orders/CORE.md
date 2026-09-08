@@ -147,6 +147,47 @@ Traps that cost a day if you meet them cold:
 
 Worked example: `services/exec-dashboard/engagement-metrics.js`.
 
+## "We sent the notification" is not evidence that anyone got it
+Three artefacts look like delivery receipts and none of them are. When a store reports "we
+were never told about the order", do not close it on any of these:
+
+- **`shoofi.notifications`** — written by `services/notification/notification-service.js:
+  createNotificationRecord`, **before** any channel is attempted, and its `deliveryStatus`
+  ({websocket, push, email, sms}) is set to `"pending"` and **never updated by anything**. A
+  row here means "we decided to notify", nothing more.
+- **`shoofi.orderFlowEvents` `notification_push_sent`** — this is the transport's own verdict,
+  and until 2026-09-08 the transport always said yes. `sendExpoPushNotification` collected
+  Expo's per-message tickets and inspected none of them, so a ticket carrying
+  `status: "error"` (`DeviceNotRegistered`, `MessageRateExceeded`, `InvalidCredentials` —
+  none of which throw) was recorded as a success. It now returns `success: false` and the
+  caller writes `notification_push_failed`, but **`getPushNotificationReceiptsAsync` is still
+  never called**, so an error that only surfaces in Expo's async receipt is still invisible,
+  and every event written before 2026-09-08 is unreliable. Treat a 0.0x% historical failure
+  rate as the absence of measurement, not as a healthy channel.
+- **A missing token is a silent skip.** `notification-service.js` guards the push on
+  `channels.push && user.notificationToken` with no `else` and no log. A store user or driver
+  with no token produces no push, no failure and no line anywhere. The token is one string on
+  the identity doc (`shoofi.store-users` for partners, `delivery-company.customers` for
+  drivers) and the clients only register it **on login**, so once it is gone nothing puts it
+  back until someone signs out and in.
+
+The store-side repeat is `utils/persistent-alerts.js`: **five reminders, spaced five minutes
+apart** by `REMINDER_INTERVAL_MS`, then the alert is silent forever regardless of whether the
+order was accepted. (Before 2026-09-08 the interval condition was commented out and all five
+fired on five consecutive minutes — any alert record older than that with `reminderCount: 5`
+and `lastReminderSent` within five minutes of `createdAt` is a symptom, not a healthy alert.)
+Records live at most 24h — `persistent-alerts-cron.js` deletes older ones, `pending` included
+— so this collection cannot answer a question about last week.
+
+On the tablet, the loud alarm and the quiet one are different code paths and only the loud
+one is the alarm stores mean: `shoofi-partner/utils/notification/index.ts:
+schedulePushNotification` (`store.wav`) is fired **only** from the 30-second poll in
+`hooks/use-notifications.ts`, for order ids the persisted ledger has not rung for; the
+websocket `notification` frame raises `showLocalNotification` with `sound: "default"`. And on
+Android 8+ sound is bound to the notification **channel** created at build time, while the
+server sends `sound` per message with no `channelId` — so "no notification" from a store very
+often means "it arrived without a noise".
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
   cross-check is intentionally disabled. Leave it.

@@ -162,13 +162,22 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   directly — `sendStoreOwnerNotifications` (`routes/order.js:843`) delegates to
   `utils/persistent-alerts.js`, which inserts a `shoofi.persistentAlerts` doc and
   **keeps re-pushing it once a minute until the partner accepts the order**.
-  `persistent-alerts-cron` runs on `*/1 * * * *`, and `sendReminders`' throttle
-  (`lastReminderSent`) is **commented out** (`utils/persistent-alerts.js:271`), so the
-  only brake is `reminderCount < 5` — i.e. 5 pushes a minute apart, per store user, not
-  the 5-minute spacing `reminderInterval` on the record implies. `clearPersistentAlert`
-  (on `isViewd`) is what stops it. If you are asked why a store gets the same
-  notification five times, this is why, and it is the `persistentAlerts` collection —
-  not `notifications` — that holds the pending state.
+  `persistent-alerts-cron` runs on `*/1 * * * *`, but `sendReminders` sends at most
+  `MAX_REMINDERS` (5) and only when the last one is older than `REMINDER_INTERVAL_MS`
+  (5 minutes) — so 5 pushes over ~25 minutes, per store user, and then **silence
+  forever whether or not the order was ever accepted**. ⚠️ Until 2026-09-08 that
+  interval condition was commented out and `reminderCount < 5` was the only brake, so
+  the whole quota burned on five consecutive minutes; any historical alert with
+  `reminderCount: 5` and `lastReminderSent` within five minutes of `createdAt` dates
+  from before the fix. `lastReminderSent` was also written as a serialised **moment**
+  (`{_isAMomentObject, _d}`) rather than a Date back then — the query still accepts
+  that shape, and it is why the dead filter had to reach into `._d`.
+  `clearPersistentAlert` (on `isViewd`) is what stops it early. If you are asked why a
+  store gets the same notification five times, this is why, and it is the
+  `persistentAlerts` collection — not `notifications` — that holds the pending state.
+  Note the collection is `shoofi.persistent-alerts` on disk (`db.persistentAlerts` is
+  only the code handle), and `persistent-alerts-cron` deletes anything older than 24h,
+  `pending` included — so it cannot answer a question about last week.
 - **FRAUD**: `order-fraud-*`, `fraud-config-loader`, `fraud-check-storage` →
   `shoofi.fraudChecks`/`deviceCustomers`/`ipCustomers`.
 - **GROWTH/COINS (secondary)**: `coinsService`, `worldCupService`, attribution — must never fail the order.

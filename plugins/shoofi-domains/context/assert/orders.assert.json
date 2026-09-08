@@ -17,7 +17,8 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
-        "docs/customer-orders-snapshot.md"
+        "docs/customer-orders-snapshot.md",
+        "services/notification/notification-service.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -36,7 +37,9 @@
           "stockDecremented",
           "stockRestored"
         ],
-        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+        "utils/customer-orders.js": [
+          "getSuccessfulOrdersByCustomerIds"
+        ]
       },
       "patterns": [
         {
@@ -56,8 +59,8 @@
         },
         {
           "file": "utils/persistent-alerts.js",
-          "regex": "//\\s*\\{ \"lastReminderSent\\._d\": \\{ \\$lt: oneMinuteAgo \\}",
-          "desc": "the reminder throttle is still commented out, so reminderCount < 5 is the only brake - when this is uncommented the per-minute claim in reference.md must be corrected"
+          "regex": "lastReminderSent\\._d",
+          "desc": "the reminder query still accepts the legacy serialised-moment shape written before 2026-09-08; drop it only once no such alert documents can remain (they live 24h)"
         },
         {
           "file": "consts/consts.js",
@@ -118,6 +121,21 @@
           "file": "routes/app-logs.js",
           "regex": "user_visit_id",
           "desc": "the device-id header, the stable installation identity abandoned-cart sessions are keyed on — NOT orders.deviceId"
+        },
+        {
+          "file": "services/notification/notification-service.js",
+          "regex": "ticket\\.status === .error.",
+          "desc": "Expo per-message tickets ARE inspected — an errored ticket must not be recorded as a delivered push"
+        },
+        {
+          "file": "services/notification/notification-service.js",
+          "regex": "deliveryStatus",
+          "desc": "shoofi.notifications carries a deliveryStatus that is written pending and never updated — a row is not a delivery receipt"
+        },
+        {
+          "file": "utils/persistent-alerts.js",
+          "regex": "REMINDER_INTERVAL_MS",
+          "desc": "store reminders are SPACED by this interval; without it all five fire on five consecutive minutes and the alert goes silent forever"
         }
       ]
     },
@@ -163,12 +181,27 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "stores/orders/index.tsx"],
+      "files": [
+        "consts/shared.ts",
+        "stores/orders/index.tsx",
+        "hooks/use-notifications.ts",
+        "stores/new-order-alerts/index.ts"
+      ],
       "patterns": [
         {
           "file": "consts/shared.ts",
           "regex": "ORDER_STATUS",
           "desc": "client copy of order status enum (must track server)"
+        },
+        {
+          "file": "stores/new-order-alerts/index.ts",
+          "regex": "takeNewOrdersOnRefresh",
+          "desc": "the badge-refresh path primes once per store then RINGS — seeding it silently on every websocket nudge suppressed the store.wav alarm for every real new order"
+        },
+        {
+          "file": "utils/notification/index.ts",
+          "regex": "store\\.wav",
+          "desc": "the loud new-order alarm; fired only from the 30s poll in hooks/use-notifications.ts"
         }
       ]
     }
