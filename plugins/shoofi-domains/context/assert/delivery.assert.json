@@ -27,7 +27,8 @@
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js",
-        "services/monitoring/centralized-flow-monitor.js"
+        "services/monitoring/centralized-flow-monitor.js",
+        "services/driver-shift/driver-duty.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -64,6 +65,27 @@
           "parsePromisedEta",
           "reassignmentOf",
           "classifyDelivery"
+        ],
+        "services/driver-shift/driver-duty.js": [
+          "getDriverCityAreas",
+          "getDriverCityAreaIds",
+          "getDutyState",
+          "isDriverBookedInShift",
+          "personalSupportedAreas",
+          "supportedCityAreas",
+          "supportedCities"
+        ],
+        "routes/driver-shift-manager.js": [
+          "getDriverCityAreas"
+        ],
+        "routes/delivery/company.js": [
+          "getDriverCityAreaIds",
+          "getDutyState",
+          "SHIFT_NOT_BOOKED"
+        ],
+        "utils/crons/driver-shift-cron.js": [
+          "getDriverCityAreaIds",
+          "getDutyState"
         ]
       },
       "patterns": [

@@ -149,6 +149,32 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
     `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
     runs — which looks identical to a correction that is simply rare.
 
+12. **Three places resolve "which city areas is this driver in", and only one of them uses the
+    full set.** Booking (`getDriverCityAreas`) takes the UNION of `company.supportedCityAreas` +
+    `company.supportedCities` + the driver's own `personalSupportedAreas`; the activation guard
+    (`POST /api/delivery/company/employee/:id/update-active-status`) and the hourly deactivation
+    cron (`resolveSupportedCityAreaIds`) walked **`company.supportedCities` only**. The
+    disagreement fails in both directions: a company with `supportedCities: []` makes its drivers
+    invisible to the guard *and* to the cron, so they self-activate at any hour and nothing ever
+    switches them off (the 03:00 blanket `driver-inactivate-cron` is commented out in
+    `app.js`, so the shift cron is the only auto-deactivator) — 12/237 drivers on 2026-08-18;
+    and a company whose cities are NARROWER than a driver's personal areas produces a **false
+    `SHIFT_NOT_BOOKED`** — the guard finds the in-progress slot in the company's area, the driver
+    is not in *that* roster, and his real booking in a personal-area slot is never queried
+    (7/237 on 2026-09-08, 2 of them booked that day in an area the guard could not see; the cron
+    then switched one of them off at the top of every hour for two days while support toggled him
+    back by hand through the `updatedBySource === "shoofi_support"` bypass). Two things hide this
+    from everyone looking at a screen: `/shifts/list` groups slots by `date_startTime_endTime`
+    **across city areas** and ORs `isBooked`, so the driver app shows him booked for the hour
+    regardless of which area holds the booking; and the 400 carries `shiftTime`/`shiftId` that
+    `DeliveryDriverHeader.tsx` never renders. Fixed by routing all three through
+    `services/driver-shift/driver-duty.js` (`getDriverCityAreas` / `getDutyState`), shoofi-server
+    `fix/driver-shift-guard-personal-areas`. **Never re-derive a driver's city areas locally** —
+    and note the guard also judged the driver against a SINGLE in-progress shift, which a
+    multi-area union makes wrong on its own. When you touch this, say which of
+    pickup-zone / dropoff-geometry / `supportedCities` / `supportedAreas` /
+    `personalSupportedAreas` you mean, per the recipe below.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
   is the **GLOBAL master switch** for the delivery-company/driver integration — when off,
