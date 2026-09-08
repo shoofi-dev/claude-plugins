@@ -103,6 +103,25 @@
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
         }
       ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/components/RestrictedRoleGuard.tsx",
+        "src/views/admin/invoices/AccountantInvoices.tsx",
+        "src/views/admin/invoices/StoreInvoices.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "src/components/RestrictedRoleGuard.tsx",
+          "regex": "accountant:\\s*\\[[^\\]]*admin/accountant-invoices",
+          "desc": "an accountant-only user reaches just the two invoice routes, so anything the accountant must enter has to live inside those screens"
+        },
+        {
+          "file": "src/views/admin/invoices/AccountantInvoices.tsx",
+          "regex": "limit=9999",
+          "desc": "the accountant's invoices screen loads the whole month and filters/paginates client-side — a new filter there is not a new server query"
+        }
+      ]
     }
   }
 }

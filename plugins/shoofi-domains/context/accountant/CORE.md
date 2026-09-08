@@ -20,6 +20,17 @@ Server: `routes/payments/{admin-reports,admin,summaries}.js`, `routes/driver-rep
 `routes/admin/masav.js`, `routes/hyp.js` (EZcount invoicing), `lib/payments/calc.js`,
 `utils/{vat,greeninvoice,invoice-provider}.js`. Client: the reports/payout screens in
 `shoofi-delivery-web`.
+**The external accountant sees exactly two screens.** A user whose roles are only
+`accountant` is confined by `RESTRICTED_ROLE_ROUTES` to `/admin/store-invoices`
+(per-order customer receipts — `views/admin/invoices/StoreInvoices.tsx`) and
+`/admin/accountant-invoices` (the store↔Shoofi / company↔Shoofi tax invoices —
+`views/admin/invoices/AccountantInvoices.tsx`); every other path redirects
+(`shoofi-delivery-web/src/components/RestrictedRoleGuard.tsx:6-8,33-36`). So anything the
+accountant has to *enter* must live inside those two screens — they cannot reach
+`/admin/accounting/:storeId`. The guard is **UI-only**: the server gates those endpoints
+with `auth.required` and no role check. `AccountantInvoices` also loads the whole month
+with `limit=9999` and searches/paginates in the browser, so a new filter there is a
+client-side change, not a new server query.
 **🔒 CLAUDE.md do-not-touch overlap:** `routes/hyp.js`, `utils/hyp.js`,
 `utils/invoice-provider.js`, `lib/payments/`. You depend on `routes/order.js` for order
 amounts but **never edit it**.
