@@ -37,6 +37,36 @@
           "file": "routes/product.js",
           "regex": "outOfStockByQuantity",
           "desc": "stock invariant field"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "api/admin/product/import-index",
+          "desc": "read-only index the Excel importer dedupes against (doc CORE: bulk import)"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "api/product/create-from-mock",
+          "desc": "template-clone path, the one that DOES reject duplicate barcodes (doc CORE: bulk import)"
+        }
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/views/admin/stores/ImportCategoriesProducts.tsx"
+      ],
+      "symbols": {
+        "src/views/admin/stores/ImportCategoriesProducts.tsx": ["handleImport", "buildProductIndex"]
+      },
+      "patterns": [
+        {
+          "file": "src/views/admin/stores/ImportCategoriesProducts.tsx",
+          "regex": "admin/product/insert",
+          "desc": "import inserts one product per HTTP call from the browser (doc CORE: bulk import)"
+        },
+        {
+          "file": "src/views/admin/stores/ImportCategoriesProducts.tsx",
+          "regex": "store-category/add",
+          "desc": "categories are created just-in-time during the import (doc CORE: bulk import)"
         }
       ]
     }

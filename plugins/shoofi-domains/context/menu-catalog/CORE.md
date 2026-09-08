@@ -54,6 +54,31 @@ boundary and say so in the PR.
 - **Recorded risk, not yours to fix:** the server trusts client-sent extras prices (no server-side
   recompute). Any fix lives in the order-create path — hand off.
 
+## Bulk product import (Excel) — runs in the browser, leaves no record
+There is **no bulk-import endpoint and no import job**. The admin screen
+`shoofi-delivery-web/src/views/admin/stores/ImportCategoriesProducts.tsx` parses the XLSX
+client-side and then loops `await`-ing **one `POST /api/admin/product/insert` per row**
+(`handleImport`, ~tsx:1132; `routes/product.js` insert handler). ~0.6 s/product, so a
+5,000-row supermarket file takes ~50 minutes — measured end-to-end on
+`all-new-supermarket-barcodes`, 2026-09-08: 4,793 products in 47 min at ~95–100/min.
+Consequences you must state rather than guess at:
+- **The run lives in a browser tab.** Closing/refreshing it stops the import mid-file with no
+  server-side trace, and no way to reconstruct which rows failed (per-row errors are a toast).
+- **"Is the import done?" is only answerable from the data.** There is no status document, no
+  `importId` on the product, nothing in `apps-logs`. Poll `<appName>.products.countDocuments({})`
+  until it stops rising for ~3 minutes; `products.createdAt` is a real BSON Date.
+- **Categories are created just-in-time**, in file order, immediately before their first product
+  (`POST /api/store-category/add`) — so the newest category names tell you how far through the
+  file the run is. `POST /api/category/general/add` stamps no `createdAt`; sort by `_id` there.
+- **The server blind-inserts** — no upsert, no unique index on `barcode`. The only dedupe is
+  client-side, from the `GET /api/admin/product/import-index` snapshot taken when the file was
+  picked (barcode first, exact name as fallback). A re-run after a crash is only ~idempotent if
+  the operator re-selects the file and the rows carry barcodes.
+- **Images are fetched by the server inside the insert call** from the sheet's `Image URL`, and a
+  download failure is swallowed as `img: []` with HTTP 200. Audit with `{img: {$size: 0}}`.
+- Not the same machinery as cloning a template: `POST /api/product/create-from-mock`
+  (`routes/product.js`) *does* reject duplicate barcodes; the Excel path does not.
+
 ## Recipe — add/modify a product field
 1. Server: accept + persist it in the product insert/update handlers (`routes/product.js`).
 2. **Expose it** in the `$project` blocks of the menu aggregation (`routes/menu.js`) or the client
