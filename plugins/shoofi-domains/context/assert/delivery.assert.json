@@ -94,6 +94,21 @@
         },
         {
           "file": "services/delivery/book-delivery.js",
+          "regex": "created:\\s*moment\\(new Date\\(\\)\\)",
+          "desc": "bookDelivery.created is stamped at INSERT (store-accept), not at delivery"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "created:\\s*moment\\(new Date\\(\\)\\)",
+          "desc": "same on the pending path — the assignment cron never re-stamps created"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "isFutureOrder:\\s*true",
+          "desc": "the delivery board branches future bookings off created onto expectedDeliveryAt"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
           "regex": "\\.add\\(parseInt\\(result\\.area\\?\\.maxETA\\), 'minutes'\\)",
           "desc": "the immediate-assignment path adds maxETA with NO fallback - a missing or non-numeric value is a silent no-op, so expectedDeliveryAt comes out equal to pickupTime rather than invalid"
         },

@@ -148,6 +148,33 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
     `order` are whole embedded documents, so a wished-for or misspelled field reads as
     `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
     runs — which looks identical to a correction that is simply rare.
+12. **`bookDelivery.created` is the moment the STORE ACCEPTED the order, not the delivery
+    day — and for `isFutureOrder: true` bookings the two can be days apart.** Both create
+    paths stamp `created: moment(new Date()).utcOffset(offset).format()` at insert
+    (`services/delivery/book-delivery.js:232`, `services/delivery/delayed-assignment.js:769`),
+    and the booking is written at partner-accept (`routes/order.js:6356`, gated only on
+    `receipt_method == "DELIVERY"` at `:6167` — there is **no** future-order exclusion). A
+    scheduled order therefore gets its row immediately and nothing re-stamps `created` when
+    the assignment cron later fires (`delayed-assignment.js:1023-1040` writes `assignedAt`
+    only). Production: 135 completed bookings carry `isFutureOrder`, 21 with
+    created-day ≠ delivered-day. **Anything that answers "what happened on day X" must not
+    bucket a future booking on `created`.** The two consumers that get it right do it
+    differently — the admin delivery board routes future rows through `expectedDeliveryAt`
+    (`routes/analytics.js:337-348`), while courier earnings use `completedAt` via
+    `deliveryWorkDayMatch`/`deliveryWorkDay` in `lib/payments/calc.js` (added in shoofi-server
+    `fix/HIGH-RISK-driver-payments-future-order-work-day`; before it, all five earnings
+    consumers bucketed on `created` and a courier's own app hid the delivery from the day he
+    made it). Three riders:
+    - **`orderDate` is the slot the customer REQUESTED, not what happened.** Production has
+      scheduled orders delivered a day either side of it (`9247-1073`: `orderDate` 05/07,
+      `completedAt` 04/07). `completedAt` is the only field recording the actual handover.
+    - **Do not "fix" this by switching every row to `completedAt`.** Across all 87,674
+      completed bookings that moves 3,026 (3.5%) to a different day and **99 into a different
+      month** — rewriting settlement periods already paid. `created` is a sound proxy for an
+      order delivered in the same session; it is only provably wrong for a scheduled one.
+    - `created` is an **offset string** and `completedAt` is a **BSON Date**. A range on one
+      is not interchangeable with a range on the other, and a cross-type range matches
+      **nothing** rather than erroring — carry the window in both forms.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
