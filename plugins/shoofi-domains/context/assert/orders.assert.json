@@ -163,12 +163,41 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "stores/orders/index.tsx"],
+      "files": [
+        "consts/shared.ts",
+        "stores/orders/index.tsx",
+        "hooks/use-notifications.ts",
+        "stores/new-order-alerts/index.ts",
+        "utils/notification/index.ts"
+      ],
+      "symbols": {
+        "utils/notification/index.ts": ["schedulePushNotification", "store.wav"],
+        "stores/new-order-alerts/index.ts": [
+          "takeNewOrders",
+          "takeNewOrdersOnRefresh",
+          "seedSeen"
+        ]
+      },
       "patterns": [
         {
           "file": "consts/shared.ts",
           "regex": "ORDER_STATUS",
           "desc": "client copy of order status enum (must track server)"
+        },
+        {
+          "file": "hooks/use-notifications.ts",
+          "regex": "newOrderAlertsStore\\.takeNewOrdersOnRefresh\\(appName, orders\\)",
+          "desc": "the badge-refresh path (fetchUnviewedOrdersCount, which answers the server's unviewed_orders_updated frame within a second) primes once then RINGS - if this ever goes back to seedSeen the loud store.wav new-order alarm is silenced entirely, because the order is already marked alerted 30s before the poll looks (ref C3)"
+        },
+        {
+          "file": "hooks/use-notifications.ts",
+          "regex": "newIds\\.length > 0 && shoofiAdminStore\\.storeData\\?\\.isUnviewOrdersEnabled",
+          "desc": "the refresh ring is gated on isUnviewOrdersEnabled, the platform switch that owns the whole new-order ring and already gates the 30s poll (ref C3)"
+        },
+        {
+          "file": "stores/new-order-alerts/index.ts",
+          "regex": "takeNewOrdersOnRefresh\\s*=\\s*\\(",
+          "desc": "the ledger's prime-once-per-store-per-session entry point; seedSeen still exists but records WITHOUT ringing and must not be what the refresh path calls (ref C3)"
         }
       ]
     }
