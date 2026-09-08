@@ -95,13 +95,38 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     `getId` (`lib/common.js`, returns the raw value unless the string is 24 chars) passes
     through and `sendNotification` drops at its `if (!user)` guard, leaving a
     `notification_attempt` row with no push and no failure;
-    (b) single mode sends **ONE push for the pair, deterministically for the primary leg** —
-    that is a contract with the approve cascade in `routes/delivery/orders.js`, which approves
-    the peer off the driver's single tap. Two pushes is a regression, not a fix;
+    (b) single mode sends **ONE push for the pair** — that is a contract with the approve
+    cascade in `routes/delivery/orders.js`, which approves the peer off the driver's single tap.
+    Two pushes is a regression, not a fix. See invariant 12 for what that one push must say;
     (c) `routes/twin-order.js` emits **no `centralizedFlowMonitor` event anywhere**, so a twin
     reassignment leaves no `order_reassigned_by_admin` row — unlike `routes/delivery/admin.js`.
     The only trace in `shoofi.orderFlowEvents` is what `sendNotification` writes itself, which
     is why a misrouted twin push looks like an orphan `notification_attempt` and nothing else.
+12. **The one push for a twin MUST name both pickups, and it orders them by
+    `pickupSequence` — never by the group's primary/secondary roles.** One job, two stores, one
+    alert: so if that alert names one leg, the second store is never mentioned to the man who
+    has to collect from it. Measured on the 7 days to 2026-09-08: **1,651 solo legs assigned, 0
+    never named to their own driver; 103 twin legs assigned, 43 (41.7%) never named.** Four
+    drivers reported it inside one hour. The body is built in
+    `services/twin-order/twin-driver-notification.js` and both senders use it —
+    `routes/twin-order.js` (259 of 331 twin legs in 21 days; its per-side de-dupe dropped the
+    other leg) and `services/delivery/delayed-assignment.js` (whose single-mode peer mirror is a
+    bare `updateOne` setting `isPendingAssignment:false`, so that leg is never processed again
+    and its push never fires at all). With one leg the builder returns the byte-identical legacy
+    string, which is what keeps the solo path untouched. Four things this rests on:
+    (a) **`group.dispatch.firstAppName` is not the primary** — they disagree on 40% of
+    production groups, which is why 12 of the 43 silent legs were `twinPickupSequence: 1` and
+    those drivers were told about the *second* pickup only;
+    (b) in `routes/twin-order.js` the sequence must come from `sequenceFor(sideAppName)`, **not**
+    `deliveryDoc.twinPickupSequence` — same pre-update snapshot as invariant 11, and that field
+    is one the `updateOne` has just rewritten;
+    (c) `data.orderId` / `data.bookId` must stay **one real approvable leg** — the first pickup,
+    so `data.pickupTime` is the time he must act on. `screens/delivery-driver/notifications.tsx`
+    requires both truthy before it offers the approve dialog. The peer goes in `data.twinLegs`;
+    (d) **adding `twinLegs` writes no `orderFlowEvents` row for the peer leg**, because
+    `trackNotificationEvent` keys on `data.orderId`. The 41.7% above will NOT move after the
+    fix — re-key the measurement to the twin **group** (healthy = the assigned driver got one
+    push naming both legs) or it will read as "the fix did nothing".
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

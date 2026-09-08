@@ -18,7 +18,9 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
-        "docs/customer-orders-snapshot.md"
+        "docs/customer-orders-snapshot.md",
+        "services/twin-order/twin-driver-notification.js",
+        "services/delivery/delayed-assignment.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -37,7 +39,9 @@
           "stockDecremented",
           "stockRestored"
         ],
-        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+        "utils/customer-orders.js": [
+          "getSuccessfulOrdersByCustomerIds"
+        ]
       },
       "patterns": [
         {
@@ -77,8 +81,8 @@
         },
         {
           "file": "routes/twin-order.js",
-          "regex": "const newIdStr = assignedDriverIdFor\\(sideLabel\\) \\|\\| '';",
-          "desc": "notifyOldDriver compares the outgoing driver against the NEWLY assigned one - comparing against deliveryDoc.driver._id again makes it always equal and the cancel push never fires (CORE invariant 11)"
+          "regex": "oldId === assignedDriverIdFor\\(side\\.label\\)",
+          "desc": "the cancel push compares the outgoing driver against the NEWLY assigned one - comparing against side.doc.driver._id again makes it always equal and the cancel push never fires (CORE invariant 11)"
         },
         {
           "file": "routes/twin-order.js",
@@ -89,6 +93,26 @@
           "file": "routes/delivery/orders.js",
           "regex": "twinGroupId",
           "desc": "the single-mode twin approve cascade - the reason assign-driver sends ONE push for the pair rather than one per leg (CORE invariant 11b)"
+        },
+        {
+          "file": "services/twin-order/twin-driver-notification.js",
+          "regex": "الاستلام الأول[\\s\\S]*?الاستلام الثاني",
+          "desc": "the one push for a twin names BOTH pickups - the shared builder both senders use; if these labels go, the second store stops being mentioned to the driver who must collect from it (CORE invariant 12)"
+        },
+        {
+          "file": "services/twin-order/twin-driver-notification.js",
+          "regex": "a\\.pickupSequence \\?\\? Number\\.MAX_SAFE_INTEGER",
+          "desc": "legs are ordered by pickupSequence, not by primary/secondary role - the two disagree on 40% of production groups (CORE invariant 12a)"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "pickupSequence: sequenceFor\\(side\\.appName\\)",
+          "desc": "the sequence comes from sequenceFor(), NOT deliveryDoc.twinPickupSequence - the doc is the pre-update snapshot and updateOne has just rewritten that field (CORE invariant 12b)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "twinDriverNotification\\.buildAssignmentMessage",
+          "desc": "the scored engine's twin push names both legs too - its peer mirror sets isPendingAssignment:false, so that leg's own push never fires (CORE invariant 12)"
         },
         {
           "file": "consts/consts.js",
@@ -202,7 +226,10 @@
         "utils/notification/index.ts"
       ],
       "symbols": {
-        "utils/notification/index.ts": ["schedulePushNotification", "store.wav"],
+        "utils/notification/index.ts": [
+          "schedulePushNotification",
+          "store.wav"
+        ],
         "stores/new-order-alerts/index.ts": [
           "takeNewOrders",
           "takeNewOrdersOnRefresh",
