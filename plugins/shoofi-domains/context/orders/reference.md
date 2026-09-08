@@ -306,6 +306,40 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
 - **Realtime**: WS `?appType=shoofi-partner`; handles `order_status_updated`,
   `unviewed_orders_updated`, `future_order_*`, `print_*` (NOT `menu_refresh`). Printing =
   a `PRINT_NOT_PRINTED` event → batched invoice-image capture/print loop (`App.tsx`).
+- **The loud new-order alarm has ONE source, and an id ledger decides whether it rings.**
+  `schedulePushNotification` (`utils/notification/index.ts`, `sound: 'store.wav'`) *is* the
+  alarm, and its only live callers are the two in `hooks/use-notifications.ts` — the 30s poll
+  and the badge refresh (`fetchUnviewedOrdersCount`). Everything else is quiet: the
+  `notification` websocket frame is handled by `showLocalNotification` in that same hook with
+  `sound: "default"`. So **"we get no notification" often means "we got the quiet banner and
+  not the alarm"** — establish which one before you look at the server. (Two globals play
+  `store.wav` for unrelated events — `components/global/{DriveInArrivalGlobal,
+  FutureOrderReminderGlobal}.tsx`; neither is the new-order path.)
+  Whether it rings is decided by `newOrderAlertsStore` (`stores/new-order-alerts/index.ts`),
+  a per-store ledger of order ids persisted in AsyncStorage: `takeNewOrders` returns only the
+  ids it has not rung for (and records them), `seedSeen` records them **without** ringing, and
+  `takeNewOrdersOnRefresh` primes once per store per app session then rings. Both ring paths
+  dedupe on order id, and both are gated on `shoofiAdminStore.storeData?.isUnviewOrdersEnabled`
+  — the platform switch that owns the whole new-order ring.
+- ⚠️ **Never seed that ledger on the badge-refresh path — it silences the alarm entirely.**
+  The badge refresh, not the poll, is what learns about a new order first — and it does so
+  through the **push**, not a websocket frame. At creation the server sends each store user a
+  `store.wav` push (`utils/persistent-alerts.js` `sendPersistentAlert`, called from
+  `sendStoreOwnerNotifications` in `routes/order.js`), and the app's
+  `Notifications.addNotificationReceivedListener` (`hooks/use-notifications.ts`) calls
+  `fetchUnviewedOrdersCount` for **every** notification the device receives while it is
+  running. So the refresh runs within a second — a good 30s before the `*/30s` poll can look
+  at the order. Anything that marks the order "alerted" there means the poll finds nothing new
+  and the local `store.wav` alarm never plays; the store gets the incoming push plus one soft
+  default-sound ping and nothing else. That is exactly what `de7daff` (2026-08-13) did by
+  calling `seedSeen` here, and what shoofi-dev/shoofi-partner#22 (`adc0e85`, merged `70c1f89`)
+  fixed with `takeNewOrdersOnRefresh` — prime once so a fresh login does not announce a
+  backlog, ring on every refresh after that.
+  **It is NOT `unviewed_orders_updated`.** That frame is emitted only on ACCEPT
+  (`routes/order.js`, inside `sendOrderNotifications`, whose one caller is
+  `/api/order/update/viewd`); `/api/order/create` emits no frame of that type. It lands on the
+  same `fetchUnviewedOrdersCount`, which makes it easy to mistake for the creation trigger —
+  it is not, and a fix reasoned from that frame will target the wrong path.
 - **Key files**: `stores/orders/index.tsx` (core + transition logic),
   `screens/admin/order/new-orders/list/index.tsx` (ACCEPT + twin caps),
   `screens/admin/order/list/index.tsx` (dashboard, transitions), `hooks/{use-websocket,use-notifications}.ts`, `App.tsx`.

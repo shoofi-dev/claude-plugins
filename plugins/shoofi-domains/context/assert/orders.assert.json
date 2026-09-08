@@ -173,12 +173,46 @@
       ]
     },
     "shoofi-partner": {
-      "files": ["consts/shared.ts", "stores/orders/index.tsx"],
+      "files": [
+        "consts/shared.ts",
+        "stores/orders/index.tsx",
+        "hooks/use-notifications.ts",
+        "stores/new-order-alerts/index.ts",
+        "utils/notification/index.ts"
+      ],
+      "symbols": {
+        "utils/notification/index.ts": ["schedulePushNotification", "store.wav"],
+        "stores/new-order-alerts/index.ts": [
+          "takeNewOrders",
+          "takeNewOrdersOnRefresh",
+          "seedSeen"
+        ]
+      },
       "patterns": [
         {
           "file": "consts/shared.ts",
           "regex": "ORDER_STATUS",
           "desc": "client copy of order status enum (must track server)"
+        },
+        {
+          "file": "hooks/use-notifications.ts",
+          "regex": "newOrderAlertsStore\\.takeNewOrdersOnRefresh\\(appName, orders\\)",
+          "desc": "the badge-refresh path (fetchUnviewedOrdersCount, which the notification-received listener runs within a second of the server's creation push) primes once then RINGS - if this ever goes back to seedSeen the loud store.wav new-order alarm is silenced entirely, because the order is already marked alerted 30s before the poll looks (ref C3). NOT triggered by unviewed_orders_updated, which the server only emits on accept"
+        },
+        {
+          "file": "hooks/use-notifications.ts",
+          "regex": "newIds\\.length > 0 && shoofiAdminStore\\.storeData\\?\\.isUnviewOrdersEnabled",
+          "desc": "the refresh ring is gated on isUnviewOrdersEnabled, the platform switch that owns the whole new-order ring and already gates the 30s poll (ref C3)"
+        },
+        {
+          "file": "stores/new-order-alerts/index.ts",
+          "regex": "takeNewOrdersOnRefresh\\s*=\\s*\\(",
+          "desc": "the ledger's prime-once-per-store-per-session entry point; seedSeen still exists but records WITHOUT ringing and must not be what the refresh path calls (ref C3)"
+        },
+        {
+          "file": "hooks/use-notifications.ts",
+          "regex": "addNotificationReceivedListener\\([\\s\\S]{0,80}?fetchUnviewedOrdersCount\\(\\)",
+          "desc": "STABILITY PIN, not a regression detector - green both before and after shoofi-partner#22, which did not introduce it. Every notification the device receives while the app runs (including the server's store.wav creation push) runs the badge refresh. This is the ONLY reason that path sees a new order ~30s before the poll, which is the whole premise of the two assertions above and of the C3 warning; drop this wiring and the doc's explanation stops being true"
         }
       ]
     }
