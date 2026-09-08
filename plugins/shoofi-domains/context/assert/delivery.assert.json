@@ -171,6 +171,38 @@
           "file": "services/monitoring/centralized-flow-monitor.js",
           "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
           "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "futureWindow = \\{ \\$gte: start\\.format\\(\\), \\$lte: futureCeiling\\.format\\(\\) \\}",
+          "desc": "the delivery board's future-order horizon is a CEILING only - a $gte:now floor drops a live scheduled delivery the moment it runs past its own ETA"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "futureCeiling = windowEnd\\.isBefore\\(end\\) \\? windowEnd : end",
+          "desc": "the horizon is clamped to the selected range so a report over past dates cannot leak deliveries scheduled after it"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "match\\.\\$and = andClauses",
+          "desc": "the order-number search and the date clause are both disjunctions - assigning match.$or twice silently erased the search, so optional $ors go under $and"
+        }
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/views/admin/analytics/DeliveryListAnalytics.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "src/views/admin/analytics/DeliveryListAnalytics.tsx",
+          "regex": "futureOrderWindowHours: 6",
+          "desc": "the delivery board's future-order horizon is hardcoded client-side with no UI control - the board looks date-filtered and is not"
+        },
+        {
+          "file": "src/views/admin/analytics/DeliveryListAnalytics.tsx",
+          "regex": "\"/analytics/deliveries\"",
+          "desc": "the board is served by routes/analytics.js, not by any routes/delivery/* endpoint"
         }
       ]
     },

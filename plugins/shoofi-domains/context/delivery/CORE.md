@@ -148,6 +148,27 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
     `order` are whole embedded documents, so a wished-for or misspelled field reads as
     `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
     runs — which looks identical to a correction that is simply rare.
+12. **The admin delivery board (`רשימת משלוחים`) is served by `POST /api/analytics/deliveries`
+    in `routes/analytics.js` — not by any `routes/delivery/*` endpoint — and it hides
+    future-scheduled deliveries on a rolling horizon the admin cannot see.** The match is two
+    **mutually exclusive** branches: an `isFutureOrder: true` delivery is reachable ONLY via
+    `expectedDeliveryAt` inside that horizon, because the `created`-in-date-range branch
+    excludes `isFutureOrder: true` outright. `shoofi-delivery-web`'s
+    `src/views/admin/analytics/DeliveryListAnalytics.tsx` hardcodes `futureOrderWindowHours: 6`
+    with no UI control, so a board that *looks* date-filtered is not. **The horizon must stay a
+    ceiling.** It was `{$gte: now, $lte: now + N}`, so a scheduled delivery fell off the board
+    the instant the clock passed its own `expectedDeliveryAt` — still at status `"3"` in a
+    courier's hands, mid-session on the 60s auto-refresh, at exactly the moment dispatch needed
+    it (order `9700-6736`, 2026-09-08; 7 of the 16 future orders since 2026-08-01 were
+    delivered after their ETA and so spent that stretch invisible). It is now floored at the
+    selected range's start and ceilinged at `min(now + N, range end)` — shoofi-server
+    `fix/delivery-list-future-order-window`. Two more traps in the same handler: it has **no
+    pagination and no auth middleware**, and `match.$or` was assigned by both the order-number
+    search and the date clause, the second silently erasing the first — the UI always sends
+    dates, so `מספר הזמנה` filtered nothing at all. Any new disjunction there goes under
+    `$and`. Corollary for tickets shaped "order X is missing from the delivery list": check
+    `isFutureOrder` first, and never diagnose from `order.status` — this board is
+    `bookDelivery`-driven and joins the store's order status in as a separate column.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
