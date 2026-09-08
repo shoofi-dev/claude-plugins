@@ -78,6 +78,30 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     (`services/delivery/late-delivery.js`) look like a genuine promise and vice versa, which is
     exactly what `originalExpectedDeliveryAt` exists to prevent. Delivery owns the reading rule;
     orders owns the fields, and this is the contract between them.
+11. **`POST /api/twin-order/admin/assign-driver` holds a PRE-UPDATE snapshot of both legs, and
+    the driver push must never be addressed from it.** `routes/twin-order.js` loads
+    `primaryDelivery` / `secondaryDelivery` once, writes the new driver with `updateOne`, and
+    never re-reads either — `updateOne` returns counts, it does not mutate the JS object. So
+    after the write `deliveryDoc.driver._id` is still the driver the leg had **before** this
+    call. `assignmentMetadata.previousDriver` relies on that and is correct; the notification
+    fan-out addressed both messages the same way and was not — every twin reassignment told the
+    outgoing driver "you have a new order" and told the incoming one nothing, and the
+    "cancelled" push compared the stale doc against itself and never fired at all (6 sends
+    across 1,733 twin legs in 30 days, all from the single-order path). Both recipients now come
+    from `primaryAssignment` / `secondaryAssignment`. Three things to keep when working here:
+    (a) in `single` mode only `primaryDriverId` is required, `secondaryDriverId` is `undefined`
+    and `secondaryAssignment` is the **same object reference** as `primaryAssignment` — a
+    fallback through `secondaryDriverId` yields the literal string `"undefined"`, which
+    `getId` (`lib/common.js`, returns the raw value unless the string is 24 chars) passes
+    through and `sendNotification` drops at its `if (!user)` guard, leaving a
+    `notification_attempt` row with no push and no failure;
+    (b) single mode sends **ONE push for the pair, deterministically for the primary leg** —
+    that is a contract with the approve cascade in `routes/delivery/orders.js`, which approves
+    the peer off the driver's single tap. Two pushes is a regression, not a fix;
+    (c) `routes/twin-order.js` emits **no `centralizedFlowMonitor` event anywhere**, so a twin
+    reassignment leaves no `order_reassigned_by_admin` row — unlike `routes/delivery/admin.js`.
+    The only trace in `shoofi.orderFlowEvents` is what `sendNotification` writes itself, which
+    is why a misrouted twin push looks like an orphan `notification_attempt` and nothing else.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

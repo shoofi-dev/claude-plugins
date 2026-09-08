@@ -6,6 +6,7 @@
       "files": [
         "routes/order.js",
         "routes/twin-order.js",
+        "routes/delivery/orders.js",
         "routes/order-fraud-checks.js",
         "routes/order-origin-validator.js",
         "routes/admin/order-monitoring.js",
@@ -68,6 +69,26 @@
           "file": "utils/persistent-alerts.js",
           "regex": "\\{ lastReminderSent: \\{ \\$type: 'date', \\$lte: cutoff \\} \\}",
           "desc": "the sendReminders throttle is LIVE and compares a real Date - if it is commented out again, or lastReminderSent goes back to a serialised moment, all 5 reminders fire on 5 consecutive minutes (reference.md NOTIFICATIONS)"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "const assignedDriverIdFor = \\(sideLabel\\) => \\{",
+          "desc": "the twin assign-driver push is addressed from the RESOLVED assignment, not from the pre-update delivery snapshot - if this helper goes, the notification goes back to the previous driver (CORE invariant 11)"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "const newIdStr = assignedDriverIdFor\\(sideLabel\\) \\|\\| '';",
+          "desc": "notifyOldDriver compares the outgoing driver against the NEWLY assigned one - comparing against deliveryDoc.driver._id again makes it always equal and the cancel push never fires (CORE invariant 11)"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "previousDriver:\\s*\\n?\\s*deliveryDoc\\.driver\\?\\._id \\|\\| null",
+          "desc": "assignmentMetadata.previousDriver DELIBERATELY reads the stale pre-update doc - it sits beside the fix and reads identically to the bug; do not 'unify' it (CORE invariant 11)"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "twinGroupId",
+          "desc": "the single-mode twin approve cascade - the reason assign-driver sends ONE push for the pair rather than one per leg (CORE invariant 11b)"
         },
         {
           "file": "consts/consts.js",
