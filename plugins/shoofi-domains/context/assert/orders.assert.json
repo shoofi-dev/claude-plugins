@@ -56,8 +56,13 @@
         },
         {
           "file": "utils/persistent-alerts.js",
-          "regex": "const MAX_REMINDERS = 5;[\\s\\S]*?const REMINDER_INTERVAL_MS = 5 \\* 60 \\* 1000;",
-          "desc": "5 reminders spaced 5 minutes apart (~25 min of alerts) - the cadence reference.md documents; change either constant and the doc is wrong"
+          "regex": "const MAX_REMINDERS = 5;[\\s\\S]*?const REMINDER_INTERVAL_MS = 60 \\* 1000;",
+          "desc": "5 reminders one minute apart, then silence - the deliberate product cadence reference.md documents; change either constant and the doc is wrong"
+        },
+        {
+          "file": "utils/persistent-alerts.js",
+          "regex": "const REMINDER_TICK_SKEW_MS = 5 \\* 1000;[\\s\\S]*?new Date\\(now\\.getTime\\(\\) - REMINDER_CUTOFF_AGE_MS\\)",
+          "desc": "the cutoff keeps its tick-skew slack and is NOT a round now - REMINDER_INTERVAL_MS; without it the interval equals the cron period and every other tick is skipped, turning 5-in-5-minutes into 5-in-5-to-10 silently (reference.md NOTIFICATIONS)"
         },
         {
           "file": "utils/persistent-alerts.js",
