@@ -78,6 +78,23 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     (`services/delivery/late-delivery.js`) look like a genuine promise and vice versa, which is
     exactly what `originalExpectedDeliveryAt` exists to prevent. Delivery owns the reading rule;
     orders owns the fields, and this is the contract between them.
+11. **The client sets the price; the server only writes down that it disagrees.** Order
+    creation stores `order.items[].price` verbatim and charges `orderDoc.total`
+    (`routes/order.js`) — `validateOrderItems` in the same file is dead (its only call site is
+    commented out in `routes/order-fraud-checks.js`) and would reject every extras order
+    anyway, since `item.price` includes extras and `product.price` does not. What does run is
+    `computePricingShadow` (`utils/order-pricing-shadow.js`), which re-prices the order from
+    the catalog with `utils/order-pricing.js` and stamps **`orders.serverPricing`**
+    (`serverOrderPrice`, `clientOrderPrice`, `orderPriceDrift`, `driftDetected`,
+    `missingProductIds`) — and changes nothing. **On any "the customer was charged the wrong
+    amount" report, read `serverPricing` first**: it settles in one field whether the catalog
+    was wrong or the app was, and it does so at the moment of the order rather than after
+    someone has edited the product. A negative `orderPriceDrift` is the customer overpaying.
+    It exists only on orders created after 2026-08-05, and platform-wide it fires on the order
+    of ten orders a month, so sweeping every store DB for `driftDetected: true` is cheap and is
+    how to size the blast radius of a pricing bug. (Confirmed on `1766-0040` /
+    `the-meat-palace`, 2026-09-07: `serverOrderPrice` 320 against `clientOrderPrice` 400 proved
+    a cart bug in shoofi-app while the catalog was correct.)
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

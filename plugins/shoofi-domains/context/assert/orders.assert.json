@@ -17,6 +17,8 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
+        "utils/order-pricing.js",
+        "utils/order-pricing-shadow.js",
         "docs/customer-orders-snapshot.md"
       ],
       "symbols": {
@@ -36,13 +38,24 @@
           "stockDecremented",
           "stockRestored"
         ],
-        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"],
+        "utils/order-pricing-shadow.js": ["computePricingShadow"]
       },
       "patterns": [
         {
           "file": "consts/consts.js",
           "regex": "ORDER_STATUS",
           "desc": "authoritative order status enum"
+        },
+        {
+          "file": "utils/order-pricing-shadow.js",
+          "regex": "driftDetected",
+          "desc": "orders.serverPricing carries the server-vs-client price comparison - CORE invariant 11 tells the next agent to read this field first on any wrong-charge report, so a rename breaks the recipe"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "serverPricing",
+          "desc": "the shadow pricer is still wired into order creation and still only records; if this becomes enforcing, CORE invariant 11 ('the server only writes down that it disagrees') is wrong"
         },
         {
           "file": "routes/order.js",
