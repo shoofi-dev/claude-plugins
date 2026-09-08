@@ -159,16 +159,24 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   semantics only; coordinate on changes.
 - **NOTIFICATIONS**: `services/notification/*`, websocket, persistent-alerts, SMS.
   ⚠️ The store-owner new-order alert does **not** come from `services/notification/*`
-  directly — `sendStoreOwnerNotifications` (`routes/order.js:843`) delegates to
+  directly — `sendStoreOwnerNotifications` (`routes/order.js`) delegates to
   `utils/persistent-alerts.js`, which inserts a `shoofi.persistentAlerts` doc and
-  **keeps re-pushing it once a minute until the partner accepts the order**.
-  `persistent-alerts-cron` runs on `*/1 * * * *`, and `sendReminders`' throttle
-  (`lastReminderSent`) is **commented out** (`utils/persistent-alerts.js:271`), so the
-  only brake is `reminderCount < 5` — i.e. 5 pushes a minute apart, per store user, not
-  the 5-minute spacing `reminderInterval` on the record implies. `clearPersistentAlert`
-  (on `isViewd`) is what stops it. If you are asked why a store gets the same
-  notification five times, this is why, and it is the `persistentAlerts` collection —
-  not `notifications` — that holds the pending state.
+  **keeps re-pushing it until the partner accepts the order**. `persistent-alerts-cron`
+  still runs on `*/1 * * * *`, but `sendReminders` now throttles per alert:
+  `MAX_REMINDERS = 5` and `REMINDER_INTERVAL_MS = 5 * 60 * 1000`
+  (`utils/persistent-alerts.js`) — **5 reminders ~5 minutes apart, ~25 minutes total**,
+  per store user, which is what `reminderInterval` on the record always implied. The gap
+  is an `$or` on `lastReminderSent` (null / `$exists:false` / `{$type:'date', $lte:cutoff}`)
+  next to `reminderCount: { $lt: MAX_REMINDERS }`. Each alert in the sweep has its own
+  try/catch, so one malformed doc no longer aborts the run for every store.
+  **Why the throttle was dead until then** (the non-obvious part): `lastReminderSent` used
+  to be written as a serialised moment (`{_isAMomentObject, _d: Date, …}`), which never
+  compares against a Date in a Mongo query — so the filter was commented out and
+  `reminderCount < 5` was the only brake, i.e. 5 pushes on five consecutive minutes. It is
+  a real `Date` now; the extra `{"lastReminderSent._d": {$lte: cutoff}}` branch exists only
+  for moment-shaped docs written before the fix (the cleanup cron deletes alerts after 24h).
+  `clearPersistentAlert` (on `isViewd`) is what stops it, and it is the `persistentAlerts`
+  collection — not `notifications` — that holds the pending state.
 - **FRAUD**: `order-fraud-*`, `fraud-config-loader`, `fraud-check-storage` →
   `shoofi.fraudChecks`/`deviceCustomers`/`ipCustomers`.
 - **GROWTH/COINS (secondary)**: `coinsService`, `worldCupService`, attribution — must never fail the order.
