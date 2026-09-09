@@ -148,6 +148,45 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
     `order` are whole embedded documents, so a wished-for or misspelled field reads as
     `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
     runs — which looks identical to a correction that is simply rare.
+12. **Nothing on the SERVER refuses an undeliverable order.** `POST /api/order/create`
+    (`routes/order.js`) never calls `findBestAreaForLocation` or
+    `checkStoreDeliveryAvailability` and runs no `$geoIntersects` — coverage is first
+    evaluated minutes later at partner-accept, inside `bookDelivery`. The card is charged in
+    that same create handler, so **money is taken before deliverability is ever consulted**,
+    and `shippingPrice` is whatever the client sent (`area.price` is never re-derived
+    server-side). Every "we don't deliver here" gate lives in `shoofi-app`, and there are
+    three of them with three different predicates:
+    - `POST /api/delivery/location/supported` (`routes/delivery/driver.js`) — point ∈ any
+      `areasGeometry` polygon carrying ≥1 `areas` doc. **No `isActive` filter and no
+      store/pickup-zone step**, so it is looser than dispatch. Blocks saving a NEW address
+      only; a saved address is never re-gated when reused, and
+      `controllers/customerAddressController.js` stores any `location` verbatim.
+    - `POST /api/delivery/available-drivers` → `checkStoreDeliveryAvailability`
+      (`services/delivery/availability.js`) — the real dispatch predicate. It only *blocks*
+      through `shoofi-app/hooks/checkout/use-checkout-validate.ts`, which **skips it entirely
+      when `orderTimingMode` is `future` or `ramadan-iftar`** — a scheduled order gets no
+      coverage check of any kind.
+    - `POST /api/delivery/city-area/by-coordinates` (`routes/delivery/geography.js`) — matches
+      **`cities` (pickup ZONE)** polygons, which blanket a whole town. It drives the address
+      map's "location not supported" overlay, so that overlay reads GREEN over a hole in
+      `areasGeometry`. Wrong collection for the question it is asked.
+    Asymmetry to keep straight: the pending dispatch path passes `{ignoreAreaActive: true}`
+    and checkout does not, so **dispatch is the more permissive side** — it can resolve an
+    area an admin deliberately deactivated, and an inactive area fails checkout while passing
+    dispatch, never the reverse.
+13. **`geo_positioning` is the chosen ADDRESS, not the phone's GPS** — and it is the point
+    dispatch books against (`routes/order.js` passes `order?.order?.geo_positioning` as
+    `customerLocation` on every booking path). The live GPS is a separate field,
+    `order.currentLocation`, written for fraud detection and read only by
+    `routes/order-fraud-detector.js` (the "current location is N m from the delivery address"
+    rule). They are never mixed: verified on **1,182 of 1,182** untouched September 2026
+    bookings where the two were more than 100 m apart, the booking used the address, Apple Pay
+    included. So "checkout validated one point and dispatch booked another" is the obvious
+    hypothesis when a delivery lands outside coverage, and it is **wrong** — check whether the
+    ADDRESS was moved after the order instead. `POST /api/customer/:customerId/`
+    `update-address-to-current-location` (`routes/customer.js`, customers domain) is the only
+    path that can, and the create-time snapshot in `shoofi.customers.orders[].address` is the
+    one copy it never rewrites, so it is what tells you where the order was actually placed.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`

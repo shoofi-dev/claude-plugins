@@ -27,7 +27,9 @@
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js",
-        "services/monitoring/centralized-flow-monitor.js"
+        "services/monitoring/centralized-flow-monitor.js",
+        "services/delivery/availability.js",
+        "controllers/customerAddressController.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -166,6 +168,16 @@
           "file": "utils/crons/growth-snapshots.js",
           "regex": "storeReadyAt",
           "desc": "the surviving storeReadyAt locals here read order.completedAt / orderFlowEvents, never bookDelivery.storeReadyAt (0 of 82,414 rows) - if a bookDelivery read reappears, the net-of-kitchen-delay lie is back"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "customerLocation: order\\?\\.order\\?\\.geo_positioning",
+          "desc": "dispatch books against geo_positioning, which the app sets from the CHOSEN ADDRESS - not order.currentLocation, which is the phone GPS and is read only by the fraud detector. If this ever changes, the CORE note that the two are never mixed is void"
+        },
+        {
+          "file": "services/delivery/availability.js",
+          "regex": "findBestAreaForLocation\\(appDb, location, storeLocation\\)",
+          "desc": "the checkout availability probe resolves the area WITHOUT ignoreAreaActive, while the pending dispatch path passes ignoreAreaActive:true - dispatch is the more permissive of the two, so an inactive area fails checkout and passes dispatch, never the reverse"
         },
         {
           "file": "services/monitoring/centralized-flow-monitor.js",
