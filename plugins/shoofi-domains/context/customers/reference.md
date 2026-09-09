@@ -103,6 +103,29 @@ addressing is unchanged. Guarded on a truthy token (an empty registration can't 
 siblings) and on the phone read off the *authenticated* doc, never the request body; a
 failure there is logged, never fails the registration.
 
+⚠️ **`POST /api/customer/:customerId/update-address-to-current-location`
+(`routes/customer.js`) is the ONLY path in the whole server that changes an order's delivery
+address after it was placed** — verified by the fact that it is the only writer of
+`order.address.updatedBySupport`. Support drives it from two buttons in
+`shoofi-delivery-web/src/components/Modals/CustomerDetailsModal.tsx`: one that drops the order
+onto the customer's captured phone GPS (`order.currentLocation`, the field the fraud detector
+compares against), and a **free map pin** that can be placed anywhere at all. It writes the
+order, the customer's `addresses[]` entry, and the `bookDelivery` snapshot — and it can move a
+delivery **outside the service area**, which is what happened on order `2933-0642`: the
+customer's own address was inside an active area, the phone GPS 284 m away was in no coverage
+polygon, the store accepted three minutes later, and the booking was created with no area and
+no possible courier. 830 such moves exist in production. It **reports, it does not refuse** —
+`newPointCoverage: {checked, deliverable, areaId, areaName}` on the response is the signal, and
+`checked: false` means "could not verify", not "fine". Do not use `bookingAreaResolved` for
+this: it is `false` both for "outside coverage" and for "the store has not accepted yet", and
+the second is when most of these corrections happen.
+
+**Corollary for any investigation:** because this endpoint rewrites the order, the customer's
+address record AND the delivery snapshot, none of those three tells you where an order was
+originally placed. The one copy it never touches is the create-time snapshot at
+`shoofi.customers.orders[].address` (written in `routes/order.js`) — that is the address the
+customer actually chose.
+
 ⚠️ **`getCustomerAppName(req, appName)` ignores both arguments and always returns the
 `shoofi` DB** (`utils/app-name-helper.js`) — it is a customer-only helper, so
 `getCustomerAppName(...).customers` resolves the identity doc **only** for

@@ -38,9 +38,25 @@
           "attributeCustomerToReferrer",
           "recordFirstOrderForReferrer"
         ],
-        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store"]
+        "routes/customer.js": [
+          "validateAuthCode",
+          "authCode",
+          "switch-store",
+          "update-address-to-current-location",
+          "newPointCoverage"
+        ]
       },
       "patterns": [
+        {
+          "file": "routes/customer.js",
+          "regex": "'order\\.address\\.updatedBySupport': true",
+          "desc": "the only writer of this flag anywhere in the server - which is what makes update-address-to-current-location the only path that changes an order's delivery address after it was placed"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "address: orderDoc\\.order\\.address",
+          "desc": "the create-time address snapshot on customers.orders[] - the one copy the support address-move endpoint never rewrites, so it is where an order was ACTUALLY placed"
+        },
         {
           "file": "routes/auth.js",
           "regex": "app-type",
