@@ -27,7 +27,9 @@
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js",
-        "services/monitoring/centralized-flow-monitor.js"
+        "services/monitoring/centralized-flow-monitor.js",
+        "services/delivery/assignment-decision-log.js",
+        "routes/customer.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -51,7 +53,13 @@
         ],
         "services/delivery/delayed-assignment.js": [
           "isPendingAssignment",
-          "assignDriverAt"
+          "assignDriverAt",
+          "createPendingDelivery",
+          "assignDriverToPendingDelivery"
+        ],
+        "services/delivery/assignment-decision-log.js": [
+          "NO_AREA_MATCH",
+          "recordAssignmentDecision"
         ],
         "services/delivery/book-delivery.js": [
           "originalBookId"
@@ -166,6 +174,21 @@
           "file": "utils/crons/growth-snapshots.js",
           "regex": "storeReadyAt",
           "desc": "the surviving storeReadyAt locals here read order.completedAt / orderFlowEvents, never bookDelivery.storeReadyAt (0 of 82,414 rows) - if a bookDelivery read reappears, the net-of-kitchen-delay lie is back"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "\\.\\.\\.\\(assignmentResult\\.area \\? \\{ area: assignmentResult\\.area \\} : \\{\\}\\)",
+          "desc": "the atomic claim heals a booking inserted with area:null - GUARDED on truthiness, because the twin mirrored-from-peer result carries the peer's pickup zone and a bare `area: assignmentResult.area` would blank a good area with undefined"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "Booked with no matching delivery area",
+          "desc": "createPendingDelivery records an assignment-decisions row with NO_AREA_MATCH when the dropoff is in a coverage hole - without it, expectedDeliveryAt - pickupTime === 30 is the only evidence anywhere that a delivery was booked outside coverage"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "bookingUpdateSet\\.area = newArea",
+          "desc": "the support address move writes `area` only when it resolved one - the previous unconditional `$set: { area: newArea }` blanked a good area whenever the corrected point missed (4 production rows)"
         },
         {
           "file": "services/monitoring/centralized-flow-monitor.js",

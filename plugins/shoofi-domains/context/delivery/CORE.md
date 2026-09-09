@@ -148,6 +148,30 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
     `order` are whole embedded documents, so a wished-for or misspelled field reads as
     `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
     runs — which looks identical to a correction that is simply rare.
+12. **`bookDelivery.area` can be `null` from birth, and the only fingerprint is the ETA.**
+    `createPendingDelivery` (`services/delivery/delayed-assignment.js`) inserts the booking
+    even when `findBestAreaForLocation` returns null — the customer has paid and the store has
+    accepted, so refusing would strand the order — and `expectedDeliveryAt` then takes the
+    `parseInt(area?.maxETA || 30)` fallback. So **`expectedDeliveryAt − pickupTime === 30` is
+    the signature of a delivery booked outside coverage**, and until
+    shoofi-server `fix/delivery-area-null-on-booking` it was the *only* record of it anywhere:
+    nothing warned, and `createPendingDelivery` writes no `assignment-decisions` row. Beware two
+    traps when using that fingerprint: an area with `maxETA: 0` produces the same 30 via
+    `0 || 30` (7 such rows in one month, `snooshy-kfar-qasim`), and 33 of 89,155 production rows
+    carry a null `area` outright. Such a delivery is also **unassignable** — `findScoredDrivers`
+    runs the same resolver and returns `[]` with `REASONS.NO_AREA_MATCH` — so the 60 s cron
+    retries it forever.
+    **Corollary: an `area` on a delivered row is not evidence it had one at booking.** Two
+    paths backfill it after the fact. `POST /api/customer/:id/update-address-to-current-location`
+    (`routes/customer.js`) re-resolves and writes `area` when support moves the dropoff point —
+    that is how `2933-0642` acquired `"טייבה - שדה"` three minutes after being booked with none;
+    and it used to write `area: newArea` *unconditionally*, blanking a good area whenever the
+    corrected point missed (4 production rows lost theirs that way). The assignment write was
+    the other gap: the atomic claim in `assignDriverToPendingDelivery` carried
+    `//area: assignmentResult.area,` commented out, so the scorer resolved the area to rank
+    drivers and then discarded it. Both now write it guarded on truthiness — never a bare
+    `area: assignmentResult.area`, because the twin mirrored-from-peer result carries the peer's
+    pickup zone, not this side's, and an unguarded `$set` blanks a good area with `undefined`.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
