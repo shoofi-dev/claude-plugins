@@ -157,6 +157,23 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    *(Do not mirror `admin.js:907-944` either — that is the legacy `/stores-export`
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
+8. **Coupons live in `shoofi` and NOWHERE else — but the admin create route picks its DB
+   from the `app-name` header.** Swept all 289 databases on 2026-09-10: `shoofi.coupons`
+   is the only `coupons` collection on the cluster (14,052 docs), and `couponUsages` is
+   auto-created empty in ~225 store DBs but written only in `shoofi` (20,842 rows).
+   Yet `POST /api/admin/coupon/create` resolves its handle with
+   `getOrInitializeDb(req.headers['app-name'], req.app.db)`
+   (`routes/coupon.js:1333-1334`), while **every read path hardcodes central** —
+   `/api/coupons/apply` opens with `req.app.db['shoofi']` (`routes/coupon.js:142`), and so
+   do the auto-apply, wallet and usage routes. It works today only because the admin web's
+   interceptor defaults the header (`shoofi-delivery-web/src/utils/http-interceptor/index.ts:27`,
+   `config.headers["app-name"] = config.headers["app-name"] || 'shoofi'`). A caller that
+   sends a store's `app-name` — a partner-app tool, a script, a new admin screen that
+   forwards the selected store — writes a coupon into that store's DB with **no error**,
+   where nothing can ever find it: it will not apply, will not appear in the wallet, and
+   will not be billed. **Any new coupon-writing code must hardcode `req.app.db['shoofi']`**,
+   which is what every `createCouponFromTemplate` caller already does. The same asymmetry
+   is why a coupon-cost reader must never iterate store DBs looking for `coupons`.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized

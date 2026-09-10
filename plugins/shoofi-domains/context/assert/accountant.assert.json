@@ -13,7 +13,8 @@
         "lib/payments/calc.js",
         "utils/vat.js",
         "utils/greeninvoice.js",
-        "utils/invoice-provider.js"
+        "utils/invoice-provider.js",
+        "routes/coupon.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -101,6 +102,16 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "router\\.post\\('/api/admin/coupon/create'[\\s\\S]{0,400}?getOrInitializeDb\\(appName, req\\.app\\.db\\)",
+          "desc": "CORE invariant 8: the admin coupon CREATE route resolves its DB from the app-name header, so a non-'shoofi' header writes a coupon into a store DB that no read path looks in"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "router\\.post\\('/api/coupons/apply'[\\s\\S]{0,200}?req\\.app\\.db\\['shoofi'\\]",
+          "desc": "CORE invariant 8: coupon redemption hardcodes the central shoofi DB — the asymmetry with the create route is what makes a wrong app-name silently unfindable"
         }
       ]
     }
