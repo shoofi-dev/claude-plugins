@@ -150,6 +150,29 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    a rollback cannot strand a customer who paid while it was on.
 
 ## Known status (human-confirmed — do NOT "fix")
+- **There is NO way to refund one specific HYP transaction id.** `refundTransaction`
+  (`utils/hyp-pay.js`, `action: zikoyAPI`, `Amount` in shekels) is transId-parameterised, but it
+  has exactly one caller — `refundOrderPayment` in `services/payments/order-authorization.js` —
+  which resolves the id from `paymentAuth.captureTransId || ccPaymentRefData.HypTransactionId`.
+  No route, script or admin screen accepts a transId. `POST /api/order/addRefund` only `$push`es
+  a `refundData` note and moves no money; `twin-payment-service.refundPartial` is ZCredit-only;
+  the RN apps' `credit-card/api/refund.ts` is legacy client-side ZCredit (already on the
+  remove-backlog) and cannot touch a HYP id.
+  ⚠️ **`refundOrderPayment` is reachable only by CANCELLING the order** — both callers sit in
+  the cancel-money handler (`routes/order.js`, `releaseOrderAuthorization`). Refunding a
+  *delivered* order therefore marks it `CANCELLED_BY_ADMIN` + `paymentAuth.status: "cancelled"`,
+  restores stock, refunds coins, releases coupons, reverts referrals, cancels the delivery
+  record, notifies the customer and the store, and drops a real sale out of settlement,
+  commission and the exec dashboard. It returns the money and destroys the record of the sale.
+  For a **duplicate debit** (the sale is genuine and its invoice is correct) that is the wrong
+  instrument: credit the extra transaction on the terminal, or build a single-purpose script
+  that calls `refundTransaction` with an explicit `{transId, amount}` and writes to a NEW field,
+  leaving `status`, `paymentAuth.status` and `invoices[]` alone.
+  ⚠️ A `zikoyAPI` credit sends **no invoice params and no `Info`** — it produces **no tax
+  document**, and the credit lands on the terminal with no link back to any order. Capture the
+  returned `Id` at issuance or it is unfindable. `DOC_TYPE.CREDIT_NOTE (330)` exists but is used
+  only for Shoofi→store / Shoofi→driver settlement documents in `routes/hyp.js`; there is no
+  customer-facing credit note anywhere. Tax treatment is an **accountant** handoff.
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.
   HYP tokenization does not store CVV; this resolves as ZCredit is retired. **Do not
   independently rip out CVV handling.**
