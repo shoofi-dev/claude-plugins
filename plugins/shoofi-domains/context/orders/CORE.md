@@ -79,6 +79,27 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     exactly what `originalExpectedDeliveryAt` exists to prevent. Delivery owns the reading rule;
     orders owns the fields, and this is the contract between them.
 
+11. **A per-redemption ceiling on a free-delivery coupon only exists in ONE shape.**
+    `maxDiscount` is ignored for `type: 'free_delivery'` on **both** paths that quote a
+    discount: `computeCouponDiscount` (`utils/coupon-discount.js`) returns the fee outright,
+    and the auto-apply scorer (`routes/coupon.js`) honours `maxDiscount` only inside the
+    `coupon.isFreeDelivery && discountType === 'delivery'` branch — otherwise it falls through
+    to `case 'free_delivery': discountAmount = deliveryFee`, uncapped.
+    `createCouponFromTemplate` writes `isFreeDelivery` only when the template defines it, and
+    no template in `services/coupons/campaign-types.js` does, so **0 of 9,222 live
+    `free_delivery` + `delivery` coupons carry the flag** — setting a ceiling on one changes
+    nothing.
+    The shape that DOES cap, with no code change, is `type: 'fixed_amount'` +
+    `discountType: 'delivery'` + `isFreeDelivery: true` with **`value === maxDiscount ===
+    ceiling`**: the scorer takes the capping branch (`min(deliveryFee, maxDiscount)`) and
+    `computeCouponDiscount` takes `case 'fixed_amount'` (`min(value, deliveryFee)`) — identical
+    numbers on both paths. Note `computeCouponDiscount` reads `maxDiscount` only for
+    `type: 'percentage'`; for `fixed_amount` the cap IS `value`, which is why the two must be
+    equal. Live proof: three production coupons of exactly this shape (one with
+    `minOrderAmount: 70`, `usagePerUser: 3`, ceiling 40) ran 5,853 redemptions between them and
+    never exceeded their ceiling. `value: 0` — what those three use — works for auto-apply but
+    yields 0 if the customer TYPES the code, so set `value` to the ceiling, not 0.
+
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
 `shoofi-app/stores/cart/index.ts` and nothing about it reaches the server until submit, so
