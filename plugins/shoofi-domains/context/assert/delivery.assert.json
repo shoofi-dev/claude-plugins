@@ -27,7 +27,9 @@
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js",
-        "services/monitoring/centralized-flow-monitor.js"
+        "services/monitoring/centralized-flow-monitor.js",
+        "services/exec-dashboard/delivery-metrics.js",
+        "services/exec-dashboard/snapshot.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -64,6 +66,17 @@
           "parsePromisedEta",
           "reassignmentOf",
           "classifyDelivery"
+        ],
+        "services/exec-dashboard/delivery-metrics.js": [
+          "computeLateDeliveries",
+          "courierRoster",
+          "measurableCount",
+          "latePercent",
+          "inMedian"
+        ],
+        "services/exec-dashboard/snapshot.js": [
+          "lateCouriers",
+          "lateCourierRoster"
         ]
       },
       "patterns": [
@@ -171,6 +184,21 @@
           "file": "services/monitoring/centralized-flow-monitor.js",
           "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
           "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+        },
+        {
+          "file": "services/exec-dashboard/snapshot.js",
+          "regex": "late\\.byCourier\\.slice\\(0, 10\\)",
+          "desc": "the stored top-ten late couriers are sliced AFTER computeLateDeliveries has ranked the roster - so the ranking rule lives in the comparator, and re-sorting lateCouriers in the browser can only reorder those ten and never reach an eleventh courier"
+        },
+        {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "accountableDriverId \\|\\| \"unassigned\"",
+          "desc": "the sentinel row for deliveries with no accountable courier - it is a bucket, not a courier, and must stay out of any per-courier ranking"
+        },
+        {
+          "file": "services/exec-dashboard/delivery-metrics.js",
+          "regex": "Math\\.round\\(\\(c\\.lateCount / c\\.measurableCount\\) \\* 1000\\) / 10",
+          "desc": "latePercent is pre-rounded to one decimal - rank on the raw lateCount/measurableCount ratio instead, or the rounding manufactures ties that the tiebreaker then resolves by count"
         }
       ]
     },

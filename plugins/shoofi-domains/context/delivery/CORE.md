@@ -149,6 +149,23 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
     `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
     runs — which looks identical to a correction that is simply rare.
 
+12. **The exec dashboard's per-courier late table is ordered *and* truncated on the server —
+    a client-side sort of it is always wrong.** `computeLateDeliveries` ranks the roster
+    (`services/exec-dashboard/delivery-metrics.js`, the `.sort` after the `latePercent` map)
+    and only then does `services/exec-dashboard/snapshot.js` store
+    `lateCouriers: late.byCourier.slice(0, 10)`. The slice runs **after** the sort, so the
+    stored top-ten is ten rows already chosen by whatever the comparator ranked on; re-sorting
+    that array in `shoofi-delivery-web`'s `LateCouriersDrill` reorders those ten and can never
+    reach an eleventh courier. Ranking changes belong in the comparator, limits stay in
+    `snapshot.js` — the metric returns everything. The house pattern for a **rate** ranking is
+    a floor under the denominator plus a flag, never a filter (`inMedian` on the courier-hour
+    rate is the precedent), because a courier with one late delivery out of one is 100% and
+    would otherwise own the top of every list. Two more traps in the same table: `latePercent`
+    is pre-rounded to one decimal, so rank on the raw `lateCount / measurableCount` or you
+    manufacture ties the data does not have and the tiebreaker then resolves them by count;
+    and the `"unassigned"` sentinel row (no `accountableDriverId`) is a bucket, not a courier
+    — keep it out of any ranking.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
   is the **GLOBAL master switch** for the delivery-company/driver integration — when off,
