@@ -39,6 +39,18 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 1. **Credentials are CENTRAL, not per-store.** ZCredit + HYP-Pay creds all come from
    `shoofi.store {id:1}.credentials` — one platform terminal charges for every store.
    Per-store creds exist only for **invoicing identity** (`store.hyp.*`). Never log values.
+   ⚠️ **An acquirer export cannot be joined to us on the terminal number.** The `מסוף`
+   column in a Shva/acquirer settlement export is the 7-digit **Shva** terminal
+   (e.g. `2677602`, branch `שופי שופינג בע"מ - 2`); `credentials.credentials_terminal_number`
+   (ZCredit, `routes/order.js:616`) and `credentials.hyp_masof` (`utils/hyp-pay.js:14-28`)
+   are both **10-digit gateway** ids. They will never be equal, and a mismatch is **not**
+   evidence the rows are somebody else's. Neither is the `Bin` column joinable — the BIN is
+   stored nowhere. Join on **(card last-4, amount, minute)** instead: `ccPaymentRefData.CardNum`
+   / `ccPaymentRefData.data.Card4Digits` / `paymentData.last4Digits`, against `orders.total`
+   and `orders.created`. One acquirer debit row = one order document; `ReferenceNumber` is
+   `$set`-overwritten per order, so two rows can never belong to the same order. A wallet
+   order is the exception — `L4digit` is the device DPAN, not the funding card
+   (`utils/hyp-pay.js:330-332`), so it joins on amount+minute only.
 2. **Single-capture:** Apple Pay finalize is an atomic `findOneAndUpdate({status:"0"})`, so the
    verify endpoint and the ZCredit callback can't double-charge. Twin = one combined capture.
 3. **Amount-mismatch backstop:** charged total vs `order.total` drift ≥ 0.01 → FRAUD_REVIEW
