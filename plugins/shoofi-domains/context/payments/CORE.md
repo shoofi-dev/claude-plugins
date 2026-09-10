@@ -70,16 +70,19 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    J5 is refused for `orderDoc.twinGroup` at `services/payments/order-authorization.js`. Nor
    can a support recharge: `services/payments/order-recharge.js` deliberately moves only
    `captureTransId` / `capturedAmount` and never `captureAt`.
-   ⚠️ **A duplicate capture is NOT the same as a duplicate charge, and our code overstates
-   this.** `utils/hyp-pay.js` `captureAuthorization` says "a second capture against the same
-   AuthNum was accepted too", which reads as proof HYP charges twice. It is not: the spike it
-   cites (`scripts/hyp-j5-spike.js` step 3) sent a **different `Order` and a different
-   `Amount`**, while two racing captures are byte-identical on `Order`, `Amount`, `AuthNum` and
-   `inputObj.originalUid` (`buildSoftCommonParams` sets `Order: params.orderId`). The
-   identical-replay case has never been characterised. Checked on the terminal 2026-09-10,
-   beit-toest 5909-4046 shows a **single** ₪95 charge — the gateway absorbed the duplicate. So
-   before telling anyone they were charged twice, **check masof `4502086430`**; the order
-   document cannot answer it.
+   ⚠️ **HYP SETTLES BOTH — it does not deduplicate an identical replay.** Confirmed on the
+   terminal 2026-09-10: searching `פרטי העסקה` for `shoofi-capture-5909-4046` returns **two**
+   approved ₪95 rows, `471659113` and `471659115`, one second apart. So a duplicate capture IS
+   a duplicate debit and there is no gateway safety net. (`scripts/hyp-j5-spike.js` step 3
+   never tested this — it varied both `Order` and `Amount`, while two racing captures are
+   byte-identical on `Order`, `Amount`, `AuthNum` and `inputObj.originalUid`;
+   `buildSoftCommonParams` sets `Order: params.orderId`.)
+   **How to check any order for a duplicate debit** — the order document CANNOT tell you, so
+   search masof `4502086430` on the `Info` field, which separates the hold from the captures:
+   the J5 hold is `shoofi-auth-<orderId>`, every capture is `shoofi-capture-<orderId>`
+   (`utils/hyp-pay.js`). Both captures carry identical `Info`, so the answer is a **row
+   count**: 2 rows = two debits. Note which id the order keeps — `captureTransId` was
+   `471659115`, the **second**; `471659113` exists nowhere in Mongo.
    ⚠️ **`capture_failed` is a RETRY state** the sweep comes back to, so nothing that has already
    moved money may write it. A failure *after* the gateway said yes now persists `captured` with
    `postCaptureFailed: true`. And `paymentAuth.status: "capturing"` is deliberately **never
