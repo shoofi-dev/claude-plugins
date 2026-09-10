@@ -17,7 +17,9 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
-        "docs/customer-orders-snapshot.md"
+        "docs/customer-orders-snapshot.md",
+        "utils/coupon-discount.js",
+        "services/coupons/campaign-types.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -36,7 +38,14 @@
           "stockDecremented",
           "stockRestored"
         ],
-        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+        "utils/customer-orders.js": [
+          "getSuccessfulOrdersByCustomerIds"
+        ],
+        "utils/coupon-discount.js": [
+          "computeCouponDiscount",
+          "computeDiscountCap",
+          "computeEffectiveOrderBase"
+        ]
       },
       "patterns": [
         {
@@ -128,6 +137,21 @@
           "file": "routes/app-logs.js",
           "regex": "user_visit_id",
           "desc": "the device-id header, the stable installation identity abandoned-cart sessions are keyed on — NOT orders.deviceId"
+        },
+        {
+          "file": "utils/coupon-discount.js",
+          "regex": "case \"free_delivery\":",
+          "desc": "free_delivery ignores maxDiscount - the uncapped branch (invariant 11)"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "coupon.isFreeDelivery",
+          "desc": "the only auto-apply branch honouring maxDiscount on a delivery coupon (invariant 11)"
+        },
+        {
+          "file": "services/coupons/campaign-types.js",
+          "regex": "CAMPAIGN_COUPON_TYPES",
+          "desc": "campaign coupon template registry (invariant 11)"
         }
       ]
     },
@@ -181,7 +205,10 @@
         "utils/notification/index.ts"
       ],
       "symbols": {
-        "utils/notification/index.ts": ["schedulePushNotification", "store.wav"],
+        "utils/notification/index.ts": [
+          "schedulePushNotification",
+          "store.wav"
+        ],
         "stores/new-order-alerts/index.ts": [
           "takeNewOrders",
           "takeNewOrdersOnRefresh",
