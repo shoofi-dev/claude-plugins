@@ -149,6 +149,21 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
     `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
     runs — which looks identical to a correction that is simply rare.
 
+12. **A month's exec-dashboard numbers come from a stored document, so changing how a metric
+    is computed is not retroactive.** `shoofi.exec-dashboard-snapshots` holds one
+    `{key:"summary"}` plus one `{key:"month", monthKey}` per month, and
+    `GET /api/exec-dashboard/month/:monthKey` is a plain `readMonthDetail` document read —
+    no aggregation at request time, so nothing recomputes because you asked. A computation
+    change lands only when `utils/crons/exec-dashboard-snapshot.js` (03:40 Asia/Jerusalem)
+    or `POST /api/exec-dashboard/refresh` rewrites the month. That cron rewrites all six
+    rolling months every night, so a metric fix settles within a day and needs no backfill
+    script — but "I deployed it and the number is unchanged" is expected, not a bug.
+    Corollary, and the reason the client types look the way they do: months are `$set`-upserted
+    (`services/exec-dashboard/snapshot.js`), so a field added after a month was last computed
+    is simply **absent** on that month rather than zero. Every such field is optional in
+    `shoofi-delivery-web`'s `MonthDetail`/`LateCourier`, and the UI must render an em dash or
+    hide the control — printing `0%` for "not computed yet" reads as a flawless month.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
   is the **GLOBAL master switch** for the delivery-company/driver integration — when off,

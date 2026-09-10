@@ -27,7 +27,10 @@
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js",
-        "services/monitoring/centralized-flow-monitor.js"
+        "services/monitoring/centralized-flow-monitor.js",
+        "services/exec-dashboard/snapshot.js",
+        "routes/exec-dashboard.js",
+        "utils/crons/exec-dashboard-snapshot.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -171,6 +174,21 @@
           "file": "services/monitoring/centralized-flow-monitor.js",
           "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
           "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+        },
+        {
+          "file": "routes/exec-dashboard.js",
+          "regex": "await readMonthDetail\\(req\\.app\\.db, monthKey\\)",
+          "desc": "the month drill-down is a stored-document read, not a request-time aggregation - a metric change shows up only once the snapshot is recomputed"
+        },
+        {
+          "file": "utils/crons/exec-dashboard-snapshot.js",
+          "regex": "\"40 3 \\* \\* \\*\"",
+          "desc": "the 03:40 Israel rewrite of all six rolling months - this is what makes a dashboard computation change take effect, and why it needs no backfill"
+        },
+        {
+          "file": "services/exec-dashboard/snapshot.js",
+          "regex": "\\{ upsert: true \\}",
+          "desc": "month documents are $set-upserted, so a field added later is simply absent on an un-recomputed month - every such field is optional on the client types and must render as an em dash, never as 0"
         }
       ]
     },
