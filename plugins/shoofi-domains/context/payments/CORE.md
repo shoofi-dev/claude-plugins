@@ -48,20 +48,28 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    all three callers hand `captureOrderPayment` a document read earlier — `routes/order.js`
    passes the PRE-update doc, and `utils/crons/order-capture-cron.js` loads its whole due-set
    into memory and then loops it — so an in-memory `status === "captured"` check describes the
-   past, and two callers can both pass it. Nothing downstream will save you: **HYP ACCEPTS a
-   repeat capture against the same `AuthNum`** (and a capture larger than the authorization),
-   proven on their test terminal — see the guard comment in `utils/hyp-pay.js`
-   `captureAuthorization`.
-   ⚠️ **A double capture leaves NO trace on the order.** The second capture overwrites
-   `paymentAuth.captureTransId` and `ccPaymentRefData`, so the first charge is recorded
-   nowhere. To find historical ones, use the ordering tell instead: `captureOrderPayment`
-   writes `paymentAuth.captureAt` and only *then* issues the document, so **`invoices[].issuedAt
-   < paymentAuth.captureAt` is impossible in a single capture run** — it means a second run
-   overwrote `captureAt` after the first had already invoiced. Four orders platform-wide matched
-   as of 2026-09-10 (GCP 9200-4694, GCP 5299-5066, beit-toest 5909-4046,
-   shnitzel-express-taamim 2933-0006). Corroborate in `shoofi.orderFlowEvents`: each shows two
-   `status_change` events a few hundred ms apart, the second a no-op (`"2 → 2"`) — a partner-app
-   double tap.
+   past, and two callers can both pass it.
+   ⚠️ **A duplicate capture leaves NO trace on the order.** The second capture overwrites
+   `paymentAuth.captureTransId` and `ccPaymentRefData`, so the first is recorded nowhere. To
+   find historical ones, use the ordering tell instead: `captureOrderPayment` writes
+   `paymentAuth.captureAt` and only *then* issues the document, so **`invoices[].issuedAt <
+   paymentAuth.captureAt` is impossible in a single capture run** — it means a second run
+   overwrote `captureAt` after the first had already invoiced. It holds across the population:
+   of 1,619 captured J5 orders carrying an invoice, 1,615 have a positive gap (min +107ms,
+   median +184ms) and exactly four are negative (GCP 9200-4694, GCP 5299-5066, beit-toest
+   5909-4046, shnitzel-express-taamim 2933-0006, as of 2026-09-10). Corroborate in
+   `shoofi.orderFlowEvents`: each shows two `status_change` events a few hundred ms apart, the
+   second a no-op (`"2 → 2"`) — a partner-app double tap.
+   ⚠️ **A duplicate capture is NOT the same as a duplicate charge, and our code overstates
+   this.** `utils/hyp-pay.js` `captureAuthorization` says "a second capture against the same
+   AuthNum was accepted too", which reads as proof HYP charges twice. It is not: the spike it
+   cites (`scripts/hyp-j5-spike.js` step 3) sent a **different `Order` and a different
+   `Amount`**, while two racing captures are byte-identical on `Order`, `Amount`, `AuthNum` and
+   `inputObj.originalUid` (`buildSoftCommonParams` sets `Order: params.orderId`). The
+   identical-replay case has never been characterised. Checked on the terminal 2026-09-10,
+   beit-toest 5909-4046 shows a **single** ₪95 charge — the gateway absorbed the duplicate. So
+   before telling anyone they were charged twice, **check masof `4502086430`**; the order
+   document cannot answer it.
    ⚠️ **`capture_failed` is a RETRY state** the sweep comes back to, so nothing that has already
    moved money may write it. A failure *after* the gateway said yes now persists `captured` with
    `postCaptureFailed: true`. And `paymentAuth.status: "capturing"` is deliberately **never
