@@ -60,6 +60,16 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    5909-4046, shnitzel-express-taamim 2933-0006, as of 2026-09-10). Corroborate in
    `shoofi.orderFlowEvents`: each shows two `status_change` events a few hundred ms apart, the
    second a no-op (`"2 → 2"`) — a partner-app double tap.
+   ⚠️ **That count is a FLOOR, not a census** — the ordering test has false negatives. This
+   interleaving is equally legal and leaves a *positive* gap: run A writes `captureAt`, run B
+   overwrites it, and only then does A issue the documents. To count duplicates properly use
+   the no-op `status_change` pairs, or two `[HYP] captureAuthorization(J4) result` lines for one
+   `orderId` — those logs are kept **7 days** (`utils/crons/opensearch-log-retention.js`), so
+   anything older can only be answered from the acquirer's clearing report.
+   Twin orders cannot produce this fingerprint at all: a twin leg has **no `paymentAuth`** —
+   J5 is refused for `orderDoc.twinGroup` at `services/payments/order-authorization.js`. Nor
+   can a support recharge: `services/payments/order-recharge.js` deliberately moves only
+   `captureTransId` / `capturedAmount` and never `captureAt`.
    ⚠️ **A duplicate capture is NOT the same as a duplicate charge, and our code overstates
    this.** `utils/hyp-pay.js` `captureAuthorization` says "a second capture against the same
    AuthNum was accepted too", which reads as proof HYP charges twice. It is not: the spike it
