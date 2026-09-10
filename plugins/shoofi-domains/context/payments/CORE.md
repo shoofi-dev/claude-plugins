@@ -128,6 +128,26 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
   either path in production, confirm on a masof with invoicing enabled that: the exempt
   document is titled קבלה with no VAT line, and the document total equals the amount
   charged.
+- **"Cancelled" never means "refunded" — read the order's own money fields.** Cancelling
+  settles the money *before* the status (`routes/order.js:5334-5362`), and the decision is
+  **persisted on the order**: `orders.cancelMoneyDecision` (`"refund"` | `"keep"`, defaulting
+  to `refund` unless support explicitly picks keep), `cancelMoneyDecisionAt`,
+  `cancelMoneyDecisionBy`, alongside the free-text `orders.cancelReason`. Reconcile against
+  those three, never against `status ∈ CANCEL_STATUSES`.
+  ⚠️ **`refundRequired: true` means the money is still ours.** `refundOrderPayment` refuses
+  ZCredit orders and twins outright and writes `paymentAuth.refundRequired` /
+  `refundRequiredReason` / `refundRequiredAmount` / `refundRequiredAt`
+  (`services/payments/order-authorization.js:665-680`) for a human to settle in the gateway
+  back office. A completed reversal is `paymentAuth.refundedAt` + `refundTransId`
+  (`:743`); `refundRequired: true` with those empty is a refund **ordered and never executed**.
+  `paymentAuth.status: "release_failed"` (`RELEASE_FAILED`, `:98`) is the same shape for a
+  hold that could not be released. And because `zikoyAPI` issues a *new credit* transaction,
+  a real reversal shows up as a separate זיכוי row in the acquirer export — a debit row is
+  never removed, so **an export with no credit rows proves no refund was transmitted.**
+  ⚠️ **Anything cancelled before 2026-08-16 carries no money decision at all.** The
+  settle-before-cancel block landed that day (`45f16304`, `91204d76`); earlier cancellations
+  simply left the charge in place with nothing recorded and nothing flagged. Do not read a
+  missing `cancelMoneyDecision` on an older order as "no refund was due".
 - **`hyp_enabled` is a PLATFORM tokenization switch, NOT a chargeability gate.** It lives on the
   `app-name: "shoofi"` config document and is served through `SHOOFI_CONFIG_PUBLIC_FIELDS`
   (`routes/store.js`), alongside rollout flags like `isTwinEnabledForAll`. It has **zero**
