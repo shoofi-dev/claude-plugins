@@ -14,7 +14,9 @@
         "lib/schemas/creditCard.json",
         "services/twin-order/twin-payment-service.js",
         "routes/twin-order.js",
-        "routes/store.js"
+        "routes/store.js",
+        "services/payments/order-authorization.js",
+        "utils/crons/order-capture-cron.js"
       ],
       "symbols": {
         "utils/hyp-pay.js": [
@@ -33,6 +35,11 @@
           "resolveSavedCard",
           "chargeCombinedHyp",
           "refundPartial"
+        ],
+        "services/payments/order-authorization.js": [
+          "claimCaptureSlot",
+          "captureOrderPayment",
+          "recordCapturedDespiteError"
         ]
       },
       "patterns": [
@@ -75,6 +82,21 @@
           "file": "routes/store.js",
           "regex": "hyp_enabled",
           "desc": "platform tokenization rollout flag — NOT read by any charge path"
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "claimCaptureSlot",
+          "desc": "CORE invariant 2: the atomic claim that makes the J5 capture single-capture. If this disappears, the double charge of GCP 9200-4694 is back."
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "CAPTURING:\\s*\"capturing\"",
+          "desc": "the in-flight capture state. buildQuery in utils/crons/order-capture-cron.js must never match it — an order stuck here is IN DOUBT, not retryable."
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "gatewayCapturedTransId",
+          "desc": "CORE invariant 2: marks that HYP took the money, so a later failure cannot write capture_failed and hand a paid order back to the retry sweep"
         }
       ]
     },

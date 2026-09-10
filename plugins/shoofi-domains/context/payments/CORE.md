@@ -41,6 +41,32 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    Per-store creds exist only for **invoicing identity** (`store.hyp.*`). Never log values.
 2. **Single-capture:** Apple Pay finalize is an atomic `findOneAndUpdate({status:"0"})`, so the
    verify endpoint and the ZCredit callback can't double-charge. Twin = one combined capture.
+   The J5 capture path is atomic too, but only since 2026-09-10 — `claimCaptureSlot`
+   (`services/payments/order-authorization.js`) moves `paymentAuth.status`
+   `authorized|capture_failed → capturing` in one conditional `updateOne`, and only the caller
+   that moved the document calls HYP. **The gate is the DATABASE, never `order.paymentAuth`**:
+   all three callers hand `captureOrderPayment` a document read earlier — `routes/order.js`
+   passes the PRE-update doc, and `utils/crons/order-capture-cron.js` loads its whole due-set
+   into memory and then loops it — so an in-memory `status === "captured"` check describes the
+   past, and two callers can both pass it. Nothing downstream will save you: **HYP ACCEPTS a
+   repeat capture against the same `AuthNum`** (and a capture larger than the authorization),
+   proven on their test terminal — see the guard comment in `utils/hyp-pay.js`
+   `captureAuthorization`.
+   ⚠️ **A double capture leaves NO trace on the order.** The second capture overwrites
+   `paymentAuth.captureTransId` and `ccPaymentRefData`, so the first charge is recorded
+   nowhere. To find historical ones, use the ordering tell instead: `captureOrderPayment`
+   writes `paymentAuth.captureAt` and only *then* issues the document, so **`invoices[].issuedAt
+   < paymentAuth.captureAt` is impossible in a single capture run** — it means a second run
+   overwrote `captureAt` after the first had already invoiced. Four orders platform-wide matched
+   as of 2026-09-10 (GCP 9200-4694, GCP 5299-5066, beit-toest 5909-4046,
+   shnitzel-express-taamim 2933-0006). Corroborate in `shoofi.orderFlowEvents`: each shows two
+   `status_change` events a few hundred ms apart, the second a no-op (`"2 → 2"`) — a partner-app
+   double tap.
+   ⚠️ **`capture_failed` is a RETRY state** the sweep comes back to, so nothing that has already
+   moved money may write it. A failure *after* the gateway said yes now persists `captured` with
+   `postCaptureFailed: true`. And `paymentAuth.status: "capturing"` is deliberately **never
+   swept** — an order stuck there is IN DOUBT (the process died between the HYP call and the
+   write), and re-capturing it is the bug this invariant exists to prevent.
 3. **Amount-mismatch backstop:** charged total vs `order.total` drift ≥ 0.01 → FRAUD_REVIEW
    (twin exempt). **Keep it.**
 4. **Session terms-guard:** repointing a pending order onto a session with a different total is
