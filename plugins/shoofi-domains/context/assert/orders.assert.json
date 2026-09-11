@@ -15,6 +15,7 @@
         "consts/consts.js",
         "utils/order-stock.js",
         "utils/customer-orders.js",
+        "utils/order-pricing.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
         "docs/customer-orders-snapshot.md"
@@ -36,7 +37,8 @@
           "stockDecremented",
           "stockRestored"
         ],
-        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"],
+        "utils/order-pricing.js": ["calculateExtrasPrice", "missingProductIds"]
       },
       "patterns": [
         {
@@ -137,7 +139,9 @@
         "stores/cart/index.ts",
         "screens/checkout/index.tsx",
         "components/checkout/FutureOrderPicker.tsx",
-        "hooks/checkout/use-checkout-validate.ts"
+        "hooks/checkout/use-checkout-validate.ts",
+        "components/extras-controls/ExtrasSection.tsx",
+        "helpers/extras-defaults.ts"
       ],
       "patterns": [
         {

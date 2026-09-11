@@ -78,6 +78,30 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     (`services/delivery/late-delivery.js`) look like a genuine promise and vice versa, which is
     exactly what `originalExpectedDeliveryAt` exists to prevent. Delivery owns the reading rule;
     orders owns the fields, and this is the contract between them.
+11. **A WEIGHT ORDER LINE CARRIES A BARE NUMBER AND NOTHING ELSE.** For a by-weight product
+    (butchers, greengrocers, roasteries — 46 store DBs, 13,057 live order lines) the item
+    holds `selectedExtras[extraId]` = a bare number in `step` units, and that is all:
+    `produtsAdapter` (`shoofi-app/stores/cart/index.ts`) sends neither the extras
+    **definition** nor `basePrice`. Three consequences:
+    - **`qty` is always `1`** — the cart replaces the quantity stepper with a weight counter
+      (`shoofi-app/screens/cart/cart.tsx`). Counting `qty` undercounts a butcher's order, and
+      `utils/order-stock.js` moves stock by 1 whether the customer bought 0.5kg or 5kg.
+    - **The number has no unit.** One store can carry `step 100 / defaultValue 1000` (grams)
+      and `step 0.5 / defaultValue 1` (kg) on different products, so `1500` is grams on one
+      line and kilos on the next. A weight is only meaningful against the product's own
+      `extras[]` in that store's DB — and the partner ticket prints it raw as `1500x`
+      (`components/order-invoice/`), which reads as a quantity.
+    - **Resolve it late, and expect it to fail.** If the store retyped the extra after the
+      order, the `selectedExtras` key matches nothing, `calculateExtrasPrice` returns 0 and an
+      amend reprices the line to the bare default weight with no warning —
+      `missingProductIds` (`utils/order-pricing.js`) only catches deleted *products*, not
+      deleted *extras*.
+    Before 2026-09-11, **4,018 of those 13,057 lines (30.8%) carried no weight key at all**:
+    the customer accepted the weight the counter already displayed and nothing wrote it into
+    the selection (`shoofi-app/components/extras-controls/ExtrasSection.tsx`, now seeded via
+    `helpers/extras-defaults.ts`). **Those historical lines mean the default weight.** They
+    are not zero-weight orders and their price is correct — reporting them as missing data, or
+    backfilling them as 0, is the wrong reading.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
