@@ -13,13 +13,22 @@
         "utils/invoice-mail.js",
         "lib/schemas/creditCard.json",
         "services/twin-order/twin-payment-service.js",
+        "services/payments/order-authorization.js",
         "routes/twin-order.js",
         "routes/store.js"
       ],
       "symbols": {
         "utils/hyp-pay.js": [
           "buildCcPaymentRefData",
-          "chargeToken"
+          "chargeToken",
+          "cancelAuthorization",
+          "refundTransaction"
+        ],
+        "services/payments/order-authorization.js": [
+          "releaseOrderAuthorization",
+          "refundOrderPayment",
+          "AUTH_STATUS",
+          "AUTH_VALIDITY_DAYS"
         ],
         "utils/invoice-mail.js": [
           "saveInvoice"
@@ -75,6 +84,26 @@
           "file": "routes/store.js",
           "regex": "hyp_enabled",
           "desc": "platform tokenization rollout flag — NOT read by any charge path"
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "captureTransId \\|\\| ref\\.HypTransactionId",
+          "desc": "CORE invariant 11: a refund needs a CAPTURE id — an uncaptured J5 hold has none, so the refund path can only ever fail on one"
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "wasCharged",
+          "desc": "CORE invariant 11: the guard that stops a refused hold release being retried as a refund (order 3599-5178)"
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "refundRequiredReason",
+          "desc": "CORE invariant 11: refundRequired is written for BOTH an unreturned charge and an unreleased hold — the reason plus capturedAmount/captureTransId is the only way to tell them apart"
+        },
+        {
+          "file": "utils/crons/order-capture-cron.js",
+          "regex": "paymentAuth\\.refundRequired",
+          "desc": "CORE invariant 11: the capture sweep's second guard — what kept 3599-5178 from being charged while its status still read \"authorized\""
         }
       ]
     },

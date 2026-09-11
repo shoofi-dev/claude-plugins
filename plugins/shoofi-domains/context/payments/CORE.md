@@ -101,6 +101,29 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    sale — and never fails the order: failures land on `order.invoices[]` and are retried by
    `utils/crons/invoice-retry-cron.js`, which is deliberately **not** gated on the flag so
    a rollback cannot strand a customer who paid while it was on.
+11. **Releasing a HOLD and refunding a CHARGE are different operations on different
+   transactions — a refused release must never fall back to a refund.** On cancel,
+   `releaseOrderAuthorization` (`services/payments/order-authorization.js`) sends HYP
+   `CancelTrans` against `paymentAuth.transId`; `refundOrderPayment` sends `zikoyAPI`
+   against `paymentAuth.captureTransId || ccPaymentRefData.HypTransactionId`. **Until a
+   capture has happened the second id does not exist**, so an uncaptured hold routed into
+   the refund path can only fail — and it fails destructively: it overwrites the real
+   reason with `refund_no_transaction_id`, and `refundOrderPayment`'s flag writer never
+   touches `paymentAuth.status`, so the `AUTH_STATUS.RELEASE_FAILED` argument is silently
+   dropped and the authorization goes on reading `"authorized"`. Gate the refund on
+   "was it charged", never on `autoRefund` alone.
+   ⚠️ **`paymentAuth.refundRequired` does NOT mean money is owed to the customer.** The
+   same flag is written for a charge we could not return AND for a hold we could not
+   release. Read `capturedAmount` / `captureTransId` before acting: both `null` with
+   `status` `"authorized"` or `"release_failed"` means **nothing was ever charged**, and a
+   manual זיכוי there hands the customer money that never left their account. Proven on
+   `royal-cheese-butchery` order `3599-5178` (2026-09-08, ₪147.4, `ccPaymentRefData.data.CCode`
+   `"700"` = authorization, no capture), which the admin card labelled "דורש החזר ידני".
+   An unreleasable hold lapses by itself at `paymentAuth.expiresAt` (`AUTH_VALIDITY_DAYS`, 5
+   days), so "do nothing" is usually the correct manual action.
+   ⚠️ There is **no durable record of why a gateway refused a release** before 2026-09-11:
+   the CCode reached `console.error` only. `paymentAuth.refundError` carries it now.
+   `shoofi.orderFlowEvents` records the `status_change` and never the money outcome.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.
