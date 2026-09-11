@@ -14,13 +14,18 @@
         "utils/order-stock.js",
         "services/database/DatabaseInitializationService.js",
         "docs/stock-management.md",
-        "docs/menu-search.md"
+        "docs/menu-search.md",
+        "utils/weight-extra-invariant.js",
+        "utils/order-pricing.js",
+        "scripts/fix-weight-extras-price-invariant.js"
       ],
       "symbols": {
         "utils/menu-cache.js": ["clearStore", "getStats"],
         "utils/order-stock.js": ["decrementOrderStock", "restoreOrderStock"],
-        "routes/product.js": ["menuCache", "supportedCategoryIds"],
-        "routes/menu.js": ["outOfStockExtras", "categoryOrders"]
+        "routes/product.js": ["menuCache", "supportedCategoryIds", "normalizeWeightExtraPrice"],
+        "routes/menu.js": ["outOfStockExtras", "categoryOrders"],
+        "utils/weight-extra-invariant.js": ["normalizeWeightExtraPrice", "getSoleWeightExtra"],
+        "utils/order-pricing.js": ["calculateExtrasPrice"]
       },
       "patterns": [
         {
@@ -37,6 +42,16 @@
           "file": "routes/product.js",
           "regex": "outOfStockByQuantity",
           "desc": "stock invariant field"
+        },
+        {
+          "file": "utils/weight-extra-invariant.js",
+          "regex": "defaultValue / step",
+          "desc": "by-weight price invariant (doc CORE invariant 7)"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "extrasCountWithoutGroup",
+          "desc": "branch A/B weight formula selector (doc CORE invariant 8)"
         }
       ]
     }

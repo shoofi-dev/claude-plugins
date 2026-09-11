@@ -39,6 +39,25 @@ boundary and say so in the PR.
 5. **`supportedCategoryIds` are STRINGS**, compared via `{$toString:'$_id'}`. Don't switch to
    ObjectId comparison without a data migration.
 6. **Product ordering** comes from `categoryOrders[categoryId]`, falling back to legacy `order`.
+7. **BY-WEIGHT PRICE INVARIANT** — for a product whose ONLY non-group-header extra has
+   `type: "weight"` (a butcher's cut, a greengrocer's tomatoes):
+   `product.price === extra.price * (extra.defaultValue / extra.step)`.
+   `extra.price` is the price of one `step`, and the shelf price already buys `defaultValue`.
+   Enforced on write by `utils/weight-extra-invariant.js`, called from all three product
+   write paths in `routes/product.js` — insert, update, and `create-from-mock`. It re-derives
+   `extra.price` from the shelf price and never the other way round: `product.price` is the
+   number the customer already read on the storefront.
+   `scripts/fix-weight-extras-price-invariant.js` is the one-shot repair for products already
+   in the data. Violate it and every weight but the default carries a constant offset; at the
+   minimum weight the line can land at 0.
+8. **The weight formula is chosen by how many extras the product has**, in
+   `utils/order-pricing.js` `calculateExtrasPrice`: branch B (weight is the only
+   non-group-header extra) charges the delta from `defaultValue`; branch A (weight alongside
+   anything else) bundles the first step and charges `price * (val/step - 1)`. **Adding a
+   second extra to a by-weight product flips B to A and nearly doubles the price** — a 30₪/kg
+   product at 1kg goes to 57₪ — and `routes/order-amend.js` reprices an existing order against
+   today's extras, so the flip applies retroactively. Nothing warns. The extras editor
+   (`ExtraEditModal.tsx` in both delivery-web and partner) is the place to stop it.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** translations resolve to the **central** DB — UI labels are global/platform-wide,
@@ -51,8 +70,10 @@ boundary and say so in the PR.
   2. Remove the dead lunr index (`lib/indexing.js` + its `indexProducts` call sites) — it indexes
      fields the schema doesn't have and runs on every product write. Touches product-write paths;
      test after.
-- **Recorded risk, not yours to fix:** the server trusts client-sent extras prices (no server-side
-  recompute). Any fix lives in the order-create path — hand off.
+- **Recorded risk, not yours to fix:** order-create still charges the client-sent price
+  (`routes/order.js`); the server recompute added since — `utils/order-pricing.js` — is
+  authoritative only on amend and runs as an unread shadow at create
+  (`serverPricing.driftDetected`). Any fix lives in the order-create path — hand off.
 
 ## Recipe — add/modify a product field
 1. Server: accept + persist it in the product insert/update handlers (`routes/product.js`).
