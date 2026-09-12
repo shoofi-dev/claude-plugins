@@ -36,6 +36,20 @@ has **BOTH** `supportedCities` (permission) **AND** `supportedAreas` (the wired 
 **fully replaces** company coverage.
 **ID trap:** `area.cityId` is a **string**, cities/`supportedCities` are **ObjectIds** — always
 normalize (`getId()` / `.toString()`).
+**There is no "active delivery company" flag — do not invent one.** `delivery-company.store`
+(168 docs, measured 2026-09-12) has **no** `isActive`, **no** `business_visible`, **no**
+`isDeleted` and **no** `isMockStore`, so there is no equivalent of the stores registry's
+`LIVE_STORE_FILTER`. It does carry a boolean `status` (69 true / 99 false) and **that is not an
+activity flag**: of the 35 companies that completed a delivery in the August 2026 business
+month, **8 had `status: false`**. Nothing in the codebase filters companies on it — the driver
+report generator is `deliveryDb.store.find({})` (`routes/driver-reports.js`) and the payments
+admin passes an empty predicate (`routes/payments/admin.js`). The only honest predicate is
+**behavioural**: distinct companies with a completed delivery in the window, read off
+`book-delivery` as `company._id` falling back to `driver.companyId` (both strings holding an
+ObjectId), with `created` compared against **offset strings** and completion taken from the
+shared `COMPLETED_DELIVERY_MATCH` in `services/delivery/late-delivery.js`. That is what
+`services/exec-dashboard/spend-metrics.js` (`countActiveDeliveryCompanies`) does, and it is
+why its coverage meter reads 34/35 rather than a meaningless 34/168.
 **`isActive` trap — an area is dispatchable only on a STRICT `true`.** `findBestAreaForLocation`
 builds `areaQuery.isActive = true` (`services/delivery/assignDriver.js`), and the coverage-alert
 and store-availability crons filter the same way. But **`POST /api/delivery/area/add` never sets

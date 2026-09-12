@@ -27,7 +27,8 @@
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js",
-        "services/monitoring/centralized-flow-monitor.js"
+        "services/monitoring/centralized-flow-monitor.js",
+        "services/exec-dashboard/spend-metrics.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -171,6 +172,16 @@
           "file": "services/monitoring/centralized-flow-monitor.js",
           "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
           "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+        },
+        {
+          "file": "services/exec-dashboard/spend-metrics.js",
+          "regex": "countActiveDeliveryCompanies",
+          "desc": "CORE: delivery-company.store has no usable active flag (its boolean status is not one), so an active company is one with a completed delivery in the window - read off book-delivery as company._id || driver.companyId"
+        },
+        {
+          "file": "services/exec-dashboard/spend-metrics.js",
+          "regex": "COMPLETED_DELIVERY_MATCH",
+          "desc": "CORE: the completion rule is imported from services/delivery/late-delivery.js, never re-typed, so the dashboard cannot disagree with itself about what completed means"
         }
       ]
     },
