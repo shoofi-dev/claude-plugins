@@ -95,6 +95,21 @@ pickupTime + area.maxETA`.
 - **`isActive` (on shift/enabled) ≠ `isAvailable` ≠ `isOnline`** — three separate flags.
 - **Location**: `POST /api/delivery/driver/location` writes `currentLocation` (GeoJSON) +
   `driverLocationHistory` (TTL) + broadcasts to admin/tracking. Driver app sends fg (10s) + background.
+  **The driver app REPLAYS failed posts from AsyncStorage** (`retryFailedBackgroundUpdates`,
+  and the background task replays `locations[0]` = the OLDEST fix of a batch), re-sending the
+  original device `location.timestamp` (epoch ms). So the request body's `timestamp` may be
+  minutes or hours old: the route parses it into `fixAt` (BSON Date) and only applies
+  `currentLocation`/`locationMetadata`/`isOnline`/`lastLocationUpdate` when the fix is **not
+  older than the driver's stored `lastFixAt`** — a guard in the `updateOne` FILTER, so it is
+  atomic. A rejected fix still returns **200** (with `stale: true`) and is still inserted into
+  `driverLocationHistory` (marked `isStale`), but is **not broadcast**. Safety valve: a stored
+  `lastFixAt` older than 10 minutes is overridden, so a skewed device clock can't strand a
+  driver. Don't "simplify" this back to an unconditional `$set` — it caused 19 measured
+  teleport-and-back spikes (up to 17 km) across 9 of 59 active drivers on 2026-09-12.
+- **Driver-map read**: `GET /api/delivery/drivers/locations` windows on `lastLocationUpdate`
+  (an OFFSET STRING, so compare via `$expr` + `$dateFromString`, never a raw string `$gte` —
+  that mis-windows by an hour across DST); `includeOffline=true` drops the window entirely.
+  ⚠️ **`delivery-company.store` docs have NO `name`** (0 of 168) — they carry `nameHE`/`nameAR`.
 - **Shifts** (`routes/driver-shift-manager.js`, `driverShifts` collection): booking system
   gated by `useBookingSystem`; peak-hours per `cityArea`; permanent-drivers; block/unblock.
 
@@ -110,10 +125,13 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   expectedDeliveryAt, area(embedded), company(embedded), driver(embedded), bookId,
   originalBookId, appName, customerLocation, order(snapshot), twinGroupId,
   twinPickupSequence, twinAssignmentMode, twinPeer, twinDegraded, *DelayNotified*}`.
-- `store` (company) — `location, coverageRadius, supportedCities[ObjectId], supportedAreas
+- `store` (company) — `nameHE, nameAR (NO plain 'name' — 0 of 168 docs have one),
+  location, coverageRadius, supportedCities[ObjectId], supportedAreas
   [{areaId,price,minOrder,eta}], isControlledByAdmin, manualAssignmentOnly, accounting`.
 - `customers` (drivers) — `role, isActive, isAvailable, isOnline, companyId(string),
-  currentLocation, lastLocationUpdate, personalSupportedAreas[areaId], maxOrdersByAdmin,
+  currentLocation, lastLocationUpdate (offset STRING = server receive time),
+  lastFixAt (BSON Date = device fix time, the staleness guard's key),
+  personalSupportedAreas[areaId], maxOrdersByAdmin,
   storeAssignmentMode, assignedStoreAppNames[]`.
 - Geo: `cities, parentCities, cityAreas, areas, areasGeometry`. Ops: `driverStatusHistory,
   driverLocationHistory(TTL), driverShifts, driverDailyHours, deliveryConfig`.

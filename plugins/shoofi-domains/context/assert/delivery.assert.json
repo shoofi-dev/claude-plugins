@@ -180,7 +180,7 @@
         {
           "file": "routes/delivery/driver.js",
           "regex": "driverLocationHistory",
-          "desc": "the GPS trail collection; its timestamp field is RECEIVE time, not the device fix time"
+          "desc": "the GPS trail collection; its timestamp field is RECEIVE time - the device fix time is the separate fixAt field (BSON Date), which is also what the currentLocation staleness guard compares against customers.lastFixAt"
         }
       ]
     },
