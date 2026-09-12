@@ -17,9 +17,17 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
+        "routes/coins.js",
+        "services/coins/coins-service.js",
+        "services/coins/coin-buckets.js",
         "docs/customer-orders-snapshot.md"
       ],
       "symbols": {
+        "services/coins/coin-buckets.js": ["computeAvailableBalance"],
+        "services/coins/coins-service.js": [
+          "calculateAvailableBalance",
+          "expireCoins"
+        ],
         "routes/order.js": [
           "processCreditCardPayment",
           "processHypTokenPayment",
@@ -123,6 +131,21 @@
           "file": "routes/app-logs.js",
           "regex": "created: new Date\\(\\)",
           "desc": "apps-logs.created is a real BSON Date — the opposite of orders.created, which is an offset string (CORE: where an order that never happened lives)"
+        },
+        {
+          "file": "services/coins/coins-service.js",
+          "regex": "balance:\\s*availableBalance",
+          "desc": "the coins balance endpoints return the expiry-replayed figure, NOT coinsDoc.balance - if this ever reads the stored counter, CORE invariant 11 is inverted and every surface overstates the customer's coins"
+        },
+        {
+          "file": "services/coins/coin-buckets.js",
+          "regex": "function computeAvailableBalance",
+          "desc": "the FIFO-by-expiry replay that defines spendable balance (CORE invariant 11)"
+        },
+        {
+          "file": "routes/coins.js",
+          "regex": "coinsService\\.expireCoins",
+          "desc": "expireCoins is reachable ONLY from this admin endpoint - if a cron in utils/crons/ ever calls it too, the stored balance stops drifting and CORE invariant 11's 'permanent and large' claim needs revisiting"
         },
         {
           "file": "routes/app-logs.js",

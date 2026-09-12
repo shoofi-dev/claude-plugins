@@ -78,6 +78,20 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     (`services/delivery/late-delivery.js`) look like a genuine promise and vice versa, which is
     exactly what `originalExpectedDeliveryAt` exists to prevent. Delivery owns the reading rule;
     orders owns the fields, and this is the contract between them.
+11. **`shoofi.customer-coins.balance` is NOT what the customer can spend — never read the
+    field.** The spendable figure is a FIFO-by-expiry replay of the embedded
+    `transactions[].expiresAt` (`computeAvailableBalance`, `services/coins/coin-buckets.js`,
+    reached through `calculateAvailableBalance` in `services/coins/coins-service.js`), and that
+    replayed number is what `GET /api/coins/balance/:storeAppName` and every app surface show.
+    The sweep that would reconcile the two, `expireCoins` (`coins-service.js`), is wired **only**
+    to the admin endpoint in `routes/coins.js` — **no cron calls it** — so in production the
+    stored counter is never decremented for expired buckets and the drift is permanent and
+    large: a live customer at `joker` reads `balance: 16`, `totalRedeemed: 0`, four `earn`
+    transactions and **3** coins actually spendable, the other three buckets having aged past
+    their `expiresAt`. Any query, report or support answer that reads `balance` overstates what
+    the customer has, i.e. promises them money. The window is per-store
+    `store.coinsSettings.expiryDays` in the **store's own** DB (not `shoofi`); `expiresAt: null`
+    means never expires, and `refund`/`reconcile` credits are written that way deliberately.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
