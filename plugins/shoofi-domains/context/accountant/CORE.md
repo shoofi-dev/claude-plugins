@@ -158,6 +158,28 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
 
+8. **`store-reports.status` is NOT the truth of "was this store billed".** The three
+   statuses are only `draft` → `approved` → `sent` (`routes/payments/admin-reports.js`
+   `:1332`, `:2086`, `:2250`), and `sent` means the PDF reached the store's billing
+   contacts. Issuing the **tax invoice** is a separate action with **no status guard** —
+   `POST /api/hyp/create-invoice` (`routes/hyp.js:138`) checks only that an invoice does
+   not already exist (`:148-151`) and then invoices `reportData.totalOutcomes` (`:190`).
+   So a **draft can carry a real, issued tax invoice**, and a `sent` report can carry
+   none. Measured in production 2026-09-12: 37 non-sent reports (₪10.6K) have an invoice,
+   and 41 `sent` reports (₪21.5K) do not.
+   - "Was an invoice issued" = `hypInvoiceDocUuid` / `hypInvoicePdfLink` (`hyp.js:278-285`)
+     or `greenInvoiceId` (`admin-reports.js:2878`). "Was it collected" = the
+     `transferPerformed` / `invoiceReceived` booleans.
+   - `reportSent` is a **different field and is never set by `/send`** (`:2246-2255`
+     writes only `status`, `sentAt`, `updatedAt`), so `reportSent: false` on a
+     `status: 'sent'` document is normal. Do not read it as a signal.
+   - Any "how much did we bill" aggregate must therefore **state which definition it
+     used**. `status: 'sent'` is the one that does not double-count: carry-over
+     compensations are settled only on send (`:2266-2276`) and are pulled with no date
+     filter at all (`:932-948`), so the same compensation sits in every draft for that
+     store until one report goes out. `services/exec-dashboard/billing-metrics.js` sums
+     `sent` and carries the invoiced-but-not-sent gap beside it rather than folding it in.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.

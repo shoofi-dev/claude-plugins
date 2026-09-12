@@ -101,6 +101,21 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "const totalForInvoice\\s*=\\s*reportData\\.totalOutcomes\\s*\\|\\|\\s*0",
+          "desc": "CORE invariant 8: the store tax invoice is written for reportData.totalOutcomes — so totalOutcomes is what 'we billed this store' means, and any aggregate of billing must sum that field"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "if\\s*\\(report\\.hypInvoicePdfLink\\)\\s*\\{",
+          "desc": "CORE invariant 8: create-invoice's ONLY guard is 'an invoice already exists' — there is no report.status check, so a draft can carry a real issued tax invoice and `status` is not the truth of 'billed'. If a status gate is added here, invariant 8 needs rewriting"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "status:\\s*'sent',\\s*sentAt:\\s*new Date\\(\\),\\s*updatedAt:\\s*new Date\\(\\)",
+          "desc": "CORE invariant 8: /send writes status + sentAt + updatedAt and nothing else — it does NOT set the separate `reportSent` boolean, so reportSent:false on a sent report is normal and must never be read as a signal"
         }
       ]
     }
