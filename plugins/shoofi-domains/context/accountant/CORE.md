@@ -174,11 +174,17 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      neither is a series here; `totalDriverCharges` (money drivers owe Shoofi) is not netted
      off either. Measured 2026-08 the top-up alone (₪30,153) nearly equalled the entire
      chart (₪31,468). **Never quote this chart as "what Shoofi spent".**
-     *(The top-up — the larger of the two omissions — is being added as a sixth series
-     `driverMinGuarantee` / "השלמה משופי" on branch
-     `feat/shoofi-expenses-min-guarantee-series` in shoofi-server + shoofi-delivery-web,
-     requested 2026-09-12. Once that merges, drop it from this list and keep the rest:
-     over 2026-03..08 it takes the six-month total from ₪231,315 to ₪307,683.)*
+     **The trap that hid the credit-card coupons for so long: `earningsByCouponsFromCreditCard`
+     is NOT a top-level report total.** It is stored **per driver** in
+     `reportData.driverPayments[]` (`routes/driver-reports.js:257,312`), and even the report
+     PDF re-totals it on the fly (`:872-873`). A `$sum` on `$reportData.earningsByCouponsFromCreditCard`
+     returns 0 for every report ever written — it needs a `$map` over `driverPayments` first.
+     The CASH twin `earningsByCoupons` *is* a top-level field; the two are gated on
+     `payment_method` CASH vs CREDITCARD and are mutually exclusive and exhaustive.
+     *(All three omissions are addressed on branch `feat/shoofi-expenses-min-guarantee-series`
+     in shoofi-server + shoofi-delivery-web, owner-requested 2026-09-12: `driverMinGuarantee`,
+     `driverCouponsCC`, and `driverCharges` as a pre-negated series. Once that merges, rewrite
+     this bullet. Six-month 2026-03..08 total goes ₪231,315 → ₪307,683 → ₪323,962.)*
    - **`totalCompensations` mixes payers.** `routes/driver-reports.js` accumulates
      `compensationFor === 'driver' && payingParty !== 'driver'`, so **store-funded** driver
      compensations land in a field the chart labels a Shoofi expense — and those same
@@ -186,8 +192,16 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      (`admin-reports.js`, deducted inside `totalOutcomes`). Measured 2026-08: ₪813
      `payingParty:'shoofi'` + ₪479 `payingParty:'business'` = the ₪1,292 the chart showed,
      i.e. 37% of the bar was store money. The store-side sibling `compensationsFromShoofi`
-     does not have this problem. Splitting the field touches a **persisted report field and
-     the additions invoice** — its own ticket, with a backfill decision. **Ask.**
+     does not have this problem. Splitting the **field** touches a persisted report field and
+     the additions invoice — that still needs its own ticket and a backfill decision. **Ask.**
+     A *reader* does not need to wait for that: `compensationsList` has no `payingParty`, but
+     `shoofi.compensations` does, on every item with no nulls, so anything that only needs to
+     display Shoofi's share should aggregate that collection directly with
+     `items.payingParty === 'shoofi'`. Bucketing then keys on the compensation's own
+     `createdAt` instead of a report's `dateRange.endDate` — measured drift over 2026-03..08
+     is **0.27%**, so it is a safe swap, but it also re-scopes the population (it counts
+     compensations for companies with no generated report), so the result will not tie to the
+     sum of any set of driver reports. That is the trade the chart took.
    - **`expectedStoresCount` is `dbAdmin.stores.countDocuments({})` — every store document,
      including hidden, coming-soon and mock/template.** Report generation loops over
      `{ business_visible: true, isCoomingSoon: { $ne: true } }` (the same active set the

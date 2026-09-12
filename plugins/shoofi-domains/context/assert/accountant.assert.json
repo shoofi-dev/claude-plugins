@@ -124,6 +124,11 @@
         },
         {
           "file": "routes/driver-reports.js",
+          "regex": "earningsByCouponsFromCreditCard:\\s*\\{",
+          "desc": "CORE invariant 8: earningsByCouponsFromCreditCard is built PER DRIVER inside the driverPayments pipeline, not as a top-level report total — a $sum on $reportData.earningsByCouponsFromCreditCard returns 0 for every report; it needs a $map over reportData.driverPayments first"
+        },
+        {
+          "file": "routes/driver-reports.js",
           "regex": "totalMinGuaranteeTopUp",
           "desc": "CORE invariant 8: the hourly minimum-guarantee top-up is real Shoofi money on the driver additions invoice — absent from the shoofi-expenses chart until feat/shoofi-expenses-min-guarantee-series lands; update the doc when it does"
         }
