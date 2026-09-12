@@ -12,6 +12,7 @@
         "routes/hyp.js",
         "lib/payments/calc.js",
         "utils/vat.js",
+        "utils/driver-active-hours.js",
         "utils/greeninvoice.js",
         "utils/invoice-provider.js"
       ],
@@ -101,6 +102,31 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "const earned\\s*=\\s*\\(earningsByDriver\\[id\\]\\s*\\|\\|\\s*0\\)\\s*\\+\\s*\\(compensationsByName\\[nameByDriver\\[id\\]\\]\\s*\\|\\|\\s*0\\)",
+          "desc": "CORE invariant 8: the min-guarantee earned base is delivery fees + compensations ONLY — bonuses are deliberately excluded, so a manual bonus is paid on top of the guarantee and does not reduce the top-up (and the compensation credit joins on driverName, not driverId)"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "netTotal\\s*=\\s*totalDriverPayment\\s*\\+\\s*totalBonuses\\s*\\+\\s*totalCompensations\\s*\\+\\s*totalMinGuaranteeTopUp\\s*-\\s*totalDriverCharges",
+          "desc": "CORE invariant 8: totalBonuses and totalMinGuaranteeTopUp are two separate addends of netTotal from two separate sources (manual drivers-bonuses vs computed hours x minPerHour) — never fold one into the other"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "if\\s*\\(minPerHour\\s*<=\\s*0\\)\\s*continue",
+          "desc": "CORE invariant 8: eligibility for the hourly guarantee is minPerHour > 0 on the driver doc — there is no boolean 'hourly driver' flag"
+        },
+        {
+          "file": "utils/driver-active-hours.js",
+          "regex": "const WORKING_START_HOUR\\s*=\\s*9[\\s\\S]{0,80}const WORKING_END_HOUR\\s*=\\s*2",
+          "desc": "CORE invariant 8: the guarantee is paid on active minutes inside the 09:00-02:00 Israel working window — if these constants move, every hourly top-up moves with them"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "details:\\s*`השלמה משופי`",
+          "desc": "CORE invariant 8: the min-guarantee top-up is its OWN line item on the driver additions invoice, separate from the בונוסים line"
         }
       ]
     }

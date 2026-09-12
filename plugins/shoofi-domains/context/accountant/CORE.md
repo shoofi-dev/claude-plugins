@@ -158,6 +158,35 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
 
+8. **The hourly minimum guarantee ("השלמה משופי") is its own payout line, and its
+   earned-side base excludes bonuses on purpose.** `routes/driver-reports.js:425-513`,
+   stored as `reportData.totalMinGuaranteeTopUp` + a per-driver `minGuaranteeList[]`,
+   rendered as its own summary row and section (`DriverReportDetail.tsx:613, 731-813`;
+   PDF `driver-reports.js:890, 921-928`) and as its own `השלמה משופי` line on the additions
+   invoice (`routes/hyp.js:3686-3692`), next to a separate `בונוסים` line.
+   - **Eligibility is `minPerHour > 0` on the driver doc** (`delivery-company.customers`,
+     `role: 'driver'`) — there is no boolean flag, so "is this an hourly driver" is a
+     numeric test. 10 drivers across 7 companies as of 2026-09, rates ₪40–₪53/h.
+   - **`earned = delivery fees (card + cash + coupons) + compensations Shoofi paid him`**
+     (`:482`). **Bonuses are NOT in it** — `totalBonuses` comes from the separate manual
+     `delivery-company.drivers-bonuses` collection and is added to `netTotal` *after* the
+     top-up is computed (`:526`). So a manual bonus is paid fully **on top of** the
+     guarantee and does not reduce it, while a compensation **does**. That asymmetry is
+     deliberate in code; do not "unify" the two without an owner ruling.
+   - **Hours are `payableWorkingMinutes`** — active minutes inside the 09:00–02:00 Israel
+     window (`utils/driver-active-hours.js:16-17`), with admin-approved hour claims
+     substituting the measured figure. Never use `inWorkingHoursMinutes` for money.
+   - **Floored at 0 per driver** — one driver's surplus cannot offset another's shortfall.
+     Exempt companies take the guarantee ÷1.18 while receipts stay with VAT (`:479`).
+   - **The compensation credit joins on `driverName`, not `driverId`**
+     (`compensationsByName[c.driverName]`, `:453,482`). No same-name pair shares a company
+     today, so it is latent, not live — but it is a name-keyed money join.
+   - **History:** the feature shipped 2026-06-22 (`driver hshlama`). Reports before that
+     carry `totalMinGuaranteeTopUp: 0`, and `totalBonuses` falls as the top-up rises
+     (05/26 ₪24,172 bonuses / ₪624 top-up → 08/26 ₪2,067 / ₪30,153), so hourly guarantees
+     were **almost certainly paid as manual bonuses beforehand**. Any before/after
+     comparison of "driver incentives" must add the two fields together.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
