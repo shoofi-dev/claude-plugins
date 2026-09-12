@@ -147,6 +147,47 @@ Traps that cost a day if you meet them cold:
 
 Worked example: `services/exec-dashboard/engagement-metrics.js`.
 
+## The only ceiling on a coins redemption is the items subtotal
+`validateCoinsRedemption` (`services/coins/coins-service.js`) checks **exactly three**
+things, and a large coins number on an order is not by itself evidence of anything:
+1. the global kill switch `shoofi.store {id:1}.coinsFeatureEnabled !== false`;
+2. that the **expiry-replayed** available balance covers the request — `calculateAvailableBalance`
+   → `services/coins/coin-buckets.js`, **not** the stored `balance` field. Lapsed coins really
+   are excluded here even though the expiry sweep has no cron, because the replay happens on
+   every read;
+3. `shekelValue > orderAmount` → reject, where `orderAmount = parsedBodey.orderPrice ||
+   parsedBodey.total` (`routes/order.js`) and `shekelValue = coinsAmount * coinValue` is
+   **recomputed server-side** from `<appName>.store.coinsSettings.coinValue` (the client's
+   figure is discarded).
+
+There is **no max-percent-of-order cap, no max-coins-per-order cap and no per-store
+redemption cap.** `coinsSettings.minOrderAmount` / `maxOrderAmount` gate **earning only** —
+they are never consulted on the redeem path. `coinsSettings.enabled: false` does **not**
+block redemption either; that is deliberate and commented in the service ("customer should
+be able to use their existing balance"). So a customer can drain an entire balance into one
+basket, and the ceiling scales with the basket. Observed platform-wide: 12,326 coin-redeeming
+orders all time, median **4**, p90 **14**, p99 **34**, max **141** — `burger-vibes`
+`7683-7567` (2026-09-12), 141 coins off a ₪176 basket, whose `shoofi.customer-coins` ledger
+reconciles to the shekel over 58 rows with no duplicate or phantom credit. Before calling a
+big number a bug, replay the ledger.
+
+Two consequences that are easy to get wrong:
+- **The coins cap is checked against the GROSS items price, before any coupon.** Nothing
+  reconciles a coupon and a redemption against each other, and the persisted `total` is
+  **client-supplied** — the `Math.max(0, total)` floor in `calculateTotal`
+  (`utils/order-pricing.js`) lives in the **shadow** pricing path only, so it does not bound
+  what is stored. A `full_discount` coupon that already covers the whole subtotal plus coins
+  on top therefore drives `orders.total` **negative**. Verified: exactly 2 documents
+  platform-wide have `total < 0` — both legs of one twin on 2026-07-24
+  (`cremerie-de-leclair` `0537-0192`, items ₪107, coupon −107, 62 coins → `total: -62`, and
+  `shnetzel-nadeem` `6573-6267` → `-11`). Rare, but a negative `total` is a real
+  underpayment plus a burned balance, not a display glitch.
+- **On the single-store path a FAILED validation does not reject the order.** `routes/order.js`
+  logs `Coins redemption validation failed` and continues; `usedCoins` persists as `null`
+  while the charge still goes through at the client's coins-discounted `total`. The twin path
+  does the opposite and returns 400 (`routes/twin-order.js`). Detector: `serverPricing.driftDetected`
+  with `totalDrift ≈` the missing coins, and only for orders from 2026-08-04 onward.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
   cross-check is intentionally disabled. Leave it.

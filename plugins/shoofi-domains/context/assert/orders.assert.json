@@ -17,6 +17,9 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
+        "services/coins/coins-service.js",
+        "services/coins/coin-buckets.js",
+        "utils/order-pricing.js",
         "docs/customer-orders-snapshot.md"
       ],
       "symbols": {
@@ -43,6 +46,21 @@
           "file": "consts/consts.js",
           "regex": "ORDER_STATUS",
           "desc": "authoritative order status enum"
+        },
+        {
+          "file": "services/coins/coins-service.js",
+          "regex": "if\\s*\\(\\s*shekelValue\\s*>\\s*orderAmount\\s*\\)",
+          "desc": "CORE: the ONLY per-order ceiling on a coins redemption is the items subtotal — there is no max-percent and no max-coins cap. If a real cap is ever added, the 'a big coins number is not a bug' guidance and the observed max (141) stop holding"
+        },
+        {
+          "file": "services/coins/coins-service.js",
+          "regex": "const\\s+availableBalance\\s*=\\s*await\\s+calculateAvailableBalance\\(",
+          "desc": "CORE: redemption validates against the expiry-REPLAYED balance (coin-buckets.js), not the stored `balance` field. Swap this for coinsDoc.balance and lapsed coins become spendable, since the expiry sweep has no cron"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "return\\s+Math\\.max\\(0,\\s*total\\)",
+          "desc": "CORE: the zero floor on `total` exists ONLY in the shadow pricing path — the persisted order.total is client-supplied and can go negative when a full_discount coupon and coins stack. If pricing ever becomes authoritative, the 2 known negative-total documents become impossible and the doc note is stale"
         },
         {
           "file": "routes/order.js",
