@@ -17,6 +17,8 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
+        "services/coins/coins-service.js",
+        "routes/menu.js",
         "docs/customer-orders-snapshot.md"
       ],
       "symbols": {
@@ -118,6 +120,16 @@
           "file": "routes/order.js",
           "regex": "originalOrderDate",
           "desc": "/update-delay shifts orderDate and preserves the original (ref §5)"
+        },
+        {
+          "file": "services/coins/coins-service.js",
+          "regex": "async function validateCoinsRedemption",
+          "desc": "the ONLY server-side check on a coins redemption - CORE invariant 11 says it has no campaign-category rule; if one is ever added here, the 'UI convention, not enforced' claim is wrong"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "isCampaign: 1",
+          "desc": "isCampaign is projected to the client, which is the only reason the app can evaluate the coins campaign block at all (CORE invariant 11)"
         },
         {
           "file": "routes/app-logs.js",

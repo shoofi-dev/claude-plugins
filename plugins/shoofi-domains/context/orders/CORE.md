@@ -78,6 +78,20 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     (`services/delivery/late-delivery.js`) look like a genuine promise and vice versa, which is
     exactly what `originalExpectedDeliveryAt` exists to prevent. Delivery owns the reading rule;
     orders owns the fields, and this is the contract between them.
+11. **Coins may not be redeemed against campaign products, and that rule lives ONLY in the
+    customer app.** A cart item counts as a campaign product when any of its
+    `data.supportedCategoryIds` resolves to a menu category flagged `isCampaign: true` — a
+    per-category boolean set in `routes/store.js` and projected by `routes/menu.js`, so the app
+    has to fetch the menu to evaluate it. `shoofi-app/components/total-price/index.tsx` runs
+    that check and hides/blocks the redeem control. The server does **not**: `validateCoinsRedemption`
+    (`services/coins/coins-service.js`) checks the global flag, the available balance and
+    "not more than the order total" — and nothing else. Two consequences:
+    (a) a client that posts `usedCoins` on a campaign basket is accepted, so the rule is a UI
+    convention, not an enforced one; and (b) the first thing to check when a customer says
+    "I have coins but cannot use them" is **what is in their cart**, not their balance — this
+    gate fires before any balance or store-settings gate and is invisible in the coins data.
+    Confirmed live: a customer with 3 spendable coins at `joker` holding "בוקס 3 בורגר" (110₪,
+    in the store's `מבצעים` category) got no redeem control, correctly.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
