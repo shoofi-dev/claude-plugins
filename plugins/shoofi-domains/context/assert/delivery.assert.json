@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@561e3ca / 2026-07-28",
+  "lastVerified": "shoofi-server@e4a3773 / 2026-09-12",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -171,12 +171,47 @@
           "file": "services/monitoring/centralized-flow-monitor.js",
           "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
           "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+        },
+        {
+          "file": "routes/delivery/company.js",
+          "regex": "personalSupportedAreas",
+          "desc": "a driver's cityArea membership is resolved from personalSupportedAreas (falling back to company supportedCities) - never from his GPS. If a point-in-polygon test ever appears here, the CORE claim that no GPS-to-area resolution exists is dead"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "driverLocationHistory",
+          "desc": "the GPS trail collection; its timestamp field is RECEIVE time, not the device fix time"
+        }
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/views/admin/driver-locations/DriverLocationsMap.tsx",
+        "src/components/Navbars/AdminNavbar.js",
+        "src/apis/delivery/get-driver-locations.ts"
+      ],
+      "patterns": [
+        {
+          "file": "src/views/admin/driver-locations/DriverLocationsMap.tsx",
+          "regex": "import \\{ GoogleMap, Marker, InfoWindow \\} from '@react-google-maps/api';",
+          "desc": "the live driver map imports no Polygon - it draws NO Shoofi boundary, so any boundary an operator sees beside a pin is Google's. If Polygon joins this import the CORE claim needs rewriting"
+        },
+        {
+          "file": "src/views/admin/driver-locations/DriverLocationsMap.tsx",
+          "regex": "companyIdsForArea",
+          "desc": "the map's area dropdown filters drivers by company supportedCities membership, never by where the pin is"
+        },
+        {
+          "file": "src/components/Navbars/AdminNavbar.js",
+          "regex": "cityAreaId",
+          "desc": "the navbar area chips just count GET /delivery/company/employees?cityAreaId rows - coverage config, not GPS"
         }
       ]
     },
     "shoofi-shoofir": {
       "files": [
         "hooks/useDriverLocationTracking.ts",
+        "utils/locationBackgroundTask.ts",
         "stores/delivery-driver/index.ts",
         "consts/shared.ts",
         "components/delivery-driver/DriverReassignModal.tsx",
@@ -198,6 +233,16 @@
           "file": "screens/delivery-driver/index.tsx",
           "regex": "twinAssignmentMode",
           "desc": "twin pairs collapse into TwinOrderCard unless mode is split"
+        },
+        {
+          "file": "utils/locationBackgroundTask.ts",
+          "regex": "retryFailedBackgroundUpdates",
+          "desc": "failed location sends are queued and replayed later, so an old fix can reach the server long after it was taken - the source of the teleport spikes"
+        },
+        {
+          "file": "utils/locationBackgroundTask.ts",
+          "regex": "distanceInterval: options\\.distanceInterval \\|\\| 5",
+          "desc": "the 5-metre background distance filter, not the 10s interval, sets the real cadence (~2s median)"
         }
       ]
     },

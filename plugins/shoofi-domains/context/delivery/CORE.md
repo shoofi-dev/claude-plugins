@@ -48,6 +48,49 @@ scope documents above it — `cityAreas.isActive` and `parentCities.isActive` re
 `{$ne: false}`, so absent means active *there*. Same field name, opposite default, one collection
 apart. Anything reasoning about whether an area was serving must use `isActive === true`.
 
+## Live driver location — the pin and the "area" are computed from different inputs
+**No code anywhere resolves a driver's area from his GPS.** Every area label and filter on the
+admin driver screens comes from **coverage configuration**: `GET /delivery/company/employees`
+(`routes/delivery/company.js`) places a driver in a `cityArea` when one of his
+`personalSupportedAreas` has an `area.cityId` in that region's `cityIds`, and falls back to his
+company's `supportedCities` when that list is empty — the same keying as dispatch. The navbar
+chips (`shoofi-delivery-web/src/components/Navbars/AdminNavbar.js`) just count that endpoint's
+rows, and the map's `בחר אזור` dropdown
+(`shoofi-delivery-web/src/views/admin/driver-locations/DriverLocationsMap.tsx`) re-derives it
+client-side from `supportedCities` alone. A driver stays under "אזור כפר קאסם" while his phone is
+in Eilat. **And that map draws no polygon at all** — it imports only `Marker`/`InfoWindow`, so the
+boundary an operator sees next to the pin is Google's rendering of the town, not ours; polygons
+exist only in the area control panel (`views/admin/delivery-areas/*`). "Why is the driver shown
+outside the area" is therefore a comparison between two things that were never computed from the
+same input — answer it by saying so, not by hunting for a broken point-in-polygon test.
+
+**A town is several polygons, and the two families disagree.** `cities` (pickup zones) and
+`areasGeometry` (dropoff polygons) are hand-drawn independently. Kafr Qasim is
+`כפר קאסם / كفر قاسم` + `כפר קאסם שדה - كفرقاسم السهل` + `כפר קאסם - איזור תעשיה` +
+`כפר קאסם - לב הארץ` in `areasGeometry`, plus a coarse municipal `כפר קאסם-עיר`, plus a separate
+53-vertex `cities` zone. Replaying one driver's real day (3,015 fixes, 2026-09-12): **27.7% fell
+outside the `cities` pickup zone**, 484 of those inside `areasGeometry`'s `כפר קאסם-עיר`. This does
+**not** break dispatch — pickup matching keys on the **store** point, and 244 of 246 visible stores
+sit inside some `cities` polygon — but any future "which area is this driver in" derived from GPS
+will be wrong about a quarter of the time.
+
+**`driverLocationHistory.timestamp` is RECEIVE time, not fix time.**
+`POST /delivery/driver/location` (`routes/delivery/driver.js`) stamps
+`moment().utcOffset(getUTCOffset()).format()` on arrival. The driver app queues sends that failed
+and replays them later — `retryFailedBackgroundUpdates`
+(`shoofi-shoofir/utils/locationBackgroundTask.ts`) and its foreground twin in
+`hooks/useDriverLocationTracking.ts` — and the background task takes `locations[0]`, the **oldest**
+fix of a batched delivery. So an old position can land labelled "now". Measured 2026-09-12: 19
+teleport-and-back spikes across 9 of 59 active drivers, up to 17 km, at a reported accuracy of 2 m.
+Detect one as a fix >300 m from **both** neighbours while the neighbours are <150 m apart — good
+reported accuracy proves nothing about whether a fix is current.
+
+**The cadence is ~2 s, not the 10 s both configs advertise.** `useDriverLocationTracking.ts` polls
+on a 10 s interval and only while the app is foregrounded; the background task's
+`distanceInterval: 5` (metres) dominates everything else. Observed median gap between stored fixes
+is **2 seconds**, accuracy p50 3.9 m / p90 10.7 m. Sizing a query or a cost estimate off "10s"
+under-counts by ~5×.
+
 ## Invariants — never weaken
 1. **`DELIVERY_STATUS` is authoritative in `consts/consts.js`**: `1` waiting-approve → `2`
    approved → `3` collected/pickup → `4` delivered; `5` waiting-in-store; cancels `-1` driver,
