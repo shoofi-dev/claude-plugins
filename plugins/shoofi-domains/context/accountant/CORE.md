@@ -70,6 +70,34 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    as `order.driveInPrice || order.driveInPricing?.price` (`routes/payments/admin.js`
    `stores-export-new`), the fallback chain older documents need. Coins are commissioned
    separately at `coinsCommissionPercent`.
+   **Loyalty coins are STORE-funded, and the store is commissioned on them anyway.** This is
+   the coins fact that changes an answer, and nothing on the order document says it.
+   `stores-export-new` books revenue **net** of the redemption —
+   `totalRevenueCreditCard += chargedOrderPrice - coinsValue`, with the identical line for
+   CASH, where `coinsValue = order.usedCoins?.shekelValue`. `generateStoreReportData` reads
+   `coinsTotal` back, but it lands only in `totalIncomes` and in the report display: it is
+   **not** in `totalForTransfer`, **not** in `totalForInvoice`, and **not** an outcome. The
+   tax invoice states the intent outright — `routes/hyp.js` emits an income line of
+   `creditCardRevenue + coinsCreditCard` followed by a second line of `-coinsCreditCard`, so
+   the net invoiced amount is the coins-stripped revenue. Meanwhile
+   `coinsCommission = coinsTotal * coinsCommissionPercent / 100` is added into
+   `totalCommission`, so the store is **paid the net and commissioned on the gross**. Worked
+   from a real order (`burger-vibes` `7683-7567`: items ₪176, 141 coins redeemed, card
+   charged ₪55) against that store's tier-1 10% contract, the transfer is ≈₪14 on a ₪176
+   basket. Nothing is unfunded on Shoofi's side — the card collected exactly
+   `items − coins + delivery` — and there is **no coins-liability ledger anywhere**;
+   `shoofi.customer-coins` is the only record, and it is keyed by `storeAppName`, which is
+   itself the evidence for the store-funded model.
+   Two things to know before "fixing" any of this. `coinsCommissionPercent` is **read-only
+   across the platform** — nothing in `shoofi-delivery-web` writes it — so in practice it
+   always falls through to `commissionTiers[0].percent`. And the comment above the totals
+   block in `admin-reports.js` reads *"coins are INCOME (Shoofi owes store for coins used by
+   customers)"*, which the formula ten lines below contradicts. Read the **formula** as
+   authoritative — the CASH branch subtracts identically and the invoice carries an explicit
+   negative line — and treat the comment as stale. Related store-facing gap: the settlement
+   PDF lists coins under **הכנסות** with no counter-row under **הוצאות**, so
+   `totalIncomes − totalExpenses ≠ balance`, and a store asking "where did my ₪141 go" cannot
+   answer it from the document it is sent.
    **Outside it: `shippingPrice`.** The delivery fee is the courier's money — it is
    `effectiveDeliveryFee` in `lib/payments/calc.js`, settled in `routes/driver-reports.js`,
    and carries its own commission computed from the delivery documents, not from the order.

@@ -64,6 +64,21 @@
         },
         {
           "file": "routes/payments/admin.js",
+          "regex": "totalRevenueCreditCard\\s*\\+=\\s*chargedOrderPrice\\s*-\\s*coinsValue",
+          "desc": "loyalty coins are STORE-funded: store revenue is booked NET of usedCoins.shekelValue. Drop this subtraction and Shoofi starts paying stores for coins it never collected (CORE invariant 3)"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "coinsCommission\\s*=\\s*coinsTotal\\s*\\*\\s*\\(\\s*coinsCommissionPercent\\s*/\\s*100\\s*\\)",
+          "desc": "the store is commissioned on the coins it funded — paid the net, commissioned on the gross. If this line goes, CORE invariant 3's worked example (~14 of a 176 basket) is wrong"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "-coinsCreditCard|String\\(-coinsCreditCard\\)",
+          "desc": "the store tax invoice grosses revenue back up by coinsCreditCard and then subtracts it on its own line — this negative line is what makes the invoice net out to the coins-stripped revenue (CORE invariant 3)"
+        },
+        {
+          "file": "routes/payments/admin.js",
           "regex": "driveInPrice\\s*=\\s*order\\.driveInPrice\\s*\\|\\|\\s*order\\.driveInPricing\\?\\.price",
           "desc": "drive-in is INSIDE the commission base and is read with this fallback chain — older orders carry only the nested driveInPricing form"
         },
