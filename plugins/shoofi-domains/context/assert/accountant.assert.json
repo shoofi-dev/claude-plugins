@@ -101,6 +101,30 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "const amount\\s*=\\s*Math\\.max\\(0,\\s*guarantee\\s*-\\s*earned\\)",
+          "desc": "CORE invariant 8: the AUTHORITATIVE min-guarantee top-up — floored per driver per PERIOD, on payableWorkingMinutes, with compensations in the earned base. DriverPayments.tsx re-derives it per DAY on raw activeMinutes without compensations and will read higher; never reconcile the report to the screen"
+        }
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/views/admin/DriverPayments.tsx",
+        "src/views/admin/driver-reports/DriverReportDetail.tsx",
+        "src/views/admin/invoices/AccountantInvoices.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "src/views/admin/DriverPayments.tsx",
+          "regex": "dayMinTopUp\\s*=\\s*hasMinPerHour\\s*\\?\\s*Math\\.max\\(0,\\s*dayMinByHours\\s*-\\s*dayMade\\)",
+          "desc": "CORE invariant 8: the driver-payments screen floors the guarantee PER DAY off raw activeMinutes and shippingPrice only — a second, non-authoritative definition that reads higher than the settlement report"
+        },
+        {
+          "file": "src/views/admin/driver-reports/DriverReportDetail.tsx",
+          "regex": "השלמה משופי",
+          "desc": "CORE invariant 8: the min-guarantee has its own labelled section and summary row in the driver report, separate from בונוסים"
         }
       ]
     }

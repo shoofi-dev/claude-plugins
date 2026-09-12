@@ -158,6 +158,26 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
 
+8. **Two screens compute the hourly minimum guarantee differently and will never agree.
+   The settlement report is the authoritative one.**
+   - **`routes/driver-reports.js:459-513`** → `reportData.totalMinGuaranteeTopUp`, labelled
+     **"השלמה משופי"**. This is what the additions invoice (`routes/hyp.js:3686-3692`) and
+     the bank transfer are built from.
+   - **`shoofi-delivery-web/src/views/admin/DriverPayments.tsx:686-689`** (`/admin/driver-payments`,
+     "תשלומי נהגים") re-derives it client-side, labelled **"מינימום לפי שעות" / "מינימום לתשלום"**.
+
+   | | settlement report | driver-payments screen |
+   |---|---|---|
+   | hours basis | `payableWorkingMinutes` — inside 09:00–02:00, admin-claim aware | `dayActiveHours.activeMinutes` — **all** active time |
+   | earned base | delivery fees **+ compensations** | `order.shippingPrice` only |
+   | floor at 0 | per driver **per period** | per driver **per day** |
+   | exempt ÷1.18 | yes | no |
+
+   Per-day flooring alone makes the screen read **systematically higher** than the report —
+   a driver's good day can no longer offset his bad day. Never quote the driver-payments
+   screen as what a company is owed, and never "fix" the report to match it. Reconciling
+   the two is a money-screen change that needs an owner ruling on which definition wins.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
