@@ -101,6 +101,31 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "api/payments/admin/shoofi-expenses",
+          "desc": "CORE invariant 8: the 'שופי הוצאות' chart endpoint — sums five persisted rollup fields only, so it is a PARTIAL view of Shoofi outflow (no minGuarantee top-up, no credit-card delivery coupons, no driver charges netted off)"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "\\$year\\s*:\\s*'\\$dateRange\\.endDate'",
+          "desc": "CORE invariant 8: shoofi-expenses buckets a report into the month of its dateRange.endDate (UTC), not the month the money was spent — a multi-month report lands wholly in its end month"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "dbAdmin\\.stores\\.countDocuments\\(\\{\\}\\)",
+          "desc": "CORE invariant 8: expectedStoresCount counts EVERY store document (255) while report generation loops over {business_visible:true, isCoomingSoon:{$ne:true}} (159) — the partial-month banner therefore reads 140/255 instead of 140/159 and can never clear"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "compensationFor\\s*===\\s*'driver'\\s*&&\\s*item\\.payingParty\\s*!==\\s*'driver'",
+          "desc": "CORE invariant 8: totalCompensations includes STORE-funded driver compensations (payingParty:'business'), which are simultaneously charged back to the store as compensationsToDrivers — so the chart's red 'פיצויים לשליחים' bar is not all Shoofi money"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "totalMinGuaranteeTopUp",
+          "desc": "CORE invariant 8: the hourly minimum-guarantee top-up is real Shoofi money on the driver additions invoice and is deliberately absent from the shoofi-expenses chart — if it is ever added as a series, update the doc"
         }
       ]
     }

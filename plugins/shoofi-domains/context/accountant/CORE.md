@@ -158,6 +158,43 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
 
+8. **The "שופי הוצאות" chart is a PARTIAL view of Shoofi-funded outflow, and its two
+   completeness numbers are wrong.** `GET /api/payments/admin/shoofi-expenses`
+   (`routes/payments/admin-reports.js:1899-2021`); its only consumer is the third tab of
+   `shoofi-delivery-web/src/views/admin/invoices/AccountantInvoices.tsx` (series `:107-113`).
+   It sums five already-persisted rollup fields — `storeReports.reportData.couponsFromShoofi`
+   and `.compensationsFromShoofi`, `driverReports.reportData.earningsByCoupons`,
+   `.totalBonuses`, `.totalCompensations` — bucketed by **`dateRange.endDate`** in UTC.
+   Four consequences, all of which get rediscovered:
+   - **The bucket is the report's END month, not the month the money was spent.** A custom
+     multi-month report dumps its whole span into its end month.
+   - **Large Shoofi outflows are missing.** `reportData.totalMinGuaranteeTopUp` (the hourly
+     minimum guarantee, `routes/driver-reports.js`) and `earningsByCouponsFromCreditCard`
+     are both real Shoofi money on the driver additions invoice (`routes/hyp.js`), and
+     neither is a series here; `totalDriverCharges` (money drivers owe Shoofi) is not netted
+     off either. Measured 2026-08 the top-up alone (₪30,153) nearly equalled the entire
+     chart (₪31,468). **Never quote this chart as "what Shoofi spent".**
+   - **`totalCompensations` mixes payers.** `routes/driver-reports.js` accumulates
+     `compensationFor === 'driver' && payingParty !== 'driver'`, so **store-funded** driver
+     compensations land in a field the chart labels a Shoofi expense — and those same
+     amounts are simultaneously charged back to the store as `compensationsToDrivers`
+     (`admin-reports.js`, deducted inside `totalOutcomes`). Measured 2026-08: ₪813
+     `payingParty:'shoofi'` + ₪479 `payingParty:'business'` = the ₪1,292 the chart showed,
+     i.e. 37% of the bar was store money. The store-side sibling `compensationsFromShoofi`
+     does not have this problem. Splitting the field touches a **persisted report field and
+     the additions invoice** — its own ticket, with a backfill decision. **Ask.**
+   - **`expectedStoresCount` is `dbAdmin.stores.countDocuments({})` — every store document,
+     including hidden, coming-soon and mock/template.** Report generation loops over
+     `{ business_visible: true, isCoomingSoon: { $ne: true } }` (the same active set the
+     failed-stores endpoint uses, `admin-reports.js:1725-1728`): 159 of 255 as of 2026-09.
+     So the "חלקי" banner reads `140/255` where the honest ratio is `140/159`, and it can
+     never clear. `expectedDriversCount` compares **report documents** against **companies**
+     while driver reports can be semi-monthly, so its numerator is the wrong unit too.
+   Customer compensations are excluded **by design** (comment at `admin-reports.js:1985-1988`)
+   on the assumption they resurface as coupons — but issuing that coupon is a manual admin
+   button in `CompensationManagement.tsx`, not an automatic consequence of approval, so
+   un-couponed customer compensations are invisible in every series.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
