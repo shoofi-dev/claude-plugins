@@ -157,6 +157,35 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    *(Do not mirror `admin.js:907-944` either — that is the legacy `/stores-export`
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
+8. **`reportData.compensationsFromShoofi` is funder-BLIND, and that is correct — the
+   label was the bug.** The reduce in `generateStoreReportData`
+   (`routes/payments/admin-reports.js`, the `totalShoofiCompensations` block) selects
+   `item.status === 1 && item.compensationFor === 'business'` with **no `payingParty`
+   filter**, so it also credits the store for compensations a **driver** funded — 8 items,
+   ~₪556 over six months (₪1,647 of the all-time ₪9,970, measured 2026-09-12).
+   **Do NOT narrow it to `payingParty === 'shoofi'`.** The figure enters `totalOutcomes`
+   with a minus and `totalForTransfer` subtracts outcomes — two minuses, so it *raises*
+   the store's payment — while the same compensation is already charged back to the
+   courier in `routes/driver-reports.js` (`totalDriverCharges`; 6 of the 8 pair exactly).
+   Narrowing it pays real stores less while the driver stays charged. The store is
+   credited for an approved compensation whoever funded it; only the wording claimed
+   otherwise, and the PDF now reads **"פיצויים לזכות החנות"** in all three places it
+   prints that amount (income table, expenses table with the `(-)` marker, itemised
+   sub-section) plus the two admin-web twins (`reports/ReportDetail.tsx` and
+   `generate-stores-summaries.tsx`, which renders its own copy of the same document with
+   the same inline filter). The split is available additively and display-only as
+   `reportData.compensationsFundedByShoofi` — absent on every report generated before
+   2026-09, so read it as *unknown*, never as zero.
+   *The driver side has the same defect and was NOT fixed:* `driver-reports.js` uses
+   `compensationFor === 'driver' && payingParty !== 'driver'`, so a **store**-funded
+   compensation to a courier also prints as "משופי". Separate ticket.
+   *Payer enum:* the values are `'shoofi' | 'driver' | 'business'`. **There is no
+   `'store'`** — a `payingParty: 'store'` filter matches nothing at all, silently.
+   Sum `items.approvedAmount`, never `items.amount` (172 approved items differ; every
+   settlement path uses `approvedAmount`). Amounts are VAT-inclusive and must never be run
+   through `utils/vat.js`. The only reliable time key is the **document's** `createdAt`, a
+   BSON Date; `items.createdDate` is an ISO string and a Date-bounded range against it
+   matches nothing.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized

@@ -101,6 +101,21 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "if\\s*\\(item\\.status\\s*===\\s*1\\s*&&\\s*item\\.compensationFor\\s*===\\s*'business'\\)\\s*\\{",
+          "desc": "CORE invariant 8: compensationsFromShoofi is funder-BLIND on purpose — adding payingParty === 'shoofi' here pays stores less while the driver is still charged in totalDriverCharges"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "פיצויים לזכות החנות",
+          "desc": "CORE invariant 8: the store-facing label names no funder, because the amount includes driver-funded compensations"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "compensationsFundedByShoofi:\\s*totalShoofiFundedCompensations",
+          "desc": "CORE invariant 8: the payingParty:'shoofi' split is display-only and lives among the report details, never in the incomes/outcomes blocks"
         }
       ]
     }
