@@ -13,6 +13,7 @@
         "utils/menu-cache.js",
         "utils/order-stock.js",
         "services/database/DatabaseInitializationService.js",
+        "utils/create-indexes.js",
         "docs/stock-management.md",
         "docs/menu-search.md"
       ],
@@ -37,6 +38,16 @@
           "file": "routes/product.js",
           "regex": "outOfStockByQuantity",
           "desc": "stock invariant field"
+        },
+        {
+          "file": "routes/global-search.js",
+          "regex": "nameAR",
+          "desc": "doc CORE: global-search is dead because it filters shoofi.stores on nameAR/nameHE, which do not exist there (the fields are name_ar/name_he) — if this stops matching, someone fixed or deleted it and the claim must go"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "api/menu/search",
+          "desc": "doc CORE: the live catalog search endpoint"
         }
       ]
     }
