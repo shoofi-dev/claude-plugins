@@ -1,21 +1,24 @@
 {
   "name": "shoofi-testing",
-  "description": "Testing for the Shoofi platform: generate the tests covering a finished change across the repo(s) it touched, and stand up the local stack + simulator to drive any of the three React-Native apps through their real UI.",
+  "description": "Testing for the Shoofi platform: generate the tests covering a finished change across the repo(s) it touched, stand up the local stack + simulator to drive any of the three React-Native apps through their real UI, and write the CI flows that put a pull request on the Emulator workflow.",
   "author": {
     "name": "shoofi-dev"
   },
   "homepage": "https://github.com/shoofi-dev/claude-plugins",
   "keywords": [
-    "testing",
-    "shoofi",
-    "ci",
+    "android",
     "ava",
-    "jest",
-    "playwright",
-    "maestro",
+    "ci",
     "e2e",
-    "simulator",
+    "emulator",
+    "github-actions",
     "ios",
-    "react-native"
+    "jest",
+    "maestro",
+    "playwright",
+    "react-native",
+    "shoofi",
+    "simulator",
+    "testing"
   ]
 }

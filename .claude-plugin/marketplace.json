@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "Claude Code plugins for the Shoofi platform (5 repos). Distributes shared skills and domain-owner subagents so local sessions AND cloud routines/Slack agents can use them across every repo.",
-    "version": "1.4.0"
+    "version": "1.5.0"
   },
   "plugins": [
     {
       "name": "shoofi-testing",
       "source": "./plugins/shoofi-testing",
-      "description": "Testing across the 5 Shoofi repos. cover-changes generates the tests covering a finished feature/bug in whichever repo(s) it touched, bootstrapping test infra on first use. local-app-e2e stands up the local stack and drives the customer/partner/driver apps through their real UI on an iOS simulator with Maestro."
+      "description": "Testing across the 5 Shoofi repos. cover-changes generates the tests covering a finished feature/bug in whichever repo(s) it touched, bootstrapping test infra on first use. local-app-e2e stands up the local stack and drives the customer/partner/driver apps through their real UI on an iOS simulator with Maestro. pr-emulator-flows writes the CI flows that put a pull request on the Emulator workflow (Maestro on Android for the apps, Playwright for the admin web), in the file contract the AI Tasks bridge reads."
     },
     {
       "name": "shoofi-domains",
