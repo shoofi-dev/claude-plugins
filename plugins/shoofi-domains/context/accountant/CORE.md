@@ -174,6 +174,11 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      neither is a series here; `totalDriverCharges` (money drivers owe Shoofi) is not netted
      off either. Measured 2026-08 the top-up alone (₪30,153) nearly equalled the entire
      chart (₪31,468). **Never quote this chart as "what Shoofi spent".**
+     *(The top-up — the larger of the two omissions — is being added as a sixth series
+     `driverMinGuarantee` / "השלמה משופי" on branch
+     `feat/shoofi-expenses-min-guarantee-series` in shoofi-server + shoofi-delivery-web,
+     requested 2026-09-12. Once that merges, drop it from this list and keep the rest:
+     over 2026-03..08 it takes the six-month total from ₪231,315 to ₪307,683.)*
    - **`totalCompensations` mixes payers.** `routes/driver-reports.js` accumulates
      `compensationFor === 'driver' && payingParty !== 'driver'`, so **store-funded** driver
      compensations land in a field the chart labels a Shoofi expense — and those same

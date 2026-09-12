@@ -105,7 +105,7 @@
         {
           "file": "routes/payments/admin-reports.js",
           "regex": "api/payments/admin/shoofi-expenses",
-          "desc": "CORE invariant 8: the 'שופי הוצאות' chart endpoint — sums five persisted rollup fields only, so it is a PARTIAL view of Shoofi outflow (no minGuarantee top-up, no credit-card delivery coupons, no driver charges netted off)"
+          "desc": "CORE invariant 8: the 'שופי הוצאות' chart endpoint — sums persisted rollup fields only, so it is a PARTIAL view of Shoofi outflow (no credit-card delivery coupons, no driver charges netted off; the minGuarantee top-up is being added on feat/shoofi-expenses-min-guarantee-series)"
         },
         {
           "file": "routes/payments/admin-reports.js",
@@ -125,7 +125,7 @@
         {
           "file": "routes/driver-reports.js",
           "regex": "totalMinGuaranteeTopUp",
-          "desc": "CORE invariant 8: the hourly minimum-guarantee top-up is real Shoofi money on the driver additions invoice and is deliberately absent from the shoofi-expenses chart — if it is ever added as a series, update the doc"
+          "desc": "CORE invariant 8: the hourly minimum-guarantee top-up is real Shoofi money on the driver additions invoice — absent from the shoofi-expenses chart until feat/shoofi-expenses-min-guarantee-series lands; update the doc when it does"
         }
       ]
     }
