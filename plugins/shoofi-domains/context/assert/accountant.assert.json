@@ -101,6 +101,11 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "await\\s+dbAdmin\\.storeReports\\.deleteOne\\(\\s*\\{\\s*_id:\\s*getId\\(reportId\\)\\s*\\}\\s*\\)",
+          "desc": "CORE invariant 5: deleting a store report is a physical deleteOne — there is no isDeleted/deletedAt on store-reports, so 'exclude deleted reports' needs no predicate. If this ever becomes a soft-delete $set, every aggregate over store-reports (exec-dashboard billing-metrics, spend-metrics) starts counting deleted reports and invariant 5 needs rewriting"
         }
       ]
     }

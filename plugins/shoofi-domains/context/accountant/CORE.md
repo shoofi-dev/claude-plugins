@@ -104,6 +104,20 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    wrong, and the fix is delete + regenerate. But delete **must release the carry-over
    compensations** that `/send` consumed (`appNameBackfill.pendingReportCarryover` back to
    `true`), or the regenerated report silently drops those amounts.
+   **And deletion is PHYSICAL — there is no soft delete on reports.**
+   `DELETE /api/payments/admin/reports/:reportId` ends in `storeReports.deleteOne(...)`;
+   `store-reports` carries no `isDeleted`, `deleted`, `deletedAt`, `deletedBy` or
+   `isActive` field, and a census of all 1212 production documents (2026-09-14) finds
+   zero carrying any of them. Same for driver reports. So **"exclude deleted reports"
+   is satisfied by doing nothing** — a deleted report is not in the collection to be
+   counted, and an `isDeleted: {$ne: true}` predicate would look like it was doing
+   something while guarding nothing. Do not add one, and do not go hunting for a
+   deletion flag when a stakeholder asks to exclude deleted reports; the answer is that
+   there is nothing to exclude. Two real consequences of the delete being physical:
+   the tax invoice at the provider is **orphaned** (only warned about, `:2506-2521`),
+   and a monthly "how many reports did we fail to produce" figure can only ever be
+   reconstructed by set difference against `shoofi.stores` — there is no tombstone to
+   count. Contrast `customers`, where `deletedAt` **is** the marker.
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
 7. **A store's coupon cost (`reportData.campaigns`) is the coupon's NOMINAL
