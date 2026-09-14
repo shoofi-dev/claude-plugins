@@ -41,7 +41,8 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 
 ## Invariants — never weaken
 1. **The transfer formula** (`generateStoreReportData` in `routes/payments/admin-reports.js`):
-   `totalForTransfer = creditCardRevenue + driveInCreditCard − totalOutcomes`;
+   `totalForTransfer = creditCardRevenue + driveInCreditCard − totalOutcomes
+   − totalDeliveryBookingStoreFees`;
    `balance = totalForTransfer` — **no VAT adjustment, for any `businessType`**.
    `totalForInvoice = creditCardRevenue + driveInCreditCard`.
    **`exempt` (עוסק פטור) does NOT mean ÷1.18.** Such a store charges no VAT, so the
@@ -53,6 +54,18 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    (Changed 2026-08-03; both were previously ÷1.18. `routes/driver-reports.js` still
    applies the old ÷1.18 rule to exempt **delivery companies** — deliberately left
    pending a separate decision, so the two payout paths currently disagree.)
+   **`totalDeliveryBookingStoreFees`** (added 2026-09-14) is the store-booked
+   **delivery-only** service fee: `deliveryOnlyFee.storeAmount` summed off
+   `delivery-company.book-delivery` (`isDeliveryOnly: true`, `status: '4'`, scoped by
+   `appName`, `created` compared as an offset **string**). It is a **separate deduction
+   term and is deliberately NOT inside `totalOutcomes`** — `totalOutcomes` is the amount
+   the Shoofi→store expenses invoice is issued for (`routes/hyp.js`), so it must stay
+   byte-identical. Always read the **snapshot**, never the live area config.
+   ⚠️ **Known gap, needs a decision:** because the fee is outside `totalOutcomes`, the
+   Shoofi→store expenses invoice does **not** carry it — Shoofi would deduct money it has
+   not invoiced for. Harmless today (every `deliveryOnlyStoreFee` in production is 0);
+   **must be resolved before a non-zero fee is configured.** The driver side solved the
+   equivalent problem in `routes/hyp.js` create-company-invoice.
 2. **`actualDriverPayment` cash-vs-card branch** (`routes/driver-reports.js`): CARD → full
    `effectiveDeliveryFee`; CASH + coupon → the coupon-covered amount; **CASH, no coupon → 0**.
    A bug here **double-pays a driver who already pocketed the cash**.
