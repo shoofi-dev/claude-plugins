@@ -35,7 +35,8 @@
           "validateOrdersClosed",
           "calculateCommissionTiered",
           "generateStoreReportData",
-          "totalForTransfer"
+          "totalForTransfer",
+          "totalDeliveryBookingStoreFees"
         ],
         "utils/invoice-provider.js": ["getActiveProvider"]
       },
@@ -44,6 +45,11 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "totalForTransfer\\s*=\\s*creditCardRevenue",
           "desc": "CORE money formula: transfer is credit-card revenue minus outcomes"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "- totalOutcomes - totalDeliveryBookingStoreFees",
+          "desc": "delivery-only store fee is a SEPARATE deduction, never folded into totalOutcomes"
         },
         {
           "file": "routes/payments/admin-reports.js",
