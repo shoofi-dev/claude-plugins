@@ -106,6 +106,30 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `true`), or the regenerated report silently drops those amounts.
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
+   **A compensation has THREE dates and they are different types — mixing them matches
+   nothing, silently.** `compensations.createdAt` / `updatedAt` are **BSON Dates** (all
+   2310 production docs). `items[].approvedAt` and `items[].modifiedDate` are **ISO
+   strings** — `new Date().toISOString()`, written at
+   `routes/shoofi-admin.js:2939`; uniformly the 24-char UTC `…Z` form, so lexicographic
+   comparison is ordering-correct. MongoDB compares BSON *type* before value, so a
+   `$gte: new Date(...)` against `approvedAt` returns **zero documents and no error**,
+   and moment `.format()` strings against `createdAt` do the same. That is not
+   hypothetical: `validateCompensationsApproved` (`routes/payments/admin-reports.js`)
+   shipped comparing strings to `createdAt`, matched nothing for a year, and the
+   `unapproved_compensations` gate it feeds never once fired.
+   **Which date a reader uses is a business choice, and the platform makes both:**
+   `createdAt` = when the request was raised (the admin compensations screen's date
+   picker, `driver-reports.js`, `spend-metrics.js`); `items[].approvedAt` = when it
+   became money (the partner and courier apps, `routes/payments/summaries.js:175`,
+   `:539`, and — since 2026-09-14, by owner ruling — the store settlement report).
+   Never assume; check which one the code you are reading picked.
+   **`approvedAt` is not universal: ~52 approved items carry only `modifiedDate`**
+   (an edit path that did not stamp). Fall back to it rather than dropping them.
+   **The trap that loses real money:** because a report filters `status === 1` at
+   generation time *and* bounded the period on `createdAt`, an item approved after its
+   month's report ran fell out of both months and was never billed — 7 store-side items,
+   ₪672, including ₪468 owed to `atza-sushi-bar-kfar-qasim`. Any new
+   compensation-reading report must decide its clock deliberately.
 7. **A store's coupon cost (`reportData.campaigns`) is the coupon's NOMINAL
    `storeDiscount`, never the waiver the customer actually got**, and the gate that
    decides it is **blind to `discountType`** (`routes/payments/admin.js:1135-1142`,

@@ -101,6 +101,16 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "approvedAt:\\s*new Date\\(\\)\\.toISOString\\(\\)",
+          "desc": "CORE invariant 6: items[].approvedAt is an ISO STRING, not a BSON Date, while compensations.createdAt IS a Date — a range query using the wrong type matches zero documents and raises nothing. If this ever becomes `new Date()`, every string-bounded reader of approvedAt breaks silently"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "'items\\.approvedAt'",
+          "desc": "CORE invariant 6: the partner and courier apps date a compensation by APPROVAL, not creation — so a settlement report on a different clock shows the store one month and pays it on another"
         }
       ]
     }
