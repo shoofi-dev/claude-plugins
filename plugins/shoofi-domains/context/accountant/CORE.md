@@ -100,6 +100,23 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `payments` domain, invariant 9. A change to what `exempt` means now moves two systems.
 5. **Report guards must stay on:** duplicate + **overlap across ALL statuses** (a sent report
    blocks a new overlapping one), orders-closed, and compensations-approved.
+   **The all-status overlap guard is what makes any per-month aggregate over
+   `store-reports` safe — spell out which half you are relying on.**
+   `checkOverlappingReports` queries by `storeId` + date range with **no status
+   predicate** (the comment there records that the old `sent`-excluding version was a
+   double-billing window), so **one store has at most one report per period.** Verified
+   across all 1212 production documents (2026-09-14): grouping on
+   `{appName, $year, $month}` of `dateRange.endDate` yields **zero** groups of more than
+   one — so a draft and a sent report for the same store-month cannot coexist, and
+   summing every status **cannot** double-count a whole report. What it *can*
+   double-count is exactly one thing: **carry-over compensations**, fetched with no date
+   filter at all and consumed only on `/send`, so an unsent report holds the same
+   compensation the next sent one will carry. Measured 2026-09-14: ₪198 across every
+   month that has reports, against ~₪150K/month of billing. Bound any all-status figure
+   by `reportData.carryoverToCustomers + carryoverToDrivers` over the non-`sent` rows and
+   publish it rather than assuming it away —
+   `services/exec-dashboard/billing-metrics.js` does this as
+   `billingPendingCarryoverTotal`.
    **Delete is deliberately NOT status-gated** — a report can be sent and only then found
    wrong, and the fix is delete + regenerate. But delete **must release the carry-over
    compensations** that `/send` consumed (`appNameBackfill.pendingReportCarryover` back to

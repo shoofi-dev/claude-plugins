@@ -101,6 +101,16 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "Check ALL reports regardless of status",
+          "desc": "CORE invariant 5: checkOverlappingReports has no status predicate, which is why a store can hold at most one report per period and why a per-month aggregate may sum every status without double-counting whole reports. If a status filter returns here, that aggregate safety is gone"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "'appNameBackfill\\.pendingReportCarryover':\\s*true",
+          "desc": "CORE invariant 5: carry-over compensations are pulled by store with NO date filter and are consumed only on /send, so an unsent report holds the same compensation the next sent one will carry — the one thing an all-status aggregate over store-reports can genuinely double-count"
         }
       ]
     }
