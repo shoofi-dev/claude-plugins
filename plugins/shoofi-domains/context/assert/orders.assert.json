@@ -152,7 +152,9 @@
         "components/checkout/FutureOrderPicker.tsx",
         "hooks/checkout/use-checkout-validate.ts",
         "hooks/useReorder.ts",
-        "stores/twin-cart/index.ts"
+        "stores/twin-cart/index.ts",
+        "stores/app-logs/index.ts",
+        "components/total-price/index.tsx"
       ],
       "patterns": [
         {
@@ -197,8 +199,8 @@
         },
         {
           "file": "stores/cart/index.ts",
-          "regex": "cart_store_data_stale_dropped",
-          "desc": "getCartStoreData drops a @storage_cart_storeData snapshot that contradicts @storage_cart_storeDB, the authority. Remove this guard and checkout routes app-name/delivery/coupons/order.storeData on a stale snapshot again - how two aldo products were submitted into burger-hmod as order 0156-0705 on 2026-09-14"
+          "regex": "cart_store_data_stale",
+          "desc": "getCartStoreData detects a @storage_cart_storeData snapshot that contradicts @storage_cart_storeDB (the authority) and substitutes the live store doc when it matches. Remove this and checkout routes app-name/delivery/coupons/order.storeData on a stale snapshot again - how two aldo products were submitted into burger-hmod as order 0156-0705 on 2026-09-14"
         },
         {
           "file": "hooks/useReorder.ts",
@@ -209,6 +211,11 @@
           "file": "stores/twin-cart/index.ts",
           "regex": "@storage_twin_cart_storeDB",
           "desc": "the twin secondary basket is namespaced on its OWN AsyncStorage keys and has its own getCartStoreData, so the primary cart's staleness guard cannot touch it. If twinCartStore is ever collapsed onto the primary cart's keys, the guard would drop the primary snapshot mid-twin-checkout and route the primary leg to the secondary store (CORE: an order can be written into the WRONG store's DB)"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "if \\(!\\(cartStoreData as any\\)\\?\\.location\\) return;",
+          "desc": "the delivery-quote effect has NO fallback to storeDataStore - this is why getCartStoreData must never return null on a drift. If this line grows a fallback, the never-return-null constraint in CORE can be relaxed"
         }
       ]
     },

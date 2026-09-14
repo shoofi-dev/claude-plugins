@@ -189,8 +189,18 @@ it (`addProductToCart`, `resetCartForNewStore`, `hooks/useReorder.ts`, and the t
 it first). `@storage_cart_storeData` is a cache of that store's details, written once by
 `addProductToCart` from whatever `storeDataStore` held at the time, and **checkout routes on
 the cache** — `app-name`, the delivery quote, the coupon check and `order.storeData` all read
-`cartStoreData || storeDataStore.storeData`. `getCartStoreData` now drops a snapshot that
-contradicts the authority and logs `cart_store_data_stale_dropped`.
+`cartStoreData || storeDataStore.storeData`. `getCartStoreData` now detects a snapshot that
+contradicts the authority, substitutes the live store doc when that doc names the authority's
+store, and logs `cart_store_data_stale` with `corrected: true|false`.
+
+**It deliberately does NOT return null on a drift, and neither should any future version of
+it.** Two consumers have no fallback of their own: `screens/checkout/index.tsx` bails out of
+the delivery-quote effect on `!cartStoreData?.location`, and `components/total-price/index.tsx`
+sets `cartStoreLocation` to null. A null there means `availableDrivers` is never fetched, which
+blocks delivery checkout outright (`use-checkout-validate.ts` then fails with
+`delivery-not-available-for-this-address`) and, on a future/iftar order — which skips that
+validation — ships `shippingPrice: 0`. When the drift cannot be corrected the stale snapshot is
+returned unchanged, which is the pre-guard behaviour, and `corrected: false` says so.
 
 **The twin secondary basket is not involved.** `twinCartStore`
 (`shoofi-app/stores/twin-cart/index.ts`) is a separate class on separate keys —
