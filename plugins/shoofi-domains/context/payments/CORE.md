@@ -142,6 +142,22 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
   block every HYP card at every store. It was reconstructed from a deployed OTA bundle, so its
   semantics are a reconstruction, not recovered intent. **Do not wire it up; deletion or a
   corrected signature is a human decision.**
+- **Counting orders by gateway: `order.payment_provider` is the router and the truth — but a
+  twin leg has no such field, and the only correct fallback is `ccPaymentRefData.provider`,
+  never the response shape.** `routes/twin-order.js:415-425` builds the child `order` object with
+  `payment_method` and **no** `payment_provider`, so on a 3-day platform sweep ~3% of card orders
+  (21 of 670, 2026-09-10..12) classify as "unknown" on the field alone. The fallback that works is
+  the charge response's own marker — `buildCcPaymentRefData` stamps `provider: 'HYP'` plus
+  `HypTransactionId` (`utils/hyp-pay.js:315-331`), and the twin HYP capture returns the same
+  (`services/twin-order/twin-payment-service.js:363-367`), while the ZCredit charge returns a blob
+  keyed `ZCreditChargeResponse` and carries no `provider` (`routes/order.js:656-667`).
+  ⚠️ **Do not sniff `ReferenceNumber`** — `utils/hyp-pay.js:329` writes it on the HYP side too, so
+  a "has `ReferenceNumber` ⇒ ZCredit" test silently buckets every HYP twin capture as ZCredit (19
+  orders misclassified on the run above, ~3 points of the platform split). Classifying by charge
+  response and by `payment_provider` agreed on **every** order where both were present, so either
+  is safe on its own — it is the *mix* of the two that has to be got right.
+  Both `payment_provider` and `payment_method` are nested under `order`; a top-level projection
+  returns `undefined` for both and drops every cash order into the unknown bucket.
 
 ## Recipe — touching a charge path
 1. Identify which of the three paths you're in (CC / HYP token / digital-wallet) and say so in

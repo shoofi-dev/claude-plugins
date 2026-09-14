@@ -75,6 +75,26 @@
           "file": "routes/store.js",
           "regex": "hyp_enabled",
           "desc": "platform tokenization rollout flag — NOT read by any charge path"
+        },
+        {
+          "file": "utils/hyp-pay.js",
+          "regex": "provider: 'HYP'",
+          "desc": "ccPaymentRefData.provider is the gateway marker a twin leg has to be classified by"
+        },
+        {
+          "file": "utils/hyp-pay.js",
+          "regex": "ReferenceNumber: hypResponse",
+          "desc": "HYP writes ReferenceNumber too — it is NOT a ZCredit marker"
+        },
+        {
+          "file": "services/twin-order/twin-payment-service.js",
+          "regex": "provider: 'HYP'",
+          "desc": "the twin HYP capture returns the same provider marker as the single-order path"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "ZCreditChargeResponse: paymentResult",
+          "desc": "the ZCredit charge response shape — no provider field, keyed ZCreditChargeResponse"
         }
       ]
     },
