@@ -17,7 +17,8 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
-        "docs/customer-orders-snapshot.md"
+        "docs/customer-orders-snapshot.md",
+        "routes/order-fraud-detector.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -36,7 +37,9 @@
           "stockDecremented",
           "stockRestored"
         ],
-        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+        "utils/customer-orders.js": [
+          "getSuccessfulOrdersByCustomerIds"
+        ]
       },
       "patterns": [
         {
@@ -128,6 +131,16 @@
           "file": "routes/app-logs.js",
           "regex": "user_visit_id",
           "desc": "the device-id header, the stable installation identity abandoned-cart sessions are keyed on — NOT orders.deviceId"
+        },
+        {
+          "file": "routes/order-fraud-detector.js",
+          "regex": "const firstItem = items\\[0\\];",
+          "desc": "checkOrderItemsStore inspects ONLY the first item - the Hebrew reason 'לא נמצא במוצרי החנות' is the de-facto wrong-store signal but misses an order whose first item happens to exist in the target store (CORE: an order can be written into the WRONG store's DB). If this is ever widened to all items, that caveat is stale"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "mockProductId: product\\._id",
+          "desc": "create-from-mock copies template products WITHOUT minting a new _id, so template-derived stores share byte-identical product _ids - which is why checkOrderItemsStore can find a plausible product in the wrong store and pass (CORE: an order can be written into the WRONG store's DB)"
         }
       ]
     },
@@ -137,7 +150,9 @@
         "stores/cart/index.ts",
         "screens/checkout/index.tsx",
         "components/checkout/FutureOrderPicker.tsx",
-        "hooks/checkout/use-checkout-validate.ts"
+        "hooks/checkout/use-checkout-validate.ts",
+        "hooks/useReorder.ts",
+        "stores/twin-cart/index.ts"
       ],
       "patterns": [
         {
@@ -169,6 +184,31 @@
           "file": "components/checkout/FutureOrderPicker.tsx",
           "regex": "MAX_RAMADAN_DAYS_AHEAD",
           "desc": "ramadan-iftar orders can be days ahead without isFutureOrder"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "checkout_store_data_check",
+          "desc": "the wrong-store telemetry at checkout mount - CORE tells the next agent to query shoofi.apps-logs for this event_type with properties.stores_match false instead of reconstructing the mismatch from the order items"
+        },
+        {
+          "file": "stores/cart/index.ts",
+          "regex": "order_submit_store_data_check",
+          "desc": "the wrong-store telemetry at submit, carrying all three notions of 'the store' (cart snapshot, browsed store, store on the order)"
+        },
+        {
+          "file": "stores/cart/index.ts",
+          "regex": "cart_store_data_stale_dropped",
+          "desc": "getCartStoreData drops a @storage_cart_storeData snapshot that contradicts @storage_cart_storeDB, the authority. Remove this guard and checkout routes app-name/delivery/coupons/order.storeData on a stale snapshot again - how two aldo products were submitted into burger-hmod as order 0156-0705 on 2026-09-14"
+        },
+        {
+          "file": "hooks/useReorder.ts",
+          "regex": "cartStore\\.setCartStoreData\\(reorderStoreData\\)",
+          "desc": "reorder repairs the store SNAPSHOT alongside the two name keys; repairing only the names left @storage_cart_storeData pointing at the previously-viewed store, which is what checkout actually routes on"
+        },
+        {
+          "file": "stores/twin-cart/index.ts",
+          "regex": "@storage_twin_cart_storeDB",
+          "desc": "the twin secondary basket is namespaced on its OWN AsyncStorage keys and has its own getCartStoreData, so the primary cart's staleness guard cannot touch it. If twinCartStore is ever collapsed onto the primary cart's keys, the guard would drop the primary snapshot mid-twin-checkout and route the primary leg to the secondary store (CORE: an order can be written into the WRONG store's DB)"
         }
       ]
     },
@@ -181,7 +221,10 @@
         "utils/notification/index.ts"
       ],
       "symbols": {
-        "utils/notification/index.ts": ["schedulePushNotification", "store.wav"],
+        "utils/notification/index.ts": [
+          "schedulePushNotification",
+          "store.wav"
+        ],
         "stores/new-order-alerts/index.ts": [
           "takeNewOrders",
           "takeNewOrdersOnRefresh",

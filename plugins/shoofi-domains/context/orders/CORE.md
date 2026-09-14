@@ -147,6 +147,73 @@ Traps that cost a day if you meet them cold:
 
 Worked example: `services/exec-dashboard/engagement-metrics.js`.
 
+## An order can be written into the WRONG store's DB — and the app already tells you
+`app-name` on `POST /api/order/create` comes from the customer app's **cart store snapshot**,
+not from the products in the cart, so a cart of store A's products can be submitted into store
+B's database. It is rare and it is real: **10** submits since 2026-02-12 went out on a store
+other than the one the customer was browsing (e.g. `burger-hmod` `0156-0705`, 2026-09-14, two
+`aldo` products; the customer re-placed the identical basket at `aldo` six minutes later as
+`3540-1705`). **None of them was a twin order.**
+
+**Do not reconstruct this from the items.** The client instruments it directly, in
+`shoofi.apps-logs`:
+
+```js
+// both are event_type values; `properties` holds the comparison
+{ event_type: "checkout_store_data_check",     "properties.stores_match": false }
+{ event_type: "order_submit_store_data_check", "properties.all_stores_match": false }
+```
+
+`checkout_store_data_check` (`shoofi-app/screens/checkout/index.tsx`, the mount effect that
+calls `cartStore.getCartStoreData`) compares the cart's store to the store being browsed;
+`order_submit_store_data_check` (`shoofi-app/stores/cart/index.ts` `submitOrder`) adds the
+store actually going on the order. Read `cart_store_app_name` vs `current_store_app_name` to
+see which way the drift ran.
+
+**The match flags are dominated by a benign case — filter it out or you will overcount by
+16x.** `stores_match`/`all_stores_match` are also false when the cart simply has no snapshot
+yet (`cart_store_app_name: null`), which is the ordinary path and which checkout already
+handles by falling back to the live store data. Of 145,830 checkout events, 270 are false but
+248 are that; only **22** have both stores present and different. Of 90,594 submit events, 171
+are false, 161 are that, and **10** are a real wrong-store routing. So:
+
+```js
+{ event_type: "order_submit_store_data_check",
+  "properties.order_vs_current_match": false,
+  "properties.cart_stored_app_name": { $ne: null } }   // 10 rows, all of 2026
+```
+
+Why the drift exists: the cart's store identity is kept in **two** AsyncStorage keys that
+nobody keeps in sync. `@storage_cart_storeDB` is the authority — every repair path maintains
+it (`addProductToCart`, `resetCartForNewStore`, `hooks/useReorder.ts`, and the twin flow reads
+it first). `@storage_cart_storeData` is a cache of that store's details, written once by
+`addProductToCart` from whatever `storeDataStore` held at the time, and **checkout routes on
+the cache** — `app-name`, the delivery quote, the coupon check and `order.storeData` all read
+`cartStoreData || storeDataStore.storeData`. `getCartStoreData` now drops a snapshot that
+contradicts the authority and logs `cart_store_data_stale_dropped`.
+
+**The twin secondary basket is not involved.** `twinCartStore`
+(`shoofi-app/stores/twin-cart/index.ts`) is a separate class on separate keys —
+`@storage_twinCartItems` / `@storage_twin_cart_storeDB` / `@storage_twin_cart_storeData` — with
+its own `getCartStoreData`. `twinOrderStore.setSecondaryStore` writes its name and data keys
+from the same `store` object, and the twin-promotion path in `screens/cart/cart.tsx` (secondary
+promoted to primary when the primary basket empties) writes the primary pair together too. The
+pair can only drift where one key is written without the other, which is why the reorder path
+was the one that produced it.
+
+Two traps when you go looking:
+- **The reasons are only as good as the first item.** `checkOrderItemsStore`
+  (`routes/order-fraud-detector.js`) inspects `items[0]` **only**, so the Hebrew fraud reason
+  `פריט הזמנה "X" לא נמצא במוצרי החנות (<appName>)` is the platform's de-facto wrong-store
+  signal but misses an order whose first item happens to exist in the target store. Template
+  stores share **byte-identical product `_id`s** (`create-from-mock` preserves them), so
+  between two template-derived stores the lookup returns a plausible product and the check
+  passes.
+- **A retrospective catalogue sweep cannot confirm it.** Checking an old order's items against
+  `products` today conflates "came from another store" with "deleted since": 105 of 48,866
+  orders since 2026-06-01 have a missing item, but only a handful were ever flagged at creation
+  time. Use the `apps-logs` events, which were recorded at the moment it happened.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
   cross-check is intentionally disabled. Leave it.
