@@ -106,6 +106,21 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `true`), or the regenerated report silently drops those amounts.
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
+   **`shoofi.compensations` is the same trap wearing different clothes.** The order
+   copy on a compensation (`order._id`, `order.status`, `order.total`) is whatever the
+   admin client posted: `normalizeCompensationOrder`
+   (`routes/shoofi-admin.js:2642-2674`) spreads `...order` from the request body and
+   adds `orderId: order._id` without a single cast. Two consequences, both silent:
+   - **`order._id` is a STRING while `orders._id` is an ObjectId.** All 2315
+     production documents are string-shaped. Mongo type-brackets `$in`, so an uncast
+     join matches **zero** rows and reports every order as "not cancelled" rather than
+     failing. Cast with `coerceOrderId` (`utils/customer-orders.js`) — it exists for
+     exactly this, and `services/exec-dashboard/spend-metrics.js` uses it.
+   - **`order.status` on the compensation is a PRE-cancel snapshot.** 89 of 276
+     resolvable items measured in production disagree with the order's live status,
+     almost all of them "2" against a cancelled order — `cancel-compensation.js`
+     builds the copy before the status write, and the manual modal freezes whatever
+     support's screen showed. Join for the status; never read the frozen one.
 7. **A store's coupon cost (`reportData.campaigns`) is the coupon's NOMINAL
    `storeDiscount`, never the waiver the customer actually got**, and the gate that
    decides it is **blind to `discountType`** (`routes/payments/admin.js:1135-1142`,

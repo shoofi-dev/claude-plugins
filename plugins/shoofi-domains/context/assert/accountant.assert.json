@@ -98,6 +98,21 @@
           "desc": "MASAV DOS-Hebrew encoding"
         },
         {
+          "file": "routes/shoofi-admin.js",
+          "regex": "orderId:\\s*order\\._id,\\s*//\\s*Keep backward compatibility",
+          "desc": "CORE invariant 6: the compensation's order copy is stored exactly as the admin client posted it — no ObjectId cast — which is why compensations.order._id is a string against an ObjectId orders._id"
+        },
+        {
+          "file": "services/exec-dashboard/spend-metrics.js",
+          "regex": "coerceOrderId",
+          "desc": "CORE invariant 6: the compensation→order join casts the string id before querying; without it the $in type-brackets and matches nothing, silently"
+        },
+        {
+          "file": "utils/customer-orders.js",
+          "regex": "module\\.exports[\\s\\S]{0,400}coerceOrderId",
+          "desc": "CORE invariant 6: coerceOrderId is shared, not private to customers.orders[] — compensations needs the identical cast"
+        },
+        {
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
