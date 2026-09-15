@@ -8,6 +8,7 @@
         "routes/payments/admin.js",
         "routes/payments/summaries.js",
         "routes/driver-reports.js",
+        "routes/shoofi-admin.js",
         "routes/admin/masav.js",
         "routes/hyp.js",
         "lib/payments/calc.js",
@@ -101,6 +102,21 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "createdAt:\\s*\\{\\s*\\$gte:\\s*rangeStart,\\s*\\$lte:\\s*rangeEnd\\s*\\}",
+          "desc": "CORE invariant 5: the store-side compensations-approved guard still windows a BSON Date field with moment().format() STRINGS, so it matches nothing and never blocks a report — if this line changes, re-check the known-broken note in CORE"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "rangeStartDate\\s*=\\s*moment\\(startDate\\)[\\s\\S]{0,80}\\.toDate\\(\\)",
+          "desc": "CORE invariant 5: the driver-side compensations-approved guard converts its window to BSON Dates with .toDate() — never 'simplify' it to .format(), which is exactly what killed the store-side twin"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "items:\\s*processedItems,\\s*createdAt:\\s*new Date\\(\\)",
+          "desc": "CORE invariant 5: shoofi.compensations.createdAt is written as a BSON Date, which is why any string-bounded window over it matches nothing"
         }
       ]
     }

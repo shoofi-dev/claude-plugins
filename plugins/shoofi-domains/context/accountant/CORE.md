@@ -104,6 +104,16 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    wrong, and the fix is delete + regenerate. But delete **must release the carry-over
    compensations** that `/send` consumed (`appNameBackfill.pendingReportCarryover` back to
    `true`), or the regenerated report silently drops those amounts.
+   **compensations-approved is on for drivers and DEAD for stores** (verified 2026-09-15):
+   `validateCompensationsApproved` (`routes/payments/admin-reports.js:173-193`) builds its
+   window with `moment(...).format()` — two **strings** — and compares them to
+   `shoofi.compensations.createdAt`, which is a BSON **Date** in all 2315 production docs
+   (written `new Date()` at `routes/shoofi-admin.js:2723`). Mongo type-brackets that
+   comparison, so the `find` returns `[]` for every store, `unapprovedCount` is always 0 and
+   the `unapproved_compensations` gate at `:1350` can never fire. The driver twin
+   `validateDriverCompensationsApproved` does it correctly with `.toDate()`
+   (`routes/driver-reports.js:46-47`) — **do not "simplify" that to `.format()`**, and fix
+   the store side with a Date pair rather than by dropping the guard.
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
 7. **A store's coupon cost (`reportData.campaigns`) is the coupon's NOMINAL
