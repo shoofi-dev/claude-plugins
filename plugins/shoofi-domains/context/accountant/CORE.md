@@ -157,6 +157,34 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    *(Do not mirror `admin.js:907-944` either — that is the legacy `/stores-export`
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
+8. **The store and Shoofi coupon shares are ASYMMETRIC, and only one of them is a
+   complete answer to "who funded this coupon".** The store's share includes the
+   delivery half; Shoofi's, under the name `couponsFromShoofi`, deliberately does not.
+   `routes/payments/admin.js:1195` says so in a comment and `:1231` implements it —
+   `shoofiAmt = shoofiItems` — while `:1259-1260` parks the excluded amount in a
+   display-only `excludedDeliveryAmount`, so it is visibly dropped rather than lost. The
+   reason is correct: Shoofi's delivery half is paid to the **courier**, not reimbursed
+   to the store, so it has no business on a store settlement report.
+   Two things follow, and both have to be held at once:
+   - **"How much coupon money did Shoofi fund" is TWO numbers, never one.**
+     `reportData.couponsFromShoofi` **plus**
+     `computeDeliveryFeeSponsorship(...).sponsoredByShoofi`
+     (`services/exec-dashboard/delivery-metrics.js`). The monthly exec spend card carries
+     them as two separate series for exactly this reason
+     (`services/exec-dashboard/spend-metrics.js`, series 1 and 2). They are comparable in
+     size — Aug 2026 was ₪14,001 store-side against ₪14,031 delivery — so a figure
+     labelled "what Shoofi funded" that reads only the first **drops roughly half of it**,
+     and specifically drops the entire free-delivery programme.
+   - **The store's delivery share is derived in two places, and summing both
+     double-bills it.** `admin.js:1135-1142` bills a flat `delivery` coupon's
+     `storeDiscount` into `campaigns`; `couponDeliverySplit` (`lib/payments/calc.js`)
+     returns the same shekels as its `store`. That is one charge seen twice, not two
+     charges. A percentage-type delivery coupon is the mirror image: `calc.js` leaves it
+     out of the fee split on purpose — a percentage of the *items* subtotal is not
+     attributable to a fee — so there it is `campaigns` and only `campaigns`. Any new
+     reader that adds an items-side store share to `couponDeliverySplit().store` must
+     split on exactly that line. Worked example:
+     `services/exec-dashboard/coupon-funding.js`, which returns a 2×2 for this reason.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized

@@ -13,7 +13,9 @@
         "lib/payments/calc.js",
         "utils/vat.js",
         "utils/greeninvoice.js",
-        "utils/invoice-provider.js"
+        "utils/invoice-provider.js",
+        "services/exec-dashboard/delivery-metrics.js",
+        "services/exec-dashboard/spend-metrics.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -39,7 +41,9 @@
           "generateStoreReportData",
           "totalForTransfer"
         ],
-        "utils/invoice-provider.js": ["getActiveProvider"]
+        "utils/invoice-provider.js": [
+          "getActiveProvider"
+        ]
       },
       "patterns": [
         {
@@ -101,6 +105,16 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "shoofiAmt\\s*=\\s*shoofiItems",
+          "desc": "couponsFromShoofi is the ITEMS half alone - Shoofi delivery half of a full_discount coupon is paid to the courier and excluded on purpose (CORE invariant 8). If this becomes shoofiItems + shoofiDelivery the store report double-counts the delivery sponsorship and the exec spend card two series stop being disjoint."
+        },
+        {
+          "file": "lib/payments/calc.js",
+          "regex": "couponType !== 'percentage'",
+          "desc": "the store share of a DELIVERY coupon fee is derived here as well as at admin.js:1135-1142 and they are the same shekels - a reader summing both double-bills the store (CORE invariant 8). This clause is what keeps percentage-type delivery coupons on the items side instead."
         }
       ]
     }
