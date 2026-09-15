@@ -142,6 +142,36 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
   block every HYP card at every store. It was reconstructed from a deployed OTA bundle, so its
   semantics are a reconstruction, not recovered intent. **Do not wire it up; deletion or a
   corrected signature is a human decision.**
+- **Cash vs card is `order.payment_method`. `payment_provider` answers a different question and
+  must not be used for this cut.** The provider says *which gateway holds the money*; the method
+  says *whether money reached a gateway at all*. Three measured reasons, over all 264 store DBs
+  (148,333 orders) and `delivery-company.book-delivery` (90,826 rows): the method is present on
+  **100%** of orders while the provider is **missing on 11.6%** of deliveries (everything before
+  `2025-09-04`, plus every twin leg — `routes/twin-order.js:415` writes the method and no
+  provider); the two **never disagree** (0 rows where a `CASH` method carries a card provider, or
+  the reverse); and every settlement reader already keys on the method
+  (`routes/driver-reports.js:152`, `routes/payments/summaries.js:607`), so a screen keyed on the
+  provider would be the only one that disagrees with the reports.
+  Classify as **`!== "CASH"` ⇒ card**, not `=== "CREDITCARD"`. Apple/Google Pay are a rail over a
+  real card and the client already stamps them `CREDITCARD`
+  (`shoofi-app/screens/checkout/index.tsx:2433`); the wallet identity survives only in the
+  provider. Two pre-provider orders carry a literal `APPLEPAY` and belong with card, not in a
+  third bucket. Live values are exactly `CASH` and `CREDITCARD` — never missing, never lowercase.
+  ⚠️ **On a delivery the path is `order.order.payment_method` — two levels, not one.** A
+  `book-delivery` document embeds the whole store order as `order` (`routes/order.js:6334`), and
+  that order has its own `order` sub-object. Because these readers project a whitelist, a
+  projection of `"order.payment_method"` matches nothing and every row reads `undefined` — so a
+  whole aggregation silently collapses into one bucket rather than erroring.
+  ⚠️ **A zero-total order is stamped `CASH` even when the customer chose a card**
+  (`routes/order.js:3074-3085` — ZCredit rejects a 0-amount charge). Measured on the exec
+  dashboard's delivery population this is ≤5 deliveries and ≤₪62 a month, negligible for a
+  revenue split — but it is a real mis-stamp, so a per-order claim about how someone paid must
+  check `total > 0` before believing it.
+  Also load-bearing for reporting: **a cash delivery fee never enters Shoofi.** The courier takes
+  it at the door and Shoofi pays them nothing for that leg, whereas a card fee is collected
+  through Shoofi's acquirer and paid out (`routes/payments/summaries.js:948-952`). Both halves
+  are money the customer paid; only one is platform cash flow, and a label that blurs the two is
+  wrong.
 
 ## Recipe — touching a charge path
 1. Identify which of the three paths you're in (CC / HYP token / digital-wallet) and say so in
