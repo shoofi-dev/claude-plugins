@@ -39,6 +39,26 @@ boundary and say so in the PR.
 5. **`supportedCategoryIds` are STRINGS**, compared via `{$toString:'$_id'}`. Don't switch to
    ObjectId comparison without a data migration.
 6. **Product ordering** comes from `categoryOrders[categoryId]`, falling back to legacy `order`.
+7. **`isHidden` is the visibility flag; `isInStore` is NOT.** `isInStore:false` still ships the
+   product to the customer (`routes/menu.js:94` projects it, no pipeline stage matches on it) —
+   it renders greyed and unorderable. Only `isHidden:true` removes it from the menu
+   (`routes/menu.js:51,75`), and therefore from product detail, which the app renders out of the
+   menu it already holds. Cross-store search (`routes/menu.js:801`) requires **both**.
+8. **Hiding for price is ONE-DIRECTIONAL.** `price:0` ⇒ `isHidden:true`
+   (`utils/crons/hide-zero-price-products.js:93-102` — a manual CLI script, not a scheduled cron,
+   despite living in `utils/crons/`). The reverse is never written anywhere: a hidden product
+   given a real price **stays hidden**. `POST /api/admin/product/update` does not write `isHidden`
+   at all — the field is absent from the rebuild list at `routes/product.js:541-624`, so the
+   existing value is carried through. Nothing on the document records **why** a product is hidden
+   (there is no `hiddenReason`), and `POST /api/admin/product/update/isHidden`
+   (`routes/product.js:1373`) is the partner app's manual eye toggle writing the same field. So
+   auto-un-hiding on a 0→N price change silently reverses a merchandising decision with no way to
+   detect it. Same restraint as invariant 4. Report those products; never un-hide them in bulk.
+9. **`isHidden` is a READ-path filter only — there is no order-time orderability gate.**
+   `utils/order-pricing.js` and `routes/order.js` never reference `isHidden`, `isInStore`,
+   `quantity` or `outOfStockByQuantity`. A client on a stale menu can still submit a hidden,
+   zero-priced product and the server will price it at 0 and accept it. Clearing both cache keys
+   shrinks that window; it does not close it.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** translations resolve to the **central** DB — UI labels are global/platform-wide,

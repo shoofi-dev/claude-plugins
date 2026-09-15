@@ -37,6 +37,16 @@
           "file": "routes/product.js",
           "regex": "outOfStockByQuantity",
           "desc": "stock invariant field"
+        },
+        {
+          "file": "utils/crons/hide-zero-price-products.js",
+          "regex": "isHidden",
+          "desc": "price:0 => isHidden, one-directional (doc CORE invariant 8)"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "api/admin/product/update/isHidden",
+          "desc": "the manual eye toggle that shares isHidden (doc CORE invariant 8)"
         }
       ]
     }
