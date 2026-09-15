@@ -148,6 +148,38 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
     `order` are whole embedded documents, so a wished-for or misspelled field reads as
     `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
     runs — which looks identical to a correction that is simply rare.
+12. **There is no shift clock-in. Attendance is INFERRED, never recorded.** A driver books a
+    slot (`$push` onto `driverShifts.bookedDrivers`) and that is the only thing stored — there
+    is no `actualStartTime`, no check-in, no attendance field anywhere in the shift model.
+    Whether he actually worked a booked slot is derived by overlapping his `isActive` on/off
+    trail (`delivery-company.driver-status-history`, written only by
+    `services/delivery/driver-status-service.js:setDriverActiveStatus`) against
+    `utils/shift-time.js:slotWindow(slot, dayStartHour)`. Build the intervals with
+    `utils/driver-active-hours.js:buildActiveIntervals` — it tie-breaks the same-second
+    cron-OFF/app-ON pairs `driver-shift-cron` writes, which hand-rolled interval building gets
+    wrong depending on which index Mongo picked. `utils/shift-attendance.js` is the one place
+    that states the inference (no-show / late / on-time / pending); reuse it rather than
+    re-deriving it. Corollaries that decide whether a count is a libel:
+    - **A driver cancel leaves NO trace.** `POST /shifts/cancel` `$pull`s the entry entirely
+      (`routes/driver-shift-manager.js`), and cancelling is *refused* inside 2 days of the
+      shift — so a cancelled booking can never be misread as a skipped one, and the late
+      drop-outs are exactly the entries still sitting there as `status: 'booked'`.
+    - **An admin removal is not a driver's absence.** It keeps the entry with
+      `status: 'removed'` + `removedAt`/`removedBy`. Exclude it.
+    - **A missing `status` is a real booking, not a missing one.** Legacy entries carry no
+      `status` field; the authoritative predicate is
+      `services/driver-shift/driver-duty.js:isDriverBookedInShift`
+      (`status === 'booked' || !status`). The stricter `status === 'booked'` used at some call
+      sites silently drops every pre-migration booking.
+    - **One slot per city area, and admin assign does not check for conflicts** (unlike
+      `ShiftService.checkBookingConflict` on the self-book path), so the same driver can hold
+      the same hour twice. De-duplicate on the *resolved wall-clock window* before counting.
+    - **A "shift" for reporting is a contiguous RUN of slots, not a slot.** An evening booked
+      as four one-hour slots is one commitment; counting per slot multiplies one offence by
+      however finely the roster was cut.
+    - `driverDailyHours` is NOT a safe stand-in for the raw rows: the cron writes nothing at
+      all for a day with `activeMinutes === 0` (`utils/crons/driver-daily-hours.js`), so a
+      missing doc means "never came online", not "no data" — and it has not reached today.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`

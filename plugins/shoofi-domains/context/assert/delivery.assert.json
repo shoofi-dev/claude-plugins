@@ -27,7 +27,11 @@
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js",
-        "services/monitoring/centralized-flow-monitor.js"
+        "services/monitoring/centralized-flow-monitor.js",
+        "utils/shift-attendance.js",
+        "utils/shift-time.js",
+        "services/driver-shift/driver-duty.js",
+        "utils/crons/driver-daily-hours.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -47,7 +51,8 @@
         "utils/driver-active-hours.js": [
           "workingDayBounds",
           "workingHoursWindow",
-          "shiftWindows"
+          "shiftWindows",
+          "buildActiveIntervals"
         ],
         "services/delivery/delayed-assignment.js": [
           "isPendingAssignment",
@@ -64,6 +69,20 @@
           "parsePromisedEta",
           "reassignmentOf",
           "classifyDelivery"
+        ],
+        "utils/shift-attendance.js": [
+          "getShiftAttendance",
+          "getMonthAttendance",
+          "isLiveBooking",
+          "buildRuns",
+          "classifyRun"
+        ],
+        "utils/shift-time.js": [
+          "slotWindow",
+          "businessDayBounds"
+        ],
+        "services/driver-shift/driver-duty.js": [
+          "isDriverBookedInShift"
         ]
       },
       "patterns": [
@@ -171,6 +190,31 @@
           "file": "services/monitoring/centralized-flow-monitor.js",
           "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
           "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+        },
+        {
+          "file": "services/driver-shift/driver-duty.js",
+          "regex": "entry\\.status === 'booked' \\|\\| !entry\\.status",
+          "desc": "a bookedDrivers entry with NO status is a live booking - the stricter status === 'booked' silently drops every legacy booking, which in an attendance report reads as 'he never signed up'"
+        },
+        {
+          "file": "utils/shift-attendance.js",
+          "regex": "now\\.isBefore\\(run\\.end\\)",
+          "desc": "a shift that has not ENDED is pending and never a no-show - this is what keeps the current-month report from accusing a driver who may still turn up"
+        },
+        {
+          "file": "utils/shift-attendance.js",
+          "regex": "status === 'cancelled'",
+          "desc": "a cancelled shift document is nobody’s no-show"
+        },
+        {
+          "file": "utils/crons/driver-daily-hours.js",
+          "regex": "activeMinutes <= 0",
+          "desc": "the cron writes NO driverDailyHours doc for a day with zero activity, so a missing doc means \"never came online\", not \"no data\" - do not use driverDailyHours as a stand-in for the raw status rows when measuring attendance"
+        },
+        {
+          "file": "routes/driver-shift-manager.js",
+          "regex": "shift-attendance/summary",
+          "desc": "the admin no-show / lateness report entry point"
         }
       ]
     },
