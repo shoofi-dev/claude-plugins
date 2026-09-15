@@ -37,7 +37,12 @@
           "supportedAreas"
         ],
         "services/delivery/driver-status-service.js": [
-          "setDriverActiveStatus"
+          "setDriverActiveStatus",
+          "updatedBySource"
+        ],
+        "routes/delivery/driver.js": [
+          "lastLocationUpdate",
+          "driverLocationHistory"
         ],
         "services/driver-shift/shift-service.js": [
           "getPermanentDriverSlotsForDay",
@@ -67,6 +72,16 @@
         ]
       },
       "patterns": [
+        {
+          "file": "utils/crons/driver-shift-cron.js",
+          "regex": "'0 \\* \\* \\* \\*'",
+          "desc": "the roster deactivation runs hourly on the hour — the reason ~22% of isActive OFF rows are the system's, not the driver's"
+        },
+        {
+          "file": "services/delivery/driver-status-service.js",
+          "regex": "updatedBySource:\\s*source",
+          "desc": "the only discriminator between a cron/support OFF and the driver's own"
+        },
         {
           "file": "consts/consts.js",
           "regex": "DELIVERY_STATUS",

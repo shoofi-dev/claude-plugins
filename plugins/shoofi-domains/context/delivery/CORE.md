@@ -72,7 +72,34 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
 3. **Never write `customers.isActive` directly** — always `setDriverActiveStatus`
    (`services/delivery/driver-status-service.js`), which writes `driverStatusHistory` in
    lock-step and pushes a websocket update. Direct writes create phantom history.
+   **An OFF row is usually NOT the driver.** `driver-shift-cron` deactivates every `isActive`
+   driver it cannot match to an in-progress booked shift, hourly on the hour
+   (`utils/crons/driver-shift-cron.js`, `'0 * * * *'` Asia/Jerusalem) — over 30 days of
+   production that was **22% of all OFF rows**, and the support desk wrote *more* activations
+   than the drivers did. The discriminator is `updatedBySource` on the history row:
+   `driver_app` | `cron` | `shoofi_support` | `admin_web` | `shift_admin`; the
+   `changes`/`newValues`/`changedFields` shape is identical either way. There is **no idle
+   timeout** — deactivation is roster-driven, never inactivity-driven — and neither logout,
+   app background nor token expiry touches `isActive`. Any metric that reads "the driver was
+   offline" as the driver's own doing without checking the source puts the couriers the
+   platform switched off at the top of it (`utils/shift-attendance.js` `offAttribution` is the
+   worked example).
+   **`updatedBySource` does not exist before 2026-04-24** and was not universal until
+   2026-08-17 (0% attributed Dec-2025→Mar-2026, 71% in May, 90% in Aug, 100% in Sep), so a
+   retrospective report reaching further back has to treat those gaps as unattributed rather
+   than guess. The one legacy pattern that is not a guess: the old driver app deactivated
+   itself by PUTting its whole profile to the employee-edit route, leaving
+   `updateType: 'employee-update'` with no source and a `ShoofiShoofir` user agent — all 8,969
+   such rows are true→false flips from a driver's own phone.
 4. **`isActive` ≠ `isAvailable` ≠ `isOnline`** — three separate flags, don't conflate.
+   In particular `isOnline` and the location trail are **not** gated on `isActive`:
+   `POST /api/delivery/driver/location` (`routes/delivery/driver.js`) keeps writing
+   `currentLocation`/`lastLocationUpdate` and `driverLocationHistory` (30-day TTL) while the
+   driver is toggled off, so a long `isActive` gap is a deliberate state rather than a
+   connectivity artifact — sampled over 14 days, 57 of 60 `isActive` gaps of 20–180 minutes
+   had location fixes arriving throughout. ID trap when joining the two:
+   `driverStatusHistory.driverId` is an **ObjectId** while `driverLocationHistory.driverId`
+   is a **string**.
 5. **Twins always go pending** and (single mode) must share ONE driver: the
    `twinPickupSequence:1` side drives selection, the peer mirrors it, and `assignDriverAt` is
    aligned to the later side. Breaking any of it splits a twin.
