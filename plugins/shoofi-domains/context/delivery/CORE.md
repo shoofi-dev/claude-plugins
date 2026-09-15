@@ -134,6 +134,30 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
       `expectedDeliveryAt < created` as unmeasurable; it is impossible by construction.
     The shared reader that gets all of this right is `services/delivery/late-delivery.js`
     (`pickupInstantOf`, `parsePromisedEta`) — use it rather than re-deriving.
+    **On a CLIENT, anchor the clock face on `expectedDeliveryAt`, not on `created`.** The
+    "snap onto `created` and roll forward if it lands earlier" recipe above is right for the
+    82% of the shape it describes and wrong for scheduled orders, where `created` can be a
+    day or more before the pickup: a future order booked 21:43 for a 14:00 pickup the next
+    day lands on *today's* 14:00, i.e. overdue the moment that clock face passes. 198
+    `isFutureOrder: true` rows exist. The ETA is minutes after the pickup, never before it,
+    so the correct reconstruction is **`expectedDeliveryAt`'s date + `pickupTime`'s `HH:mm`,
+    minus a day if the result lands after the ETA** — that one subtraction is the
+    midnight-rollover case and nothing else. Measured over the 3,000 most recent
+    `delivery-company.book-delivery` rows (2026-09): `eta − pickup` is median **+12 min**,
+    max **+45**, and negative on 44 rows (1.47%) — all genuine rollovers — so the correction
+    is unambiguous. Keep `created` only as the fallback for a row with no usable ETA, and
+    give it a ±12h window there: `pickup − created` is median +20 min but **2 of 3,000 rows
+    sit a few hours behind their own booking** without having rolled over, so a bare
+    "earlier than `created` ⇒ tomorrow" test misfires on exactly the future orders. Worked
+    example, with the three classes as tests:
+    `shoofi-delivery-web/src/utils/pickup-overdue.ts` (+ `.test.ts`).
+    Also settled by the same sweep, against the "offset strings and BSON Dates are mixed on
+    this collection" warning: on **these three fields** there is no mixing at all. All 90,868
+    rows carry `created`, `expectedDeliveryAt` and `pickupTime`, all three as **strings**,
+    with `created`/`expectedDeliveryAt` always bearing an explicit `+03:00` (never `Z`,
+    never a BSON `Date`) and `pickupTime` always matching `/^\d{2}:\d{2}$/`. So a client may
+    read the calendar date and the offset straight out of the text and never consult the
+    browser's timezone — and a `pickupTime && ` guard is dead code.
 11. **`bookDelivery.storeReadyAt` does not exist — nothing writes it, ever.** 0 of 82,414
     production documents carry the field and no code in any Shoofi repo assigns it. It is not
     legacy; it was never written. Three report consumers nonetheless read it off a delivery and

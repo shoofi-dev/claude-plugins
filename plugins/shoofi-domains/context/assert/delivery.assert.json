@@ -213,6 +213,29 @@
           "desc": "partner delivery status must match server (fixed off-by-one)"
         }
       ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/utils/pickup-overdue.ts",
+        "src/views/admin/analytics/DeliveryListAnalytics.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "src/utils/pickup-overdue.ts",
+          "regex": "onEtaDay > etaMs \\? onEtaDay - DAY_MS : onEtaDay",
+          "desc": "pickupTime's clock face is anchored on expectedDeliveryAt's calendar day, minus a day when it lands after the ETA — that subtraction is the midnight rollover and nothing else"
+        },
+        {
+          "file": "src/utils/pickup-overdue.ts",
+          "regex": "ROLLOVER_WINDOW_MS = 12 \\* 60 \\* 60 \\* 1000",
+          "desc": "the created-anchored fallback needs a window, not a bare 'earlier than created means tomorrow' test — a scheduled order sits hours behind its own booking without having rolled over"
+        },
+        {
+          "file": "src/views/admin/analytics/DeliveryListAnalytics.tsx",
+          "regex": "minutesPastPickup",
+          "desc": "the delivery board's pickup-overdue row reads the shared reconstruction; the inline rule it replaced pushed every pickup a day out via `if (hours >= 0)`"
+        }
+      ]
     }
   }
 }
