@@ -37,6 +37,16 @@
           "file": "routes/product.js",
           "regex": "outOfStockByQuantity",
           "desc": "stock invariant field"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "productDoc\\.price = req\\.body\\.price \\? Number\\(JSON\\.parse\\(req\\.body\\.price\\)\\)",
+          "desc": "doc CORE trap: /admin/product/update drops a price of 0 (falsy) and JSON.parse throws outside its try block — if this line is fixed, delete the trap from CORE.md"
+        },
+        {
+          "file": "services/catalog/bulk-price-update.js",
+          "regex": "runBulkPriceUpdate",
+          "desc": "the correct bulk price writer CORE.md points at instead"
         }
       ]
     }

@@ -53,6 +53,20 @@ boundary and say so in the PR.
      test after.
 - **Recorded risk, not yours to fix:** the server trusts client-sent extras prices (no server-side
   recompute). Any fix lives in the order-create path — hand off.
+- **TRAP — `POST /api/admin/product/update` cannot set a price of 0, and throws on a bad one.**
+  `routes/product.js:611-612` reads
+  `productDoc.price = req.body.price ? Number(JSON.parse(req.body.price)) : product.price || 0`.
+  A JSON body carrying the **number** `0` is falsy, so the handler silently keeps the OLD price
+  and answers 200 — and `price: 0` is the platform's own meaning for "not for sale"
+  (`utils/crons/hide-zero-price-products.js`), so this is a real write that looks like it worked.
+  Only the FormData **string** `"0"` gets through. Separately, `JSON.parse` of a non-numeric
+  string (`"abc"`, `"12,5"`, `"₪12"`) throws **outside** the handler's try block, which starts at
+  `:783` — an unhandled rejection in an async Express 4 handler, so the request never responds.
+  The same handler is a full-document rewrite (`productDoc = { ...product }` at `:522`,
+  `$set: productDoc` at `:785`), so it also clobbers a concurrent partner edit. **Do not reuse it
+  as the writer for any bulk or programmatic price change** — do a targeted
+  `$set: { price, updatedAt }` through `bulkWrite`, the way
+  `services/catalog/bulk-price-update.js` and `/api/admin/product/bulk-reorder` do.
 
 ## Recipe — add/modify a product field
 1. Server: accept + persist it in the product insert/update handlers (`routes/product.js`).
