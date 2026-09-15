@@ -78,6 +78,30 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     (`services/delivery/late-delivery.js`) look like a genuine promise and vice versa, which is
     exactly what `originalExpectedDeliveryAt` exists to prevent. Delivery owns the reading rule;
     orders owns the fields, and this is the contract between them.
+11. **Every platform-wide order figure counts COMPLETED orders only, so none of them
+    can be reused for a day that is still running.** `collectOrders`
+    (`services/exec-dashboard/orders-metrics.js`) buckets a row only if its status is in
+    the completed or cancelled list and otherwise drops it with the comment *"still in
+    flight — counted by neither"*; revenue accrues on the completed branch alone. Over a
+    settled month that is near-lossless, which is why it has never bitten. Applied to
+    today at 19:00 it hides every order in a kitchen (`1`), pending (`6`), in fraud
+    review (`13`) and every scheduled one (`14`/`15`) — so the figure reads as a fraction
+    of reality and keeps climbing for hours after the last order was taken.
+    For anything covering a live or recent day, count **placed**: created in the window,
+    `isSchoolProject !== true`, and status ≠ `"0"`. Cancelled orders are a **subset** of
+    placed, not a sibling of it.
+    Two further reasons placed is the right axis, both about `created` never moving:
+    - The 07:00 `utils/crons/fix-stuck-orders.js` sweep force-completes yesterday's
+      `status:"1"` rows, so a completed-only reading of **yesterday** differs at 06:00
+      and at 08:00. Those rows are counted and also reported separately as
+      `autoFixedCount`, so the size of the effect is measurable.
+    - Comparing two days on the completed definition compares how far through that
+      cron's queue each one is, not how they traded.
+    Related and easy to miss: the exec snapshot cron runs at **03:40**, which is inside
+    the *previous* business day (the boundary is 07:00). So the stored document has never
+    contained the current business day, and does not contain yesterday either until the
+    next night's run. Anything about "today" or "yesterday" is a live query or it is
+    nothing. Worked example: `services/exec-dashboard/daily-pulse.js`.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

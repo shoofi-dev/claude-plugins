@@ -17,7 +17,12 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
-        "docs/customer-orders-snapshot.md"
+        "docs/customer-orders-snapshot.md",
+        "services/exec-dashboard/orders-metrics.js",
+        "services/exec-dashboard/daily-pulse.js",
+        "utils/crons/fix-stuck-orders.js",
+        "utils/crons/exec-dashboard-snapshot.js",
+        "utils/business-day.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -36,7 +41,9 @@
           "stockDecremented",
           "stockRestored"
         ],
-        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+        "utils/customer-orders.js": [
+          "getSuccessfulOrdersByCustomerIds"
+        ]
       },
       "patterns": [
         {
@@ -128,6 +135,16 @@
           "file": "routes/app-logs.js",
           "regex": "user_visit_id",
           "desc": "the device-id header, the stable installation identity abandoned-cart sessions are keyed on — NOT orders.deviceId"
+        },
+        {
+          "file": "services/exec-dashboard/orders-metrics.js",
+          "regex": "if \\(!isCompleted && !isCancelled\\) continue;",
+          "desc": "the platform-wide order sweep drops in-flight orders (CORE invariant 11). If this guard is ever relaxed, every stored exec-dashboard figure changes meaning and the placed-vs-completed distinction the daily card is built on stops being a distinction."
+        },
+        {
+          "file": "utils/crons/exec-dashboard-snapshot.js",
+          "regex": "cron\\.schedule\\(\\s*\"40 3 \\* \\* \\*\"",
+          "desc": "the exec snapshot is computed at 03:40, i.e. INSIDE the previous business day, which is why it has never contained today (CORE invariant 11). Move it past 07:00 and the \"today is never in the snapshot\" reasoning stops holding."
         }
       ]
     },
@@ -181,7 +198,10 @@
         "utils/notification/index.ts"
       ],
       "symbols": {
-        "utils/notification/index.ts": ["schedulePushNotification", "store.wav"],
+        "utils/notification/index.ts": [
+          "schedulePushNotification",
+          "store.wav"
+        ],
         "stores/new-order-alerts/index.ts": [
           "takeNewOrders",
           "takeNewOrdersOnRefresh",
