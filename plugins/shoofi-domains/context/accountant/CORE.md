@@ -159,6 +159,20 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `full_discount`. Settlement uses `/stores-export-new`.)*
 
 ## Known status (human-confirmed — do NOT "fix")
+- **A Shoofi-funded compensation paid to the CUSTOMER moves no money in this codebase.**
+  Grep every consumer of `compensationFor` and the pattern is exact: the store report
+  (`admin-reports.js:911`, `:921`) and the store summaries (`summaries.js:203-209`)
+  bill customer- and driver-recipient items only when **`payingParty === 'business'`**;
+  the delivery-company report takes only `compensationFor === 'driver'`
+  (`driver-reports.js:392`); the store credit takes only `compensationFor === 'business'`
+  (`admin-reports.js:985`). Nothing matches customer + Shoofi. The money is returned by
+  a person — a coupon (`services/payments/cancel-compensation.js`, the only automated
+  path, and it always stamps `couponCode`), a back-office card credit, or a bank
+  transfer — and the row is the record of that, not the instruction. It is also the
+  bulk of the volume: 162 of 350 Shoofi-funded cash items over six months, ₪29,179 of
+  ₪37,884. **So "who does this compensation pay?" is not answerable from
+  `compensationFor` alone** — ask which report consumes it, and if none does, the
+  amount left the company somewhere no collection records.
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
 - **INTENTIONAL, do NOT "restore":** delete accepts **any** report status (2026-08-03). The

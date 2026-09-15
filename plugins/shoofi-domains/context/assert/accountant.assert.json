@@ -8,6 +8,7 @@
         "routes/payments/admin.js",
         "routes/payments/summaries.js",
         "routes/driver-reports.js",
+        "services/payments/cancel-compensation.js",
         "routes/admin/masav.js",
         "routes/hyp.js",
         "lib/payments/calc.js",
@@ -96,6 +97,21 @@
           "file": "routes/admin/masav.js",
           "regex": "CP862|cp862",
           "desc": "MASAV DOS-Hebrew encoding"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "item\\.payingParty === 'business' && item\\.compensationFor === 'customer'",
+          "desc": "Known status: the ONLY settlement consumer of a customer-recipient compensation requires the STORE to be the payer — a Shoofi-funded one has no consumer anywhere, so it moves no money in this codebase"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "item\\.payingParty === 'business' && item\\.status === 1 && item\\.compensationFor !== 'business'",
+          "desc": "Known status: the store summaries bill customer/driver compensations only when the store funded them — same rule as admin-reports, and the reason a Shoofi-funded customer compensation is write-only data"
+        },
+        {
+          "file": "services/payments/cancel-compensation.js",
+          "regex": "couponCode",
+          "desc": "Known status: the only automated Shoofi→customer compensation path settles as a COUPON and stamps couponCode — which is what lets the exec dashboard tell a commitment from cash"
         },
         {
           "file": "routes/payments/admin-reports.js",
