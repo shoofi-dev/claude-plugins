@@ -44,6 +44,35 @@ boundary and say so in the PR.
 - **BY DESIGN:** translations resolve to the **central** DB — UI labels are global/platform-wide,
   not per-store. Do **not** re-route them to `app-name`.
 - **FACT (not a bug):** `supportedCategoryIds` are strings (invariant 5).
+- **FACT — a general category with no linked store category does not exist to the customer.**
+  `routes/menu.js` filters the tree down to general categories that have at least one
+  subcategory (`generalCategories.filter(gc => gc.subCategories.length > 0)`, customer apps only
+  — `shouldShowHiddenProducts` skips it), and the join it filters on is
+  `category.supportedGeneralCategoryIds.some(id => id === generalCategory._id.toString())`. So a
+  store can hold a dozen `general-categories` documents, show all dozen on the admin screen, and
+  ship `generalCategories: []` to the app. **Before calling a store's general categories
+  "missing", count the LINKS, not the documents:**
+  `db.categories.countDocuments({'supportedGeneralCategoryIds.0': {$exists: true}})`. Measured
+  2026-09-16: 39 of 247 store DBs have any link at all, and `mini-market-jiousi` had 12 general
+  categories, 351 categories and **zero** links — which is why a human deleted the twelve as
+  useless. Three more things a grep gets wrong here:
+  (a) `supportedGeneralCategoryIds` is **strings**, like invariant 5 — 2,062 values across those
+  39 stores, 100% strings, written by `routes/store.js` `/api/store-category/add|update` through
+  `JSON.parse`. An ObjectId query never matches one — which is why
+  `GET /api/category/by-general/:id` (`routes/category.js`, `$in: [getId(id)]`) returns `[]` for
+  every store on the platform. Fix proposed on shoofi-server
+  `fix/create-from-mock-silent-empty-store`; unmerged as of 2026-09-16.
+  (b) The gate is the **per-store** `<appName>.store.hasGeneralCategories`, read by
+  `routes/menu.js` off `db.collection('store').findOne({id:1})` — *not*
+  `shoofi.stores.hasGeneralCategories`, which the admin store form writes and the menu never
+  reads. They disagree on several live stores.
+  (c) `general-categories` exists as a collection in **both** the central `shoofi` DB (platform
+  verticals) and **every store** DB, behind the one `db.generalCategories` handle. The add/update/
+  delete routes in `routes/category.js` pick between them on the `app-name` header alone, so the
+  same admin button edits the platform list or one store's list depending on which store is
+  selected. `shoofi.stores.supportedGeneralCategoryIds` is a third, **dead** field — `[]` on every
+  store, no writer in any admin UI, and stored as ObjectIds by the server where everything else is
+  strings.
 - **Backlog (confirmed, safe to act on when asked):**
   1. `GET /api/menu` and `POST /api/menu/refresh` build the menu **differently** — `refresh` is a
      real admin-triggered action that re-caches under the same key, so clicking it degrades the

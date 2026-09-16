@@ -37,6 +37,21 @@
           "file": "routes/product.js",
           "regex": "outOfStockByQuantity",
           "desc": "stock invariant field"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "subCategories\\.length > 0",
+          "desc": "CORE known-status: the filter that drops a general category with no linked store category, so the tree a store ships can be empty while its general-categories collection is not. If this goes, the doc's 'count the LINKS, not the documents' rule needs re-checking."
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "supportedGeneralCategoryIds",
+          "desc": "CORE known-status: the category -> general-category link, written here as STRINGS via JSON.parse. The whole general-categories tree joins on this field."
+        },
+        {
+          "file": "routes/category.js",
+          "regex": "general/all/by-store",
+          "desc": "CORE known-status: the per-store general-categories read, which is a DIFFERENT collection from the central shoofi one behind the same db.generalCategories handle, selected on the app-name header alone."
         }
       ]
     }
