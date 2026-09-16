@@ -78,6 +78,17 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     (`services/delivery/late-delivery.js`) look like a genuine promise and vice versa, which is
     exactly what `originalExpectedDeliveryAt` exists to prevent. Delivery owns the reading rule;
     orders owns the fields, and this is the contract between them.
+11. **`isCheckoutValid` reads every optional argument defensively, and the checkout screen
+    calls it from FIVE places.** `shoofi-app/hooks/checkout/use-checkout-validate.ts` guards
+    with `carDetails?.carType`, `isFutureOrderEnabled && …` and friends, so a call site that
+    simply **omits** an argument does not fail loudly — it validates as though the customer had
+    left the field blank. `shoofi-app/screens/checkout/index.tsx` has one call per submit path
+    (cash/card, twin, ZCredit Google Pay, HYP wallet, ZCredit WebView) and they drift: when the
+    drive-in car details landed, `handleHypWalletCheckout` was never updated, so DRIVEIN +
+    Apple Pay was unsubmittable for three weeks — the customer was asked for a car type and
+    colour they had already typed, forever. On a HYP store that function is the **only** wallet
+    entry point (its button renders *instead of* the one calling `handleCheckout`), so a gap
+    there is total, not intermittent. Any new validator argument must be added at all five.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
@@ -93,6 +104,9 @@ apart — always establish which is meant:
    available" create NO order document at all** — this is their only record anywhere. The
    top-level failure in `screens/checkout/index.tsx` sends no `step`, so ~half the rows have
    none; bucket them rather than dropping them.
+   A row whose `*_missing` flags are **all** true is as likely to be a call site that passed
+   nothing as a customer who typed nothing (invariant 11) — 238 of them were. Rows with exactly
+   one flag set are the only ones that certainly reflect what the customer entered.
 2. **Submitted and never paid** — status `"0"` order rows, per store DB. See the
    `FAILED_PAYMENT_STATUS` note; that is the only layer carrying an issuer reason.
 3. **Never reached checkout** — `page_viewed` with `properties.page_name` ∈

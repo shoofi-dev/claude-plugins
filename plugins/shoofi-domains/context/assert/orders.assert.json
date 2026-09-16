@@ -36,7 +36,9 @@
           "stockDecremented",
           "stockRestored"
         ],
-        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+        "utils/customer-orders.js": [
+          "getSuccessfulOrdersByCustomerIds"
+        ]
       },
       "patterns": [
         {
@@ -169,6 +171,21 @@
           "file": "components/checkout/FutureOrderPicker.tsx",
           "regex": "MAX_RAMADAN_DAYS_AHEAD",
           "desc": "ramadan-iftar orders can be days ahead without isFutureOrder"
+        },
+        {
+          "file": "hooks/checkout/use-checkout-validate.ts",
+          "regex": "carTypeMissing = !\\(carDetails\\?\\.carType \\|\\| \"\"\\)\\.trim\\(\\)",
+          "desc": "the validator reads its optional arguments defensively, which is WHY a call site that omits one validates as 'customer left it blank' instead of erroring (CORE invariant 11). If this becomes a required read the omission fails loudly and the two call-site pins below stop being the safety net"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "const handleHypWalletCheckout(?:(?!\\n  const )[\\s\\S])*?isDeliverySupport:[\\s\\S]{0,400}?carDetails,",
+          "desc": "the HYP wallet path - the ONLY wallet entry point on a HYP store - still passes carDetails to isCheckoutValid. Drop it and DRIVEIN + Apple Pay becomes unsubmittable with 'please enter car type and colour' (CORE invariant 11). The negative lookahead keeps the match inside handleHypWalletCheckout so it cannot slide onto a neighbouring call site that still has the argument"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "const handleHypWalletCheckout(?:(?!\\n  const )[\\s\\S])*?isDeliverySupport:[\\s\\S]{0,400}?onCarDetailsError",
+          "desc": "and the error callback with it - without it the two inputs never turn red, so the dialog names fields the customer cannot see are the problem (CORE invariant 11)"
         }
       ]
     },
@@ -181,7 +198,10 @@
         "utils/notification/index.ts"
       ],
       "symbols": {
-        "utils/notification/index.ts": ["schedulePushNotification", "store.wav"],
+        "utils/notification/index.ts": [
+          "schedulePushNotification",
+          "store.wav"
+        ],
         "stores/new-order-alerts/index.ts": [
           "takeNewOrders",
           "takeNewOrdersOnRefresh",
