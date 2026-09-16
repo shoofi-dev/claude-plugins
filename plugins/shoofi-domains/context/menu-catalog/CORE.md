@@ -39,6 +39,24 @@ boundary and say so in the PR.
 5. **`supportedCategoryIds` are STRINGS**, compared via `{$toString:'$_id'}`. Don't switch to
    ObjectId comparison without a data migration.
 6. **Product ordering** comes from `categoryOrders[categoryId]`, falling back to legacy `order`.
+7. **General categories are read from the PER-STORE DB, gated by the PER-STORE store doc.**
+   The tiles are `<appName>.general-categories`; the link is
+   `<appName>.categories[].supportedGeneralCategoryIds`, which holds **strings** compared
+   against `_id.toString()` (`routes/menu.js:178-183`) — an ObjectId there matches nothing.
+   The master switch is `hasGeneralCategories` on `<appName>.store`, **never** the mirror of
+   the same name on `shoofi.stores` (`routes/menu.js:169`). `shoofi.stores.supportedGeneralCategoryIds`
+   is written in four places and **read by none** — it is inert; do not diagnose from it.
+   Don't confuse any of this with `shoofi.general-categories`, which is the marketplace
+   taxonomy behind the Explore home screen (`routes/category.js`), a different feature.
+8. **`<appName>.store` is a SINGLETON — match it as `{}`, never as `{ id: 1 }`.**
+   ~75 reads still do `db.store.findOne({ id: 1 })` with the **number** 1. Mongo compares types
+   strictly, so a doc saved with the string `"1"` matches none of them and the store silently
+   half-dies — nulls, not errors. It gets saved that way because `POST /api/store/update`
+   (`routes/store.js`) `$set`s the client body verbatim and admin form values arrive as strings;
+   both write paths now pin it through `storeService.normalizeStoreId`
+   (`utils/store-service.js`), and `scripts/normalize-store-id.js` repairs existing rows.
+   This was live: one store lost its entire general-categories strip because
+   `routes/menu.js` dereferenced that null inside a `try/catch` that swallowed it.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** translations resolve to the **central** DB — UI labels are global/platform-wide,

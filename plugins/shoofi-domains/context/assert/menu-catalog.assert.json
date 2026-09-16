@@ -14,7 +14,9 @@
         "utils/order-stock.js",
         "services/database/DatabaseInitializationService.js",
         "docs/stock-management.md",
-        "docs/menu-search.md"
+        "docs/menu-search.md",
+        "utils/store-service.js",
+        "scripts/normalize-store-id.js"
       ],
       "symbols": {
         "utils/menu-cache.js": ["clearStore", "getStats"],
@@ -37,6 +39,26 @@
           "file": "routes/product.js",
           "regex": "outOfStockByQuantity",
           "desc": "stock invariant field"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "general-categories",
+          "desc": "per-store general-categories collection (CORE invariant 7)"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "supportedGeneralCategoryIds",
+          "desc": "string link category -> general category (CORE invariant 7)"
+        },
+        {
+          "file": "utils/store-service.js",
+          "regex": "normalizeStoreId",
+          "desc": "pins <appName>.store.id to the number 1 (CORE invariant 8)"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "normalizeStoreId",
+          "desc": "POST /api/store/update cannot persist a string store id (CORE invariant 8)"
         }
       ]
     }
