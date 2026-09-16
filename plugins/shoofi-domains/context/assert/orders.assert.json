@@ -178,10 +178,26 @@
         "stores/orders/index.tsx",
         "hooks/use-notifications.ts",
         "stores/new-order-alerts/index.ts",
-        "utils/notification/index.ts"
+        "utils/notification/index.ts",
+        "App.tsx",
+        "helpers/printer/index.ts",
+        "helpers/printer/print.ts",
+        "helpers/printer/printer-types.ts",
+        "helpers/printer/printer-selection.ts",
+        "components/order-invoice/invoice-order-items.tsx"
       ],
       "symbols": {
         "utils/notification/index.ts": ["schedulePushNotification", "store.wav"],
+        "App.tsx": ["invoicesRef", "captureInvoiceHost"],
+        "helpers/printer/printer-selection.ts": [
+          "invoicePageWidth",
+          "resolvePrinterType",
+          "storeUsesBuiltInHead"
+        ],
+        "helpers/printer/printer-types.ts": [
+          "EXTERNAL_HEAD_INVOICE_PAGE_WIDTH",
+          "BUILT_IN_HEAD_PAPER_WIDTH_DOTS"
+        ],
         "stores/new-order-alerts/index.ts": [
           "takeNewOrders",
           "takeNewOrdersOnRefresh",
@@ -213,6 +229,21 @@
           "file": "hooks/use-notifications.ts",
           "regex": "addNotificationReceivedListener\\([\\s\\S]{0,80}?fetchUnviewedOrdersCount\\(\\)",
           "desc": "STABILITY PIN, not a regression detector - green both before and after shoofi-partner#22, which did not introduce it. Every notification the device receives while the app runs (including the server's store.wav creation push) runs the badge refresh. This is the ONLY reason that path sees a new order ~30s before the poll, which is the whole premise of the two assertions above and of the C3 warning; drop this wiring and the doc's explanation stops being true"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "width:\\s*invoicePageWidth\\(isBuiltInHeadStore\\)",
+          "desc": "every off-screen invoice host is laid out at a FIXED width. The printed slip is a screenshot scaled to the head's dot width, so this width is what sets the font size on paper; when it was \"100%\" it resolved to the device's screen and a small-screen POS printed at ~2x, with the product-name column squeezed to one glyph and the wider rows clipped away at capture. If this stops matching, the doc's whole explanation of print size is wrong"
+        },
+        {
+          "file": "helpers/printer/printer-types.ts",
+          "regex": "EXTERNAL_HEAD_INVOICE_PAGE_WIDTH = 820",
+          "desc": "the 80mm templates in components/order-invoice/ hardcode font sizes 45-100 against an 820-wide page. Change this number and every Epson receipt rescales - it is the design width of those templates, not a free parameter"
+        },
+        {
+          "file": "helpers/printer/print.ts",
+          "regex": "width: 510",
+          "desc": "the Epson addImage width is hardcoded and ignores paperWidthDots (which only the urovo/sunmi paths read). A 58mm roll behind an Epson-configured store loses ~126 dots, split across BOTH edges by align: 'center' - which is how you tell printer clipping from layout clipping"
         }
       ]
     }

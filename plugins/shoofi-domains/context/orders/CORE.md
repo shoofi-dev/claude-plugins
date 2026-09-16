@@ -156,6 +156,39 @@ Worked example: `services/exec-dashboard/engagement-metrics.js`.
   reconciliation; HYP "verified=false but paid" is logged paid-but-stuck; background work in
   store-accept runs after the 200 response so failures never reach the client.
 
+## The printed slip is a screenshot, and its font size is a layout width
+Printing is a **non-status side path** — it writes only `isPrinted` via `order/printed` — but
+it is the store's working copy of the order, so treat the templates as production-visible.
+
+There is **no server-side receipt rendering**. `shoofi-partner/services/invoicePrintService.ts`
+posts to `/invoice/generate-batch` and `/invoice/generate-for-not-printed`, which **do not
+exist** on the server; that file is dead and must not be "fixed". The live path is a React
+Native view → `captureRef` bitmap → ESC/POS `addImage`: the off-screen hosts are mounted in
+`shoofi-partner/App.tsx` (the `invoicesRef` views), snapshotted by `captureInvoiceHost`, and
+routed to a printer family by `helpers/printer/index.ts`.
+
+- **Nothing about the font size is a font size.** The whole page is snapshotted and then
+  scaled to the head's dot width, so the size type lands at on paper is the *ratio* between
+  the template's hardcoded sizes (45–100 in `components/order-invoice/`) and the width the
+  page was laid out at. That width is `invoicePageWidth(isBuiltInHead)` in
+  `shoofi-partner/helpers/printer/printer-selection.ts` — 384 for a built-in head,
+  `EXTERNAL_HEAD_INVOICE_PAGE_WIDTH` 820 for Epson — and it has to stay a **constant**. It
+  used to be `"100%"`, i.e. the device's screen capped at 820, and a store running the app on
+  a phone-sized POS screen printed every slip at roughly double size: at ~400 the `flex: 1`
+  name column in `components/order-invoice/invoice-order-items.tsx` has about one glyph of
+  room, so Arabic product names break one letter per line, and the wider header rows overflow
+  the host and are clipped away by the capture — in RTL, off the left. A slip clipped on
+  **one** side is this, a layout problem, not the printer.
+- **Which template prints is the store doc's `printerType`** (`<appName>.store`), and only a
+  literal `"urovo"`/`"sunmi"` leaves the 80mm Epson path — absent, empty or a typo is Epson
+  (`resolvePrinterType`). As of 2026-09 that is 252 of 253 stores, so the 58mm layouts are
+  effectively unexercised in the field. There is no admin UI for the field: `StoreData.tsx`
+  in `shoofi-delivery-web` exposes only `printerTarget`, so switching a store is a DB write.
+- The Epson `addImage` width is **hardcoded 510 dots** (`helpers/printer/print.ts`) and
+  ignores `paperWidthDots`, which only the built-in-head paths read. A 58mm roll behind an
+  Epson-configured store loses ~126 dots — split across **both** edges, because
+  `align: 'center'`.
+
 ## Recipe — add a field to an order, end-to-end
 1. **Customer app** — add it where the cart payload is built (`stores/cart` `getCartData`).
 2. **Server** — accept it in the `orderDoc` build inside `POST /api/order/create`. Decide
