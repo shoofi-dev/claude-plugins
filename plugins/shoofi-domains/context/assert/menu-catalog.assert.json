@@ -12,6 +12,8 @@
         "routes/global-search.js",
         "utils/menu-cache.js",
         "utils/order-stock.js",
+        "utils/product-discount.js",
+        "utils/product-price.js",
         "services/database/DatabaseInitializationService.js",
         "docs/stock-management.md",
         "docs/menu-search.md"
@@ -19,6 +21,8 @@
       "symbols": {
         "utils/menu-cache.js": ["clearStore", "getStats"],
         "utils/order-stock.js": ["decrementOrderStock", "restoreOrderStock"],
+        "utils/product-discount.js": ["applyProductDiscount", "getProductDiscountPercent"],
+        "utils/product-price.js": ["roundPrice"],
         "routes/product.js": ["menuCache", "supportedCategoryIds"],
         "routes/menu.js": ["outOfStockExtras", "categoryOrders"]
       },
@@ -37,6 +41,16 @@
           "file": "routes/product.js",
           "regex": "outOfStockByQuantity",
           "desc": "stock invariant field"
+        },
+        {
+          "file": "utils/product-discount.js",
+          "regex": "if \\(maxDiscountPercent <= 0\\) return product;",
+          "desc": "the early return that makes the read-time discount a no-op on a store with no category discount (doc CORE invariant 3)"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "roundPrice",
+          "desc": "the stored price is rounded at every product write (doc CORE invariant 3)"
         }
       ]
     }

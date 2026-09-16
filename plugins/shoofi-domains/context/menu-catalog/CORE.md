@@ -31,7 +31,17 @@ boundary and say so in the PR.
    Missing one serves a stale menu for up to the 5-minute TTL. Menu cache is **customer-only** —
    admin/partner bypass it, so never add caching there (hidden products would leak).
 3. **Displayed price is derived at READ time** from the category's `discountPercent` (max across
-   the product's categories). The stored `product.price` is **not** what the customer sees.
+   the product's categories) — **but only when some category actually carries one.**
+   `applyProductDiscount` early-returns the *same object* at `utils/product-discount.js:66`
+   (`if (maxDiscountPercent <= 0) return product;`), and most stores have `discountPercent: 0` on
+   every category. On those stores the stored `product.price` **is** what the customer sees,
+   digit for digit — `utils/menu-cache.js` never touches a price and `routes/menu.js` only
+   `$project`s it. So a price that looks wrong on screen is usually wrong **in Mongo**: read the
+   document before reading the discount code. This is why the two historical "round the price"
+   commits (`931ba6aa` here, `abf24907` in shoofi-app) did not stop `₪26.899999935150145`
+   reaching a menu — both round a *derived discount*, inside that same `> 0` gate.
+   Nothing rounds the **stored** price except `services/catalog/bulk-price-update.js` and
+   `utils/product-price.js` (the product write paths).
 4. **Stock invariant** (stock-managed stores, `store.isStockManagment`): `quantity <= 0` ⟺
    `{ isInStore:false, outOfStockByQuantity:true }`. **Human-confirmed: applies to ALL products,
    no exceptions.** Decrement only on order confirmation; restore only re-enables products that
