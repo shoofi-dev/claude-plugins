@@ -48,8 +48,13 @@
         },
         {
           "file": "routes/payments/admin-reports.js",
-          "regex": "- totalOutcomes - totalDeliveryBookingStoreFees",
-          "desc": "delivery-only store fee is a SEPARATE deduction, never folded into totalOutcomes"
+          "regex": "driveInShoofi \\+ totalDeliveryBookingStoreFees",
+          "desc": "delivery-only store fee is a member of totalOutcomes (so the Shoofi->store invoice carries it)"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "totalForTransfer = creditCardRevenue \\+ driveInCreditCard - totalOutcomes;",
+          "desc": "the fee is deducted from the transfer exactly ONCE, via totalOutcomes - never a second explicit term"
         },
         {
           "file": "routes/payments/admin-reports.js",

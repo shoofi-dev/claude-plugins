@@ -41,8 +41,7 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 
 ## Invariants — never weaken
 1. **The transfer formula** (`generateStoreReportData` in `routes/payments/admin-reports.js`):
-   `totalForTransfer = creditCardRevenue + driveInCreditCard − totalOutcomes
-   − totalDeliveryBookingStoreFees`;
+   `totalForTransfer = creditCardRevenue + driveInCreditCard − totalOutcomes`;
    `balance = totalForTransfer` — **no VAT adjustment, for any `businessType`**.
    `totalForInvoice = creditCardRevenue + driveInCreditCard`.
    **`exempt` (עוסק פטור) does NOT mean ÷1.18.** Such a store charges no VAT, so the
@@ -54,18 +53,27 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    (Changed 2026-08-03; both were previously ÷1.18. `routes/driver-reports.js` still
    applies the old ÷1.18 rule to exempt **delivery companies** — deliberately left
    pending a separate decision, so the two payout paths currently disagree.)
-   **`totalDeliveryBookingStoreFees`** (added 2026-09-14) is the store-booked
-   **delivery-only** service fee: `deliveryOnlyFee.storeAmount` summed off
-   `delivery-company.book-delivery` (`isDeliveryOnly: true`, `status: '4'`, scoped by
-   `appName`, `created` compared as an offset **string**). It is a **separate deduction
-   term and is deliberately NOT inside `totalOutcomes`** — `totalOutcomes` is the amount
-   the Shoofi→store expenses invoice is issued for (`routes/hyp.js`), so it must stay
-   byte-identical. Always read the **snapshot**, never the live area config.
-   ⚠️ **Known gap, needs a decision:** because the fee is outside `totalOutcomes`, the
-   Shoofi→store expenses invoice does **not** carry it — Shoofi would deduct money it has
-   not invoiced for. Harmless today (every `deliveryOnlyStoreFee` in production is 0);
-   **must be resolved before a non-zero fee is configured.** The driver side solved the
-   equivalent problem in `routes/hyp.js` create-company-invoice.
+   **`totalOutcomes` now contains `totalDeliveryBookingStoreFees`** (added 2026-09-16)
+   — the store-booked **delivery-only** service fee: `deliveryOnlyFee.storeAmount`
+   summed off `delivery-company.book-delivery` (`isDeliveryOnly: true`, `status: '4'`,
+   scoped by `appName`, `created` compared as an offset **string**). Always read the
+   **snapshot**, never the live area config.
+   🔒 **Deduct it exactly ONCE.** It reaches the transfer through `totalOutcomes`;
+   adding a second `− totalDeliveryBookingStoreFees` term to `totalForTransfer` charges
+   a real store twice for one booking. `test/integration/store-delivery-only-expense.js`
+   pins `totalForTransfer === cardRevenue − totalOutcomes` as plain arithmetic.
+   It is **never** a commission base and never touches `totalIncomes`.
+   Because it is inside `totalOutcomes`, the Shoofi→store expenses invoice — issued for
+   `reportData.totalOutcomes` by both `routes/hyp.js` create-invoice and the GreenInvoice
+   route in `admin-reports.js` — now bills exactly what is deducted. (An earlier revision
+   kept the fee outside that bucket and left the invoice short; that gap is closed.)
+   ⚠️ **Remaining caveat:** `routes/hyp.js` create-invoice (and the 330 credit-note
+   rebuild) send an **itemised** `items[]` alongside the header `amount`, and there is no
+   line item for this fee — so the lines sum to less than the header. This is a
+   **pre-existing** property of that itemisation, not new: `carryoverToCustomers` /
+   `carryoverToDrivers` are likewise inside `totalOutcomes` with no line item. The header
+   `amount` is the authoritative figure. Adding the missing line items is a `routes/hyp.js`
+   change (a do-not-touch zone) and needs a human decision.
 2. **`actualDriverPayment` cash-vs-card branch** (`routes/driver-reports.js`): CARD → full
    `effectiveDeliveryFee`; CASH + coupon → the coupon-covered amount; **CASH, no coupon → 0**.
    A bug here **double-pays a driver who already pocketed the cash**.
