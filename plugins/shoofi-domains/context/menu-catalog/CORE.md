@@ -40,6 +40,31 @@ boundary and say so in the PR.
    ObjectId comparison without a data migration.
 6. **Product ordering** comes from `categoryOrders[categoryId]`, falling back to legacy `order`.
 
+## Catalog text — what you are actually searching
+Before writing anything that matches on a name, know what the corpus looks like. Verified
+against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store DBs):
+- **There is NO text index and NO Atlas Search.** `shoofi.stores` and every store's
+  `products` carry only `_id`. Nothing in `services/database/DatabaseInitializationService.js`
+  or `utils/create-indexes.js` creates one on a name or description field. Every name search
+  is a collection scan — so `$text` is not available to you, and neither is `$search`.
+- **The catalog disagrees with itself about spelling.** Production holds `شوارما` *and*
+  `شاورما`, `بيتسا` *and* `بيتزا`, `שווארמה` *and* `שוארמה`, `שניצל` *and* `שנצל`. These are
+  store owners typing, not user typos, so **exact or anchored matching on catalog text is
+  wrong by construction** — a customer who types one spelling perfectly still misses every
+  store written the other way.
+- **`name_he` is usually a TRANSLITERATION of `name_ar`, not a translation**
+  ("شوارما السلطان" / "שווארמה אלסולטאן"). Searching only the UI language's field throws
+  away half the corpus for nothing; search both, always.
+- **There is no English anywhere.** Stores have `name_ar`/`name_he` only; `appName` (the slug,
+  `shawarma-alsultan`) is the sole Latin text a store carries, and products have none at all.
+  A Latin query reaches products only if you transliterate it into the two scripts.
+- The definite article is glued on (`السلطان`, `אלסולטאנ`) — users type the bare noun.
+- Matching + ranking live in `services/search/text-search.js` (pure, unit-tested); the
+  endpoint is `POST /api/menu/search` in `routes/menu.js`. See `docs/menu-search.md`.
+- `routes/global-search.js` is **dead and broken**: it filters `shoofi.stores` on
+  `nameAR`/`nameHE`/`name`, none of which exist (the fields are `name_ar`/`name_he`), so it
+  returns `[]` for every input, and it has no caller in any app. Don't cite it as prior art.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** translations resolve to the **central** DB — UI labels are global/platform-wide,
   not per-store. Do **not** re-route them to `app-name`.
