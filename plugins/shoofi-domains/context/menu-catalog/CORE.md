@@ -49,6 +49,28 @@ boundary and say so in the PR.
    the same write: product create/update/create-from-mock (`normalizeWeightExtraPrice`) and
    `services/catalog/bulk-price-update.js`. Never add a product-price writer that skips it.
    See `docs/sold-by-weight.md` for the flag, the unit, and the rollout scripts.
+8. **A BULK TOOL MAY NOT WRITE A PRICE IT CANNOT INTERPRET.** Invariant 7 is about keeping
+   the two prices consistent; this one is about the two prices a *file* cannot express:
+   - **`price: 0` means "not for sale"** — `utils/crons/hide-zero-price-products.js` hides
+     every product carrying it. So a **blank** cell in an import/price file is NOT 0. Parse it
+     to `null` and omit the field; only an explicit 0 is posted. `POST
+     /api/admin/product/update` writes only the keys it receives
+     (`if (req.body.price !== undefined)`), so **omitting is the whole mechanism**.
+   - **A by-weight product's price cannot be taken from a sheet at all.** By invariant 7 it is
+     the price of `defaultValue` and the per-step rate is re-derived from it — so a bare
+     number with no unit rewrites the per-kilo rate too, invisibly, with no audit trail on
+     product updates. Bulk tools **skip these and report them by name** for a human to edit;
+     they do not guess. (`bulk-price-update` is the exception and may write, because its file
+     is a round-trip of our own export and the units are ours.)
+
+   `GET /api/admin/product/import-index` computes `isByWeight` in the aggregation so the extras
+   never travel to the browser. ⚠️ It currently implements only the **unflagged** half of
+   invariant 7's test (sole non-header `weight` extra) — `soldByWeight` is not on
+   `shoofi-server` main yet, and **`import-index` must start honouring it in the same PR that
+   lands the flag**, or every explicitly-flagged by-weight product becomes repriceable.
+   Consumers must treat a **missing** `isByWeight` key as "this server is too old to tell me"
+   and say so out loud: the aggregation sets it on every row, so absence never means "this
+   store has no by-weight products".
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified

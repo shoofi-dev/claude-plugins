@@ -19,7 +19,8 @@
         "utils/weight-extra-invariant.js",
         "services/catalog/bulk-price-update.js",
         "scripts/flag-sold-by-weight.js",
-        "docs/sold-by-weight.md"
+        "docs/sold-by-weight.md",
+        "services/catalog/import-index.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -81,6 +82,16 @@
           "file": "services/catalog/bulk-price-update.js",
           "regex": "selectWeightExtra",
           "desc": "doc CORE invariant 7: bulk price update rescales the weight extra through the flag-aware selector"
+        },
+        {
+          "file": "services/catalog/import-index.js",
+          "regex": "isByWeight",
+          "desc": "doc CORE invariant 8: the by-weight flag a bulk tool checks before it writes a price"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "req\\.body\\.price !== undefined",
+          "desc": "doc CORE invariant 8: omitting `price` leaves the stored one alone — how a bulk tool skips a price"
         }
       ]
     }
