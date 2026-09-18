@@ -89,6 +89,11 @@
           "desc": "doc CORE invariant 8: the by-weight flag a bulk tool checks before it writes a price"
         },
         {
+          "file": "services/catalog/import-index.js",
+          "regex": "soldByWeight",
+          "desc": "doc CORE invariant 8: import-index answers the FLAGGED half too, not just the legacy sole-weight-extra one"
+        },
+        {
           "file": "routes/product.js",
           "regex": "req\\.body\\.price !== undefined",
           "desc": "doc CORE invariant 8: omitting `price` leaves the stored one alone — how a bulk tool skips a price"

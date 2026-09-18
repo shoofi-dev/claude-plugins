@@ -64,13 +64,15 @@ boundary and say so in the PR.
      is a round-trip of our own export and the units are ours.)
 
    `GET /api/admin/product/import-index` computes `isByWeight` in the aggregation so the extras
-   never travel to the browser. ⚠️ It currently implements only the **unflagged** half of
-   invariant 7's test (sole non-header `weight` extra) — `soldByWeight` is not on
-   `shoofi-server` main yet, and **`import-index` must start honouring it in the same PR that
-   lands the flag**, or every explicitly-flagged by-weight product becomes repriceable.
-   Consumers must treat a **missing** `isByWeight` key as "this server is too old to tell me"
-   and say so out loud: the aggregation sets it on every row, so absence never means "this
-   store has no by-weight products".
+   never travel to the browser. It answers **both** halves of invariant 7's test: flagged
+   (`soldByWeight === true` plus exactly one non-header `weight` extra, however many other
+   extras sit beside it) and legacy-unflagged (the sole non-header extra is the weight one).
+   It deliberately does **not** also require `step > 0 && defaultValue > 0` the way
+   `isSoldByWeightProduct` does — that pair decides how to *price*, while this flag decides
+   whether a bulk tool may *overwrite* a price, and a flagged product with a malformed weight
+   extra is the last one to hand to an importer. Consumers must treat a **missing**
+   `isByWeight` key as "this server is too old to tell me" and say so out loud: the aggregation
+   sets it on every row, so absence never means "this store has no by-weight products".
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
