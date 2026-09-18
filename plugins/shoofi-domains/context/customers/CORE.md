@@ -43,6 +43,20 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
 2. **Stored-token equality:** customer/partner/driver auth requires the request token to equal
    the token stored on the user doc (`routes/auth.js`), which is what makes **logout actually
    invalidate a session**. Keep it.
+
+   **The scheme prefix is load-bearing on that branch, and only there.** Once the
+   stored-token check passes, `getTokenFromHeaders` only *returns* the token when the
+   `Authorization` header starts with the literal **`Token `**
+   (`authorization.split(" ")[0] === "Token"`, `routes/auth.js`) — or when `req.body.token`
+   is set, which a GET never has. A `Bearer ` header falls off the end of that `if / else if`
+   and the function returns `undefined`, so `auth.required` answers a bare **401 with no
+   error body** even though the JWT is valid, the user exists and the stored token matches.
+   All three RN apps send `Token ` (`shoofi-app/utils/http-interceptor/index.ts` and its
+   partner/driver twins); only `shoofi-delivery-web` sends `Bearer`. The
+   `app-type: shoofi-admin` branch returns *before* that block, so `Bearer` works for admin
+   routes and nowhere else — which is why an admin-token integration test copied as a
+   template 401s the moment it is pointed at a customer route. **Do not "fix" this by
+   accepting both from an unrelated ticket** — every real client already sends the right one.
 3. **Impersonation** (`imp:true`) bypasses that check by design — it is **`master`-role only and
    audited**. Never loosen the gate or drop the audit.
 4. **The partner `switch-store` flow** re-mints a **per-store token** and sets
