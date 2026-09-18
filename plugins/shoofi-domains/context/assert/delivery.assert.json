@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@561e3ca / 2026-07-28",
+  "lastVerified": "shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -27,7 +27,10 @@
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js",
-        "services/monitoring/centralized-flow-monitor.js"
+        "services/monitoring/centralized-flow-monitor.js",
+        "services/delivery/delivery-only.js",
+        "scripts/delivery-only-preflight.js",
+        "docs/delivery-only-bookings.md"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -64,6 +67,21 @@
           "parsePromisedEta",
           "reassignmentOf",
           "classifyDelivery"
+        ],
+        "services/delivery/delivery-only.js": [
+          "DELIVERY_ONLY_REASONS",
+          "resolveStoreContext",
+          "listServiceableTowns",
+          "resolveTownForBooking",
+          "snapshotDeliveryOnlyFee",
+          "isDeliveryOnlySupport",
+          "acquireBookingLock"
+        ],
+        "routes/delivery/orders.js": [
+          "/api/delivery/delivery-only/towns",
+          "/api/delivery/delivery-only/book",
+          "/api/delivery/delivery-only/list",
+          "isDeliveryOnly"
         ]
       },
       "patterns": [
@@ -171,6 +189,26 @@
           "file": "services/monitoring/centralized-flow-monitor.js",
           "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
           "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+        },
+        {
+          "file": "services/delivery/delivery-only.js",
+          "regex": "deliveryOnlyStoreFee[\\s\\S]{0,120}deliveryOnlyDriverFee",
+          "desc": "delivery-only fees are REGION (city-areas) values, not town values"
+        },
+        {
+          "file": "services/delivery/delivery-only.js",
+          "regex": "!platform\\?\\.isDeliveryOnlySupport\\s*&&\\s*!store\\?\\.isDeliveryOnlySupport",
+          "desc": "the delivery-only gate is an OR of the platform and store flags"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "updateData\\.isPendingAssignment\\s*=\\s*false",
+          "desc": "a cancelled delivery stops being a delayed-assignment candidate (CORE invariant 10)"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "\\[delivery-only\\] booked",
+          "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
         }
       ]
     },
@@ -181,7 +219,8 @@
         "consts/shared.ts",
         "components/delivery-driver/DriverReassignModal.tsx",
         "components/delivery-driver/TwinOrderCard.tsx",
-        "screens/delivery-driver/index.tsx"
+        "screens/delivery-driver/index.tsx",
+        "components/delivery-driver/OrderCard.tsx"
       ],
       "patterns": [
         {
@@ -198,19 +237,62 @@
           "file": "screens/delivery-driver/index.tsx",
           "regex": "twinAssignmentMode",
           "desc": "twin pairs collapse into TwinOrderCard unless mode is split"
+        },
+        {
+          "file": "components/delivery-driver/OrderCard.tsx",
+          "regex": "isDeliveryOnly\\s*\\?",
+          "desc": "the driver card swaps the order table for the pay/collect money block on a manual booking"
         }
       ]
     },
     "shoofi-partner": {
       "files": [
         "consts/shared.ts",
-        "hooks/useAvailableDrivers.ts"
+        "hooks/useAvailableDrivers.ts",
+        "screens/delivery-only/book/index.tsx",
+        "screens/delivery-only/list/index.tsx",
+        "stores/delivery-only/index.ts",
+        "screens/delivery-only/reasons.ts"
       ],
       "patterns": [
         {
           "file": "consts/shared.ts",
           "regex": "COLLECTED_FROM_RESTAURANT:\\s*\"3\"",
           "desc": "partner delivery status must match server (fixed off-by-one)"
+        },
+        {
+          "file": "stores/delivery-only/index.ts",
+          "regex": "getBookings\\s*=\\s*async\\s*\\(\\s*isAll",
+          "desc": "the bookings list asks the server for active-only vs all; the filter is server-side"
+        },
+        {
+          "file": "screens/delivery-only/book/index.tsx",
+          "regex": "!isTownListOpen\\s*&&",
+          "desc": "the quote lines unmount while the inline dropdown list is open (no zIndex/elevation)"
+        }
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/views/admin/analytics/DeliveryListAnalytics.tsx",
+        "src/views/admin/delivery-areas/CityAreasList.tsx",
+        "src/views/admin/settings/ShoofiSettings.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "src/views/admin/analytics/DeliveryListAnalytics.tsx",
+          "regex": "CLOSED_DELIVERY_STATUSES",
+          "desc": "admin cancel is offered only on an open delivery-only booking"
+        },
+        {
+          "file": "src/views/admin/delivery-areas/CityAreasList.tsx",
+          "regex": "deliveryOnly(Store|Driver)Fee",
+          "desc": "the delivery-only fees are edited on the REGION (city-area), not the town"
+        },
+        {
+          "file": "src/views/admin/settings/ShoofiSettings.tsx",
+          "regex": "isDeliveryOnlySupport",
+          "desc": "the platform-wide delivery-only switch lives in admin Settings"
         }
       ]
     }

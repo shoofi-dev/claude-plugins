@@ -45,6 +45,50 @@ Transitions: driver `approve`/`start`/`complete`/`cancel`/`waiting-in-store`
 `order/status/update` (`admin.js`); store cancel `-2`. Every transition writes a
 `centralizedFlowMonitor` event. (⚠️ status-value inconsistencies exist — see §10.)
 
+## 2b. Delivery-only bookings (store books a courier, no order)
+`services/delivery/delivery-only.js` + three `auth.required` routes in
+`routes/delivery/orders.js`, all scoped by the `app-name` header. Authoritative write-up:
+**`shoofi-server/docs/delivery-only-bookings.md`**.
+
+| Route | Returns | Refusal |
+|---|---|---|
+| `GET /api/delivery/delivery-only/towns` | towns reachable from this store's pickup zone, each with `priceFrom/priceTo`, ETA and the store fee | `{enabled:false, reason}` |
+| `POST /api/delivery/delivery-only/book` | `{success, bookId, storeFee}` | 403 gate / 400 `Town not serviceable` / 200 `{success:false, reason:"no_eligible_driver"}` |
+| `POST /api/delivery/delivery-only/list` | this store's bookings, newest 200 | — |
+
+`DELIVERY_ONLY_REASONS` (`delivery-only.js:35`): `platform_disabled`, `store_disabled`,
+`store_has_no_location`, `store_outside_any_pickup_zone`, `no_area_match`,
+`no_company_covers_area`, `town_not_serviceable`, `town_has_no_geometry`,
+`no_eligible_driver`, `duplicate_booking` — mapped to Arabic in the partner app's
+`screens/delivery-only/reasons.ts`.
+
+**Booking document:** `isDeliveryOnly: true`, `originalBookId = idempotencyKey` (client-supplied,
+**required**, ≥8 chars — `bookDelivery()` invents a random one when absent, which silently
+disables its de-dupe), `dropoffParentCityId` + `dropoffTownName{AR,HE}`, `deliveryOnlyFee`
+(`storeAmount`/`driverAmount`/`cityAreaId`/`vatIncluded`/`snapshotAt`, frozen by
+`snapshotDeliveryOnlyFee`), `deliveryOnlyPriceRange`, `isApproximateLocation: true`,
+`price` (the goods), `pickupTime` = ready-minutes. **No `order`**, **no `twinGroupId`** (absent,
+not `undefined` — the driver DB has `ignoreUndefined` off, so undefined would persist as `null`
+and surface in `{twinGroupId:{$exists:true}}` queries).
+
+**De-dupe is two-layered:** a lock `delivery_only_lock:<key>` → `{duplicate:true, inProgress:true}`,
+then an `originalBookId` lookup → `{duplicate:true, bookId}`. Both return **success**, so a retry
+after a timeout confirms the existing booking instead of reading as "no courier available".
+
+**List visibility is server-side:** default `{status: {$in: [1,2,3,5]}}` (an active work queue),
+`isAll:true` drops the status filter entirely. Not a date toggle — there is no time window
+either way. Known limits: `.limit(200)` with no pagination, and the partner's عرض الكل
+checkbox is `useState(false)` so it resets on every visit.
+
+**Logs** (OpenSearch `shoofi-server-logs`): `[delivery-only] booked|book refused|book failed|
+book duplicate-inflight|book replay|book errored`, and `[delivery-cancel] bookId=… isDeliveryOnly=…
+driverId=…`. `/towns` refusals are deliberately **not** logged — the screen polls it on every
+open and focus, and every call is a refusal while the platform flag is off.
+
+**Tests:** `test/integration/delivery-only-region-fee.js`, `delivery-support-gate.js`,
+`store-delivery-only-expense.js`; `scripts/delivery-only-preflight.js` is a read-only prod
+pre-flight for stores/regions that would book at ₪0.
+
 ## 3. Driver assignment (`services/delivery/`)
 **Area match** (`assignDriver.js findBestAreaForLocation`): customer point →
 `areasGeometry.$geoIntersects` (dropoff candidates) → `areas` with those `geometryId` →
@@ -145,6 +189,10 @@ passed into `OrderCard`, which renders the assigned-driver row + `DriverReassign
 that picks a driver. Twin pairs collapse into `TwinOrderCard` (`groupTwinPairs`, unless
 `twinAssignmentMode === 'split'`), so anything admin-only must be wired into BOTH cards or
 it silently does not exist for twins.
+**Delivery-only:** `components/delivery-driver/OrderCard.tsx` renders a `طلب يدوي` badge on its
+own row and **replaces the order table with a two-line money block** (تدفع للمتجر / تحصّل من الزبون,
+both `order.price`) — the order panel would otherwise render an all-zero table, since there is
+no order.
 **Dead/inherited (leave alone):** `services/deliveryDriverService.ts` (legacy fetch dup,
 `app-name: shoofi-app`), `getNearbyOrders`/`getSchedule` (no UI callers), customer-app city/address remnants.
 
@@ -157,6 +205,10 @@ lives here: `views/admin/delivery-areas/*` — full CRUD for cities, parent-citi
 delivery-areas, company-areas, geometries (draw/fill-gaps/suggest). **Config**:
 `views/admin/settings/DeliverySettings.tsx` (`admin/delivery-config`, `admin/twin-order-config`).
 Shift admin: `apis/admin/driver-shift-manager.ts`. `DELIVERY_STATUS` copy = `1..5`.
+**Delivery-only:** `DeliveryListAnalytics.tsx` marks these rows with a `ידנית` badge and shows a
+`ביטול משלוח` button — `isDeliveryOnly && !CLOSED_DELIVERY_STATUSES.includes(status)` — which
+POSTs `delivery/order/status/update` with `status: -3`. That route clears `isPendingAssignment`
+and pushes the driver a cancellation (see CORE invariants 10–11).
 This is where a human curates coverage — treat it as the source of truth UI for §1/§4.
 
 ### C3. shoofi-partner — STORE-OWNER (booking trigger + coverage check)
@@ -165,6 +217,11 @@ orderId}`), `order/book-custom-delivery` (ad-hoc), reads `delivery/book/:bookId`
 `delivery/order/:orderId/driver`. Store-side coverage/ETA: `hooks/useAvailableDrivers.ts` →
 `POST /delivery/available-drivers` (`stores/shoofi-admin`). Key: `stores/orders/index.tsx`,
 `screens/book-delivery/*`, `hooks/useAvailableDrivers.ts`.
+**Delivery-only booking (§2b) lives here:** `screens/delivery-only/{book,list}/index.tsx`,
+`stores/delivery-only/index.ts` (`isBookable = enabled && towns.length > 0`), `reasons.ts`.
+The town dropdown is `react-native-dropdown-picker`, whose list renders **inline** — siblings
+after it paint over it, and `zIndex` fixes only iOS while `elevation` reorders the whole
+subtree on the Urovo POS, so the quote lines below it are unmounted while it is open.
 **Partner has NO driver-assignment surface** — it books and reads, it never picks a driver.
 **Dead/inherited (leave alone):** `components|screens|stores/delivery-driver/*` (a pre-admin
 copy of the shoofir driver UI — no `isAdmin`, no reassign, no `DriverReassignModal`, and no
