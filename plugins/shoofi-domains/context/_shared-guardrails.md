@@ -37,6 +37,10 @@ of work. Do not merely report drift and move on — an uncorrected doc lies to t
   **update `context/assert/<domain>.assert.json` in that same companion PR** — otherwise
   `docs:check` will (correctly) fail the next build.
 - Bump the doc's `last-verified` header when you re-confirm it against the code.
+- The code repos make this visible: every PR template carries a mandatory `Docs:` line (the
+  companion-PR link, the repo doc you changed, or `none — <reason>`), and `shoofi-server` CI
+  (`npm run docs:impact`) fails a PR that touches a file an assert manifest names without that
+  line. Fill it in yourself; do not leave it for the human.
 
 Two hard rules:
 - **Never invent** a doc claim you haven't verified in the code.

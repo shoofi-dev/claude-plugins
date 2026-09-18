@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@561e3ca / 2026-07-28",
+  "lastVerified": "shoofi-server@34f8cc0c / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -17,7 +17,11 @@
         "utils/customer-orders.js",
         "utils/persistent-alerts.js",
         "utils/crons/persistent-alerts-cron.js",
-        "docs/customer-orders-snapshot.md"
+        "docs/customer-orders-snapshot.md",
+        "utils/order-pricing.js",
+        "utils/order-pricing-shadow.js",
+        "routes/order-amend.js",
+        "test/integration/order-pricing-parity.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -36,7 +40,18 @@
           "stockDecremented",
           "stockRestored"
         ],
-        "utils/customer-orders.js": ["getSuccessfulOrdersByCustomerIds"]
+        "utils/customer-orders.js": [
+          "getSuccessfulOrdersByCustomerIds"
+        ],
+        "utils/order-pricing.js": [
+          "calculateExtrasPrice",
+          "calculateItemUnitPrice",
+          "calculateOrderPricing",
+          "loadPricedProducts"
+        ],
+        "routes/order-amend.js": [
+          "repriceOrder"
+        ]
       },
       "patterns": [
         {
@@ -128,6 +143,16 @@
           "file": "routes/app-logs.js",
           "regex": "user_visit_id",
           "desc": "the device-id header, the stable installation identity abandoned-cart sessions are keyed on — NOT orders.deviceId"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "opts\\?\\.soldByWeight === true",
+          "desc": "doc CORE invariant 11: the by-weight flag overrides the extras-count branch selection; must stay in lockstep with the two client copies"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "serverPricing",
+          "desc": "doc CORE invariant 11: creation records shadow pricing drift instead of enforcing the server price"
         }
       ]
     },
@@ -181,7 +206,10 @@
         "utils/notification/index.ts"
       ],
       "symbols": {
-        "utils/notification/index.ts": ["schedulePushNotification", "store.wav"],
+        "utils/notification/index.ts": [
+          "schedulePushNotification",
+          "store.wav"
+        ],
         "stores/new-order-alerts/index.ts": [
           "takeNewOrders",
           "takeNewOrdersOnRefresh",

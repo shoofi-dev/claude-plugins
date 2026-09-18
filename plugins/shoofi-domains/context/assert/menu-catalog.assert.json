@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@561e3ca / 2026-07-28",
+  "lastVerified": "shoofi-server@34f8cc0c / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -15,13 +15,36 @@
         "services/database/DatabaseInitializationService.js",
         "utils/create-indexes.js",
         "docs/stock-management.md",
-        "docs/menu-search.md"
+        "docs/menu-search.md",
+        "utils/weight-extra-invariant.js",
+        "services/catalog/bulk-price-update.js",
+        "scripts/flag-sold-by-weight.js",
+        "docs/sold-by-weight.md"
       ],
       "symbols": {
-        "utils/menu-cache.js": ["clearStore", "getStats"],
-        "utils/order-stock.js": ["decrementOrderStock", "restoreOrderStock"],
-        "routes/product.js": ["menuCache", "supportedCategoryIds"],
-        "routes/menu.js": ["outOfStockExtras", "categoryOrders"]
+        "utils/menu-cache.js": [
+          "clearStore",
+          "getStats"
+        ],
+        "utils/order-stock.js": [
+          "decrementOrderStock",
+          "restoreOrderStock"
+        ],
+        "routes/product.js": [
+          "menuCache",
+          "normalizeWeightExtraPrice",
+          "soldByWeight",
+          "supportedCategoryIds"
+        ],
+        "routes/menu.js": [
+          "outOfStockExtras",
+          "categoryOrders"
+        ],
+        "utils/weight-extra-invariant.js": [
+          "getWeightExtra",
+          "selectWeightExtra",
+          "normalizeWeightExtraPrice"
+        ]
       },
       "patterns": [
         {
@@ -48,6 +71,16 @@
           "file": "routes/menu.js",
           "regex": "api/menu/search",
           "desc": "doc CORE: the live catalog search endpoint"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "soldByWeight: 1",
+          "desc": "doc CORE invariant 7 / reference §4: the by-weight flag is projected to clients by every menu shape"
+        },
+        {
+          "file": "services/catalog/bulk-price-update.js",
+          "regex": "selectWeightExtra",
+          "desc": "doc CORE invariant 7: bulk price update rescales the weight extra through the flag-aware selector"
         }
       ]
     }

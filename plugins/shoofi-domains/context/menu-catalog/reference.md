@@ -102,22 +102,37 @@ Reorder endpoints: `product.js` (`update/order`, `order-per-category`,
 (`store-category/update-order`, `category/general/update-order`).
 
 ## 4. Product options / extras / pricing
-A product's `extras` is an **object keyed by option name**, each value shaped by `type`:
-- `{ type: 'COUNTER', value }` — quantity option
-- `{ type: 'oneChoice', value, options: { medium:{price,count}, large:{...} } }` — single-select (sizes)
-- `{ type: 'dropDown', value, options: {...} }` — e.g. cake taste levels
-- `{ type: 'uploadImage', value }` — customer image upload
+A product's `extras` is an **array** of extras (stored verbatim from `JSON.parse(req.body.extras)`;
+shape not enforced on write). Every extra has `{ id, type, nameAR, nameHE, order?, groupId?,
+isGroupHeader?, freeCount? }`; group headers (`isGroupHeader:true`) are pseudo-extras that only
+title a group and carry `freeCount`. Real types:
+- `single` — `options[{id,nameAR,nameHE,price}]`, `defaultOptionId`
+- `multi` — `options[]`, `maxCount`, `defaultOptionIds[]`
+- `counter` — `min,max,step,defaultValue,price` (price × value)
+- `weight` — `min,max,step,defaultValue,price,unit?:"g"|"kg"`; `price` is the price of ONE
+  `step`; `defaultValue` is the weight the product price already buys. The customer's choice
+  travels as `selectedExtras[extra.id] = <number in the extra's unit>`.
+- `pizza-topping` — `options[{ price?, areaOptions[{id,name,price}] }]`
 
-Stored verbatim (`JSON.parse(req.body.extras)`); shape is **not** strictly
-enforced. **Option pricing is computed client-side** (human-confirmed) — there is
-**no** server-side extras price calculator; the client sends line totals in the
-order and the server trusts them.
+**By-weight products** carry `product.soldByWeight: true` (whitelisted on create/update/
+create-from-mock, projected by every menu `$project`). The flag chooses the client UI (per-kg
+label, weight stepper instead of an extras row) and the pricing branch; storage does not change.
+Invariant 7 in CORE.md binds `product.price` to the weight extra. Existing products are
+opted in by `scripts/flag-sold-by-weight.js`; see `docs/sold-by-weight.md`.
+
+**Pricing has three copies that must stay in lockstep** — `shoofi-app/stores/extras/index.ts`,
+`shoofi-partner/stores/extras/index.ts`, and the server reference `utils/order-pricing.js`
+(`calculateExtrasPrice(extras, selections, { soldByWeight })`, orders domain). The weight
+extra prices as the **delta from `defaultValue`** (branch B) when the product is flagged or the
+weight is the only non-header extra; otherwise as an **add-on with the first step bundled**
+(branch A). Order creation charges the client total and shadow-compares it
+(`utils/order-pricing-shadow.js` → `order.serverPricing`); the amend flow reprices server-side.
 `store.outOfStockExtras` (in the menu response) lets clients grey out unavailable extras.
 
-> ⚠️ **Security note (confirmed, out of your scope to fix):** because the server
-> trusts client-sent prices, a modified client could submit a fake price. A real
-> fix belongs in the **order-create path** (`routes/order.js`), which is a
-> human-review boundary — NOT menu-agent territory. Record it, don't touch it.
+> ⚠️ **Recorded risk (confirmed, out of your scope to fix):** creation still trusts the
+> client-sent total; a modified client could submit a fake price and it would only be
+> *recorded* as drift. Making creation server-authoritative belongs in the order-create path
+> (`routes/order.js`), a human-review boundary — NOT menu-agent territory.
 
 ## 5. Availability & stock
 Three interacting product fields — keep them consistent:

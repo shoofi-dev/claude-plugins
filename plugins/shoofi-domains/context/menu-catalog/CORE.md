@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@561e3ca / 2026-07-28
+last-verified: shoofi-server@34f8cc0c / 2026-09-18
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -12,8 +12,8 @@ Products, categories, menu assembly, options/extras, availability & stock, catal
 ## Scope
 Server: `routes/menu.js`, `routes/product.js`, `routes/category.js`, the catalog slice of
 `routes/store.js`, `routes/translations.js`, `routes/global-search.js`, `utils/menu-cache.js`,
-`utils/order-stock.js` (stock semantics only). Docs: `docs/stock-management.md`,
-`docs/menu-search.md`.
+`utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`. Docs:
+`docs/stock-management.md`, `docs/menu-search.md`, `docs/sold-by-weight.md`.
 Mostly **server-first**: catalog data is server-owned and clients render it — but if a task
 needs a client change (partner product screens, customer menu display), do it full-stack,
 one PR per repo.
@@ -39,6 +39,16 @@ boundary and say so in the PR.
 5. **`supportedCategoryIds` are STRINGS**, compared via `{$toString:'$_id'}`. Don't switch to
    ObjectId comparison without a data migration.
 6. **Product ordering** comes from `categoryOrders[categoryId]`, falling back to legacy `order`.
+7. **By-weight price invariant:** a by-weight product stores its weight as an extra of
+   `type:"weight"` (`{min,max,step,defaultValue,price,unit?}`, `price` = price of ONE step) and
+   must satisfy `product.price === extra.price * (defaultValue / step)` to the agora. Which
+   products it binds to: a product with `soldByWeight === true` (the weight extra whatever
+   sits beside it) or, unflagged, a product whose ONLY non-header extra is the weight
+   (`selectWeightExtra` / `getWeightExtra` in `utils/weight-extra-invariant.js`). Every
+   writer of `product.price` or `extras` re-derives `extra.price` from the product price in
+   the same write: product create/update/create-from-mock (`normalizeWeightExtraPrice`) and
+   `services/catalog/bulk-price-update.js`. Never add a product-price writer that skips it.
+   See `docs/sold-by-weight.md` for the flag, the unit, and the rollout scripts.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
@@ -76,15 +86,18 @@ against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store D
   2. Remove the dead lunr index (`lib/indexing.js` + its `indexProducts` call sites) — it indexes
      fields the schema doesn't have and runs on every product write. Touches product-write paths;
      test after.
-- **Recorded risk, not yours to fix:** the server trusts client-sent extras prices (no server-side
-  recompute). Any fix lives in the order-create path — hand off.
+- **Recorded risk, not yours to fix:** order **creation** still charges the client-sent total;
+  `utils/order-pricing.js` (orders domain) recomputes it in **shadow mode** and records
+  `serverPricing.driftDetected` on the order, and the **amend** flow reprices authoritatively.
+  Flipping creation to server-authoritative lives in the order-create path — hand off.
 
 ## Recipe — add/modify a product field
 1. Server: accept + persist it in the product insert/update handlers (`routes/product.js`).
 2. **Expose it** in the `$project` blocks of the menu aggregation (`routes/menu.js`) or the client
    will never see it.
 3. **Clear both cache keys** on every write path you touched (invariant 2).
-4. Client (if needed): partner edit UI, customer display.
+4. Client (if needed): partner edit UI, customer display. Worked example across all four
+   repos: the `soldByWeight` flag (`docs/sold-by-weight.md`).
 5. Verify: `npm run lint` (0 errors), `npm run routes:check` if routes moved, tests via the
    `shoofi-testing` cover-changes skill.
 

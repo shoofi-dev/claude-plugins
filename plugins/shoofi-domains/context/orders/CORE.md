@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@561e3ca / 2026-07-28
+last-verified: shoofi-server@34f8cc0c / 2026-09-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -78,6 +78,19 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     (`services/delivery/late-delivery.js`) look like a genuine promise and vice versa, which is
     exactly what `originalExpectedDeliveryAt` exists to prevent. Delivery owns the reading rule;
     orders owns the fields, and this is the contract between them.
+
+11. **Line pricing has ONE server reference and two client copies that must stay in lockstep:**
+    `utils/order-pricing.js` `calculateExtrasPrice(extras, selections, { soldByWeight })` is a
+    port of `shoofi-app/stores/extras/index.ts` and `shoofi-partner/stores/extras/index.ts`.
+    The weight extra prices as the delta from `defaultValue` when the product has
+    `soldByWeight === true` (`calculateItemUnitPrice` reads the flag off the product loaded by
+    `loadPricedProducts`, which must keep returning it) or when the weight is the only
+    non-header extra; otherwise as an add-on with the first step bundled. Creation charges
+    the client total and only **shadow-compares** (`utils/order-pricing-shadow.js` →
+    `order.serverPricing.driftDetected`); **amend** (`routes/order-amend.js` `repriceOrder`)
+    is server-authoritative through `calculateOrderPricing`. Change one copy, change all
+    three, and extend `test/integration/order-pricing-parity.js`. Catalog side of the same
+    rule: menu-catalog CORE invariant 7; `docs/sold-by-weight.md`.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
