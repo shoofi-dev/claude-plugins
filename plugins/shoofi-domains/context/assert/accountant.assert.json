@@ -37,7 +37,8 @@
           "validateOrdersClosed",
           "calculateCommissionTiered",
           "generateStoreReportData",
-          "totalForTransfer"
+          "totalForTransfer",
+          "totalDeliveryBookingStoreFees"
         ],
         "utils/invoice-provider.js": ["getActiveProvider"]
       },
@@ -46,6 +47,16 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "totalForTransfer\\s*=\\s*creditCardRevenue",
           "desc": "CORE money formula: transfer is credit-card revenue minus outcomes"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "driveInShoofi \\+ totalDeliveryBookingStoreFees",
+          "desc": "delivery-only store fee is a member of totalOutcomes (so the Shoofi->store invoice carries it)"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "totalForTransfer = creditCardRevenue \\+ driveInCreditCard - totalOutcomes;",
+          "desc": "the fee is deducted from the transfer exactly ONCE, via totalOutcomes - never a second explicit term"
         },
         {
           "file": "routes/payments/admin-reports.js",
