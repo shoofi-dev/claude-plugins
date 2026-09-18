@@ -75,6 +75,11 @@
           "file": "routes/store.js",
           "regex": "hyp_enabled",
           "desc": "platform tokenization rollout flag — NOT read by any charge path"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "payload: paymentPayload",
+          "desc": "the ZCredit request payload — terminal password + CVV — is persisted onto the order as ccPaymentRefData.payload (CORE Known status). If this stops matching, the leak may be fixed; re-verify before relaxing the leaf-by-leaf projection rule."
         }
       ]
     },
