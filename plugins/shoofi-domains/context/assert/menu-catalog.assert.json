@@ -20,7 +20,8 @@
         "services/catalog/bulk-price-update.js",
         "scripts/flag-sold-by-weight.js",
         "docs/sold-by-weight.md",
-        "services/catalog/import-index.js"
+        "services/catalog/import-index.js",
+        "utils/order-pricing.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -97,6 +98,16 @@
           "file": "routes/product.js",
           "regex": "req\\.body\\.price !== undefined",
           "desc": "doc CORE invariant 8: omitting `price` leaves the stored one alone — how a bulk tool skips a price"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "if \\(isFree \\|\\| remainingFreeCount > 0\\)",
+          "desc": "doc reference \u00a74: an isFree-stamped topping is free WITHOUT decrementing remainingFreeCount, so freeCount: N gives away up to 2N. If this line changes, the defect note in reference \u00a74 must be re-checked."
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "if \\(area && area.price\\)",
+          "desc": "doc reference \u00a74: truthiness test, so an area priced 0 falls through to the option-level price"
         }
       ]
     }

@@ -112,7 +112,29 @@ title a group and carry `freeCount`. Real types:
 - `weight` — `min,max,step,defaultValue,price,unit?:"g"|"kg"`; `price` is the price of ONE
   `step`; `defaultValue` is the weight the product price already buys. The customer's choice
   travels as `selectedExtras[extra.id] = <number in the extra's unit>`.
-- `pizza-topping` — `options[{ price?, areaOptions[{id,name,price}] }]`
+- `pizza-topping` — `options[{ price?, areaOptions[{id,name,price}] }]`. Two traps, both
+  verified against `utils/order-pricing.js` and the three order viewers:
+  - **`areaOptions[].id` must be exactly `full` / `half1` / `half2`, and all three must be
+    present on every option.** The selection travels as
+    `selectedExtras[extra.id] = { [toppingId]: { areaId, isFree } }`, and every viewer looks
+    the area up by the id the *customer* chose and then does an unguarded `switch (area.id)`
+    to pick an icon — the customer's order card, the partner's order card, and
+    `InvoiceOrderExtrasDisplay` (the **printed kitchen ticket**). A missing or invented area
+    throws while rendering an order that has already been paid for.
+  - **`areaOptions[].price` of 0 falls through to the option-level `price`.** The pricer tests
+    `if (area && area.price)`, so a zero-priced area drops to the `else if (topping.price)`
+    branch — an area meant to be free charges the option price instead. The admin editor
+    writes `price: 0` at option level for this type, which is what keeps it harmless.
+
+⚠️ **`freeCount` is honoured twice — `freeCount: N` gives away up to 2N toppings.** The
+client stamps `isFree: true` on the first N toppings it sees selected and sends that on the
+selection; `calculateExtrasPrice` then skips the charge for an `isFree` topping **without
+decrementing its own `remainingFreeCount`** (the decrement sits inside `if (!isFree)`), so the
+counter gives away N more. The three pricers agree with each other, so the shadow-pricing
+drift alarm stays silent and the customer is charged exactly what they were shown — this is a
+store-revenue leak, not a client/server disagreement. Not yet fixed: it is a shared change
+across `shoofi-server`, `shoofi-app` and `shoofi-partner` and needs its own PR. **Any bulk
+tool writing extras should emit `freeCount: 0`** until it is.
 
 **By-weight products** carry `product.soldByWeight: true` (whitelisted on create/update/
 create-from-mock, projected by every menu `$project`). The flag chooses the client UI (per-kg
