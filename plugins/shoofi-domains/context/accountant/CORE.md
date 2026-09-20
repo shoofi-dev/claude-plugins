@@ -158,6 +158,19 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
 
+8. **Compensation parties.** `compensationFor ∈ {customer, business, driver, shoofi}`,
+   `payingParty ∈ {shoofi, business, driver}`, and **payer ≠ recipient** — enforced server-side
+   on add and edit by `services/compensations/validate-parties.js`. `business → business` would
+   be credited by `compensationsFromShoofi` (a recipient filter) and billed by nothing;
+   `driver → driver` has one `item.driver` field for two people. The `shoofi` recipient
+   (2026-09) is "the store owes Shoofi": an OUTCOME `compensationsToShoofi` inside
+   `totalOutcomes`, itemised on the Shoofi→store invoice, **never a coupon and never credited
+   to anyone** — the money stays with Shoofi. It replaces the old habit of filing a store's
+   refund to Shoofi as a "customer" compensation with no payout path. The exec dashboard's
+   `BILLING_COMPONENTS` carries it and `totalDeliveryBookingStoreFees` as terms 13 and 14;
+   a term added to `totalOutcomes` and not to that list shows up as a non-zero
+   `billingReconciliationDelta`, which is the point of the list.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.

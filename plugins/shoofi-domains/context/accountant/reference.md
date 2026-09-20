@@ -45,8 +45,9 @@ Then `generateStoreReportData`  → insert `storeReports` `status:'draft'` → H
 ```
 totalIncomes    = creditCardRevenue + cashRevenue + coinsTotal + driveInTotal + couponsFromShoofi
 totalOutcomes   = totalCommission + vat + oneTimeFees + monthlyFees + campaigns
-                  + compensationsToCustomers + compensationsToDrivers
+                  + compensationsToCustomers + compensationsToDrivers + compensationsToShoofi
                   + carryoverToCustomers + carryoverToDrivers + driveInShoofi
+                  + totalDeliveryBookingStoreFees
                   - couponsFromShoofi - compensationsFromShoofi
 totalForTransfer = creditCardRevenue + driveInCreditCard - totalOutcomes   ← the MASAV/bank figure
 totalForInvoice  = creditCardRevenue + driveInCreditCard                    ← tax-invoice gross
@@ -131,7 +132,10 @@ a human bridges it. Payout amount = store `balance` / driver `netTotal`.
 - **`delivery-company.driverDailyHours`** — `{driverId, date, activeMinutes, inShiftMinutes,
   inWorkingHoursMinutes, …}` (nightly cron; live fallback from `driverStatusHistory`+`driverShifts`).
 - **`shoofi.compensations`** — `{order, items:[{status(0|1|2), compensationFor('business'|'customer'|
-  'driver'), payingParty, approvedAmount, driver, deliveryCompany}], appNameBackfill{pendingReportCarryover}}`.
+  'driver'|'shoofi'), payingParty('shoofi'|'business'|'driver'), approvedAmount, driver, deliveryCompany}],
+  appNameBackfill{pendingReportCarryover}}`. `payingParty !== compensationFor` is enforced on add/edit
+  (`services/compensations/validate-parties.js`). `compensationFor:'shoofi'` = the store (or driver) owes
+  Shoofi — store report outcome `compensationsToShoofi`, driver report `totalDriverCharges`; no coupon.
 - **Store `accounting`** (store's own DB): `bankAccount{bank,branch,accountNumber,companyId,
   businessType('exempt'|'licensed')}`, `billingContacts[]`, `contract{commissionTiers[],
   coinsCommissionPercent, monthlyPayments[], onetimePayments[]}`, `store.hyp{ua_uuid,api_key,access_token,status}`.
