@@ -88,6 +88,28 @@ Catalog-relevant flags: `isStockManagment` (the stock gate — **source of truth
 this per-store doc, NOT central `shoofi.stores`**), `hasGeneralCategories`,
 `mockStoreAppName`, `outOfStockExtras` (surfaced in the menu response),
 plus open/visibility flags.
+
+⚠️ **`hasGeneralCategories` lives in TWO documents and they drift.** `GET /api/menu`
+reads it from this per-store `store {id:1}` doc (`routes/menu.js`), but the admin
+store form writes it to central `shoofi.stores`
+(`POST /api/shoofiAdmin/store/update/:id`), and the propagation block in that
+route copies `storeLogo`, `cover_sliders`, `externalOrderProvider`,
+`isCityToCity` and `isDeliveryOnlySupport` — **not this flag**. So ticking the
+checkbox makes the admin importer create general categories (it reads the
+registry) while `/api/menu` keeps returning none. The copy-from-mock-store flow
+escapes this by setting both documents explicitly. Same shape as the
+`isDeliveryOnlySupport` bug fixed in shoofi-server PR #185.
+
+### `menu-import-issues` — what a menu import could not bring in
+`runId`, `fileName`, `phase`, `code`, `row`, `detail`, `reason`, `resolved`.
+Written by `routes/admin/menu-import-issues.js`, read by the admin screen
+"בעיות ייבוא תפריט". **`phase` is load-bearing:** `parse` means the file could
+not express the row and nothing was written (fix the sheet, re-import), while
+`import` means the write failed *after* the rest of the run went in — so
+re-importing the whole file is the wrong remedy. `reason` is stored as text, not
+derived from `code` at read time, and is editable by the operator. No TTL: it is
+a worklist, not a diagnostic log. See `docs/menu-import-issues.md`.
+
 ### `translations` — i18n labels: `{ key, ar, he }`.
 ### `images` — auxiliary image library: `{ data:{uri}, type, subType }`.
 ### central `shoofi.stores` — store registry (used by cross-store search & `initDb`).
@@ -201,6 +223,10 @@ endpoints also emit a websocket `menu_refresh` (`shoofi-shopping`) /
 - `POST /api/product/create-from-mock`, `GET /api/product/mock-store/:appName`, `POST /api/product/update-barcode`
 - `GET/POST/DELETE /api/store-category/*` — regular subcategory CRUD (in `store.js`)
 - `GET/POST/DELETE /api/category/general/*` — general category CRUD
+- `POST /api/admin/menu-import-issues` — record one import run's issues (whole run, one call)
+- `GET  /api/admin/menu-import-issues?status=open|resolved|all[&runId=]` — the store's worklist
+- `POST /api/admin/menu-import-issues/:id` — edit `reason` / tick `resolved` (writes only the keys it receives)
+- `DELETE /api/admin/menu-import-issues/:id`
 - `GET  /api/getTranslations`, `POST /api/translations/{update,add,delete}`
 - `POST /api/global-search` — central store name search
 
