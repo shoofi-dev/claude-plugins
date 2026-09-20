@@ -84,6 +84,17 @@ commission base `originalOrderPrice||orderPrice` (pre-discount), revenue by meth
 (`orderPrice - coinsValue`), coupon split from per-source `couponUsages` docs. `summaries.js`
 serves partner/driver self-service views via `calc.js`.
 
+**Live financial overview (2026-09)** — `services/financial-overview/{compute,metrics,contract-charges}.js`
++ `routes/financial-overview.js` (`GET /api/financial-overview?startDate&endDate`, roles master/admin/manager),
+the admin screen "תמונת מצב כספית". It **runs `generateStoreReportData` and `generateDriverReportData`
+over any range without persisting**, so it cannot disagree with a report; the 26 owner metrics are a
+pure reshaping (`storeMetrics`/`driverMetrics`). Beside the engines it reads raw `compensations` by
+PAYER×recipient (the report fields are recipient-filtered), F1–F3 per company/store via
+`effectiveDeliveryFee`/`couponDeliverySplit` on `book-delivery` `status:'4'`, and equipment/setup from
+the contract dropdown label. Each figure carries the stored report's value for the SAME range with a
+delta (`compareWithStoredReport`; no report = null, never 0). Cached 5 min per range, Redis-locked,
+202 while another process computes. See shoofi-server `docs/financial-overview.md`.
+
 ## 5. Store ↔ Shoofi tax invoices — `routes/hyp.js` / `utils/{hyp,greeninvoice,invoice-provider}.js`
 Provider = `amazonconfigs {app:"invoiceProvider"}.active` (`greeninvoice` default | `hyp`).
 - **Shoofi → store commission invoice**: amount = `totalOutcomes`. GreenInvoice type **320**
@@ -144,7 +155,8 @@ a human bridges it. Payout amount = store `balance` / driver `netTotal`.
 
 ## 9. Client — shoofi-delivery-web (admin) is the accountant's cockpit
 The reports/settlement/payout UI lives in the **admin** app: `views/admin/DriverPayments.tsx`,
-`DriverBonuses.tsx`, `CompensationManagement.tsx`, `driver-reports/`, plus store-report screens
+`DriverBonuses.tsx`, `CompensationManagement.tsx`, `driver-reports/`, `financial-overview/` (the live
+26-metric screen, 4 tabs: summary / stores / companies / delivery fees), plus store-report screens
 and `generate-stores-summaries.tsx`; `app-type: shoofi-admin`. This is where a human generates,
 approves, sends reports, and exports the MASAV Excel. (Full-stack: server computes, admin drives.)
 
