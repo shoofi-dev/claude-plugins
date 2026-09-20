@@ -13,7 +13,8 @@
         "lib/payments/calc.js",
         "utils/vat.js",
         "utils/greeninvoice.js",
-        "utils/invoice-provider.js"
+        "utils/invoice-provider.js",
+        "services/compensations/validate-parties.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -39,7 +40,12 @@
           "generateStoreReportData",
           "totalForTransfer"
         ],
-        "utils/invoice-provider.js": ["getActiveProvider"]
+        "utils/invoice-provider.js": [
+          "getActiveProvider"
+        ],
+        "services/compensations/validate-parties.js": [
+          "validateCompensationParties"
+        ]
       },
       "patterns": [
         {
@@ -101,6 +107,16 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "totalDriverCompensations\\s*\\+\\s*totalShoofiRecipientCompensations\\s*\\+\\s*carryoverToCustomers",
+          "desc": "store→Shoofi compensations (compensationFor 'shoofi') are an OUTCOME inside totalOutcomes — never credited back, never a coupon"
+        },
+        {
+          "file": "services/exec-dashboard/billing-metrics.js",
+          "regex": "field:\\s*\"totalDeliveryBookingStoreFees\"",
+          "desc": "every term of totalOutcomes must be a BILLING_COMPONENT, or the dashboard's reconciliation delta lies"
         }
       ]
     }
