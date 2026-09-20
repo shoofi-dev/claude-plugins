@@ -21,7 +21,9 @@
         "scripts/flag-sold-by-weight.js",
         "docs/sold-by-weight.md",
         "services/catalog/import-index.js",
-        "utils/order-pricing.js"
+        "utils/order-pricing.js",
+        "routes/admin/menu-import-issues.js",
+        "docs/menu-import-issues.md"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -108,6 +110,16 @@
           "file": "utils/order-pricing.js",
           "regex": "if \\(area && area.price\\)",
           "desc": "doc reference \u00a74: truthiness test, so an area priced 0 falls through to the option-level price"
+        },
+        {
+          "file": "routes/admin/menu-import-issues.js",
+          "regex": "menuImportIssues",
+          "desc": "doc reference \u00a72: the per-store import-issues worklist. If this stops matching, the collection moved or was removed and the screen it feeds is dead."
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "store.hasGeneralCategories",
+          "desc": "doc reference \u00a72: the menu reads this flag from the PER-STORE store doc, while the admin form writes central shoofi.stores. If this line changes, re-check the two-document drift note."
         }
       ]
     }
