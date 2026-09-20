@@ -27,14 +27,16 @@
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js",
-        "services/monitoring/centralized-flow-monitor.js"
+        "services/monitoring/centralized-flow-monitor.js",
+        "services/audit/admin-audit-routes.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
           "findBestAreaForLocation",
           "personalSupportedAreas",
           "supportedCities",
-          "supportedAreas"
+          "supportedAreas",
+          "driverAcceptsStore"
         ],
         "services/delivery/driver-status-service.js": [
           "setDriverActiveStatus"
@@ -64,6 +66,10 @@
           "parsePromisedEta",
           "reassignmentOf",
           "classifyDelivery"
+        ],
+        "services/audit/admin-audit-routes.js": [
+          "add_employee",
+          "update_employee"
         ]
       },
       "patterns": [
@@ -171,6 +177,21 @@
           "file": "services/monitoring/centralized-flow-monitor.js",
           "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
           "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "mode === \"include\"\\)\\s*return list\\.length === 0 \\? false",
+          "desc": "include + empty assignedStoreAppNames accepts NOTHING (exclude + empty accepts everything)"
+        },
+        {
+          "file": "services/audit/admin-audit-routes.js",
+          "regex": "pattern: '/api/delivery/company/employee/update/:id'[\\s\\S]{0,120}action: 'update_employee'",
+          "desc": "the driver store-scope edit IS audited into shoofi.admin-audit-log as update_employee"
+        },
+        {
+          "file": "services/audit/admin-audit-routes.js",
+          "regex": "pattern: '/api/delivery/company:companyId/employee/add'",
+          "desc": "KNOWN TYPO - missing slash means driver CREATE is never audited; fix this and update CORE.md"
         }
       ]
     },

@@ -193,6 +193,37 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
   Real gating today is `cityAreas.bookingDisabledWeeks`. There is also no waiting-list
   promotion anywhere — `waitingList` is only pushed, pulled and displayed.
 
+## Recipe — "who restricted this driver to store X, and when"
+The driver document carries **no `updatedBy` for scope changes** — `routes/delivery/company.js`
+stamps `updatedAt` only, and `updatedBy` on the same doc is written by the *driver's own* profile
+save. `delivery-company.driver-status-history` records `isActive` flips and nothing else. The only
+attribution is **`shoofi.admin-audit-log`**:
+```js
+db.getSiblingDB('shoofi').getCollection('admin-audit-log').find({
+  route: { $regex: '<driverObjectIdAsString>' },      // resourceId works too
+  'requestBody.storeAssignmentMode': { $exists: true }
+}).sort({ timestamp: 1 })                              // timestamp is a real BSON Date (UTC)
+```
+Each row gives `adminName`, `adminPhone`, `adminUserId`, `timestamp`, and the **submitted** body —
+so the value *set*, never the previous value. Reconstruct a history by walking consecutive rows;
+the state before the first row is unknown unless an earlier row happens to echo it (the edit form
+posts the whole loaded document, so `requestBody.updatedAt` dates the state the admin was looking
+at). Only `POST /api/delivery/company/employee/update/:id` is audited.
+- **TRAP — the `add` route is NOT audited.** `services/audit/admin-audit-routes.js:106` declares
+  `'/api/delivery/company:companyId/employee/add'` — the slash after `company` is missing, so
+  `patternToRegex` compiles `company([^/]+)/employee/add`, which the real URL can never match and
+  the middleware drops the event silently. A driver **created** already restricted to one store
+  leaves no audit row anywhere. (`'/api/delivery/company/update:id'` at line 100 looks like the
+  same typo class.)
+- **TRAP — `exclude` + `[]` is not the same stored value as `all`, but behaves identically.**
+  `driverAcceptsStore` (`services/delivery/assignDriver.js:20-28`) returns true for both, while
+  `include` + `[]` accepts **nothing**. So "is this driver restricted" is a two-field question:
+  `mode === 'include'` (any list), or `mode === 'exclude'` with a **non-empty** list.
+- A store-scoped driver goes quiet without any error, alert or status change — `isActive` stays
+  `true`, GPS keeps pinging, and they simply stop appearing as a candidate. Confirm the symptom by
+  checking `delivery-company.book-delivery` for a gap starting at the audit row's `timestamp`;
+  there is no other signal.
+
 ## Recipe — change assignment or coverage
 1. State which of **pickup-zone / dropoff-geometry / `supportedCities` / `supportedAreas` /
    `personalSupportedAreas`** your change affects — that sentence catches most bugs by itself.
