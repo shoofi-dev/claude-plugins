@@ -14,7 +14,11 @@
         "utils/vat.js",
         "utils/greeninvoice.js",
         "utils/invoice-provider.js",
-        "services/compensations/validate-parties.js"
+        "services/compensations/validate-parties.js",
+        "services/financial-overview/compute.js",
+        "services/financial-overview/metrics.js",
+        "services/financial-overview/contract-charges.js",
+        "routes/financial-overview.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -45,6 +49,23 @@
         ],
         "services/compensations/validate-parties.js": [
           "validateCompensationParties"
+        ],
+        "services/financial-overview/compute.js": [
+          "computeFinancialOverview",
+          "getFinancialOverview"
+        ],
+        "services/financial-overview/metrics.js": [
+          "storeMetrics",
+          "driverMetrics",
+          "deliveryFeeSplit",
+          "compareWithStoredReport",
+          "flattenApprovedItems"
+        ],
+        "services/financial-overview/contract-charges.js": [
+          "classifyOneTimeCharges"
+        ],
+        "routes/driver-reports.js": [
+          "generateDriverReportData"
         ]
       },
       "patterns": [
@@ -117,6 +138,16 @@
           "file": "services/exec-dashboard/billing-metrics.js",
           "regex": "field:\\s*\"totalDeliveryBookingStoreFees\"",
           "desc": "every term of totalOutcomes must be a BILLING_COMPONENT, or the dashboard's reconciliation delta lies"
+        },
+        {
+          "file": "services/financial-overview/compute.js",
+          "regex": "generateStoreReportData",
+          "desc": "the live overview runs the store report ENGINE over the range — it must never re-derive settlement math"
+        },
+        {
+          "file": "services/financial-overview/compute.js",
+          "regex": "status:\\s*\"4\",\\s*isDeliveryOnly:\\s*\\{\\s*\\$ne:\\s*true\\s*\\}",
+          "desc": "delivery-fee population is the settlement one (delivered, not delivery-only), not the dashboard's completedAt"
         }
       ]
     }

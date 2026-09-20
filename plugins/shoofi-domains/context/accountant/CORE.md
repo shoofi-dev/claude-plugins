@@ -18,8 +18,9 @@ invoices, and bank payouts. Distinct from `payments` (money IN).
 ## Scope
 Server: `routes/payments/{admin-reports,admin,summaries}.js`, `routes/driver-reports.js`,
 `routes/admin/masav.js`, `routes/hyp.js` (EZcount invoicing), `lib/payments/calc.js`,
-`utils/{vat,greeninvoice,invoice-provider}.js`. Client: the reports/payout screens in
-`shoofi-delivery-web`.
+`utils/{vat,greeninvoice,invoice-provider}.js`, `services/financial-overview/` (the live overview —
+it RUNS the two report engines over any range; never re-derive money there). Client: the
+reports/payout screens and `views/admin/financial-overview/` in `shoofi-delivery-web`.
 **🔒 CLAUDE.md do-not-touch overlap:** `routes/hyp.js`, `utils/hyp.js`,
 `utils/invoice-provider.js`, `lib/payments/`. You depend on `routes/order.js` for order
 amounts but **never edit it**.
