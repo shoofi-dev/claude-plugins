@@ -148,6 +148,20 @@ title a group and carry `freeCount`. Real types:
     branch — an area meant to be free charges the option price instead. The admin editor
     writes `price: 0` at option level for this type, which is what keeps it harmless.
 
+**Data quality — empty option ids.** Until 2025-06-13 (delivery-web 241fee0) the admin
+`ExtraEditModal` seeded a new extra's first option with `id: ""`, and marking it default wrote
+`defaultOptionId: ""` / `defaultOptionIds: [""]`. Product duplication (`views/admin/product.tsx
+handleDuplicate`) and `POST /api/product/create-from-mock` copy extras verbatim, so the defect
+outlives the fix, and the inherited editor in `shoofi-app/components/admin/ExtraEditModal.tsx`
+still seeds `id: ""`. A `""` selection reads as "not answered" in the customer app (add-to-cart
+blocked on a required group) and is dropped by the partner's `OrderExtrasDisplay` (kitchen ticket
+omits the choice). Repair with `scripts/fix-empty-extra-option-ids.js` (dry-run by default;
+`--apply` writes with a compare-and-set on the extras array and clears both menu-cache keys when
+Redis is reachable); the customer app also assigns `<extraId>-opt-<index>` inside its own product
+copy as a guard (`shoofi-app/helpers/extras-normalize.ts`). Any bulk tool writing extras must emit
+a non-empty `options[].id`; `areaOptions[].id` is a fixed vocabulary and is out of that script's
+scope.
+
 ⚠️ **`freeCount` is honoured twice — `freeCount: N` gives away up to 2N toppings.** The
 client stamps `isFree: true` on the first N toppings it sees selected and sends that on the
 selection; `calculateExtrasPrice` then skips the charge for an `isFree` topping **without

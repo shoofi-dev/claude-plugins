@@ -19,6 +19,7 @@
         "utils/weight-extra-invariant.js",
         "services/catalog/bulk-price-update.js",
         "scripts/flag-sold-by-weight.js",
+        "scripts/fix-empty-extra-option-ids.js",
         "docs/sold-by-weight.md",
         "services/catalog/import-index.js",
         "utils/order-pricing.js",
