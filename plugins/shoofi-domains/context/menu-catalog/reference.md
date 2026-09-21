@@ -100,15 +100,26 @@ registry) while `/api/menu` keeps returning none. The copy-from-mock-store flow
 escapes this by setting both documents explicitly. Same shape as the
 `isDeliveryOnlySupport` bug fixed in shoofi-server PR #185.
 
-### `menu-import-issues` — what a menu import could not bring in
-`runId`, `fileName`, `phase`, `code`, `row`, `detail`, `reason`, `resolved`.
-Written by `routes/admin/menu-import-issues.js`, read by the admin screen
-"בעיות ייבוא תפריט". **`phase` is load-bearing:** `parse` means the file could
-not express the row and nothing was written (fix the sheet, re-import), while
-`import` means the write failed *after* the rest of the run went in — so
-re-importing the whole file is the wrong remedy. `reason` is stored as text, not
-derived from `code` at read time, and is editable by the operator. No TTL: it is
-a worklist, not a diagnostic log. See `docs/menu-import-issues.md`.
+### `menu-import-issues` — the operator worklist: what an import could not bring in, and what the catalog lint found
+`runId`, `fileName`, `phase`, `code`, `row`, `detail`, `reason`, `resolved`, `resolvedAt`;
+lint rows add `severity` (`critical` | `warning`), `productId`, `productName`, `extraId`,
+`optionIndex` (null when the issue is on the extra), `resolvedBy` (`"lint"` | null),
+`lastSeenAt`, `seenCount`, and for `BLOCKED_ADD_TO_CART` `users` / `events`.
+Written by `routes/admin/menu-import-issues.js` (phases `parse` / `import`, one call per import
+run) and by `services/catalog/catalog-lint.js` (phase `lint`); read by the admin screen
+"בעיות ייבוא תפריט". **`phase` is load-bearing:**
+`parse` = the file could not express the row, nothing written; `import` = the write failed
+after the rest of the run went in; `lint` = the product IS in the catalog and is defective —
+a re-import fixes nothing, the product needs editing (or the repair script). Lint rows are
+**deduped on `(phase, code, productId, extraId, optionIndex)`** (index in
+`DatabaseInitializationService.js`) and **never deleted by code**: a row that stops reproducing
+is set `resolved: true, resolvedBy: "lint"`; one the lint closed re-opens if the defect
+returns; one a HUMAN ticked stays ticked (the tick means "acknowledged" — otherwise a
+BLOCKED row would re-open every night for the 7-day window after the fix). `reason` is
+stored text, not derived from `code` at read time — the operator can edit it; for lint rows
+it starts as the Hebrew from `LINT_REASON` in `utils/catalog-lint.js`. `detail` is
+`<productId>/<extraId>[/<optionIndex>] <product nameAR>`. No TTL: it is a worklist, not a
+diagnostic log. See `docs/menu-import-issues.md`.
 
 ### `translations` — i18n labels: `{ key, ar, he }`.
 ### `images` — auxiliary image library: `{ data:{uri}, type, subType }`.
@@ -148,6 +159,44 @@ title a group and carry `freeCount`. Real types:
     branch — an area meant to be free charges the option price instead. The admin editor
     writes `price: 0` at option level for this type, which is what keeps it harmless.
 
+**Lint rules** (`utils/catalog-lint.js` `lintProduct(product, { outOfStockExtras })`), one
+row per hit, in the customer's terms — `critical` = cannot buy / a viewer throws, `warning` =
+works but not as configured. What each outcome means at the write boundary is CORE invariant 9;
+the nightly run is §7b:
+
+| code | severity | fires when | at the write boundary |
+|---|---|---|---|
+| `EMPTY_OPTION_ID` | critical | `options[].id` missing / null / `""`, any type | repaired (the #205 planner) |
+| `DUPLICATE_OPTION_ID` | critical | same id twice in one extra | repaired: later duplicate re-id'd |
+| `SINGLE_WITHOUT_OPTIONS` | critical | non-header `single` with no options | **refused** |
+| `ORPHAN_GROUP_MEMBER` | warning | `groupId` with no `isGroupHeader` extra carrying it | saved + recorded |
+| `DEFAULT_NOT_IN_OPTIONS` | warning | `defaultOptionId` / a `defaultOptionIds` entry matching no option (after the id repairs) | repaired: dropped |
+| `PIZZA_AREA_VOCAB` | critical | a `pizza-topping` option whose `areaOptions[].id` list is not exactly `full`,`half1`,`half2` (missing, invented, duplicated, or no array) | **refused** |
+| `MAX_COUNT_INVALID` | warning | `multi` with `maxCount` present and not `>= 1` | saved + recorded |
+| `WEIGHT_PRICE_INVARIANT` | warning | `normalizeWeightExtraPrice` would correct the weight extra | never fires there (normalized first); cron reports |
+| `REQUIRED_GROUP_ALL_OUT_OF_STOCK` | critical | non-header `single` with ≥1 option and every option's `nameAR` in `store.outOfStockExtras` | saved + recorded |
+| `BLOCKED_ADD_TO_CART` | critical | cron only: ≥ `CATALOG_LINT_BLOCKED_MIN_USERS` (default 3) distinct customers hit `add_to_cart_blocked` on the same store/product/extra in 7 days | — |
+
+`planProduct` (the empty-id planner) lives in `utils/catalog-lint.js`;
+`scripts/fix-empty-extra-option-ids.js` re-exports it, so the script, the write boundary and
+the cron cannot disagree about what "empty" means or what to write.
+
+**Data quality — empty option ids.** Until 2025-06-13 (delivery-web 241fee0) the admin
+`ExtraEditModal` seeded a new extra's first option with `id: ""`, and marking it default wrote
+`defaultOptionId: ""` / `defaultOptionIds: [""]`. Product duplication (`views/admin/product.tsx
+handleDuplicate`) and `POST /api/product/create-from-mock` copy extras verbatim, so the defect
+outlives the fix, and the inherited editor in `shoofi-app/components/admin/ExtraEditModal.tsx`
+still seeds `id: ""`. A `""` selection reads as "not answered" in the customer app (add-to-cart
+blocked on a required group) and is dropped by the partner's `OrderExtrasDisplay` (kitchen ticket
+omits the choice). Since shoofi-server #206 the write boundary repairs it in place
+(`EMPTY_OPTION_ID`, the same planner — table above) and the nightly lint reports what is still
+in the catalog; for that backlog, `scripts/fix-empty-extra-option-ids.js` (dry-run by default;
+`--apply` writes with a compare-and-set on the extras array and clears both menu-cache keys when
+Redis is reachable); the customer app also assigns `<extraId>-opt-<index>` inside its own product
+copy as a guard (`shoofi-app/helpers/extras-normalize.ts`). Any bulk tool writing extras must emit
+a non-empty `options[].id`; `areaOptions[].id` is a fixed vocabulary and is out of that script's
+scope.
+
 ⚠️ **`freeCount` is honoured twice — `freeCount: N` gives away up to 2N toppings.** The
 client stamps `isFree: true` on the first N toppings it sees selected and sends that on the
 selection; `calculateExtrasPrice` then skips the charge for an `isFree` topping **without
@@ -164,6 +213,21 @@ label, weight stepper instead of an extras row) and the pricing branch; storage 
 Invariant 7 in CORE.md binds `product.price` to the weight extra. Existing products are
 opted in by `scripts/flag-sold-by-weight.js`; see `docs/sold-by-weight.md`.
 
+**Which extras are mandatory (customer app).** `required` is a **dead field**: neither the admin
+nor the partner `ExtraEditModal` writes it, the server stores extras verbatim, and 0 of ~3.7k
+prod extras carried it on 2026-09-21. The only rule in effect is `extrasStore.validateWith`
+(`shoofi-app/stores/extras/index.ts`): **every non-header `single` is mandatory, nothing else
+is** — `multi`/`counter`/`pizza-topping`/`weight` never block add-to-cart, and a `single` with
+`defaultOptionId` is pre-seeded on mount so only default-less singles ever do. The product
+screen mirrors the same predicate in `shoofi-app/helpers/extras-groups.ts` (`isMandatoryExtra`,
+unit-tested) to label groups "required / optional" and to list **mandatory groups first**,
+each set in header `order`; keep it in lockstep with `validateWith` — and with the lint, whose
+`SINGLE_WITHOUT_OPTIONS` / `REQUIRED_GROUP_ALL_OUT_OF_STOCK` are `critical` precisely because
+this predicate leaves the add-to-cart button disabled forever. The partner app enforces
+nothing (`isValidForm={true}`), and order creation does not re-validate extras (see the recorded
+risk below). Making `required` real is a full-stack change: both editors → server passthrough →
+both validators → this doc.
+
 **Pricing has three copies that must stay in lockstep** — `shoofi-app/stores/extras/index.ts`,
 `shoofi-partner/stores/extras/index.ts`, and the server reference `utils/order-pricing.js`
 (`calculateExtrasPrice(extras, selections, { soldByWeight })`, orders domain). The weight
@@ -171,7 +235,9 @@ extra prices as the **delta from `defaultValue`** (branch B) when the product is
 weight is the only non-header extra; otherwise as an **add-on with the first step bundled**
 (branch A). Order creation charges the client total and shadow-compares it
 (`utils/order-pricing-shadow.js` → `order.serverPricing`); the amend flow reprices server-side.
-`store.outOfStockExtras` (in the menu response) lets clients grey out unavailable extras.
+`store.outOfStockExtras` (in the menu response) lets clients grey out unavailable extras —
+matched by option `nameAR`, exactly, no trim (`menuStore.outOfStockExtras.includes(opt.nameAR)`
+in RadioGroup / CheckboxGroup / PizzaToppingGroup); a renamed option silently comes back in stock.
 
 > ⚠️ **Recorded risk (confirmed, out of your scope to fix):** creation still trusts the
 > client-sent total; a modified client could submit a fake price and it would only be
@@ -227,8 +293,28 @@ endpoints also emit a websocket `menu_refresh` (`shoofi-shopping`) /
 - `GET  /api/admin/menu-import-issues?status=open|resolved|all[&runId=]` — the store's worklist
 - `POST /api/admin/menu-import-issues/:id` — edit `reason` / tick `resolved` (writes only the keys it receives)
 - `DELETE /api/admin/menu-import-issues/:id`
+- `GET  /api/admin/catalog-lint/summary` — open lint rows per store by severity (`{ totals, stores[] }`), admin token
+- `POST /api/admin/catalog-lint/run` — `{ appName }` for one store, else every store; admin token; returns the run stats
 - `GET  /api/getTranslations`, `POST /api/translations/{update,add,delete}`
 - `POST /api/global-search` — central store name search
+
+## 7b. Nightly catalog lint — the cron and the app event contract
+`utils/crons/catalog-lint-cron.js` — `30 4 * * *` Asia/Jerusalem, registered in `app.js` inside
+the `shouldRunCrons` block (`NODE_ENV=production && ENABLE_CRONS=true`), under the Redis lock
+`cron:catalog-lint` (60-min TTL). `services/catalog/catalog-lint.js lintAllStores(app.db)`:
+one `apps-logs` aggregate for the BLOCKED rule, then per store `lintStore` → every product
+through `lintProduct` (+ `store.outOfStockExtras`) → `syncLintRows` (upsert on the dedupe key,
+auto-resolve what no longer reproduces). **Reports only — never writes a product.** If the
+`apps-logs` aggregate fails, the catalog rules still run and existing BLOCKED rows are left
+open rather than resolved on no evidence. One store failing is logged and the run continues.
+`POST /api/admin/catalog-lint/run` is the same code path on demand (§7).
+
+**The app event contract** (customer app `trackEvent("add_to_cart_blocked", {...})`):
+`POST /api/app-logs/insert` stores the body verbatim as
+`{ event_type, app_type, created: Date, userId, user_visit_id, properties }`, so the cron reads
+`properties.storeDBName`, `properties.productId`, `properties.extraId`, `properties.productName`,
+`properties.extraName`; a customer is `userId`, falling back to `user_visit_id` (device) when
+logged out. Rename a property in the app and the BLOCKED rule silently finds nothing.
 
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`.

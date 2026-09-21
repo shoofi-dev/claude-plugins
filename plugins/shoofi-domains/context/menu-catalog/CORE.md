@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@34f8cc0c / 2026-09-18
+last-verified: shoofi-server@a12977e3 / 2026-09-21
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -12,8 +12,11 @@ Products, categories, menu assembly, options/extras, availability & stock, catal
 ## Scope
 Server: `routes/menu.js`, `routes/product.js`, `routes/category.js`, the catalog slice of
 `routes/store.js`, `routes/translations.js`, `routes/global-search.js`, `utils/menu-cache.js`,
-`utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`. Docs:
-`docs/stock-management.md`, `docs/menu-search.md`, `docs/sold-by-weight.md`.
+`utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`,
+`utils/catalog-lint.js` (the extras lint rules), `services/catalog/catalog-lint.js` (the
+worklist writer + nightly run), `routes/admin/catalog-lint.js`, `utils/crons/catalog-lint-cron.js`.
+Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/sold-by-weight.md`,
+`docs/menu-import-issues.md` (the worklist — now also documents the `lint` phase).
 Mostly **server-first**: catalog data is server-owned and clients render it — but if a task
 needs a client change (partner product screens, customer menu display), do it full-stack,
 one PR per repo.
@@ -73,6 +76,27 @@ boundary and say so in the PR.
    extra is the last one to hand to an importer. Consumers must treat a **missing**
    `isByWeight` key as "this server is too old to tell me" and say so out loud: the aggregation
    sets it on every row, so absence never means "this store has no by-weight products".
+9. **Extras are linted on every product write** (`routes/product.js` insert / update /
+   create-from-mock → `catalogLint.lintForWrite`, rules in `utils/catalog-lint.js`). The lint
+   runs AFTER `normalizeWeightExtraPrice`, on the extras about to be saved. Three outcomes, by
+   code, not by severity:
+   - **auto-repaired and saved** (`autoRepaired: true` on the issue): `EMPTY_OPTION_ID`
+     (the #205 planner — fresh admin-editor-shaped id, blank `defaultOptionId` /
+     `defaultOptionIds` entry follows it when exactly one option was empty, cleared otherwise),
+     `DUPLICATE_OPTION_ID` (the LATER duplicate is re-id'd; the first keeps its id — past
+     orders, reorder and amend resolve against it), `DEFAULT_NOT_IN_OPTIONS` (dropped);
+   - **refused with `400 { code: "CATALOG_INVALID", issues }`** — `REJECT_CODES` =
+     `PIZZA_AREA_VOCAB`, `SINGLE_WITHOUT_OPTIONS`. Nothing is written and no cache key is
+     cleared. Both admin editors (delivery-web + partner `ExtraEditModal`) always write all
+     three pizza areas, so a product they produce never trips this;
+   - **saved anyway, recorded, returned as `lintIssues`** — everything else (warnings and
+     `REQUIRED_GROUP_ALL_OUT_OF_STOCK`, which is critical but is a stock state, not a data
+     defect). Recorded on the store's `menu-import-issues` (phase `lint`) via
+     `recordProductLintIssues`, scoped to that product, BLOCKED rows excluded.
+   A product with no issues takes exactly the path it took before — same response body, no
+   `lintIssues` key. `POST /api/admin/product/update` lints only when the request sends
+   `extras`; an image-only or price-only save is never refused for defects it did not touch.
+   Rule table, codes and the nightly run: reference §4 and §7b.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
@@ -103,6 +127,15 @@ against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store D
 - **BY DESIGN:** translations resolve to the **central** DB — UI labels are global/platform-wide,
   not per-store. Do **not** re-route them to `app-name`.
 - **FACT (not a bug):** `supportedCategoryIds` are strings (invariant 5).
+- **FACT:** the customer app treats EVERY non-header `single` as mandatory
+  (`shoofi-app/stores/extras validateWith`: `if (extra.type === "single" && !val) return false`;
+  `helpers/extras-groups.ts isMandatoryExtra`). That is why `SINGLE_WITHOUT_OPTIONS` and
+  `REQUIRED_GROUP_ALL_OUT_OF_STOCK` are critical: the add-to-cart button never enables.
+- **FACT:** out-of-stock extras are matched by option `nameAR`, exactly, no trim
+  (`menuStore.outOfStockExtras.includes(opt.nameAR)`, RadioGroup/CheckboxGroup/PizzaToppingGroup).
+- **FACT:** `maxCount: 0` on a `multi` means "no limit" to the app (`max && …`), but both admin
+  editors default it to 1 and refuse `<= 0`, so the lint reports `< 1` as `MAX_COUNT_INVALID`
+  (warning, not repaired).
 - **Backlog (confirmed, safe to act on when asked):**
   1. `GET /api/menu` and `POST /api/menu/refresh` build the menu **differently** — `refresh` is a
      real admin-triggered action that re-caches under the same key, so clicking it degrades the
@@ -124,6 +157,14 @@ against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store D
    repos: the `soldByWeight` flag (`docs/sold-by-weight.md`).
 5. Verify: `npm run lint` (0 errors), `npm run routes:check` if routes moved, tests via the
    `shoofi-testing` cover-changes skill.
+
+## Recipe — "why can't customers add product X?"
+`GET /api/admin/menu-import-issues` with `app-name: <store>` and look at `phase: "lint"` rows
+(or the dashboard badge from `GET /api/admin/catalog-lint/summary`).
+`POST /api/admin/catalog-lint/run { appName }` runs the lint now. `BLOCKED_ADD_TO_CART` rows
+are the customers' side of the same story (7-day window on `shoofi.apps-logs`
+`add_to_cart_blocked`). A `lint` row means the product IS in the catalog and is defective —
+re-importing fixes nothing; edit the product (or run the repair script, reference §4).
 
 ## Definition of done
 Inherit `_shared-guardrails.md` §7. Here specifically: name every write path you touched and

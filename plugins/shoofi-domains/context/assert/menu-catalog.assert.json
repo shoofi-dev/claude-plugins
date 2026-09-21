@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@34f8cc0c / 2026-09-18",
+  "lastVerified": "shoofi-server@a12977e3 / 2026-09-21",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -19,11 +19,16 @@
         "utils/weight-extra-invariant.js",
         "services/catalog/bulk-price-update.js",
         "scripts/flag-sold-by-weight.js",
+        "scripts/fix-empty-extra-option-ids.js",
         "docs/sold-by-weight.md",
         "services/catalog/import-index.js",
         "utils/order-pricing.js",
         "routes/admin/menu-import-issues.js",
-        "docs/menu-import-issues.md"
+        "docs/menu-import-issues.md",
+        "utils/catalog-lint.js",
+        "services/catalog/catalog-lint.js",
+        "routes/admin/catalog-lint.js",
+        "utils/crons/catalog-lint-cron.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -48,6 +53,25 @@
           "getWeightExtra",
           "selectWeightExtra",
           "normalizeWeightExtraPrice"
+        ],
+        "utils/catalog-lint.js": [
+          "lintProduct",
+          "planProduct",
+          "rejectedIssues",
+          "REJECT_CODES",
+          "LINT_REASON"
+        ],
+        "services/catalog/catalog-lint.js": [
+          "lintStore",
+          "lintAllStores",
+          "syncLintRows",
+          "findBlockedAddToCart",
+          "recordProductLintIssues",
+          "summarizeOpenIssues"
+        ],
+        "utils/crons/catalog-lint-cron.js": [
+          "startCatalogLintCron",
+          "SCHEDULE"
         ]
       },
       "patterns": [
@@ -120,6 +144,51 @@
           "file": "routes/menu.js",
           "regex": "store.hasGeneralCategories",
           "desc": "doc reference \u00a72: the menu reads this flag from the PER-STORE store doc, while the admin form writes central shoofi.stores. If this line changes, re-check the two-document drift note."
+        },
+        {
+          "file": "utils/catalog-lint.js",
+          "regex": "REJECT_CODES = new Set\\(\\[\"PIZZA_AREA_VOCAB\", \"SINGLE_WITHOUT_OPTIONS\"\\]\\)",
+          "desc": "doc CORE invariant 9: exactly these two codes are refused at the write boundary; everything else is repaired or saved+recorded"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "CATALOG_INVALID",
+          "desc": "doc CORE invariant 9: the 400 body the admin form keys on"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "lintForWrite",
+          "desc": "doc CORE invariant 9: insert / update / create-from-mock all lint before the write"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "if \\(req\\.body\\.extras !== undefined\\) \\{\\n      updateLint",
+          "desc": "doc CORE invariant 9: update lints only when the save sends extras"
+        },
+        {
+          "file": "services/catalog/catalog-lint.js",
+          "regex": "\\$properties\\.storeDBName",
+          "desc": "doc reference §7b: the apps-logs property path the customer app's add_to_cart_blocked event must match"
+        },
+        {
+          "file": "services/catalog/catalog-lint.js",
+          "regex": "resolvedBy: \"lint\"",
+          "desc": "doc reference §2: lint rows are resolved, never deleted; a human tick is never re-opened"
+        },
+        {
+          "file": "utils/crons/catalog-lint-cron.js",
+          "regex": "30 4 \\* \\* \\*",
+          "desc": "doc reference §7b: nightly lint slot (04:30 Asia/Jerusalem)"
+        },
+        {
+          "file": "scripts/fix-empty-extra-option-ids.js",
+          "regex": "require\\('../utils/catalog-lint'\\)",
+          "desc": "doc reference §4: the repair script and the lint share one planner"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "phase: 1, code: 1, productId: 1, extraId: 1, optionIndex: 1",
+          "desc": "doc reference §2: the lint dedupe key index"
         }
       ]
     }
