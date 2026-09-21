@@ -164,6 +164,19 @@ label, weight stepper instead of an extras row) and the pricing branch; storage 
 Invariant 7 in CORE.md binds `product.price` to the weight extra. Existing products are
 opted in by `scripts/flag-sold-by-weight.js`; see `docs/sold-by-weight.md`.
 
+**Which extras are mandatory (customer app).** `required` is a **dead field**: neither the admin
+nor the partner `ExtraEditModal` writes it, the server stores extras verbatim, and 0 of ~3.7k
+prod extras carried it on 2026-09-21. The only rule in effect is `extrasStore.validateWith`
+(`shoofi-app/stores/extras/index.ts`): **every non-header `single` is mandatory, nothing else
+is** — `multi`/`counter`/`pizza-topping`/`weight` never block add-to-cart, and a `single` with
+`defaultOptionId` is pre-seeded on mount so only default-less singles ever do. The product
+screen mirrors the same predicate in `shoofi-app/helpers/extras-groups.ts` (`isMandatoryExtra`,
+unit-tested) to label groups "required / optional" and to list **mandatory groups first**,
+each set in header `order`; keep it in lockstep with `validateWith`. The partner app enforces
+nothing (`isValidForm={true}`), and order creation does not re-validate extras (see the recorded
+risk below). Making `required` real is a full-stack change: both editors → server passthrough →
+both validators → this doc.
+
 **Pricing has three copies that must stay in lockstep** — `shoofi-app/stores/extras/index.ts`,
 `shoofi-partner/stores/extras/index.ts`, and the server reference `utils/order-pricing.js`
 (`calculateExtrasPrice(extras, selections, { soldByWeight })`, orders domain). The weight
