@@ -80,17 +80,24 @@ draft should assume a per-town account exists.
   Meta, through a publishing path that is not yet built. Until it is, "approved" means a human
   copies the text out — which is fine, and is not a reason to reach for the token.
 
-### 3a. ⚠️ Known gap a human owns
-`shoofi-server/routes/social-media-ideas.js` has **no authentication middleware at all** —
-no `auth.required`, no `checkAdminRole`. Compare `routes/ai-tasks.js`, which gates every
-admin route with `[auth.required, checkAdminRole(AI_TASK_ROLES)]`. So
-`POST /api/admin/social-media-ideas/generate` is reachable by anyone who can reach the API,
-and it burns model tokens — now possibly against the Claude *subscription* seat, since
-`idea-generator.js` runs on `backend: "bridge"`.
+### 3a. How the gate is actually enforced (fixed 2026-09-21)
+`shoofi-server/routes/social-media-ideas.js` shipped with **no authentication middleware at
+all** — the paths began `/api/admin/` and that was the whole access control, so anyone who
+could reach the API could generate, spending model tokens and, since `idea-generator.js`
+moved to `backend: "bridge"`, the Claude subscription seat.
 
-The approver decision above cannot be implemented on top of an unauthenticated endpoint.
-Fixing it is a `shoofi-server` change and belongs to a Class A agent with a human's go-ahead;
-flag it, do not quietly work around it.
+All three routes now carry `[auth.required, checkAdminRole(SOCIAL_ROLES)]`, with
+`SOCIAL_ROLES = ["admin", "master", "manager"]` — the approver decision above, enforced in
+code rather than assumed.
+
+**Both middlewares are load-bearing, and the second is the one that is easy to miss.** Admin
+and customer tokens are signed with the same secret, so `auth.required` alone passes a plain
+logged-in customer; only admin tokens carry `roles`, which is what `checkAdminRole` reads
+(`utils/admin-role.js`). The check is an OR with no hierarchy, so `master` is named
+explicitly. `test/integration/social-media-ideas-auth.js` mutation-tests both halves.
+
+`SOCIAL_ROLES` is written out rather than imported from `AI_TASK_ROLES`: the lists agree
+today and are separate decisions.
 
 ---
 
@@ -136,7 +143,7 @@ reference real product photos we already have.
 1. **The publishing path** — who builds it, and where the Meta token lives (never here).
 2. **Cadence**, once manual runs have been tested.
 3. **Hebrew**, for the 3.7%.
-4. **The auth gap in §3a** — this one is not really a question, it is a bug with an owner.
+4. ~~The auth gap in §3a~~ — fixed 2026-09-21; §3a now describes the gate as enforced.
 
 ## Definition of done
 See the agent file. In short: short Arabic drafts in voice C, two or three options, every
