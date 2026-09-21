@@ -15,11 +15,14 @@
 | Operator | Owns |
 |---|---|
 | `competitive-intel` | Haat + Tira Eat — the coverage gap, price gaps, menu coverage, promos, ratings, and competitor↔our-store matching |
+| `social-marketing` | Shoofi's own Facebook/Instagram content — Arabic only, one account. Drafts posts, stories and ad copy against live platform data. **Never publishes.** |
 
-Planned: `social-media`, `marketing-growth`, `merchant-success`, `retention-crm`,
-`bizops-brief`, `support-cx`.
+Planned: `marketing-growth`, `merchant-success`, `retention-crm`, `bizops-brief`, `support-cx`.
 
-Invoke namespaced: **`shoofi-operators:competitive-intel`**.
+Invoke namespaced: **`shoofi-operators:competitive-intel`**, **`shoofi-operators:social-marketing`**.
+
+The two do not overlap: what *competitors* post is `competitive-intel`'s social phase; what
+*we* post is `social-marketing`. Neither reaches into the other.
 
 ## The house pattern — approval before trust
 
@@ -36,6 +39,14 @@ A confidently wrong comparison — "we were closed and they were open" — is wo
 comparison at all, because it gets repeated in a meeting and then acted on. So: propose
 automatically, let a person confirm, and make the unconfirmed state visible in every output.
 
+For `social-marketing` the same rule is sharper still, because the output is **public**:
+
+> **It drafts. A human approves. Something that is not the operator talks to Meta.**
+
+It never holds the Meta token — not to preview, not to test. And its voice is not a matter of
+taste: it was measured from 3,166 real customer messages, so "that doesn't sound like us" is
+answered with evidence rather than argument.
+
 ## Two constraints that shape everything here
 
 - **The bridge's DB credential is read-only by design.** Anything that *writes* — the mapping
@@ -49,9 +60,13 @@ automatically, let a person confirm, and make the unconfirmed state visible in e
 ```
 .claude-plugin/plugin.json
 agents/competitive-intel.md              # mission, hard limits, hand-offs, definition of done
+agents/social-marketing.md
 context/competitive-intel/CORE.md        # ALWAYS read: competitor endpoints + field lists,
                                          #   the two asymmetries, the matching design,
                                          #   the mapping collection, open questions
+context/social-marketing/CORE.md         # ALWAYS read: the measured voice spec and its
+                                         #   evidence, the account model, the approval
+                                         #   chain, the coupon rule, what exists today
 ```
 
 ## Adding an operator
