@@ -27,7 +27,9 @@
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js",
-        "services/monitoring/centralized-flow-monitor.js"
+        "services/monitoring/centralized-flow-monitor.js",
+        "routes/order-comment-to-courier.js",
+        "utils/admin-role.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -55,6 +57,9 @@
         ],
         "services/delivery/book-delivery.js": [
           "originalBookId"
+        ],
+        "routes/order-comment-to-courier.js": [
+          "requireDashboardUser"
         ],
         "services/delivery/late-delivery.js": [
           "LATE_THRESHOLD_MIN",
@@ -171,6 +176,39 @@
           "file": "services/monitoring/centralized-flow-monitor.js",
           "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
           "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+        },
+        {
+          "file": "routes/order-comment-to-courier.js",
+          "regex": "const tokenRoles = Array\\.isArray\\(tokenUser\\.roles\\) \\? tokenUser\\.roles : \\[\\];\\s*\\n\\s*if \\(tokenRoles\\.length === 0\\)",
+          "desc": "comment-to-courier is open to ANY dashboard user - no role allow-list, deliberately. The only token-side guard is a NON-EMPTY roles claim, which is what keeps customer / store-user / driver / impersonation tokens (minted with no roles) out. If this ever becomes a membership test again, or degrades to a mere existence check, the CORE note is wrong"
+        },
+        {
+          "file": "routes/order-comment-to-courier.js",
+          "regex": "if \\(!adminUser \\|\\| currentRoles\\.length === 0\\)",
+          "desc": "the fresh shoofi-admin-users re-read asserts current ENROLMENT, not role membership - a deleted or fully-stripped account loses access at once instead of at token expiry 180 min later"
+        },
+        {
+          "file": "utils/admin-role.js",
+          "regex": "no hierarchy",
+          "desc": "admin roles are an OR with no hierarchy - master does NOT imply admin, which is why any allow-list on an admin surface silently excludes master/senior/operator/editor"
+        }
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/components/Cards/CardOrder.tsx",
+        "src/apis/admin/order/comment-to-courier.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "src/components/Cards/CardOrder.tsx",
+          "regex": "commentToCourier \\? \"ערוך\" : \"הוסף\"",
+          "desc": "the הערות לשליח edit button is rendered with NO role condition - the card gates only impersonation/re-charge on isMaster. A permission restriction here therefore shows as a 403 at save time, never as a hidden button; read the server guard, not this component"
+        },
+        {
+          "file": "src/apis/admin/order/comment-to-courier.tsx",
+          "regex": "status === 403",
+          "desc": "the client already ships 403 copy for this endpoint, which is how a server-side role gate surfaces to the user"
         }
       ]
     },

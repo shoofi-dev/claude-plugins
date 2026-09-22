@@ -187,6 +187,28 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
   payload, PDF column, tooltip — so the shift bugs need **no settlement backfill**. Separately,
   `DriverPayments.tsx` computes its *own* per-calendar-day guarantee from a midnight-split
   `activeMinutes`; that one can move a payout and is tracked separately.
+- **BY DESIGN (Sep 2026) — `POST /api/order/comment-to-courier` has NO role allow-list.**
+  Editing "הערות לשליח" is open to **any** Shoofi dashboard user; do not "restore" the
+  `["admin","manager"]` pair that `requireDashboardUser`
+  (`routes/order-comment-to-courier.js`) replaced. The reason is a fact about the user base,
+  not a preference: **7 of the 10 rows in `shoofi.shoofi-admin-users` hold `viewer` and
+  nothing else**, and those are the people working the delivery board — so the allow-list
+  blocked exactly the job it was written for. The roles vocabulary also has **no hierarchy**
+  (`utils/admin-role.js`), so it silently excluded `master`, `senior`, `operator` and
+  `editor` too. What still guards the endpoint is enrolment, checked twice: a **non-empty
+  `roles` claim** on the token (customer / store-user / driver / impersonation tokens are
+  minted `{phone, id, exp}` with none, so none can qualify — the check is a *length* test
+  precisely so "any dashboard user" cannot drift into "any token") plus a fresh
+  `shoofi-admin-users` re-read, so a removed account loses access at once rather than at
+  token expiry 180 minutes later.
+- **TRAP — the admin order card has no client-side permission gating at all.**
+  `shoofi-delivery-web/src/components/Cards/CardOrder.tsx` renders every action for
+  everyone; the sole exception is `isMaster`, which hides impersonation and re-charge.
+  Permission for everything else lives **only** on the server route. So a role restriction
+  never presents as a hidden or disabled control — it presents as a button that works right
+  up to Save and then returns 403. **When a ticket says "this field is blocked for certain
+  user types", read the server route's guard, not the component**; searching the client for
+  the restriction finds nothing and invites the wrong conclusion that the report is mistaken.
 - **DEAD CONFIG:** `ShiftService.isBookingWindowOpen` is hard `return true`, so
   `bookingWindow.opensDayOfWeek` / `opensForWeekOffset` do nothing, and
   `bookingClosesHoursBefore` is stored and admin-editable but read by **no server code**.
