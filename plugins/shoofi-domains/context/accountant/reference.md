@@ -87,13 +87,27 @@ serves partner/driver self-service views via `calc.js`.
 **Live financial overview (2026-09)** — `services/financial-overview/{compute,metrics,contract-charges}.js`
 + `routes/financial-overview.js` (`GET /api/financial-overview?startDate&endDate`, roles master/admin/manager),
 the admin screen "תמונת מצב כספית". It **runs `generateStoreReportData` and `generateDriverReportData`
-over any range without persisting**, so it cannot disagree with a report; the 26 owner metrics are a
+over any range without persisting**; the 26 owner metrics are a
 pure reshaping (`storeMetrics`/`driverMetrics`). Beside the engines it reads raw `compensations` by
 PAYER×recipient (the report fields are recipient-filtered), F1–F3 per company/store via
 `effectiveDeliveryFee`/`couponDeliverySplit` on `book-delivery` `status:'4'`, and equipment/setup from
 the contract dropdown label. Each figure carries the stored report's value for the SAME range with a
 delta (`compareWithStoredReport`; no report = null, never 0). Cached 5 min per range, Redis-locked,
 202 while another process computes. See shoofi-server `docs/financial-overview.md`.
+
+**Sharing the engine does NOT make the screen agree with the report — the INPUT is not shared.**
+`compute.js` feeds `generateDriverReportData` a **projected** company document
+(`deliveryDb.store.find({}, {projection})`, `compute.js:136-138`), while the monthly generator passes
+the whole document (`driver-reports.js:1070`, `:1076`). Any field the engine reads that the projection
+omits is silently `undefined` on the screen only. This has already cost real money once: the projection
+was `{_id, nameHE, nameAR}`, so `company.accounting?.bankAccount?.businessType` (`driver-reports.js:428`)
+was absent, `isExempt` was false for all 171 companies, and the screen added ~18% to the 121 exempt ones —
+₪132,194 against ₪117,874 across the 37 stored reports for 08/2026, of which ≈₪12.1k was this. Before
+adding a read of `company.<anything>` to `generateDriverReportData`, add the leaf to that projection.
+Project the leaf, not `accounting` — the rest of it is bank detail and the result is cached and served
+to a screen. A remaining gap is inherent and not a bug: the report is frozen at generation, the screen is
+live, so bonuses, approved hours claims, roster changes and compensations approved later move the screen
+and not the report.
 
 ## 5. Store ↔ Shoofi tax invoices — `routes/hyp.js` / `utils/{hyp,greeninvoice,invoice-provider}.js`
 Provider = `amazonconfigs {app:"invoiceProvider"}.active` (`greeninvoice` default | `hyp`).

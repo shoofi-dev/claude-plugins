@@ -110,6 +110,16 @@
           "desc": "cash-vs-card driver payout branch"
         },
         {
+          "file": "services/financial-overview/compute.js",
+          "regex": "\"accounting\\.bankAccount\\.businessType\":\\s*1",
+          "desc": "the overview feeds generateDriverReportData a PROJECTED company doc while the monthly generator passes the whole document — any field the engine reads must be in this projection or it is undefined on the screen only (the exempt flag went missing this way and put the screen ₪12.1k above the 08/2026 reports)"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "company\\.accounting\\?\\.bankAccount\\?\\.businessType",
+          "desc": "the driver engine derives isExempt from the company doc it is HANDED, not from a fresh read — so the caller's projection decides an exempt company's VAT treatment"
+        },
+        {
           "file": "routes/payments/admin.js",
           "regex": "if\\s*\\(storeDiscount\\s*&&\\s*!isSpecificToCustomers\\s*&&\\s*appliedCoupon\\.coupon\\?\\.discountType\\s*!==\\s*'full_discount'\\)",
           "desc": "CORE invariant 7: the store is billed a coupon's nominal storeDiscount whenever it is not customer-specific and not full_discount — the gate is blind to discountType, so a delivery coupon lands here too"
