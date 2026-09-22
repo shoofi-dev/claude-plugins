@@ -121,6 +121,24 @@ it starts as the Hebrew from `LINT_REASON` in `utils/catalog-lint.js`. `detail` 
 `<productId>/<extraId>[/<optionIndex>] <product nameAR>`. No TTL: it is a worklist, not a
 diagnostic log. See `docs/menu-import-issues.md`.
 
+**Names on a lint row (shoofi-server #219).** The admin extras editor shows **group** and **option**
+names, never extra ids, and a grouped member's own `nameAR`/`nameHE` is usually `""` (the name is on
+its header) — so every `phase: "lint"` row also carries, re-written on every run that sees it:
+
+| Field | Meaning |
+|---|---|
+| `categoryName` | `supportedCategoryIds[0]` (else first `categoryOrders` key) resolved against the store's `categories` (`nameHE` else `nameAR`), one read per store per run (`readCategoryNames`); `""` when none |
+| `extraName` | the extra's own `nameHE`/`nameAR`, else its `groupName`, else `""` — never an id |
+| `groupName` | the header's name for the extra's `groupId`; `""` when ungrouped/headerless |
+| `optionName` | option-level rows only; `""` otherwise |
+
+The Hebrew `reason` quotes these (`בתוספת "…"` / `בקבוצה "…"` / `אפשרות "…"`, `אפשרות מס' N` when
+unnamed) and prints no ids — except `ORPHAN_GROUP_MEMBER`, which keeps `(groupId …)` because there is
+no header to name. `extraId`, `detail` and the dedupe key are unchanged. `BLOCKED_ADD_TO_CART` rows
+take `extraName`/`productName` from the app event (Arabic), `groupName`/`optionName` are `""`.
+Resolution: `utils/catalog-lint.js` (`displayName`), copied by `toLintRow`; the write boundary passes
+the product's category ids so its rows get `categoryName` too.
+
 ### `translations` — i18n labels: `{ key, ar, he }`.
 ### `images` — auxiliary image library: `{ data:{uri}, type, subType }`.
 ### central `shoofi.stores` — store registry (used by cross-store search & `initDb`).
