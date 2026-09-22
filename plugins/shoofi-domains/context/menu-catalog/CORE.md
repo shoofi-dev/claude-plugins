@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@a12977e3 / 2026-09-21
+last-verified: shoofi-server@a0e8bdb2 / 2026-09-23
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -14,9 +14,12 @@ Server: `routes/menu.js`, `routes/product.js`, `routes/category.js`, the catalog
 `routes/store.js`, `routes/translations.js`, `routes/global-search.js`, `utils/menu-cache.js`,
 `utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`,
 `utils/catalog-lint.js` (the extras lint rules), `services/catalog/catalog-lint.js` (the
-worklist writer + nightly run), `routes/admin/catalog-lint.js`, `utils/crons/catalog-lint-cron.js`.
+worklist writer + nightly run), `routes/admin/catalog-lint.js`, `utils/crons/catalog-lint-cron.js`,
+and the combo-deals trio `utils/combo-validation.js`, `services/menu/combo-snapshots.js`,
+`utils/client-features.js`.
 Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/sold-by-weight.md`,
-`docs/menu-import-issues.md` (the worklist — now also documents the `lint` phase).
+`docs/menu-import-issues.md` (the worklist — now also documents the `lint` phase),
+`docs/combo-deals.md`.
 Mostly **server-first**: catalog data is server-owned and clients render it — but if a task
 needs a client change (partner product screens, customer menu display), do it full-stack,
 one PR per repo.
@@ -97,6 +100,57 @@ boundary and say so in the PR.
    `lintIssues` key. `POST /api/admin/product/update` lints only when the request sends
    `extras`; an image-only or price-only save is never refused for defects it did not touch.
    Rule table, codes and the nightly run: reference §4 and §7b.
+10. **COMBO PRODUCTS REFERENCE, NEVER COPY** (`docs/combo-deals.md`). A combo is a product
+   *kind* — `productType: "combo"` (absent / `""` / `"regular"` are all regular) carrying
+   `combo.sections[{ id, nameAR, nameHE, order, count, options[{ productId, surcharge }] }]`,
+   whose options point at real products of the SAME store. Nothing about a component is ever
+   stored on the combo: the menu embeds a live snapshot at read time and the order pricer
+   re-reads the component's extras from the catalogue. What keeps that sound:
+   - **Every write runs `utils/combo-validation.js`, in order:** `parseComboBody`
+     (`PRODUCT_TYPE_INVALID`, `COMBO_NOT_JSON`; a `combo` body on a regular product is
+     **dropped**), `validateComboShape` (non-empty sections, unique section ids, a name,
+     numeric `order`, integer `count ≥ 1`, non-empty options, `productId` unique per section,
+     `surcharge ≥ 0` defaulting to 0 — and the definition is **normalised to exactly those
+     fields**, so a `product` snapshot a client echoes back from the menu is never persisted),
+     `validateComboProductFields` (`COMBO_SOLD_BY_WEIGHT`; `COMBO_PRICE_REQUIRED` — `price`
+     must be > 0 because 0 means "not for sale", invariant 8), then `validateComboReferences`
+     with **ONE** `products.find` projected `{ productType, soldByWeight }`:
+     `COMBO_COMPONENT_NOT_FOUND`, `COMBO_SELF_REFERENCE`, `COMBO_NESTED` (no combo inside a
+     combo), `COMBO_COMPONENT_SOLD_BY_WEIGHT`. Every refusal is
+     `400 { message: "Invalid combo", code: "COMBO_INVALID", errors: [{ code, sectionId?, productId?, … }] }`.
+   - **Demotion is a `$unset`.** Update keeps omit-to-skip: with neither `productType` nor
+     `combo` in the request the stored kind is untouched (an image-only save from the partner
+     app). The web form always sends `productType`, so `productType=regular` on a stored combo
+     is a demotion and the route `$unset`s `productType` + `combo` — the write is `$set` of the
+     whole spread document, so deleting the keys from it alone would write nothing. Reference
+     checks run only when `combo` or `productType` was actually sent.
+   - **A referenced product cannot be deleted on its own.** `POST /api/admin/product/delete`
+     answers `409 { code: "PRODUCT_REFERENCED_BY_COMBO", data: { combos: [{ _id, nameHE, nameAR,
+     blockedProductIds }] } }` (query on `combo.sections.options.productId`). Deleting the
+     combo together with its parts in one request is allowed — the combo is excluded from the
+     lookup.
+   - **The menu snapshot is resolved with ONE find, ignoring `isHidden`.**
+     `services/menu/combo-snapshots.js` `resolveComboSnapshots` attaches `option.product`
+     (`SNAPSHOT_PROJECTION`, run through `applyProductDiscount` so its `price` is the number on
+     the component's own card) for every option of every combo in one `products.find`. A hidden
+     component is still a valid pick inside a deal; a deleted one resolves to `product: null`
+     plus a warning, never a thrown menu. Zero cost for a store without combos. It runs in
+     `GET /api/menu` AND `POST /api/menu/refresh` **before the cache is written**, so the cache
+     always holds the complete menu.
+   - **`x-client-features: combo` is applied AFTER the cache read and never keys the cache.**
+     A customer request without the header gets `stripCombos(menu)` — combo products removed,
+     and any category or general-category subcategory that held ONLY combos removed with them
+     — on a cache hit exactly as on a fresh build (`stripCombos(cachedMenu)`). The cache stays
+     keyed by store (+ school-project), never by capability; admin/partner `app-type`s are never
+     stripped; `POST /api/menu/search` applies the same gate. There is no feature flag: a store
+     having a combo product is the flag. (`utils/client-features.js`; reference §6b.)
+   - **Mock stores refuse combos.** `POST /api/product/create-from-mock` on a combo template is
+     `400 COMBO_NOT_CLONEABLE`, and `GET /api/menu/mock` never offers one — its option ids
+     belong to the template store.
+   Phase-1 limits: no combo inside a combo; never `soldByWeight` on either side; `price > 0`;
+   no Haat/xlsx import of combos. The order side — `calculateComboExtrasPrice`,
+   `expandStockLines`, amend scope — is orders CORE invariants 11–12; `utils/order-stock.js`
+   is the shared review boundary named in Scope.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified

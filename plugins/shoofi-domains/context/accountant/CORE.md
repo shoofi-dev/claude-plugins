@@ -89,6 +89,15 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    that was fixed. The pre-discount **commission** base survived that fix and was then
    dropped by owner decision on **2026-08-04** ("commission only from the final order
    items price after discount").
+   **Combo deals (2026-09, `docs/combo-deals.md`) change nothing here, on purpose.** A combo
+   line's share of `orderPrice` is its fixed price + catalog surcharges + nested extras — what
+   was charged — and its `originalPrice` keeps the same discounted-extras asymmetry as any
+   product (`originalPrice: baseOriginal ? baseOriginal + extrasPrice : undefined`,
+   `utils/order-pricing.js`). The "you save ₪N" the customer sees (Σ component card prices −
+   bundle price) is client display only and, by the parity-tested contract, never enters
+   `originalOrderPrice` — so it is never a `productDiscount`
+   (`Math.max(0, originalOrderPrice − chargedOrderPrice)`, `routes/payments/admin.js`) and
+   never moves money between Shoofi and the store.
 4. **VAT has ONE source of truth: `utils/vat.js`** (`VAT_RATE`, `VAT_MULTIPLIER`,
    `calculateVAT`, `withoutVAT`, `withoutVATIfExempt`, `isVatExempt`). **Never re-introduce
    a `0.18`/`1.18` literal** — divergent rounding points silently skew payouts.

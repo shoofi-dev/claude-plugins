@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@34f8cc0c / 2026-09-18",
+  "lastVerified": "shoofi-server@a0e8bdb2 / 2026-09-23",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -21,7 +21,10 @@
         "utils/order-pricing.js",
         "utils/order-pricing-shadow.js",
         "routes/order-amend.js",
-        "test/integration/order-pricing-parity.js"
+        "test/integration/order-pricing-parity.js",
+        "docs/combo-deals.md",
+        "test/integration/order-pricing-shadow-combo.js",
+        "test/integration/order-stock-combo.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -38,7 +41,9 @@
           "decrementOrderStock",
           "restoreOrderStock",
           "stockDecremented",
-          "stockRestored"
+          "stockRestored",
+          "expandStockLines",
+          "applyStockDelta"
         ],
         "utils/customer-orders.js": [
           "getSuccessfulOrdersByCustomerIds"
@@ -47,10 +52,14 @@
           "calculateExtrasPrice",
           "calculateItemUnitPrice",
           "calculateOrderPricing",
-          "loadPricedProducts"
+          "loadPricedProducts",
+          "calculateComboExtrasPrice",
+          "COMBO_ISSUE"
         ],
         "routes/order-amend.js": [
-          "repriceOrder"
+          "repriceOrder",
+          "applyItemChanges",
+          "isComboLine"
         ]
       },
       "patterns": [
@@ -153,6 +162,66 @@
           "file": "routes/order.js",
           "regex": "serverPricing",
           "desc": "doc CORE invariant 11: creation records shadow pricing drift instead of enforcing the server price"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "Number\\(option\\.surcharge\\)",
+          "desc": "doc CORE invariant 12: a pick is charged the CATALOG surcharge off the combo's own section, never sel.surcharge"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "if \\(sel\\?\\.productId\\) ids\\.add\\(String\\(sel\\.productId\\)\\)",
+          "desc": "doc CORE invariant 11: loadPricedProducts loads item_id ∪ comboSelections[].productId in ONE find — components' extras are priced from the catalogue"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "COMBO_SLOT_COUNT_MISMATCH",
+          "desc": "doc CORE invariant 12: a wrong slot count is an issue, recorded at create and a 409 at amend"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "COMBO_COMPONENT_MISSING",
+          "desc": "doc CORE invariant 12: a deleted component is an issue, not a missing product — the line is still priced"
+        },
+        {
+          "file": "utils/order-pricing-shadow.js",
+          "regex": "comboIssues",
+          "desc": "doc CORE invariant 12: creation persists the pricer's combo issues as serverPricing.comboIssues"
+        },
+        {
+          "file": "utils/order-pricing-shadow.js",
+          "regex": "!hasMissingComponents &&",
+          "desc": "doc CORE invariant 12: driftDetected is suppressed ONLY for COMBO_COMPONENT_MISSING (a data gap); the other combo issues ARE drift"
+        },
+        {
+          "file": "routes/order-amend.js",
+          "regex": "COMBO_EXTRAS_NOT_AMENDABLE",
+          "desc": "doc CORE invariant 12: amend is qty/remove only for a combo line (phase 1)"
+        },
+        {
+          "file": "routes/order-amend.js",
+          "regex": "change\\.selectedExtras !== undefined \\|\\| change\\.comboSelections !== undefined",
+          "desc": "doc CORE invariant 12: the exact test that turns a pick/extras edit on a combo line into COMBO_EXTRAS_NOT_AMENDABLE"
+        },
+        {
+          "file": "routes/order-amend.js",
+          "regex": "COMBO_SELECTION_INVALID",
+          "desc": "doc CORE invariant 12: any comboIssues after repriceOrder is a 409, the same posture as PRODUCT_NOT_FOUND"
+        },
+        {
+          "file": "routes/order-amend.js",
+          "regex": "\\{ serverPriced, extrasPrice, comboIssues, __originalIndex, \\.\\.\\.item \\}",
+          "desc": "doc CORE invariant 12 / reference §5: comboIssues is stripped before order.items is written — the persisted item shape never carries it"
+        },
+        {
+          "file": "utils/order-stock.js",
+          "regex": "expandStockLines\\(",
+          "desc": "doc CORE invariant 12: the one expansion decrement, restore and the amend delta share, so stock stays symmetric by construction"
+        },
+        {
+          "file": "utils/order-stock.js",
+          "regex": "expandStockLines\\(oldItems, \\{ minQty: 0 \\}\\)",
+          "desc": "doc CORE invariant 12: the amend delta compares two expansions with minQty 0 — it must not invent a unit"
         }
       ]
     },

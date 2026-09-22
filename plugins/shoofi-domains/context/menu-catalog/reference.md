@@ -19,7 +19,11 @@ Primary files:
 - `routes/translations.js` — catalog i18n labels
 - `routes/global-search.js` — central store search
 - `utils/menu-cache.js`, `utils/order-stock.js`, `utils/image-variants.js`
-- Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/explore-cache-invalidation.md`
+- `utils/combo-validation.js`, `services/menu/combo-snapshots.js`, `utils/client-features.js`
+  — combo deals: the product kind at the write boundary, the menu snapshot + old-client
+  strip, and the capability header (§2, §4, §6, §6b)
+- Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/explore-cache-invalidation.md`,
+  `docs/combo-deals.md`
 
 **You must NOT touch without explicit human review** (per `CLAUDE.md` guardrails):
 - Order creation / status transitions (`routes/order.js`), payments, auth.
@@ -68,6 +72,13 @@ Accessors are defined in `services/database/DatabaseInitializationService.js`.
 - **Availability/stock:** `isInStore`, `quantity`, `outOfStockByQuantity`,
   `outOfStoreUntil` (timed reopen), `isHidden` (catalog visibility).
 - **Options:** `extras` (embedded, see §4), `others` (JSON blob).
+- **Kind / combo (`docs/combo-deals.md`):** `productType` (`"combo"`; absent / `""` /
+  `"regular"` are regular) and `combo: { sections[{ id, nameAR, nameHE, order, count,
+  options[{ productId, surcharge }] }] }` — string `_id`s of products in the SAME store,
+  normalised to exactly these fields on every write (CORE invariant 10). `price` is the fixed
+  bundle price (category `discountPercent` applies like any product); `extras` are optional
+  combo-level extras priced like today's. Never stores a component snapshot — `option.product`
+  is added at read time (§6). Phase 1: never `soldByWeight`, no nested combos, `price > 0`.
 - **Images:** `img` (array of `{ uri }`; size variants generated on upload).
 - **Barcode/mock:** `barcode`, `barcodeId` (store-prefixed unique), `mockStoreAppName`,
   `mockProductId`, `mockType`.
@@ -257,6 +268,18 @@ weight is the only non-header extra; otherwise as an **add-on with the first ste
 matched by option `nameAR`, exactly, no trim (`menuStore.outOfStockExtras.includes(opt.nameAR)`
 in RadioGroup / CheckboxGroup / PizzaToppingGroup); a renamed option silently comes back in stock.
 
+**Combo lines price as ONE item** — `calculateComboExtrasPrice(comboProduct, item, components)`
+(`utils/order-pricing.js`, orders domain; client copies `shoofi-app/helpers/combo-pricing.ts`
+and its `shoofi-partner` twin) sums, per pick in `item.comboSelections`, the **catalog**
+`option.surcharge` (never the `surcharge` the client wrote on the selection) plus
+`calculateExtrasPrice` over the **component's** own `extras` definition against
+`sel.selectedExtras`, plus any combo-level extras. That sum X takes the place of a plain
+product's extras and rounds the same way:
+`price = discounted(combo.price) + (d > 0 ? Math.round(X × (1 − d/100)) : X)`. The pricer
+loads every `item_id` ∪ every `comboSelections[].productId` in one find. The "you save ₪N"
+a customer sees (Σ component card prices − bundle price) is client display only and never
+reaches the server. Orders CORE invariant 12 has the issue codes and the amend rule.
+
 > ⚠️ **Recorded risk (confirmed, out of your scope to fix):** creation still trusts the
 > client-sent total; a modified client could submit a fake price and it would only be
 > *recorded* as drift. Making creation server-authoritative belongs in the order-create path
@@ -295,16 +318,49 @@ Missing this serves a stale menu for up to 5 minutes. Most product write
 endpoints also emit a websocket `menu_refresh` (`shoofi-shopping`) /
 `product_updated` (`shoofi-partner`) and re-run indexing.
 
+**Combo snapshots and the capability header sit on opposite sides of the cache.**
+`resolveComboSnapshots` (`services/menu/combo-snapshots.js`) runs BEFORE `menuCache.set` in
+both `GET /api/menu` and `POST /api/menu/refresh`, so a cached menu is always complete — one
+`products.find` over every component of every combo, `isHidden` ignored, each snapshot
+through `applyProductDiscount`, a deleted component → `product: null` + warning. `stripCombos`
+runs AFTER the cache read (`stripCombos(cachedMenu)`) for a customer without
+`x-client-features: combo` (§6b), never mutates the cached object, and drops a category /
+general-category subcategory that held ONLY combos. The cache is keyed by store (+
+`_schoolProject`), never by capability. A component hitting 0 stock disables the component
+only: `notifyMenuRefresh` clears both keys, the snapshot carries `isInStore`, the app hides
+that option (`docs/stock-management.md`).
+
+*Pre-existing divergence, harmless — do not "fix" it in a combo PR:* the menu's
+`categoryDiscountMap` is built from `menuAggregation`, the **filtered** category list (hidden /
+school-project matches already applied), while `loadPricedProducts` (`utils/order-pricing.js`)
+builds its map from **all** `categories`. A component's snapshot `price` can therefore differ
+from what the pricer would derive for the same product, but nothing depends on it: pricing
+never reads a component's price — only `option.surcharge` and the component's `extras`.
+
+## 6b. Client capability header — `x-client-features`
+`utils/client-features.js`: `HEADER = "x-client-features"`, `parseClientFeatures` (a
+comma-separated list, trimmed and lower-cased), `hasClientFeature(req, 'combo')`. The customer
+app sends it from the **same JS bundle** that renders the feature — that is the whole reason
+it exists: `app-version` is the native binary version and does not move with an OTA
+(`eas update`), so it cannot say whether the running JS understands a new menu shape; this
+header can. Used ONLY to shape customer responses for old bundles: `GET /api/menu` and
+`POST /api/menu/refresh` (`canSeeCombos = isAdminApp || hasClientFeature(req, 'combo')`, decided
+per request AFTER the cache read) and `POST /api/menu/search` (`productType: { $ne: 'combo' }`
+without it, and `productType` projected). It never gates admin/partner surfaces, never keys
+the cache, and needs no CORS change (`cors()` reflects `Access-Control-Request-Headers`).
+Adding the next feature: append its token to the list, add its strip, keep the strip after
+the cache read.
+
 ## 7. Key endpoints (quick reference)
-- `GET  /api/menu` — **the** customer menu fetch (assembly + discount + optional general-categories). **Source of truth.**
+- `GET  /api/menu` — **the** customer menu fetch (assembly + discount + optional general-categories + combo snapshots). **Source of truth.** Combos reach a customer only with `x-client-features: combo` (§6b).
 - `POST /api/menu/search` — cross-store product/store search (regex on `nameAR/nameHE`, geo via `delivery-company.cities`). See `docs/menu-search.md`.
-- `GET  /api/menu/mock` — template/mock store menu (dedup vs current store).
+- `GET  /api/menu/mock` — template/mock store menu (dedup vs current store); never offers a combo.
 - `POST /api/menu/clear-cache[/:storeId]`, `GET /api/menu/cache-stats`
-- `POST /api/admin/product/insert | update | delete` — product CRUD (partial update)
+- `POST /api/admin/product/insert | update | delete` — product CRUD (partial update). Insert/update run the combo validation chain (`400 COMBO_INVALID`); delete is `409 PRODUCT_REFERENCED_BY_COMBO` when a combo still points at a requested product (CORE invariant 10).
 - `POST /api/admin/product/update/{isInStore,quantity,isHidden,isInStore/byCategory,activeTastes}` — availability/stock/visibility
 - `POST /api/admin/product/{update/order,order-per-category,bulk-reorder,reset-order/:cat,migrate-orders}` — ordering
 - `GET  /api/admin/product/extras`, `GET /api/admin/product/:id`, `POST /api/admin/images/upload`
-- `POST /api/product/create-from-mock`, `GET /api/product/mock-store/:appName`, `POST /api/product/update-barcode`
+- `POST /api/product/create-from-mock` (`400 COMBO_NOT_CLONEABLE` for a combo template), `GET /api/product/mock-store/:appName`, `POST /api/product/update-barcode`
 - `GET/POST/DELETE /api/store-category/*` — regular subcategory CRUD (in `store.js`)
 - `GET/POST/DELETE /api/category/general/*` — general category CRUD
 - `POST /api/admin/menu-import-issues` — record one import run's issues (whole run, one call)
@@ -335,7 +391,7 @@ open rather than resolved on no evidence. One store failing is logged and the ru
 logged out. Rename a property in the app and the BLOCKED rule silently finds nothing.
 
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
-- **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`.
+- **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b).
 - **Partner app** (`shoofi-partner`): product write + ordering endpoints; sends `app-type: shoofi-partner` to see hidden products; listens for `product_updated`.
 - **Admin web** (`shoofi-delivery-web`/`shoofi-admin`): category CRUD, product ordering/migration, translations CRUD, stock screen (`update/quantity`), store config toggles (`isStockManagment`, `hasGeneralCategories`).
 

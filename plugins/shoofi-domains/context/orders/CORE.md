@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@34f8cc0c / 2026-09-18
+last-verified: shoofi-server@a0e8bdb2 / 2026-09-23
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -17,7 +17,8 @@ customer order history, order crons, and the order-side wiring of secondary feat
 (coins, world-cup, attribution, coupon usage).
 Server: `routes/order.js`, `routes/twin-order.js`, `routes/order-fraud-*.js`,
 `routes/admin/order-monitoring.js`, `services/twin-order/*`, `utils/order-stock.js`,
-order crons. Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
+`utils/order-pricing.js` + `utils/order-pricing-shadow.js`, `routes/order-amend.js`,
+order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
 (shoofir), monitoring/twin-admin (delivery-web).
 
 **Not yours:** payment internals (`payments`), settlement/payouts (`accountant`), driver
@@ -88,9 +89,52 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     non-header extra; otherwise as an add-on with the first step bundled. Creation charges
     the client total and only **shadow-compares** (`utils/order-pricing-shadow.js` →
     `order.serverPricing.driftDetected`); **amend** (`routes/order-amend.js` `repriceOrder`)
-    is server-authoritative through `calculateOrderPricing`. Change one copy, change all
-    three, and extend `test/integration/order-pricing-parity.js`. Catalog side of the same
-    rule: menu-catalog CORE invariant 7; `docs/sold-by-weight.md`.
+    is server-authoritative through `calculateOrderPricing`. **Combo lines add a fourth
+    function to the same lockstep:** `calculateComboExtrasPrice(comboProduct, item, components)`
+    (`utils/order-pricing.js`) is a port of `shoofi-app/helpers/combo-pricing.ts`
+    (`calculateComboX`) and its `shoofi-partner` twin, and `loadPricedProducts` must keep
+    loading every `item_id` ∪ every `comboSelections[].productId` in ONE find with NO projection
+    — the combo needs `productType` + `combo`, its components need `extras` + `soldByWeight`.
+    Change one copy, change all three (both functions), and extend
+    `test/integration/order-pricing-parity.js` (it has a "Combo deals" section). Catalog side
+    of the same rule: menu-catalog CORE invariants 7 and 9; `docs/sold-by-weight.md`,
+    `docs/combo-deals.md`.
+12. **A COMBO IS ONE ORDER LINE** (`docs/combo-deals.md`). `item_id` = the combo product,
+    every existing item field unchanged, plus
+    `comboSelections[{ sectionId, slot, productId, nameAR, nameHE, surcharge, selectedExtras, extrasPrice }]`.
+    The server reads ONLY `sectionId`, `productId` and `selectedExtras`; the rest are display
+    snapshots for tickets.
+    - **Catalog surcharge only.** A pick's money is the CATALOG `option.surcharge`
+      (`Number(option.surcharge)` off the combo's own section) plus the COMPONENT's own extras
+      definition priced against `sel.selectedExtras`. `sel.surcharge` and `sel.extrasPrice`
+      are never charged — the same "item.price is the untrusted input" rule as every line.
+      X (surcharges + nested extras + combo-level extras) takes the place of a plain product's
+      extras: `price = discounted(combo.price) + (d > 0 ? Math.round(X × (1 − d/100)) : X)`,
+      `originalPrice = baseOriginal + X` undiscounted (the existing asymmetry). The client's
+      "you save ₪N" is display only and never reaches the server.
+    - **Issues are recorded at create and refused at amend.** The pricer never throws: a pick
+      the catalogue cannot price is priced as far as it can be and recorded —
+      `COMBO_SELECTION_NOT_IN_SECTION` (ignored for the price), `COMBO_COMPONENT_MISSING`
+      (surcharge still charged, nested extras unknown), `COMBO_SLOT_COUNT_MISMATCH
+      { expected, got }` — on the line (`item.comboIssues`) and top-level (`comboIssues[]` with
+      `itemIndex`/`item_id`). Creation persists them as `serverPricing.comboIssues` and
+      suppresses `driftDetected` ONLY for `COMBO_COMPONENT_MISSING` (a data gap, like
+      `missingProductIds`); the other two mean the client priced a different deal than the
+      catalogue describes and ARE drift. Amend has no client number to fall back on, so any
+      `comboIssues` after `repriceOrder` is `409 COMBO_SELECTION_INVALID` — the same posture as
+      `PRODUCT_NOT_FOUND`.
+    - **Stock is symmetric by construction.** `expandStockLines(items)` (`utils/order-stock.js`)
+      turns a line into `item_id × qty` PLUS every `comboSelections[].productId × qty`,
+      aggregated (a burger in two slots of a combo ordered twice moves four burgers).
+      Decrement, restore and the amend delta (`applyStockDelta`, `minQty: 0`) all go through
+      it — whatever confirm took is exactly what cancel gives back. A component at 0 disables
+      the component only; the combo document is never touched (the menu snapshot carries
+      `isInStore`). Invariant 3's gates are unchanged.
+    - **Amend is qty/remove only (phase 1).** A change carrying `selectedExtras` or
+      `comboSelections` for a combo line is `400 COMBO_EXTRAS_NOT_AMENDABLE` (`indexes` names
+      them); `comboSelections` ride along untouched and are never diffed; `comboIssues` is
+      stripped with the other bookkeeping fields before `order.items` is written, so the
+      persisted item shape never carries it.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
