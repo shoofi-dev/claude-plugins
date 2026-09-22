@@ -172,6 +172,22 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    a term added to `totalOutcomes` and not to that list shows up as a non-zero
    `billingReconciliationDelta`, which is the point of the list.
 
+9. **A compensation lands in the month it was CREATED, not the month it was approved** —
+   and the platform is not consistent about it. Every settlement path filters the document's
+   `createdAt` (a BSON **Date**): the store report's fetch (`routes/shoofi-admin.js:3535`),
+   `routes/driver-reports.js:67,377`, and the financial-overview screen
+   (`services/financial-overview/compute.js:100`). The item-level
+   `items[].approvedAt` is an ISO **string**, is written *only* by the approve-one-item
+   handler (`routes/shoofi-admin.js:2951`) — the bulk edit path at `:2810-2835` approves
+   without stamping it — and is read *only* by the partner/driver summary screens
+   (`routes/payments/summaries.js:175,198,345,541,771`). So a store's own payments screen
+   and the settlement report it is billed from bucket the same item into different months
+   whenever approval crosses a month boundary, and an item approved in bulk is invisible to
+   the screen entirely while still being billed by the report. Do not "align" these by
+   switching settlement to `approvedAt`: a meaningful share of approved items carry no
+   `approvedAt` at all and would silently drop out of the money. **Ask before changing the
+   basis.**
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.

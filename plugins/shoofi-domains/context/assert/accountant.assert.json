@@ -125,6 +125,21 @@
           "desc": "MASAV DOS-Hebrew encoding"
         },
         {
+          "file": "services/financial-overview/compute.js",
+          "regex": "createdAt:\\s*\\{\\s*\\$gte:\\s*bounds\\.startDateObj",
+          "desc": "CORE invariant 9: compensations are bucketed into a month by the document's createdAt (a BSON Date), never by items[].approvedAt — the financial-overview screen, the store report fetch and driver-reports all key on this"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "queryConditions\\.push\\(\\{\\s*createdAt:\\s*dateFilter\\s*\\}\\)",
+          "desc": "CORE invariant 9: the compensations list endpoint that generateStoreReportData calls date-filters on createdAt, which is what puts a compensation in a settlement month"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "'items\\.approvedAt'",
+          "desc": "CORE invariant 9: the partner/driver summary screens are the ONLY readers of items[].approvedAt, so they disagree with settlement whenever approval crosses a month boundary — and miss bulk-approved items, which carry no approvedAt at all"
+        },
+        {
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
