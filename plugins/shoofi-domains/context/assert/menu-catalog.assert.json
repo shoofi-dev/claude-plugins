@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@a12977e3 / 2026-09-21",
+  "lastVerified": "shoofi-server@a0e8bdb2 / 2026-09-23",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -28,7 +28,11 @@
         "utils/catalog-lint.js",
         "services/catalog/catalog-lint.js",
         "routes/admin/catalog-lint.js",
-        "utils/crons/catalog-lint-cron.js"
+        "utils/crons/catalog-lint-cron.js",
+        "utils/combo-validation.js",
+        "services/menu/combo-snapshots.js",
+        "utils/client-features.js",
+        "docs/combo-deals.md"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -37,7 +41,8 @@
         ],
         "utils/order-stock.js": [
           "decrementOrderStock",
-          "restoreOrderStock"
+          "restoreOrderStock",
+          "expandStockLines"
         ],
         "routes/product.js": [
           "menuCache",
@@ -47,7 +52,9 @@
         ],
         "routes/menu.js": [
           "outOfStockExtras",
-          "categoryOrders"
+          "categoryOrders",
+          "canSeeCombos",
+          "resolveComboSnapshots"
         ],
         "utils/weight-extra-invariant.js": [
           "getWeightExtra",
@@ -72,6 +79,22 @@
         "utils/crons/catalog-lint-cron.js": [
           "startCatalogLintCron",
           "SCHEDULE"
+        ],
+        "utils/combo-validation.js": [
+          "parseComboBody",
+          "validateComboShape",
+          "validateComboProductFields",
+          "validateComboReferences",
+          "rejectInvalidCombo"
+        ],
+        "services/menu/combo-snapshots.js": [
+          "resolveComboSnapshots",
+          "stripCombos",
+          "SNAPSHOT_PROJECTION"
+        ],
+        "utils/client-features.js": [
+          "hasClientFeature",
+          "parseClientFeatures"
         ]
       },
       "patterns": [
@@ -128,22 +151,22 @@
         {
           "file": "utils/order-pricing.js",
           "regex": "if \\(isFree \\|\\| remainingFreeCount > 0\\)",
-          "desc": "doc reference \u00a74: an isFree-stamped topping is free WITHOUT decrementing remainingFreeCount, so freeCount: N gives away up to 2N. If this line changes, the defect note in reference \u00a74 must be re-checked."
+          "desc": "doc reference §4: an isFree-stamped topping is free WITHOUT decrementing remainingFreeCount, so freeCount: N gives away up to 2N. If this line changes, the defect note in reference §4 must be re-checked."
         },
         {
           "file": "utils/order-pricing.js",
           "regex": "if \\(area && area.price\\)",
-          "desc": "doc reference \u00a74: truthiness test, so an area priced 0 falls through to the option-level price"
+          "desc": "doc reference §4: truthiness test, so an area priced 0 falls through to the option-level price"
         },
         {
           "file": "routes/admin/menu-import-issues.js",
           "regex": "menuImportIssues",
-          "desc": "doc reference \u00a72: the per-store import-issues worklist. If this stops matching, the collection moved or was removed and the screen it feeds is dead."
+          "desc": "doc reference §2: the per-store import-issues worklist. If this stops matching, the collection moved or was removed and the screen it feeds is dead."
         },
         {
           "file": "routes/menu.js",
           "regex": "store.hasGeneralCategories",
-          "desc": "doc reference \u00a72: the menu reads this flag from the PER-STORE store doc, while the admin form writes central shoofi.stores. If this line changes, re-check the two-document drift note."
+          "desc": "doc reference §2: the menu reads this flag from the PER-STORE store doc, while the admin form writes central shoofi.stores. If this line changes, re-check the two-document drift note."
         },
         {
           "file": "utils/catalog-lint.js",
@@ -189,6 +212,111 @@
           "file": "services/database/DatabaseInitializationService.js",
           "regex": "phase: 1, code: 1, productId: 1, extraId: 1, optionIndex: 1",
           "desc": "doc reference §2: the lint dedupe key index"
+        },
+        {
+          "file": "utils/client-features.js",
+          "regex": "const HEADER = \"x-client-features\"",
+          "desc": "doc CORE invariant 10 / reference §6b: the client capability header name — an OTA-safe signal from the JS bundle, unlike app-version"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "hasClientFeature\\(req, 'combo'\\)",
+          "desc": "doc CORE invariant 10: combos are gated per request on the header (menu + search); admin/partner app-types bypass it via canSeeCombos"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "stripCombos\\(cachedMenu\\)",
+          "desc": "doc CORE invariant 10: the strip is applied AFTER the cache read — a cache hit is stripped like a fresh build, and the cache is keyed by store, never by capability"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "productType: 1",
+          "desc": "doc reference §2: the product kind is projected to clients by the menu shapes and by search"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "combo: 1",
+          "desc": "doc reference §2: the combo definition is projected to clients (snapshots are attached on top of it by resolveComboSnapshots)"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "\\$ne: \\['\\$productType', 'combo'\\]",
+          "desc": "doc CORE invariant 10: GET /api/menu/mock never offers a combo — its option ids belong to the template store"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "productType: \\{ \\$ne: 'combo' \\}",
+          "desc": "doc reference §6b: POST /api/menu/search applies the same capability gate as the menu"
+        },
+        {
+          "file": "services/menu/combo-snapshots.js",
+          "regex": "find\\(\\{ _id: \\{ \\$in: objectIds \\} \\}, \\{ projection: SNAPSHOT_PROJECTION \\}\\)",
+          "desc": "doc CORE invariant 10: the snapshot is ONE products.find with NO isHidden filter — a hidden component is still a valid pick"
+        },
+        {
+          "file": "services/menu/combo-snapshots.js",
+          "regex": "return \\{ \\.\\.\\.option, product: null \\}",
+          "desc": "doc CORE invariant 10: a deleted component resolves to product: null, never a thrown menu"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "PRODUCT_REFERENCED_BY_COMBO",
+          "desc": "doc CORE invariant 10: delete refuses (409) a product a combo still points at"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "combo\\.sections\\.options\\.productId",
+          "desc": "doc CORE invariant 10: the delete guard's lookup path into the combo definition"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "unset = \\{ productType: \"\", combo: \"\" \\}",
+          "desc": "doc CORE invariant 10: demoting a stored combo to regular is a $unset of both keys"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "\\$unset: unset",
+          "desc": "doc CORE invariant 10: the update write is $set of the whole document plus the demotion $unset — deleting keys from productDoc alone would write nothing"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "comboErrors\\.length === 0 && comboDefinitionSent",
+          "desc": "doc CORE invariant 10: reference checks run only when combo or productType was actually sent (omit-to-skip survives)"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "COMBO_NOT_CLONEABLE",
+          "desc": "doc CORE invariant 10: create-from-mock refuses a combo template"
+        },
+        {
+          "file": "utils/combo-validation.js",
+          "regex": "projection: \\{ _id: 1, productType: 1, soldByWeight: 1 \\}",
+          "desc": "doc CORE invariant 10: validateComboReferences is ONE find projected to exactly what the rules need"
+        },
+        {
+          "file": "utils/combo-validation.js",
+          "regex": "COMBO_NESTED",
+          "desc": "doc CORE invariant 10: no combo inside a combo (phase 1)"
+        },
+        {
+          "file": "utils/combo-validation.js",
+          "regex": "COMBO_SELF_REFERENCE",
+          "desc": "doc CORE invariant 10: a combo cannot list itself"
+        },
+        {
+          "file": "utils/combo-validation.js",
+          "regex": "COMBO_COMPONENT_SOLD_BY_WEIGHT",
+          "desc": "doc CORE invariant 10: a by-weight product can never be a component (phase 1)"
+        },
+        {
+          "file": "utils/combo-validation.js",
+          "regex": "Number\\(option\\.surcharge\\)",
+          "desc": "doc CORE invariant 10: surcharge is normalised to a number >= 0 on write — the catalog value the pricer charges"
+        },
+        {
+          "file": "utils/order-stock.js",
+          "regex": "if \\(sel\\?\\.productId\\) add\\(sel\\.productId, qty\\)",
+          "desc": "doc CORE invariant 10 / docs/stock-management.md: a combo line moves its components' stock too, via the one expansion decrement/restore/amend share"
         }
       ]
     }

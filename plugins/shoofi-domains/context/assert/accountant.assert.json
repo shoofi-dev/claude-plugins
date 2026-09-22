@@ -148,6 +148,16 @@
           "file": "services/financial-overview/compute.js",
           "regex": "status:\\s*\"4\",\\s*isDeliveryOnly:\\s*\\{\\s*\\$ne:\\s*true\\s*\\}",
           "desc": "delivery-fee population is the settlement one (delivered, not delivery-only), not the dashboard's completedAt"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "originalPrice: baseOriginal \\? baseOriginal \\+ extrasPrice : undefined",
+          "desc": "CORE invariant 3 (combo note): a line's originalPrice adds the extras portion undiscounted — for a combo that is surcharges + nested extras, and the customer-facing combo 'savings' is never part of it, so it never becomes a productDiscount"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "productDiscount = Math\\.max\\(0, originalOrderPrice - chargedOrderPrice\\)",
+          "desc": "CORE invariant 3: productDiscount is derived from the order's own originalOrderPrice vs charged price — nothing else (not a combo's display savings) feeds it"
         }
       ]
     }

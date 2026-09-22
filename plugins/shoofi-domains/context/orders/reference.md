@@ -107,6 +107,15 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 ## 5. Data model — the join map (memorize the snapshot trap)
 - **Store `<app>.orders`** = authoritative. Join key `_id` (ObjectId). Display
   `orderId` (`"8475-2384"`), `originalOrderId` (`"8475-570235-2384"`).
+- **`orders.order.items[]`** = the wire shape the cart sends and the document keeps:
+  `{ item_id, qty, price, selectedExtras, nameAR/nameHE, … }` — the extras DEFINITION is not
+  on the line; `utils/order-pricing.js` re-reads it from `products`. A **combo line**
+  (`docs/combo-deals.md`) is the same shape with `item_id` = the combo product plus
+  `comboSelections[{ sectionId, slot, productId, nameAR, nameHE, surcharge, selectedExtras, extrasPrice }]`
+  — ONE line however many slots. Only `sectionId` / `productId` / `selectedExtras` are read
+  server-side; `surcharge`, `extrasPrice` and the names are ticket snapshots. `comboIssues`
+  is never persisted on an item (amend strips it); creation keeps them under
+  `serverPricing.comboIssues`. CORE invariants 11–12.
 - **`shoofi.customers.orders[]`** = a **write-once snapshot with NO status field.**
   `{ orderId(ObjectId→orders._id), appName, created, total, orderIdNumber(=orders.orderId),
   originalOrderId, ... }`. **NEVER infer status/completion/revenue from it** — join
@@ -236,7 +245,10 @@ or displays the order. **A change per repo = a PR per repo** (guardrails §1b).
 Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
 - **API client**: axios (`utils/http-interceptor/index.ts`), token `@storage_userToken`
   as `"Token …"`, `app-type: shoofi-shopping`, `app-name` per-call = target store `appName`,
-  plus a **`device-id`** header for fraud detection.
+  plus a **`device-id`** header for fraud detection, and **`x-client-features: combo`** from
+  the bundle that can render combo deals — without it the server strips combos from the menu
+  (menu-catalog reference §6b). `helpers/combo-pricing.ts` is the client copy of
+  `calculateComboExtrasPrice` (CORE invariant 11).
 - **Order creation** = **`POST order/create` as multipart/form-data** (`body` = JSON
   cart payload + `img` files), built by `stores/cart/index.ts` (`getCartData` →
   `produtsAdapter`) via `hooks/checkout/use-checkout-submit.ts` from

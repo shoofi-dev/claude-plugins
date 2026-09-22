@@ -14,7 +14,10 @@
         "routes/translations.js",
         "routes/global-search.js",
         "utils/menu-cache.js",
-        "utils/order-stock.js"
+        "utils/order-stock.js",
+        "utils/combo-validation.js",
+        "utils/client-features.js",
+        "services/menu/combo-snapshots.js"
       ],
       "shoofi-partner": ["screens/admin/product", "screens/menu"],
       "shoofi-app": ["screens/menu"]
@@ -32,7 +35,9 @@
         "utils/customer-orders.js",
         "utils/crons/order-overdue-checker.js",
         "utils/crons/fix-stuck-orders.js",
-        "consts/consts.js"
+        "consts/consts.js",
+        "utils/order-pricing",
+        "routes/order-amend.js"
       ],
       "shoofi-app": [
         "screens/checkout",
