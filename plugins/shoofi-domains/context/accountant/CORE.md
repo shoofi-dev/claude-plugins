@@ -183,10 +183,24 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    (`routes/payments/summaries.js:175,198,345,541,771`). So a store's own payments screen
    and the settlement report it is billed from bucket the same item into different months
    whenever approval crosses a month boundary, and an item approved in bulk is invisible to
-   the screen entirely while still being billed by the report. Do not "align" these by
-   switching settlement to `approvedAt`: a meaningful share of approved items carry no
-   `approvedAt` at all and would silently drop out of the money. **Ask before changing the
-   basis.**
+   the screen entirely while still being billed by the report.
+
+   **The owner has ruled against the current behaviour** (2026-09-14, reaffirmed
+   2026-09-22): a compensation is money only once approved, and belongs to the report for
+   the period it was **approved** in. Do not treat `createdAt` as the intended design — it
+   is the state of `main`, not the target. The store half is already written, tested and
+   pushed on `fix/HIGH-RISK-compensation-attributed-to-approval-date` (commit `59adbc7c`,
+   opt-in `dateField=approvedAt`), **unmerged and with no PR**; check whether it has landed
+   before writing any new code here. That branch deliberately leaves
+   `routes/driver-reports.js:371-378` and `services/exec-dashboard/spend-metrics.js:200` on
+   `createdAt`, so merging it alone yields store=approval / driver=creation — a split the
+   owner has since said he does not want.
+
+   Two traps for whoever finishes this: 52 approved items (₪4,996) carry **no** `approvedAt`
+   at all, so any `approvedAt` filter silently drops them, and the `modifiedDate` fallback
+   the branch uses can land a later edit in a different month from the one the counterparty
+   was already billed in — splitting one compensation across two periods **and** two
+   parties. The live `vapego-taibe` ₪2,000 item is exactly that shape.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
