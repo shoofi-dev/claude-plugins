@@ -125,6 +125,16 @@
           "desc": "MASAV DOS-Hebrew encoding"
         },
         {
+          "file": "routes/hyp.js",
+          "regex": "totalForInvoice\\s*=\\s*creditCardRevenue\\s*\\+\\s*driveInCreditCard",
+          "desc": "the store's invoice to Shoofi is the UNDIVIDED collected amount for every business type — it must equal the balance the store is paid (admin-reports.js const balance = totalForTransfer). Re-introducing a ÷1.18 on either side alone underpays every exempt store ~15% against a document it has already filed"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "withoutVATIfExempt\\(\\s*reportData\\.earningsByCreditCard",
+          "desc": "the ÷1.18-for-exempt rule survives ONLY on the delivery-company invoice — the store side dropped it on 2026-08-03, so the two payout paths deliberately disagree and a fix to one must not be carried to the other"
+        },
+        {
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"

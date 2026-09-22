@@ -51,8 +51,16 @@ totalOutcomes   = totalCommission + vat + oneTimeFees + monthlyFees + campaigns
                   - couponsFromShoofi - compensationsFromShoofi
 totalForTransfer = creditCardRevenue + driveInCreditCard - totalOutcomes   ← the MASAV/bank figure
 totalForInvoice  = creditCardRevenue + driveInCreditCard                    ← tax-invoice gross
-balance          = totalForTransfer   (÷1.18 if businessType === 'exempt')
+balance          = totalForTransfer   ← NO VAT adjustment, for any businessType
 ```
+⚠️ `balance` has carried **no** `÷1.18` for exempt stores since 2026-08-03
+(`admin-reports.js`, `const balance = totalForTransfer`). See CORE.md invariant 1 for why —
+an exempt store charges no VAT, so there is nothing to strip, and the store's own invoice is
+issued `vatType: 'NON'` for the same undivided amount. **Re-introducing the division here
+underpays every exempt store ~15% against a document it has already filed.** The `÷1.18`
+survives only on the **delivery-company** side (`driver-reports.js`, `hyp.js` — separate
+decision, still pending), which is why a stale memory of "exempt means divide" is so easy
+to carry across from one payout path to the other.
 Revenue comes from an internal self-call to **`stores-export-new`** (§4, the real engine).
 Commission base = **pre-discount** price so coupons can't erode Shoofi's cut. `vat = totalCommission * 0.18`.
 
@@ -100,8 +108,11 @@ Provider = `amazonconfigs {app:"invoiceProvider"}.active` (`greeninvoice` defaul
 - **Shoofi → store commission invoice**: amount = `totalOutcomes`. GreenInvoice type **320**
   (tax invoice+receipt, when `totalForTransfer>0`) else **305**; HYP always docType **305**, itemized.
 - **Store → Shoofi invoice (on behalf of store)** (`create-store-invoice`, `hyp.js`): amount =
-  CC revenue + coins-CC + driveIn-CC; `÷1.18 if exempt`; docType **300 (receipt) if exempt else 305**;
-  uses the **store's own** HYP `api_key` (`createInvoiceOnBehalf`), customer = Shoofi.
+  `creditCardRevenue + driveInCreditCard`, **undivided for every business type** — it must equal
+  the `balance` the store is paid; docType **300 (receipt) if exempt else 305**, `vatType: 'NON'`
+  when exempt; uses the **store's own** HYP `api_key` (`createInvoiceOnBehalf`), customer = Shoofi.
+  (Also changed 2026-08-03, in the same move as `balance`. The **company** invoice
+  `create-company-invoice` is the one that still divides: `withoutVATIfExempt(earningsByCreditCard)`.)
 - **Credit notes** = docType **330** (reversals / negative balance).
 - **Israel allocation-number rule** (`hyp.js`, threshold **4999**): a non-exempt tax invoice
   > 4999 VAT-incl needs an allocation number; block only when (connection invalid AND amount>threshold
