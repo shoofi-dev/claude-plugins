@@ -56,6 +56,23 @@ balance          = totalForTransfer   (÷1.18 if businessType === 'exempt')
 Revenue comes from an internal self-call to **`stores-export-new`** (§4, the real engine).
 Commission base = **pre-discount** price so coupons can't erode Shoofi's cut. `vat = totalCommission * 0.18`.
 
+**`oneTimeFees` / `monthlyFees` — a contract charge's LIFE is `startDate .. untilDate`, both
+inclusive.** `isPaymentActiveInRange` (`admin-reports.js`) is the single predicate behind
+`getTotalMonthlyPayments`, `getTotalOnetimePayments` and `filterPaymentsByDateRange` (the last feeds
+`monthlyPaymentsList`/`onetimePaymentsList`, which `routes/hyp.js` itemizes onto the tax invoice — the
+totals and the lists must always agree). Two things that surprise everyone:
+- **`onetimePayments` is an INSTALMENT PLAN, not a single charge.** A tablet at ₪160 with
+  `startDate 2025-08-01, untilDate 2026-05-31` is billed ₪160 in *each* of those ten reports;
+  `getInstallmentInfo` prints "(3 מ- 12)" from the same two dates. 170 of the 175 production rows
+  carry a `startDate`. Never read `oneTimeCharges` as "what the store paid once".
+- **`monthlyPayments` rows written before 2026-09 carry NO `startDate`** (the contract screen only
+  collected one for the one-time table until then), so they are open-ended on the left and billed in
+  every period, past and future. That is why "חיוב חודשי קבוע" on the live overview was the same
+  number in every month of history — the screen re-reads *today's* contract for whatever month you ask
+  for. 87 rows across 83 stores are in this shape; whether to backfill them is an owner decision, and
+  doing so restates any report regenerated afterwards.
+A charge that starts mid-period is billed **in full** — there is no proration anywhere in settlement.
+
 **Lifecycle**: `draft →(approve)→ approved →(send: WhatsApp monthly_report to billingContacts)→
 sent`; `send-invoice`; `create-invoice` (§5); status toggles `reportSent/invoiceSent/
 invoiceReceived/transferPerformed`. Carry-over comps marked collected only on **send** (idempotency).
@@ -150,6 +167,10 @@ a human bridges it. Payout amount = store `balance` / driver `netTotal`.
 - **Store `accounting`** (store's own DB): `bankAccount{bank,branch,accountNumber,companyId,
   businessType('exempt'|'licensed')}`, `billingContacts[]`, `contract{commissionTiers[],
   coinsCommissionPercent, monthlyPayments[], onetimePayments[]}`, `store.hyp{ua_uuid,api_key,access_token,status}`.
+  A payment row is `{id, name, type?, amount, startDate?, untilDate}` — `startDate..untilDate` is the
+  charge's billing life (§2), `type` is the one-time dropdown label that `contract-charges.js` maps to
+  equipment/setup/campaign/balance, and `name` is what the PDF prints. `type` is never set on a
+  monthly row.
 - **`shoofi.amazonconfigs`** — `{app:"greeninvoice"|"hyp"|"invoiceProvider"|"amazon"}` (provider creds/switch; never print).
 - **`shoofi.couponUsages`** — per-source discount rows (store/shoofi × items/delivery).
 
