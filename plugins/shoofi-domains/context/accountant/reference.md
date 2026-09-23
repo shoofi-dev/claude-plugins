@@ -103,6 +103,12 @@ Provider = `amazonconfigs {app:"invoiceProvider"}.active` (`greeninvoice` defaul
   CC revenue + coins-CC + driveIn-CC; `÷1.18 if exempt`; docType **300 (receipt) if exempt else 305**;
   uses the **store's own** HYP `api_key` (`createInvoiceOnBehalf`), customer = Shoofi.
 - **Credit notes** = docType **330** (reversals / negative balance).
+- **`ua_uuid` is for CUSTOMER documents only.** The per-order customer document
+  (`utils/hyp.createCustomerInvoice`, payments' territory) is issued on behalf of a
+  sub-account via `ua_uuid`. None of the settlement documents above send it, deliberately:
+  routing a store invoice or credit note to a different business changes whose books it
+  lands in. If you touch `utils/hyp.js`, keep the field inside `createCustomerInvoice`'s
+  own object literal.
 - **Israel allocation-number rule** (`hyp.js`, threshold **4999**): a non-exempt tax invoice
   > 4999 VAT-incl needs an allocation number; block only when (connection invalid AND amount>threshold
   AND non-exempt) — **fail-open** on transient distributor-API errors.
@@ -151,6 +157,8 @@ a human bridges it. Payout amount = store `balance` / driver `netTotal`.
   businessType('exempt'|'licensed')}`, `billingContacts[]`, `contract{commissionTiers[],
   coinsCommissionPercent, monthlyPayments[], onetimePayments[]}`, `store.hyp{ua_uuid,api_key,access_token,status}`.
 - **`shoofi.amazonconfigs`** — `{app:"greeninvoice"|"hyp"|"invoiceProvider"|"amazon"}` (provider creds/switch; never print).
+  `{app:"hyp"}` also carries `CUSTOMER_DOC_UA_UUID` (customer-document sub-account; empty = don't send)
+  and `USE_DEMO`/`API_ENDPOINT`/`DEMO_ENDPOINT`. **No admin UI edits this document** — prod changes are a manual Mongo write.
 - **`shoofi.couponUsages`** — per-source discount rows (store/shoofi × items/delivery).
 
 ## 9. Client — shoofi-delivery-web (admin) is the accountant's cockpit

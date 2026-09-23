@@ -101,6 +101,19 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    sale — and never fails the order: failures land on `order.invoices[]` and are retried by
    `utils/crons/invoice-retry-cron.js`, which is deliberately **not** gated on the flag so
    a rollback cannot strand a customer who paid while it was on.
+   ⚠️ The customer document carries **`ua_uuid`** — Shoofi's EZcount user holds several
+   businesses and this says which one issues it. `CUSTOMER_DOC_UA_UUID` in `amazonconfigs
+   {app:"hyp"}` overrides the constant in `utils/hyp.js`; an **empty string there stops the
+   field being sent**, which is the only rollback (there is no cancel path for per-order
+   customer documents). **The settlement builders must never inherit it** — `createInvoice`
+   shares the same `DISTRIBUTOR_API_KEY`, and `createInvoiceOnBehalf` issues with the
+   store's own key where Shoofi's sub-account has no meaning. The three builders hand-list
+   their keys and never spread `params`; keep it that way rather than adding a generic
+   pass-through. Note `createInvoice` accepts a `storeUaUuid` that four call sites pass and
+   it has **never sent** — a dead parameter, not evidence the field already flows.
+   Reach: wallet orders always (unconditionally manual), card orders only where the flag is
+   on — a gateway-issued document cannot take a `ua_uuid`, and `EZ.*` is an undocumented
+   pass-through that can reject the whole charge, so do not try `EZ.ua_uuid`.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.
