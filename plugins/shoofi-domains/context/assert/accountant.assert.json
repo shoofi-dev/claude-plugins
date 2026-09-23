@@ -158,6 +158,11 @@
           "file": "routes/payments/admin.js",
           "regex": "productDiscount = Math\\.max\\(0, originalOrderPrice - chargedOrderPrice\\)",
           "desc": "CORE invariant 3: productDiscount is derived from the order's own originalOrderPrice vs charged price — nothing else (not a combo's display savings) feeds it"
+        },
+        {
+          "file": "lib/payments/calc.js",
+          "regex": "startDate\\s*=\\s*now\\.clone\\(\\)\\.subtract\\(30,\\s*'days'\\)",
+          "desc": "CORE invariant 9: getDateRange's default: branch is 'the last 30 days' — an unrecognised period keyword does not error, it silently widens every report figure to a month"
         }
       ]
     }

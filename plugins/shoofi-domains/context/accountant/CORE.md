@@ -181,6 +181,19 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    a term added to `totalOutcomes` and not to that list shows up as a non-zero
    `billingReconciliationDelta`, which is the point of the list.
 
+9. **`getDateRange` has no period whitelist, and its `default:` is "the last 30 days"**
+   (`lib/payments/calc.js`). Every report endpoint funnels `req.body.period` straight
+   into it — 13 call sites across `routes/payments/admin.js`,
+   `routes/payments/summaries.js`, `routes/payments.js` and
+   `services/store-analytics/index.js` — so an unrecognised keyword does **not** 400.
+   It silently widens every figure to a month while the screen keeps whatever heading
+   the client gave it, which on `/payments/admin/drivers` means a 30-day payout total
+   presented as a day's. Known cases: `day`, `week` (calendar week, Sunday-start),
+   `month` — and `yesterday` once `feat/report-period-yesterday-HIGH-RISK` lands.
+   **Adding a period option is therefore a two-repo change, server first**: the `case`
+   in `calc.js` and the button in `shoofi-delivery-web` are coupled, and shipping the
+   client half alone produces wrong numbers rather than an error.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
