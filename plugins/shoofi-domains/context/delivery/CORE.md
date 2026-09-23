@@ -148,6 +148,30 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
     `order` are whole embedded documents, so a wished-for or misspelled field reads as
     `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
     runs — which looks identical to a correction that is simply rare.
+12. **Deliveries are counted on a CALENDAR day; hours are measured on a WORKING day. Never
+    divide one by the other as stored.** `book-delivery.created` is an Israel-offset string
+    (`"2026-09-24T00:10:18+03:00"` — 93,339/93,339 rows, never a Date), and the report routes
+    bound it with a plain `$gte/$lte` against a `moment(...).startOf('day').format()` string.
+    That is a **lexicographic** comparison and the offset sits after the seconds, so it never
+    participates: whatever offset the server formats in (UTC in production), the effective
+    window is Israel wall clock **00:00:00 → 23:59:59**. Meanwhile `driver-daily-hours.date` is
+    a working-day LABEL for `[09:00 D, 09:00 D+1]` (`workingDayBounds` — invariant 8's rule,
+    applied to hours), and `activeMinutes` is that whole window's total. So a driver online
+    22:00 → 01:00 has all 180 minutes stored under D, while his deliveries either side of
+    midnight split across D and D+1. Over a month the mismatch is the two boundary days; on a
+    single-day view it is the whole figure. The fix is not to pick a calendar — it is to **clip
+    `activePeriods[]` to the caller's window instants**, which is exact because
+    `sum(activePeriods[].minutes) === activeMinutes` on every stored doc (2,428/2,428 verified).
+    `utils/driver-connected-hours.js` is the worked example; clipping moved the fleet
+    denominator for 2026-09-01..22 by 4.1 hours against the naive whole-day sum. Two riders:
+    - **`activeMinutes` is measured; `payableWorkingMinutes` is negotiated.** The latter is
+      substituted with the driver's own claimed hours wherever an admin approved a dispute
+      (`utils/driver-hours-period.js`; 17 approved of 129 claims in production). Anything
+      reporting on productivity reads `activeMinutes` — only settlement reads the payable one,
+      or an approved dispute silently improves a driver's measured performance.
+    - **The collection starts 2026-05-29, and today is never precomputed** (the cron writes at
+      ~01:15 for the day that just closed). An earlier range is "no measurement", not "zero
+      hours", and a range including today needs a live compute or it under-reports by a day.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`

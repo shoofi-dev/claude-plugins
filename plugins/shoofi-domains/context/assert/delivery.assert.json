@@ -27,7 +27,10 @@
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js",
-        "services/monitoring/centralized-flow-monitor.js"
+        "services/monitoring/centralized-flow-monitor.js",
+        "utils/driver-connected-hours.js",
+        "utils/driver-hours-period.js",
+        "routes/payments/admin.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -64,6 +67,11 @@
           "parsePromisedEta",
           "reassignmentOf",
           "classifyDelivery"
+        ],
+        "utils/driver-connected-hours.js": [
+          "getConnectedMinutesByDriver",
+          "wallClockInIsrael",
+          "workingDayKey"
         ]
       },
       "patterns": [
@@ -171,6 +179,26 @@
           "file": "services/monitoring/centralized-flow-monitor.js",
           "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
           "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+        },
+        {
+          "file": "utils/driver-connected-hours.js",
+          "regex": "clippedSeconds",
+          "desc": "connected minutes are clipped to the caller's window INSTANTS, never summed as whole working days - the deliveries they get divided by are counted on a calendar day"
+        },
+        {
+          "file": "utils/driver-connected-hours.js",
+          "regex": "activePeriods",
+          "desc": "the clip reads activePeriods[] off the stored doc; it is exact because sum(activePeriods[].minutes) === activeMinutes on every doc (2,428/2,428)"
+        },
+        {
+          "file": "utils/driver-hours-period.js",
+          "regex": "payableWorkingMinutes",
+          "desc": "the NEGOTIATED hours figure - the driver's own claimed hours wherever an admin approved a dispute. Settlement reads it; nothing reporting on productivity may"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "created: \\{ \\$gte: dateRange\\.start, \\$lte: dateRange\\.end \\}",
+          "desc": "a lexicographic string compare against an Israel-offset created, so this delivery window is Israel wall-clock CALENDAR days whatever offset the server formats in"
         }
       ]
     },
