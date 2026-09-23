@@ -11,6 +11,9 @@
         "routes/payment-methods.js",
         "utils/hyp-pay.js",
         "utils/invoice-mail.js",
+        "services/payments/invoice-config.js",
+        "services/payments/order-invoices.js",
+        "utils/hyp.js",
         "lib/schemas/creditCard.json",
         "services/twin-order/twin-payment-service.js",
         "routes/twin-order.js",
@@ -33,6 +36,17 @@
           "resolveSavedCard",
           "chargeCombinedHyp",
           "refundPartial"
+        ],
+        "utils/hyp.js": [
+          "createCustomerInvoice",
+          "CUSTOMER_DOC_UA_UUID",
+          "DOC_TYPE"
+        ],
+        "services/payments/order-invoices.js": [
+          "issueInvoicesForOrder",
+          "issueInvoicesForTwin",
+          "reconcileToCharge",
+          "customerDocType"
         ]
       },
       "patterns": [
