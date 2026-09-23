@@ -158,6 +158,11 @@
           "file": "routes/payments/admin.js",
           "regex": "productDiscount = Math\\.max\\(0, originalOrderPrice - chargedOrderPrice\\)",
           "desc": "CORE invariant 3: productDiscount is derived from the order's own originalOrderPrice vs charged price — nothing else (not a combo's display savings) feeds it"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "start:\\s*moment\\(startDate\\)\\.startOf\\('day'\\)\\.format\\(\\)",
+          "desc": "known-status OPEN: /payments/admin/drivers builds its explicit startDate/endDate boundaries with NO utcOffset, so they are server-TZ dependent while bookDelivery.created always carries Israel's offset — prefer a period keyword over client dates, and do not harmonise this without asking"
         }
       ]
     }

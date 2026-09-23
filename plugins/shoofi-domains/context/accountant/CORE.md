@@ -193,6 +193,21 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 - **OPEN — flagged, needs a decision:** `reset-invoice` only clears the *local* invoice fields;
   it does **not** cancel the document at GreenInvoice/HYP, so a following `create-invoice`
   issues a **second** invoice. Do not silently change behavior — ask.
+- **OPEN — flagged, latent:** the report endpoints' explicit `startDate`/`endDate` branch is
+  **not uniform**, and none of them share a helper. `/payments/admin/overview`,
+  `/stores-export` and `/admin/school-students` build boundaries as
+  `moment(x).utcOffset(off).startOf('day')`; `driver/summary` and `driver/details` use
+  `.utcOffset(off, true)` (equivalent); `/drivers/summary` applies the offset **after**
+  `startOf`; `stores-export-new` applies the offset with **no** `startOf`/`endOf` (deliberate
+  — its caller in `admin-reports.js` passes full timestamps); and **`/payments/admin/drivers`
+  applies no `utcOffset` at all** (`routes/payments/admin.js`), so the offset suffix it
+  produces depends on the server process TZ while the `bookDelivery.created` strings it is
+  compared against as **plain strings** always carry Israel's offset. Separately, the explicit
+  branch bypasses `getDateRange` and therefore **skips the openHours business-day boundaries**,
+  so a custom range silently disagrees with the equivalent `period` keyword for a store with
+  overnight hours. **Prefer a `period` keyword over client-supplied dates for anything new**,
+  and do not "harmonise" these five spellings as a side effect of another change — it moves
+  what drivers are paid. **Ask.**
 - **Awareness:** MASAV is **decoupled** from the reports — payout amounts are re-keyed into an
   Excel by a human; there is no automated report→MASAV link. Hardcoded GreenInvoice
   `businessId`/`itemId` constants exist.
