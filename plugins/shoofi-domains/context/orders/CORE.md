@@ -152,9 +152,10 @@ apart — always establish which is meant:
    **duplicate**: it fires after the stepped event for the same press, so ~half the rows have
    no step. Count reasons from the stepped rows only; the step-less row adds a price snapshot,
    not a reason (verified 2026-09-24: 158 of 168 blocked sessions had both).
-   `payment_method_invalid` is mostly friction, not loss — checkout starts with NO payment
-   method (the cash default is commented out) and forgets the choice on remount, so ~94% of
-   those customers pick one and order within 30 min.
+   `payment_method_invalid` is mostly friction, not loss — until 2026-09 checkout started
+   with NO payment method and forgot the choice on remount, so ~94% of those customers picked
+   one and ordered within 30 min. Checkout now remembers and pre-selects it (see the
+   checkout draft below); the cash default is still commented out, on purpose.
 2. **Submitted and never paid** — status `"0"` order rows, per store DB. See the
    `FAILED_PAYMENT_STATUS` note; that is the only layer carrying an issuer reason.
 3. **Never reached checkout** — `page_viewed` with `properties.page_name` ∈
@@ -168,20 +169,28 @@ apart — always establish which is meant:
 Checkout-screen events that explain the "reached checkout, didn't send" layer:
 - **`checkout_left`** — checkout lost focus (`reason`: `blur`|`unmount`) without a completed
   order: `seconds_on_screen`, `attempted`, and the payment method / shipping / timing / price
-  the customer had at that moment. Payment method and order timing live in screen state
-  and **reset on every mount**, so a customer who goes back to the cart and returns loses
-  both; this event is the only record of the dropped choice.
+  the customer had at that moment.
+- **The checkout draft** (`shoofi-app/stores/checkout-draft`) keeps the payment METHOD and
+  the future slot across checkout remounts: in memory only, per cart store, 2 h, cleared on
+  order completion. It never holds card data — the chosen card is the server-side default,
+  re-read by `PaymentMethodCMP.getCCData`. With no draft, checkout pre-selects the customer's
+  last successful method (AsyncStorage, per customer id), after checking it against
+  `/payment-methods`; wallets are never pre-selected on a ZCredit-wallet store (they need the
+  session the customer's tap creates). Logged as `checkout_choice_restored`
+  (`source`: `draft`|`last_used`). A restored slot the picker no longer offers is replaced
+  with the first slot and logged as `order_timing_auto_changed`
+  (`reason: restored_slot_unavailable`).
 - **`page_viewed` `Checkout`** carries `cart_store` and `browsed_store`. The future-order
-  picker is gated on the **browsed** store's flags (`storeDataStore.storeData`), not the
-  cart's — a mismatch explains a picker that is missing.
+  picker is gated on `storeDataStore.storeData` — whatever store was loaded last — so
+  checkout repoints it at the cart's store on focus (`checkout_store_data_refreshed`), and
+  the cart reads the future-order flags from the cart's store it has just fetched.
 - **`order_timing_changed`** is what the customer chose, but it also fires `now→now` on
   every picker mount — noise, not a choice. Changes the SCREEN makes (auto-flip to future
   delivery, twin mode forcing `now`) log `order_timing_auto_changed` with a `reason`.
 - **`future_order_picker_opened` / `_closed`**, and **`future_order_no_slots`** when future
   ordering is enabled but no day has a slot left.
-- A future slot picked then silently lost is real: in Sep 2026, 13 of 47 orders whose last
-  timing pick was `future` were sent as ASAP after the customer left and re-entered
-  checkout.
+- Why the draft exists: in Sep 2026, 13 of 47 orders whose last timing pick was `future` were
+  sent as ASAP after the customer left and re-entered checkout.
 
 Traps that cost a day if you meet them cold:
 - **`apps-logs.created` is a real BSON `Date`** — the exact opposite of `orders.created`. One
