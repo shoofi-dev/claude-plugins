@@ -196,6 +196,24 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 - **Awareness:** MASAV is **decoupled** from the reports — payout amounts are re-keyed into an
   Excel by a human; there is no automated report→MASAV link. Hardcoded GreenInvoice
   `businessId`/`itemId` constants exist.
+- **Awareness — a report PDF on Spaces is world-readable, and its URL is semi-guessable.**
+  Every Spaces upload in this repo passes `ACL: "public-read"`, with no exception:
+  `routes/payments/admin-reports.js` (store settlement), `routes/driver-reports.js`
+  (courier settlement), `utils/invoice-mail.js` (the customer invoice PDF), plus
+  `utils/images-service.js`, `utils/image-variants.js`, `routes/product.js` and
+  `services/social-posts/render-service.js`. The URL handed back to the admin —
+  `https://<bucket>.fra1.digitaloceanspaces.com/reports/<appName>/<reportId>.pdf`, and
+  `driver-reports/<companyId>/<reportId>.pdf` — carries no token, so anyone holding it
+  reads a store's or a courier's whole period. `<appName>` is a public store slug and
+  `<reportId>` is a Mongo ObjectId, which is a timestamp plus a counter rather than a
+  random value: one known report id makes its neighbours enumerable. Read "on Spaces"
+  as "published", never as "behind the admin login".
+  This is a **property to design around, not a bug to fix opportunistically** — those
+  links are already in sent emails and stored on the report documents, so flipping the
+  ACL breaks reports that have gone out. When a NEW artefact must stay internal, keep
+  the bytes in Mongo and serve them from an admin-gated route (`routes/how-tos.js` and
+  `routes/ai-tasks.js` both do this), and budget for the **16MB BSON document limit**
+  that storage model carries.
 
 ## Recipe — change a payout or invoice amount
 1. **Trace the money first**: who collected (cash/card) → who is owed → which formula line.

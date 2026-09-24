@@ -158,6 +158,21 @@
           "file": "routes/payments/admin.js",
           "regex": "productDiscount = Math\\.max\\(0, originalOrderPrice - chargedOrderPrice\\)",
           "desc": "CORE invariant 3: productDiscount is derived from the order's own originalOrderPrice vs charged price — nothing else (not a combo's display savings) feeds it"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "ACL:\\s*\"public-read\"",
+          "desc": "store settlement PDFs are uploaded world-readable — the doc's 'a report PDF on Spaces is published' awareness note. If this ever goes private, the note must change with it"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "ACL:\\s*\"public-read\"",
+          "desc": "courier settlement PDFs are uploaded world-readable, same as the store ones"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "const key\\s*=\\s*`reports/\\$\\{appName\\}/\\$\\{reportId\\}\\.pdf`",
+          "desc": "the public URL is store slug + report ObjectId, which is what makes a neighbouring report enumerable rather than merely unguessable"
         }
       ]
     }
