@@ -232,7 +232,8 @@
         "screens/checkout/index.tsx",
         "components/checkout/FutureOrderPicker.tsx",
         "hooks/checkout/use-checkout-validate.ts",
-        "screens/cart/cart.tsx"
+        "screens/cart/cart.tsx",
+        "stores/checkout-draft/index.ts"
       ],
       "patterns": [
         {
@@ -279,6 +280,16 @@
           "file": "screens/cart/cart.tsx",
           "regex": "cart_checkout_blocked",
           "desc": "closed/busy-store bounces from the cart, previously unlogged (CORE: where an order that never happened lives)"
+        },
+        {
+          "file": "stores/checkout-draft/index.ts",
+          "regex": "paymentMethod\\?: string \\| null;",
+          "desc": "the checkout draft stores the payment METHOD only, never card data (CORE: where an order that never happened lives)"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "if \\(isWallet && !isHypWallet\\) return;",
+          "desc": "wallets are never pre-selected on a ZCredit-wallet store (CORE: the checkout draft)"
         }
       ]
     },
