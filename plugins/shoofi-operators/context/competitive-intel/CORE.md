@@ -469,10 +469,36 @@ One caveat: `no-match` is **terminal but revisitable** — when we onboard a new
    list and must be re-scored whenever we onboard a new store.
 
 ## 7. Explicitly out of scope right now
-No scheduled collectors or crons. No competitor snapshots or history. No menu scraping, no
+No scheduled collectors or crons **other than the hourly open/closed check in §8**, which was
+asked for explicitly on 2026-09-24. No competitor snapshots or history beyond that check's
+issue episodes. No menu scraping, no
 price comparison. No brief generation, no Slack posting. Those are the **next** tasks and will
 be asked for separately — building ahead makes the matching design harder to review, and that
 is the one thing that has to be right before any of it is worth having.
+
+## 8. The flagship question, answered hourly (2026-09-24)
+"Open on Haat, closed on us" now runs server-side **every hour** (minute 5, Asia/Jerusalem) and
+feeds the admin dashboard's **issues rail**, a thin bar on the left with a counter per issue
+type. Code and contract: `shoofi-server` `docs/admin-issues.md`,
+`services/admin-issues/checks/competitor-open-status.js`. Admin page:
+`/admin/issues/competitor-open-we-closed`.
+
+- **Haat only, confirmed links only.** A Haat store is compared only when its
+  `competitor-stores` row is `status: "confirmed"` (§3.0). Every confirmation in the coverage
+  view widens what the check can see. Tira Eat is not checked yet.
+- **Our side** is what the customer app shows, `isStoreOpenNow(openHours).isOpen && !isStoreClose`
+  (§2a), and the persisted `isOpen` is still never read. Each issue carries `ourReason`:
+  `manual-close` | `outside-hours` | `no-hours`.
+- **Haat side:** `status === 2` is closed and anything else counts as open. The raw status is
+  kept on the issue so a new code shows up there.
+- **This is the first history there is.** `shoofi.admin-issues` holds one row per *episode*
+  (`firstSeenAt`, `lastSeenAt`, `hits`, `resolvedAt`). It is hourly-granular evidence of
+  "they were open and we were closed", for confirmed pairs only. It is still not a
+  full open/closed timeline for either side, so say that in any brief that quotes it.
+- **Credential:** the server reads the Haat token from `HAAT_BEARER_TOKEN` in its environment
+  and nowhere else. The token is still committed in `shoofi-delivery-web`; the server copy is
+  env-only and must never be committed. Without the env var the check records
+  `not-configured` and the rail flags it.
 
 ## Definition of done
 See the agent file. In short: a dated brief a human reads in two minutes, every claim traceable
