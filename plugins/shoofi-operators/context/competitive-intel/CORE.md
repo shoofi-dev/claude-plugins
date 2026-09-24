@@ -469,9 +469,11 @@ One caveat: `no-match` is **terminal but revisitable** — when we onboard a new
    list and must be re-scored whenever we onboard a new store.
 
 ## 7. Explicitly out of scope right now
-No scheduled collectors or crons **other than the hourly open/closed check in §8**, which was
-asked for explicitly on 2026-09-24. No competitor snapshots or history beyond that check's
-issue episodes. No menu scraping, no
+No scheduled collectors or crons **other than the two checks in §8** (the hourly open/closed
+check and the nightly Haat menu comparison), both asked for explicitly on 2026-09-24. That
+request is the go-ahead the agent file's "never scrape menus on a schedule" limit asks for,
+**for Haat, confirmed pairs, nightly, only**. Tira Eat menus are still ~500 reads per store
+and still need their own go-ahead. No competitor snapshots or history beyond those checks. No menu scraping, no
 price comparison. No brief generation, no Slack posting. Those are the **next** tasks and will
 be asked for separately — building ahead makes the matching design harder to review, and that
 is the one thing that has to be right before any of it is worth having.
@@ -499,6 +501,21 @@ type. Code and contract: `shoofi-server` `docs/admin-issues.md`,
   and nowhere else. The token is still committed in `shoofi-delivery-web`; the server copy is
   env-only and must never be committed. Without the env var the check records
   `not-configured` and the rail flags it.
+
+### 8b. Menu and price differences, nightly (2026-09-24)
+04:00 Asia/Jerusalem, `services/admin-issues/checks/competitor-menu-diff.js`: for each
+confirmed Haat pair, the Haat menu against our `products`. Results are in
+`shoofi.competitor-menu-diffs` (the latest state per pair). Admin page:
+`/admin/issues/competitor-menu-diff`, with a missing-products tab and a prices tab.
+
+- **Product matching is strict** (`services/competitors/menu-compare.js`): same script only,
+  no generic-word stripping (for a dish "פיצה" is the whole point), names whose numbers differ
+  never match, one-to-one, score ≥ 0.85. A wrong match would be a confident, wrong "we are ₪8
+  more expensive", so a spelling variant lands in `missing` with a `closest` hint instead.
+  **Quote `missing` as "not found under the same name", never as "we don't carry it".**
+- `diff` = ours − theirs. Sold-by-weight products and combos are never price-compared.
+- A base-price gap can be structure, not price: Haat often prices a "from" base with sizes as
+  options. Say so when quoting one.
 
 ## Definition of done
 See the agent file. In short: a dated brief a human reads in two minutes, every claim traceable
