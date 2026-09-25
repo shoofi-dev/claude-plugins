@@ -188,6 +188,35 @@ title a group and carry `freeCount`. Real types:
     branch — an area meant to be free charges the option price instead. The admin editor
     writes `price: 0` at option level for this type, which is what keeps it harmless.
 
+**An option's only address is `(extraId, optionId)` — a NAME is not unique inside a product.**
+Nothing makes it unique and nothing checks: `DUPLICATE_OPTION_ID` compares **ids within one
+extra**, so two *different* extras on the same product may carry the same option names at
+different prices — a free topping group beside a paid duplicate of it is the shape that turns
+up, and the admin's duplicate affordances copy extras verbatim (`handleDuplicate`,
+`POST /api/product/create-from-mock`, above). Anything that resolves an option by name writes
+to whichever it finds first, with no error anywhere: a free group silently takes a paid
+group's price. Remember too that a grouped extra's own `nameAR`/`nameHE` is usually `""` (the
+name is on its `isGroupHeader` sibling with the same `groupId`), so a name-keyed row often has
+no group name to disambiguate with either.
+
+The Mongo consequence is a trap, because the positional `$` descends **one** level only:
+
+```js
+// extra-level price (weight, counter) — positional, atomic-or-nothing
+{ filter: { _id, "extras.id": extraId }, update: { $set: { "extras.$.price": p } } }
+// OPTION-level price — needs arrayFilters; `extras.$.options.$.price` is not a thing
+{ filter: { _id },
+  update: { $set: { "extras.$[e].options.$[o].price": p } },
+  arrayFilters: [{ "e.id": extraId }, { "o.id": optionId }] }
+```
+
+Live examples of both: `toBulkOps` in `services/catalog/competitor-price-align.js`, and the
+weight rescale in `services/catalog/bulk-price-update.js`. So **any tool that reports an
+option** — a lint row, a competitor price diff, an export — should carry both ids, or whatever
+acts on its output has only a name to go on. The Haat price comparison
+(`services/competitors/menu-compare.js` `ourOptions`) had the ids in memory and dropped them,
+which is why its rows could not be re-priced until `extraId`/`optionId` were added.
+
 **Lint rules** (`utils/catalog-lint.js` `lintProduct(product, { outOfStockExtras })`), one
 row per hit, in the customer's terms — `critical` = cannot buy / a viewer throws, `warning` =
 works but not as configured. What each outcome means at the write boundary is CORE invariant 9;

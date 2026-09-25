@@ -18,6 +18,8 @@
         "docs/menu-search.md",
         "utils/weight-extra-invariant.js",
         "services/catalog/bulk-price-update.js",
+        "services/catalog/competitor-price-align.js",
+        "services/competitors/menu-compare.js",
         "scripts/flag-sold-by-weight.js",
         "scripts/fix-empty-extra-option-ids.js",
         "docs/sold-by-weight.md",
@@ -132,6 +134,21 @@
           "file": "services/catalog/bulk-price-update.js",
           "regex": "selectWeightExtra",
           "desc": "doc CORE invariant 7: bulk price update rescales the weight extra through the flag-aware selector"
+        },
+        {
+          "file": "utils/catalog-lint.js",
+          "regex": "DUPLICATE_OPTION_ID",
+          "desc": "doc reference §4: the ONLY uniqueness rule on options, and it is ids within ONE extra — nothing makes option NAMES unique across a product. If this code ever checks names, or checks ids across extras, the 'an option's only address is (extraId, optionId)' note must be re-checked."
+        },
+        {
+          "file": "services/catalog/competitor-price-align.js",
+          "regex": "extras\\.\\$\\[e\\]\\.options\\.\\$\\[o\\]\\.price",
+          "desc": "doc reference §4: an option price is written with arrayFilters keyed on (extraId, optionId), because the positional `$` descends one level only and a name is not a unique address"
+        },
+        {
+          "file": "services/competitors/menu-compare.js",
+          "regex": "extraId: a\\.extraId",
+          "desc": "doc reference §4: the Haat option diff carries the ids a price write needs. If this goes, its rows are name-only again and nothing can act on them safely."
         },
         {
           "file": "services/catalog/import-index.js",
