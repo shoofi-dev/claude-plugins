@@ -36,6 +36,19 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
 "user not found" cause. **Identity routing is by `app-type` throughout this domain**; an
 `app-name` on an identity call is usually inert (and sometimes misleading — see Known status).
 
+⚠️ **The admin web cannot name a store in the `app-name` header.** Its interceptor pins
+that header to the literal `'shoofi'` on every request
+(`shoofi-delivery-web/src/utils/http-interceptor/index.ts`, alongside
+`app-type: shoofi-admin`) — a per-call override is possible but the default is not the
+store being looked at, it is the central DB. So **any admin-facing route that reports on
+one store must take `appName` as an explicit query/body parameter**, and validate it
+against `shoofi.stores` before touching a DB: `getOrInitializeDb` (`lib/db.js`) only
+consults the registry for a database it does not already hold in memory, and every store
+is initialized at boot, so passing `shoofi` hands back the **central** DB rather than
+failing. `GET /api/store-analytics/admin/overview` is the worked example.
+The mirror-image rule for partner callers still holds: `app-name` there is plain client
+input and must be *proven* by `requireStoreMembership()`, never trusted.
+
 ## Invariants — never weaken
 1. **Customers are CENTRAL.** `getCustomerAppName` (`utils/app-name-helper.js`) **always**
    returns the `shoofi` DB, ignoring `appName`. **Intentional — do NOT "fix" it** to use the

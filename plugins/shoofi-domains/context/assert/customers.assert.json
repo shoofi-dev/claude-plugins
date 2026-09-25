@@ -143,6 +143,11 @@
           "file": "src/utils/http-interceptor/index.ts",
           "regex": "Bearer",
           "desc": "admin uses Bearer (RN apps use 'Token')"
+        },
+        {
+          "file": "src/utils/http-interceptor/index.ts",
+          "regex": "app-name\"\\]\\s*=\\s*config\\.headers\\[\"app-name\"\\]\\s*\\|\\|\\s*'shoofi'",
+          "desc": "admin web pins app-name to the central 'shoofi' DB, so an admin route reporting on one store must take appName as an explicit parameter"
         }
       ]
     }
