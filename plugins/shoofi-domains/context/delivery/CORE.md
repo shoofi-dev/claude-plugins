@@ -72,7 +72,15 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
 3. **Never write `customers.isActive` directly** — always `setDriverActiveStatus`
    (`services/delivery/driver-status-service.js`), which writes `driverStatusHistory` in
    lock-step and pushes a websocket update. Direct writes create phantom history.
-4. **`isActive` ≠ `isAvailable` ≠ `isOnline`** — three separate flags, don't conflate.
+4. **`isActive` ≠ `isAvailable` ≠ `isOnline`** — three separate flags, don't conflate. Only
+   **`isActive`** gates anything: dispatch filters on it (`services/delivery/assignDriver.js`),
+   and the one live way to set it is `POST /api/delivery/company/employee/:id/update-active-status`
+   (`routes/delivery/company.js`) → `setDriverActiveStatus`. **`isAvailable` is dead.**
+   `POST /api/delivery/driver/availability` (`routes/delivery/driver.js`) is a raw `updateOne`
+   with no guard and no history row, its only client wrappers
+   (`shoofi-shoofir/stores/delivery-driver/index.ts`, `services/deliveryDriverService.ts`) have
+   **no UI caller**, and nothing in assignment reads the field. Treat it as inherited: a guard
+   added there gates nobody, and a screen built on it shows a flag no one writes.
 5. **Twins always go pending** and (single mode) must share ONE driver: the
    `twinPickupSequence:1` side drives selection, the peer mirrors it, and `assignDriverAt` is
    aligned to the later side. Breaking any of it splits a twin.

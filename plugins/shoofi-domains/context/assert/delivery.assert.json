@@ -128,6 +128,16 @@
           "desc": "the one correct business-day window ([D 09:00, D+1 02:00]); feeds the paid guarantee"
         },
         {
+          "file": "routes/delivery/driver.js",
+          "regex": "isAvailable",
+          "desc": "the dead availability surface - if a guard, a history row or an assignment read ever appears beside this field, CORE invariant 4's 'isAvailable is dead' claim needs rechecking"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "isActive: true",
+          "desc": "dispatch filters candidate drivers on isActive - NOT on isAvailable, which nothing reads"
+        },
+        {
           "file": "services/delivery/assignDriver.js",
           "regex": "areaQuery\\.isActive = true",
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"

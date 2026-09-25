@@ -133,8 +133,11 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
 `app-type: shoofi-shoofir`, default `app-name: delivery-company`. **Location**:
 `hooks/useDriverLocationTracking.ts` (fg 10s) + `utils/locationBackgroundTask.ts`
 (background, requires "always" permission), both POST `delivery/driver/location`, with an
-AsyncStorage offline-retry queue. **Availability/active**: `delivery/driver/availability`
-+ `.../update-active-status`. **Shifts**: `services/driverShiftService.ts` → `/driver-shift-manager/*`.
+AsyncStorage offline-retry queue. **Availability/active**: `.../update-active-status` ONLY —
+the switch is `components/delivery-driver/DeliveryDriverHeader.tsx` plus a second toggle in
+`screens/delivery-driver/profile.tsx`. `delivery/driver/availability` is **dead**: its store
+wrappers have no UI caller and nothing reads `isAvailable` (CORE invariant 4).
+**Shifts**: `services/driverShiftService.ts` → `/driver-shift-manager/*`.
 **Assignment**: arrives via push/WS (not polling); lifecycle actions POST `delivery/driver/order/*`.
 `DELIVERY_STATUS` copy = `1..4` (`consts/shared.ts`). Key: `stores/delivery-driver/index.ts`,
 `screens/delivery-driver/*`, `hooks/{useDriverLocationTracking,use-websocket}.ts`.
