@@ -110,6 +110,16 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
    alone books a driver into every slot they hold on *any* day. An overnight tail belongs to
    the weekday whose **night** it is (invariant 8), so "Mon 18:00→02:00" is entirely
    `dayOfWeek: 1`.
+   **And they are booked WITHOUT going through `/shifts/book`.** Shift generation writes the
+   matching permanent drivers straight into `bookedDrivers` as the shift document is created
+   (`bookedDrivers: matchingPermanentDrivers`), and `assignPermanentDriversToShifts` `$push`es
+   into existing ones — both in `services/driver-shift/shift-service.js`, neither touching the
+   booking route. So **every rule enforced in `/shifts/book` has to be duplicated there** or it
+   holds for drivers who book by hand and silently not for permanent ones. The same applies to
+   `/shifts/join-waiting-list` (a promotion off the list books you) and the admin
+   `assign-driver` / `reassign-driver` / Excel-import routes: five write paths create a
+   booking, one of them is the route. A guard that lives only in the route is a guard with
+   four holes — this is exactly how the blocked-drivers feature came to gate nothing.
 10. **`bookDelivery.pickupTime` is a wall-clock `"HH:mm"` string that wraps past midnight —
     it is not a timestamp.** Both create paths write
     `moment(...).utcOffset(offset).format("HH:mm")` (`services/delivery/book-delivery.js:104-113`,

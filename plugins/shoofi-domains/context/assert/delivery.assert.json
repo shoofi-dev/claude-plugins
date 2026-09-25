@@ -123,6 +123,16 @@
           "desc": "single per-weekday resolver; iterating the flat timeSlots over-books every weekday"
         },
         {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "bookedDrivers: matchingPermanentDrivers",
+          "desc": "shift generation writes permanent drivers straight into bookedDrivers - a booking created WITHOUT /shifts/book, so every guard in that route has to be duplicated here"
+        },
+        {
+          "file": "routes/driver-shift-manager.js",
+          "regex": "\\$push: \\{ bookedDrivers: booking \\}",
+          "desc": "the other booking-creating write paths (book, admin assign, reassign) - a guard that lives only in /shifts/book has holes at each of these"
+        },
+        {
           "file": "utils/driver-active-hours.js",
           "regex": "WORKING_START_HOUR",
           "desc": "the one correct business-day window ([D 09:00, D+1 02:00]); feeds the paid guarantee"
