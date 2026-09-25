@@ -72,6 +72,25 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
 3. **Never write `customers.isActive` directly** — always `setDriverActiveStatus`
    (`services/delivery/driver-status-service.js`), which writes `driverStatusHistory` in
    lock-step and pushes a websocket update. Direct writes create phantom history.
+   **And that collection is the ONLY place "when did he switch on/off" exists.** The driver
+   document has no `isActiveUpdatedAt`, no `lastActiveAt`, no `activeSince` (0 of 242 carry
+   any of them), and its `updatedAt` is bumped by unrelated profile edits — so `updatedAt`
+   is **not** a toggle time. `delivery-company.driver-status-history` (code handle
+   `db.driverStatusHistory` — **the collection is hyphenated**) is a complete availability
+   audit trail: 27,891 rows on 2026-09-25, oldest 2025-12-20, and **every single one is an
+   `isActive` change** (`changedFields:['isActive']` on 27,891/27,891, `newValues.isActive`
+   present on all of them). Each row carries `timestamp`, `driverId`, a denormalised
+   `driverName`/`companyId`, `changes.isActive.{old,new}` and — since the attribution fix —
+   `updatedBySource` + `updatedByName`. So a "who turned what on, when, and who did it"
+   feature is a read, never a schema change. Three traps: (a) `timestamp` is an
+   offset-suffixed STRING, so a lexicographic bound is an hour out across the DST flip —
+   widen the Mongo bound and cut precisely in JS, and sort "latest per driver" on **`_id`**,
+   which is monotonic in insertion order; (b) `updatedBySource` is absent on 11,879
+   historical rows (newest unattributed: 2026-08-17) — that is `unknown`, not a default to
+   guess at; (c) the hourly `driver-shift` cron writes ~4,200 of the rows in bursts, so any
+   "who did this" feed must separate `driver_app` / `shoofi_support` / `cron` or the human
+   actions are buried. Attribution split of all rows: `shoofi_support` 7,407 ·
+   `cron` 4,223 · `driver_app` 4,042 · `admin_web` 60 · `shift_admin` 11 · legacy 12,148.
 4. **`isActive` ≠ `isAvailable` ≠ `isOnline`** — three separate flags, don't conflate.
 5. **Twins always go pending** and (single mode) must share ONE driver: the
    `twinPickupSequence:1` side drives selection, the peer mirrors it, and `assignDriverAt` is

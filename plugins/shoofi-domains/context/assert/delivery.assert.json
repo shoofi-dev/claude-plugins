@@ -27,7 +27,8 @@
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js",
-        "services/monitoring/centralized-flow-monitor.js"
+        "services/monitoring/centralized-flow-monitor.js",
+        "services/delivery/driver-availability-feed.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -171,6 +172,21 @@
           "file": "services/monitoring/centralized-flow-monitor.js",
           "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
           "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "db\\.driverStatusHistory\\s*=\\s*db\\.collection\\('driver-status-history'\\)",
+          "desc": "db.driverStatusHistory is bound to the HYPHENATED driver-status-history collection - querying delivery-company.driverStatusHistory by hand returns zero rows silently"
+        },
+        {
+          "file": "services/delivery/driver-status-service.js",
+          "regex": "changedFields",
+          "desc": "every history row is tagged changedFields:['isActive'] - 27,891 of 27,891 rows, which is what makes the collection a complete availability audit trail rather than a general change log"
+        },
+        {
+          "file": "services/delivery/driver-availability-feed.js",
+          "regex": "\\$sort: \\{ _id: -1 \\}",
+          "desc": "latest-change-per-driver sorts on _id, not the offset-string timestamp, which is an hour out across the DST flip"
         }
       ]
     },

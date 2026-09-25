@@ -93,6 +93,20 @@ pickupTime + area.maxETA`.
   `services/delivery/driver-status-service.js:setDriverActiveStatus` (it writes
   `driverStatusHistory` in lock-step + WS-pushes `driver_status_updated`). Direct writes create phantom history.
 - **`isActive` (on shift/enabled) ≠ `isAvailable` ≠ `isOnline`** — three separate flags.
+- **`driver-status-history` is the availability audit trail** (code `db.driverStatusHistory`,
+  collection **hyphenated**). 27,891 rows on 2026-09-25 and **all** of them are `isActive`
+  changes — `{timestamp(offset STRING), driverId(ObjectId), driverName, companyId(string),
+  changes:{isActive:{old,new}}, oldValues, newValues, changedFields:['isActive'], updateType,
+  updatedBySource, updatedByName, updatedById, userAgent, ipAddress}`. The driver document
+  has **no** toggle timestamp (see CORE invariant 3), so this is the only source of "when".
+  Sort "latest per driver" on `_id`, not `timestamp` (offset string, DST-unsafe). Join it as
+  a LEFT join: drivers are hard-deleted (`routes/delivery/company.js`, `driver.js`) and 26 of
+  the 231 driver ids in the history have no `customers` document left — the row's own
+  `driverName` is the fallback. Existing readers:
+  `GET /api/driver-shift-manager/admin/driver-status-history` (per-driver, per-month
+  forensics → `DriverActiveHours.tsx`) and
+  `GET /api/driver-shift-manager/admin/driver-availability-changes`
+  (`services/delivery/driver-availability-feed.js` → the admin's driver-activity board).
 - **Location**: `POST /api/delivery/driver/location` writes `currentLocation` (GeoJSON) +
   `driverLocationHistory` (TTL) + broadcasts to admin/tracking. Driver app sends fg (10s) + background.
 - **Shifts** (`routes/driver-shift-manager.js`, `driverShifts` collection): booking system
