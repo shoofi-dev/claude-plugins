@@ -16,6 +16,8 @@
         "utils/create-indexes.js",
         "docs/stock-management.md",
         "docs/menu-search.md",
+        "services/search/text-search.js",
+        "test/integration/menu-search-mongo-regex-dialect.js",
         "utils/weight-extra-invariant.js",
         "services/catalog/bulk-price-update.js",
         "scripts/flag-sold-by-weight.js",
@@ -55,6 +57,12 @@
           "categoryOrders",
           "canSeeCombos",
           "resolveComboSnapshots"
+        ],
+        "services/search/text-search.js": [
+          "codepointRanges",
+          "COMBINING_MARKS_SOURCE",
+          "WORD_START",
+          "createMatcher"
         ],
         "utils/weight-extra-invariant.js": [
           "getWeightExtra",

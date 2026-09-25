@@ -151,6 +151,38 @@ boundary and say so in the PR.
    no Haat/xlsx import of combos. The order side — `calculateComboExtrasPrice`,
    `expandStockLines`, amend scope — is orders CORE invariants 11–12; `utils/order-stock.js`
    is the shared review boundary named in Scope.
+11. **A REGEX BUILT IN NODE AND USED AS A MONGO QUERY VALUE IS COMPILED BY PCRE2, NOT V8.**
+    The driver ships `regex.source` verbatim; the server matches it. The two engines do not
+    read the same dialect and each rejects what the other needs:
+    - `\uXXXX` — V8 yes, **PCRE2 hard error**: `Regular expression is invalid: PCRE2 does not
+      support \F, \L, \l, \N{name}, \U, or \u`.
+    - `\x{0591}` — PCRE2 yes, **V8 hard error**: it reads `\x` + `{0591}` as a quantifier and
+      throws `Range out of order in character class`.
+
+    So put **literal codepoints** in character classes — the one form both accept. Build them
+    with `codepointRanges()` (`services/search/text-search.js`) rather than pasting combining
+    marks into the file, where they are invisible and the next editor mangles them. `\w`, `\s`,
+    `\d`, `{n,m}`, `(?:…)` and backslash-escaped punctuation are fine in both.
+
+    This is invariant 5's failure class again — a JS-side assumption that does not survive the
+    trip to the server. It shipped: `POST /api/menu/search` scores store names **in memory** but
+    prefilters dishes **in Mongo**, so from 2026-09-17 no dish was findable by anybody, in any
+    script, while store-name search looked fine.
+
+    ⚠️ **And it did not surface as a 500.** The throwing `find` sits inside the per-store
+    `try/catch` that exists so one unreachable store database cannot empty the page, so the
+    route answered **200** with the store-name leg only, logging `menu search: store skipped`
+    once per store per keystroke. A guard against a partial failure downgrades a total one into
+    a plausible-looking partial result — when a per-item leg returns nothing, count the
+    warnings before believing the response.
+
+    ⚠️ **A Mongo fake in a test cannot catch this and must not pretend to.**
+    `test/integration/menu-search-language-and-typos.js` matched with `cond.test(value)` —
+    V8 — so fourteen tests, several exercising the product leg, passed against a code path
+    that was dead in production. A fake that borrows the runtime's regex engine is blind here
+    by construction; it now refuses what PCRE2 refuses, and
+    `test/integration/menu-search-mongo-regex-dialect.js` asserts the property of `.source`
+    directly, without a database.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
