@@ -171,6 +171,16 @@
           "file": "services/monitoring/centralized-flow-monitor.js",
           "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
           "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "isOnline:\\s*isOnline !== undefined \\? isOnline : true",
+          "desc": "isOnline is written ONLY by the location ping and defaults to true, with nothing writing it back to false - that is why it is sticky-true (220/242) while only isActive means available. If this line goes, re-measure before believing isOnline again"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "lastAvailabilityUpdate",
+          "desc": "the isAvailable/availabilityReason/lastAvailabilityUpdate write, whose only client method has no UI caller - 0 of 242 drivers carry any of the three. If a caller appears, the doc's dead-field claim needs re-checking"
         }
       ]
     },

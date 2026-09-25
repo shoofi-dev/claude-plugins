@@ -92,7 +92,13 @@ pickupTime + area.maxETA`.
 - **Active-status chokepoint:** NEVER write `customers.isActive` directly — always
   `services/delivery/driver-status-service.js:setDriverActiveStatus` (it writes
   `driverStatusHistory` in lock-step + WS-pushes `driver_status_updated`). Direct writes create phantom history.
-- **`isActive` (on shift/enabled) ≠ `isAvailable` ≠ `isOnline`** — three separate flags.
+- **`isActive` is the only availability flag that means anything.** `isOnline` is written
+  only by the location ping and defaults to `true` with nothing writing it back
+  (`routes/delivery/driver.js:893`) — sticky-true after the first GPS fix (220/242 true vs
+  3 `isActive`, 2026-09-25). `isAvailable`/`availabilityReason`/`lastAvailabilityUpdate`
+  (`POST /api/delivery/driver/availability`, `routes/delivery/driver.js:1377`) are
+  populated on **0 of 242** drivers and their only client method has no UI caller. Dispatch
+  reads `isActive`. See CORE.md invariant 4.
 - **Location**: `POST /api/delivery/driver/location` writes `currentLocation` (GeoJSON) +
   `driverLocationHistory` (TTL) + broadcasts to admin/tracking. Driver app sends fg (10s) + background.
 - **Shifts** (`routes/driver-shift-manager.js`, `driverShifts` collection): booking system
@@ -112,9 +118,12 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   twinPickupSequence, twinAssignmentMode, twinPeer, twinDegraded, *DelayNotified*}`.
 - `store` (company) — `location, coverageRadius, supportedCities[ObjectId], supportedAreas
   [{areaId,price,minOrder,eta}], isControlledByAdmin, manualAssignmentOnly, accounting`.
-- `customers` (drivers) — `role, isActive, isAvailable, isOnline, companyId(string),
-  currentLocation, lastLocationUpdate, personalSupportedAreas[areaId], maxOrdersByAdmin,
-  storeAssignmentMode, assignedStoreAppNames[]`.
+- `customers` (drivers) — `role, isActive, companyId(string), currentLocation,
+  lastLocationUpdate, personalSupportedAreas[areaId], maxOrdersByAdmin, storeAssignmentMode,
+  assignedStoreAppNames[]`. Also present but NOT usable as availability: `isOnline` (sticky
+  true), `isAvailable` (0/242 populated) — §5. Matching a driver: `role:'driver'` is 242
+  docs and `isDriver:true` is 243 — one carries the flag without the role, so a complete
+  sweep is `{$or:[{role:'driver'},{isDriver:true}]}`.
 - Geo: `cities, parentCities, cityAreas, areas, areasGeometry`. Ops: `driverStatusHistory,
   driverLocationHistory(TTL), driverShifts, driverDailyHours, deliveryConfig`.
 

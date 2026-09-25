@@ -72,7 +72,20 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
 3. **Never write `customers.isActive` directly** — always `setDriverActiveStatus`
    (`services/delivery/driver-status-service.js`), which writes `driverStatusHistory` in
    lock-step and pushes a websocket update. Direct writes create phantom history.
-4. **`isActive` ≠ `isAvailable` ≠ `isOnline`** — three separate flags, don't conflate.
+4. **`isActive` is the ONLY real availability flag. `isOnline` and `isAvailable` are not
+   what they look like** — "three separate flags, don't conflate" reads as though all three
+   carry meaning, and two of them do not. `isOnline` is written **only** by the location
+   ping, defaults to `true` and is never written back to `false`
+   (`routes/delivery/driver.js:893`, `$set` at `:981`) — so it is sticky-true forever after
+   a driver's first GPS fix: measured 2026-09-25, **220 of 242 drivers `isOnline:true` while
+   3 were `isActive:true`**. `isAvailable` / `availabilityReason` / `lastAvailabilityUpdate`
+   are written by `POST /api/delivery/driver/availability`
+   (`routes/delivery/driver.js:1377`), whose only client method
+   (`shoofi-shoofir/stores/delivery-driver/index.ts:433`) has no UI caller: **0 of 242
+   drivers carry any of the three**. Dispatch reads `isActive` and nothing else. The only
+   other durable presence signal is `customers.lastLocationUpdate` (an offset STRING, not a
+   Date), which the map treats as stale at 10 minutes — useful as "GPS fresh / stale", never
+   as "available". A screen built on `isOnline` reports a fleet of 220 that is really 3.
 5. **Twins always go pending** and (single mode) must share ONE driver: the
    `twinPickupSequence:1` side drives selection, the peer mirrors it, and `assignDriverAt` is
    aligned to the later side. Breaking any of it splits a twin.
