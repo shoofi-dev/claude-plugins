@@ -196,6 +196,49 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 - **Awareness:** MASAV is **decoupled** from the reports — payout amounts are re-keyed into an
   Excel by a human; there is no automated report→MASAV link. Hardcoded GreenInvoice
   `businessId`/`itemId` constants exist.
+- **Awareness — a report PDF on Spaces is published, not protected.** All **8**
+  `PutObjectCommand` call sites in this repo pass `ACL: "public-read"`, with no exception:
+  `routes/payments/admin-reports.js:239` (store settlement), `routes/driver-reports.js:687`
+  (courier settlement), `utils/invoice-mail.js:155` (the customer invoice PDF),
+  `backfill-invoices.js:205` (the bulk variant — one run republishes every historical
+  invoice), `utils/images-service.js:36`, `utils/image-variants.js:127`,
+  `routes/product.js:113` and `services/social-posts/render-service.js:204`. Counting by
+  grep overshoots: `routes/payments.js:14`, `routes/payments/admin.js:14` and
+  `routes/payments/summaries.js:14` **import** `PutObjectCommand` and never call it — dead
+  imports from the `payments.js` split. The URL handed back to the admin —
+  `https://shoofi-spaces.fra1.digitaloceanspaces.com/reports/<appName>/<reportId>.pdf`
+  (`admin-reports.js:233`, `:247`) and `driver-reports/<companyId>/<reportId>.pdf`
+  (`driver-reports.js:679`, `:691`) — carries no token, so anyone holding it reads a
+  store's or a courier's whole period. Note this is the **origin** host; the invoice URLs
+  in `routes/order.js` use the `.cdn.` host instead, the one place the two differ. Read
+  "on Spaces" as "the code publishes it", never as "behind the admin login" — whether a
+  given object is actually reachable also depends on bucket settings that code can't tell
+  you, but `routes/order.js` handing these URLs to customers is the behavioural proof.
+- **Awareness — report ids are enumerable *within a monthly run*.** `<appName>` is the
+  public `app-name` slug (returned by unauthenticated `routes/shoofi-admin.js:766` and
+  `routes/store.js:193`); `<companyId>` is a `delivery-company.store` ObjectId, not a slug.
+  `<reportId>` is a Mongo ObjectId minted client-side by the driver — neither report doc
+  sets `_id`, it is read off the insert (`admin-reports.js:1604`, `driver-reports.js:1158`).
+  Under the pinned `mongodb@^3.3.3`/`bson@1.x` that is timestamp + **5 random per-process
+  bytes** + counter, so cold guessing is infeasible. But every report in one monthly run is
+  inserted in a single loop in a single process, so they share those bytes and differ only
+  by a consecutive counter: **one leaked report id exposes that whole batch's ids by
+  arithmetic** — i.e. every store's settlement for that month. Worst case in the repo is not
+  the report key at all but `utils/invoice-mail.js:153`, `invoices/doc-<providerDocId>.pdf`,
+  where the id is a short sequential provider number.
+- **Awareness — you cannot un-send those links, so design around them.** This is a
+  **property, not a bug to fix opportunistically**: `pdfUrl` is stored on the report doc
+  (`admin-reports.js:1630`, `driver-reports.js:1168`) and has already gone out as parameter
+  `{{2}}` of the WhatsApp `monthly_report` template (`admin-reports.js:2491`,
+  `driver-reports.js:1575`) — not by email; that block is commented out at
+  `admin-reports.js:2423-2433` and `sendEmail` is required and never called. A URL sitting
+  in a third party's WhatsApp thread is less revocable than one you mailed, and WhatsApp's
+  own link-preview fetch is an unauthenticated reader. Flipping the ACL breaks reports that
+  have gone out. When a NEW artefact must stay internal, keep the bytes in Mongo and serve
+  them from an admin-gated route — `routes/ai-tasks.js:718` (`...adminOnly`, `sendFile()` at
+  `:706` with `Cache-Control: private`) and `routes/team-tasks.js:752` both do this — and cap
+  one file per document well under the 16MB BSON limit, the way
+  `services/ai-tasks/constants.js:180` pins `MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024`.
 
 ## Recipe — change a payout or invoice amount
 1. **Trace the money first**: who collected (cash/card) → who is owed → which formula line.
