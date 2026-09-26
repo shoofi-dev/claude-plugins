@@ -1,7 +1,7 @@
 ---
 operator: competitive-intel
 class: B (operator / department head — ships decisions, not code)
-last-verified: shoofi-delivery-web@main + shoofi-server@main / 2026-08-14
+last-verified: shoofi-delivery-web@main + shoofi-server@main / 2026-09-24
 scope: reads Haat + Tira Eat public/internal endpoints; reads shoofi-server data; writes briefs
 ---
 
@@ -469,8 +469,9 @@ One caveat: `no-match` is **terminal but revisitable** — when we onboard a new
    list and must be re-scored whenever we onboard a new store.
 
 ## 7. Explicitly out of scope right now
-No scheduled collectors or crons **other than the two checks in §8** (the hourly open/closed
-check and the nightly Haat menu comparison), both asked for explicitly on 2026-09-24. That
+No scheduled collectors or crons **other than the three checks in §8** (the hourly open/closed
+check, the nightly Haat menu comparison, and the daily Haat store-list sync), all asked for
+explicitly on 2026-09-24. That
 request is the go-ahead the agent file's "never scrape menus on a schedule" limit asks for,
 **for Haat, confirmed pairs, nightly, only**. Tira Eat menus are still ~500 reads per store
 and still need their own go-ahead. No competitor snapshots or history beyond those checks. No menu scraping, no
@@ -516,6 +517,30 @@ confirmed Haat pair, the Haat menu against our `products`. Results are in
 - `diff` = ours − theirs. Sold-by-weight products and combos are never price-compared.
 - A base-price gap can be structure, not price: Haat often prices a "from" base with sizes as
   options. Say so when quoting one.
+
+### 8c. Haat's store list, synced daily, and the stores nobody handled (2026-09-24)
+03:30 Asia/Jerusalem, `services/admin-issues/checks/competitor-unhandled-stores.js`, cron
+`utils/crons/competitor-store-sync-cron.js`. Asked for because Haat adds stores every day.
+Admin page: `/admin/issues/competitor-unhandled-store` (third icon on the issues rail).
+
+- **The sync is the coverage screen's refresh, run by the server.** `runCompetitorRefresh`
+  with `source: "haat"`, pulled by `fetchStoreList` (server-side, `HAAT_BEARER_TOKEN`), which
+  builds the same ingest records the browser posts. Ingest → town stamp → proposals. It never
+  gives a verdict: `confirmed`, `rejected` and `no-match` stay human-owned (§4).
+  Tira Eat is still refreshed by the button only.
+- **"Not handled"** = a Haat row with `townId` set (in a town we deliver in), `status`
+  `unmatched` or `proposed`, and `lastSeenAt` within 7 days (rows are never deleted, so a store
+  Haat dropped stops counting). One `competitor-unhandled-store` issue per such store.
+  A rejection writes `unmatched` back, so it stays in the queue until the right store is linked
+  or it is marked `no-match`.
+- **The count moves when an admin rules**, not the next night: the DB-only half
+  (`syncUnhandledIssues`) runs after every confirm / reject / no-match / reopen / propose /
+  refresh route. The page links to the coverage screen with
+  `?source=haat&filter=unhandled&q=<name>`; the new `לא טופלו` filter there hides the groups
+  outside our towns so it matches the rail.
+- **For a brief:** the open count is the size of the review backlog, not a count of stores we
+  are missing. A `proposed` row is still a guess (`detail.proposedAppName`; the issue's
+  `appName` is always null).
 
 ## Definition of done
 See the agent file. In short: a dated brief a human reads in two minutes, every claim traceable
