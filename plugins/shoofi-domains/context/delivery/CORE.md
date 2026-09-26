@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@561e3ca / 2026-07-28
+last-verified: shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -16,7 +16,9 @@ Server: `routes/delivery.js` + `routes/delivery/*`, `routes/geo.js`,
 `routes/driver-shift-manager.js`, `services/delivery/*` (`assignDriver`, `delayed-assignment`,
 `book-delivery`, `assignment-scheduler`, `driver-status-service`), delivery crons.
 Clients: driver app (shoofir), admin delivery + **area control panel** (delivery-web),
-partner booking trigger.
+partner booking trigger + **delivery-only booking screens**.
+Also yours: `services/delivery/delivery-only.js` and the three
+`/api/delivery/delivery-only/*` routes in `routes/delivery/orders.js`.
 **Not yours:** driver **payouts** = `accountant`; order lifecycle = `orders` (you're the callee
 at the booking handoff — never edit `routes/order.js`).
 
@@ -47,6 +49,36 @@ sets**, and the second one is wrong for anything dispatch-related. Note the asym
 scope documents above it — `cityAreas.isActive` and `parentCities.isActive` really are read as
 `{$ne: false}`, so absent means active *there*. Same field name, opposite default, one collection
 apart. Anything reasoning about whether an area was serving must use `isActive === true`.
+
+## Delivery-only — a courier with no order behind it
+A store can book a driver for goods **Shoofi never sold**: owner picks a town, gives a phone
+and a ready-time, a courier goes. `services/delivery/delivery-only.js` +
+`GET|POST /api/delivery/delivery-only/{towns,book,list}` (`routes/delivery/orders.js`).
+Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
+
+- The document is an ordinary `bookDelivery` with **`isDeliveryOnly: true` and no `order`**
+  (the single exception is `order.order.commentToCourier`). Same `DELIVERY_STATUS` enum, same
+  assignment engine, same driver app — it invents no statuses and no second pipeline.
+- `customerLocation` is a **dispatch point inside the chosen town**, flagged
+  `isApproximateLocation: true` — not an address. The driver phones the customer for the
+  real one, which is also why a town is quoted as a **price range** (`deliveryOnlyPriceRange`,
+  frozen at booking) and not a price: one town holds many areas at different prices.
+- Towns are recovered **geometrically** (dropoff polygon → `cities` → `parent-cities`); areas
+  carry no dropoff city id. Matching `areas.geometryId` to `parentCities.geometryId` matches
+  nothing in prod — that bug shipped once and emptied the dropdown for every store.
+- **Gate = OR of two flags**, both named `isDeliveryOnlySupport`: central `shoofi.store {id:1}`
+  (on for everybody) and `<appName>.store {id:1}` (on for one store). Resolved server-side and
+  exposed as the computed `isDeliveryOnlyActive` on `GET /api/store`; never re-implement it.
+- **Three separate numbers, never mixed:** `price` = the goods (driver pays the store, collects
+  from the customer — never Shoofi revenue, never a commission base);
+  `deliveryOnlyFee.storeAmount` = store→Shoofi; `deliveryOnlyFee.driverAmount` = driver→Shoofi.
+  Both fees are **region** (`city-areas`) values, so a town whose region is unset books at a
+  silent ₪0 — `node scripts/delivery-only-preflight.js` (read-only) lists those.
+- Reports **exclude** delivery-only from ordinary delivery counts
+  (`isDeliveryOnly: { $ne: true }` in `driver-reports.js`, `payments/summaries.js`,
+  `exec-dashboard/delivery-metrics.js`) and add the two fees as their own settlement lines.
+- The store's list is filtered **server-side**: default = active work queue (`1,2,3,5`),
+  عرض الكل = no status filter at all (not a date toggle), newest 200, `appName`-scoped.
 
 ## Invariants — never weaken
 1. **`DELIVERY_STATUS` is authoritative in `consts/consts.js`**: `1` waiting-approve → `2`
@@ -149,7 +181,21 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
     `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
     runs — which looks identical to a correction that is simply rare.
 
+10. **A cancelled delivery must lose `isPendingAssignment`.** `processPendingAssignments`
+    scans `{isPendingAssignment: true, assignDriverAt: {$lte: now}}`; the status filter added
+    there is a second line of defence, not the fix — and `$nin` still matches documents with
+    no `status` field. Every cancel path (`routes/order.js`, `routes/delivery/admin.js`) writes
+    `isPendingAssignment: false` or the cancel un-cancels itself minutes later.
+11. **Never assume a delivery has an order.** `deliveryOrder.order` is absent on every
+    delivery-only booking, so anything keyed on `order.customerId`, `order.total` or
+    `order.orderId` silently no-ops there. That is exactly how admin cancellation used to
+    notify nobody while the driver was still driving to the store.
+
 ## Known status (human-confirmed — do NOT "fix")
+- **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
+  `isDeliveryOnlySupport` field, so the gate returns `platform_disabled`/`store_disabled` for
+  every store and the partner button is hidden platform-wide. The feature is built and merged;
+  it is waiting on the admin Settings toggle, not on code.
 - **BY DESIGN:** `isSendNotificationToDeliveryCompany` on the **central** `shoofi.store {id:1}`
   is the **GLOBAL master switch** for the delivery-company/driver integration — when off,
   **no `bookDelivery` is created platform-wide**. The **per-store**
