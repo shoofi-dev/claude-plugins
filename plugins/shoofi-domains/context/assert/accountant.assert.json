@@ -161,18 +161,48 @@
         },
         {
           "file": "routes/payments/admin-reports.js",
-          "regex": "ACL:\\s*\"public-read\"",
-          "desc": "store settlement PDFs are uploaded world-readable — the doc's 'a report PDF on Spaces is published' awareness note. If this ever goes private, the note must change with it"
+          "regex": "Body:\\s*pdfBuffer,\\s*[\\r\\n]+\\s*ACL:\\s*\"public-read\"",
+          "desc": "store settlement PDFs are UPLOADED world-readable — the doc's 'a report PDF on Spaces is published' note. Anchored on the Body/ACL pair because a bare ACL match is also satisfied by the delete path, which would let the upload go private unnoticed"
         },
         {
           "file": "routes/driver-reports.js",
-          "regex": "ACL:\\s*\"public-read\"",
-          "desc": "courier settlement PDFs are uploaded world-readable, same as the store ones"
+          "regex": "Body:\\s*pdfBuffer,\\s*[\\r\\n]+\\s*ContentType:[^\\r\\n]*[\\r\\n]+\\s*ACL:\\s*\"public-read\"",
+          "desc": "courier settlement PDFs are uploaded world-readable, same as the store ones (ACL sits after ContentType here, unlike admin-reports.js)"
+        },
+        {
+          "file": "backfill-invoices.js",
+          "regex": "Key:\\s*s3Key,\\s*[\\r\\n]+\\s*Body:\\s*pdfBuffer,\\s*[\\r\\n]+\\s*ACL:\\s*\"public-read\"",
+          "desc": "the bulk variant: one run republishes every historical invoice PDF world-readable. Listed in the doc because a grep of routes/ alone misses it"
+        },
+        {
+          "file": "utils/invoice-mail.js",
+          "regex": "Key:\\s*`invoices/doc-\\$\\{searchString\\}\\.pdf`",
+          "desc": "the worst case for guessability in the doc's note — the customer invoice key is a short sequential provider document id, not an ObjectId"
         },
         {
           "file": "routes/payments/admin-reports.js",
           "regex": "const key\\s*=\\s*`reports/\\$\\{appName\\}/\\$\\{reportId\\}\\.pdf`",
-          "desc": "the public URL is store slug + report ObjectId, which is what makes a neighbouring report enumerable rather than merely unguessable"
+          "desc": "the public URL is public store slug + report ObjectId. NOTE this literal appears twice (upload and deletePDFFromSpaces) — change both"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "const key\\s*=\\s*`driver-reports/\\$\\{companyId\\}/\\$\\{reportId\\}\\.pdf`",
+          "desc": "the courier key is a delivery-company ObjectId, not a public slug — the doc distinguishes the two. Also duplicated in the delete path"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "const result = await dbAdmin\\.storeReports\\.insertOne\\(report\\)",
+          "desc": "reportId is minted client-side by the driver (no _id is set, it is read off the insert) — the basis for the doc's 'enumerable within a monthly run' claim"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "'monthly_report'",
+          "desc": "the pdfUrl leaves as a WhatsApp monthly_report template parameter, NOT by email (the email block above it is commented out) — that is why the link cannot be recalled"
+        },
+        {
+          "file": "services/ai-tasks/constants.js",
+          "regex": "MAX_ATTACHMENT_BYTES = 8 \\* 1024 \\* 1024",
+          "desc": "the doc points at Mongo-stored, admin-gated bytes as the pattern for a NEW internal artefact, and quotes this cap as the working number under the 16MB BSON limit"
         }
       ]
     }
