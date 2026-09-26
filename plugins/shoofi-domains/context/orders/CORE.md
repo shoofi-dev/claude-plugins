@@ -148,13 +148,40 @@ apart — always establish which is meant:
    `payment_method_invalid`, `car_details_missing`, `future_order_date_missing`}, from
    `shoofi-app/hooks/checkout/use-checkout-validate.ts`. **"Store closed" and "no delivery
    available" create NO order document at all** — this is their only record anywhere. The
-   top-level failure in `screens/checkout/index.tsx` sends no `step`, so ~half the rows have
-   none; bucket them rather than dropping them.
+   top-level failure in `screens/checkout/index.tsx` sends no `step`, but it is a
+   **duplicate**: it fires after the stepped event for the same press, so ~half the rows have
+   no step. Count reasons from the stepped rows only; the step-less row adds a price snapshot,
+   not a reason (verified 2026-09-24: 158 of 168 blocked sessions had both).
+   `payment_method_invalid` is mostly friction, not loss — checkout starts with NO payment
+   method (the cash default is commented out) and forgets the choice on remount, so ~94% of
+   those customers pick one and order within 30 min.
 2. **Submitted and never paid** — status `"0"` order rows, per store DB. See the
    `FAILED_PAYMENT_STATUS` note; that is the only layer carrying an issuer reason.
 3. **Never reached checkout** — `page_viewed` with `properties.page_name` ∈
    {`ProductAddToCart`, `Cart`} and no `order_submit_success`. Add-to-cart uses
    `trackPageView`, not `trackEvent`, so it is a `page_viewed` row and easy to miss.
+   The cart's continue button logs `cart_checkout_pressed`, and `cart_checkout_blocked`
+   with `reason` ∈ {`store_closed`, `store_busy`, `store_custom_message`,
+   `school_order_time_invalid`, `store_status_error`} (from `screens/cart/cart.tsx`). Before
+   those events, a cart stopped by a closed/busy store left no trace at all.
+
+Checkout-screen events that explain the "reached checkout, didn't send" layer:
+- **`checkout_left`** — checkout lost focus (`reason`: `blur`|`unmount`) without a completed
+  order: `seconds_on_screen`, `attempted`, and the payment method / shipping / timing / price
+  the customer had at that moment. Payment method and order timing live in screen state
+  and **reset on every mount**, so a customer who goes back to the cart and returns loses
+  both; this event is the only record of the dropped choice.
+- **`page_viewed` `Checkout`** carries `cart_store` and `browsed_store`. The future-order
+  picker is gated on the **browsed** store's flags (`storeDataStore.storeData`), not the
+  cart's — a mismatch explains a picker that is missing.
+- **`order_timing_changed`** is what the customer chose, but it also fires `now→now` on
+  every picker mount — noise, not a choice. Changes the SCREEN makes (auto-flip to future
+  delivery, twin mode forcing `now`) log `order_timing_auto_changed` with a `reason`.
+- **`future_order_picker_opened` / `_closed`**, and **`future_order_no_slots`** when future
+  ordering is enabled but no day has a slot left.
+- A future slot picked then silently lost is real: in Sep 2026, 13 of 47 orders whose last
+  timing pick was `future` were sent as ASAP after the customer left and re-entered
+  checkout.
 
 Traps that cost a day if you meet them cold:
 - **`apps-logs.created` is a real BSON `Date`** — the exact opposite of `orders.created`. One

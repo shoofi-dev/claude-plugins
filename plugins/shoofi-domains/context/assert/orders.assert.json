@@ -231,13 +231,24 @@
         "stores/cart/index.ts",
         "screens/checkout/index.tsx",
         "components/checkout/FutureOrderPicker.tsx",
-        "hooks/checkout/use-checkout-validate.ts"
+        "hooks/checkout/use-checkout-validate.ts",
+        "screens/cart/cart.tsx"
       ],
       "patterns": [
         {
           "file": "hooks/checkout/use-checkout-validate.ts",
           "regex": "checkout_validation_failed",
           "desc": "checkouts blocked client-side never reach the server as an order (CORE: where an order that never happened lives)"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "\"checkout_left\"",
+          "desc": "checkout abandonment snapshot, incl. the payment/timing choice that resets on remount (CORE: where an order that never happened lives)"
+        },
+        {
+          "file": "components/checkout/FutureOrderPicker.tsx",
+          "regex": "future_order_no_slots",
+          "desc": "future ordering enabled but nothing to pick (CORE: where an order that never happened lives)"
         },
         {
           "file": "consts/shared.ts",
@@ -263,6 +274,11 @@
           "file": "components/checkout/FutureOrderPicker.tsx",
           "regex": "MAX_RAMADAN_DAYS_AHEAD",
           "desc": "ramadan-iftar orders can be days ahead without isFutureOrder"
+        },
+        {
+          "file": "screens/cart/cart.tsx",
+          "regex": "cart_checkout_blocked",
+          "desc": "closed/busy-store bounces from the cart, previously unlogged (CORE: where an order that never happened lives)"
         }
       ]
     },
