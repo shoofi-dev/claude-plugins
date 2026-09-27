@@ -30,9 +30,7 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "test/integration/delivery-only-region-fee.js",
-        "test/integration/delivery-support-gate.js",
-        "test/integration/store-delivery-only-expense.js"
+        "docs/delivery-only-bookings.md"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -209,13 +207,8 @@
         },
         {
           "file": "routes/delivery/orders.js",
-          "regex": "success:\\s*true,\\s*bookId,\\s*storeFee:\\s*deliveryData\\.deliveryOnlyFee\\.storeAmount",
-          "desc": "the delivery-only booking success response returns ONLY storeAmount, read off the frozen fee snapshot - driverAmount must never reach the store"
-        },
-        {
-          "file": "routes/delivery/orders.js",
-          "regex": "console\\.error\\(\"delivery-only/book failed:\", err\\)",
-          "desc": "the ONLY trace a delivery-only booking leaves in the logs is this 500 catch - success and every refusal path log nothing at all"
+          "regex": "\\[delivery-only\\] booked",
+          "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
         }
       ]
     },

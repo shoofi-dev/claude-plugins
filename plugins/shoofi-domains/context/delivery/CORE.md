@@ -54,8 +54,7 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
 A store can book a driver for goods **Shoofi never sold**: owner picks a town, gives a phone
 and a ready-time, a courier goes. `services/delivery/delivery-only.js` +
 `GET|POST /api/delivery/delivery-only/{towns,book,list}` (`routes/delivery/orders.js`).
-Full write-up: **`reference.md` §2b** — the feature ships **no `docs/` page in the server repo**;
-this doc pair is the only write-up there is.
+Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
 
 - The document is an ordinary `bookDelivery` with **`isDeliveryOnly: true` and no `order`**
   (the single exception is `order.order.commentToCourier`). Same `DELIVERY_STATUS` enum, same
