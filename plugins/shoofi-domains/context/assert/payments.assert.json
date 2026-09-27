@@ -22,7 +22,10 @@
       "symbols": {
         "utils/hyp-pay.js": [
           "buildCcPaymentRefData",
-          "chargeToken"
+          "chargeToken",
+          "cancelAuthorization",
+          "authorizeToken",
+          "authorizeWalletToken"
         ],
         "utils/invoice-mail.js": [
           "saveInvoice"
@@ -89,6 +92,31 @@
           "file": "routes/store.js",
           "regex": "hyp_enabled",
           "desc": "platform tokenization rollout flag — NOT read by any charge path"
+        },
+        {
+          "file": "utils/hyp-pay.js",
+          "regex": "action: 'CancelTrans'",
+          "desc": "the J5 release call HYP refuses with CCode=920 for every saved card (CORE invariant 11)"
+        },
+        {
+          "file": "utils/hyp-pay.js",
+          "regex": "Token: 'True'",
+          "desc": "what makes a saved-card authorization tokenized — the only structural difference from the wallet path, which releases cleanly (CORE invariant 11)"
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "authorizeWalletToken",
+          "desc": "the wallet authorization + getToken exchange whose holds DO release (CORE invariant 11)"
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "RELEASE_FAILED",
+          "desc": "terminal state a refused release lands in; reconciled to EXPIRED once expiresAt passes (CORE invariant 11)"
+        },
+        {
+          "file": "utils/crons/order-capture-cron.js",
+          "regex": "reconcileLapsedHolds",
+          "desc": "turns a lapsed uncaptured hold into EXPIRED so it stops demanding a manual refund (CORE invariant 11)"
         }
       ]
     },

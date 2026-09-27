@@ -114,6 +114,37 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    Reach: wallet orders always (unconditionally manual), card orders only where the flag is
    on — a gateway-issued document cannot take a `ua_uuid`, and `EZ.*` is an undocumented
    pass-through that can reject the whole charge, so do not try `EZ.ua_uuid`.
+11. **HYP will not release a J5 hold placed with a SAVED CARD — `CancelTrans` answers
+   `CCode=920` every time.** Wallet holds release cleanly. Swept across all 259 store DBs on
+   2026-09-27: of every release ever attempted since two-phase went live (2026-08-20), **7 of 7
+   saved-card releases were refused and 25 of 25 Apple/Google Pay releases succeeded** — no
+   exception in either direction. **Timing is not the discriminator**: refusals ran 3.6–34.6 min
+   after authorization, successes 0.4–26.6 min, ranges fully overlapping, so the "not yet
+   transmitted to Shva" reading in `cancelAuthorization`'s own doc comment (`utils/hyp-pay.js`)
+   does not explain it. The `CancelTrans` request is byte-identical for both
+   (`Masof`/`PassP`/`TransId` only); the AUTHORIZATION is what differs — `authorizeToken` sends
+   `CC=<token>` + `Token=True` over GET, while `authorizeWalletToken` posts
+   `ApplePay`/`WalletToken` and then swaps the authorization for a token via `getToken`
+   (`services/payments/order-authorization.js` `authorizeWalletOrderPayment`).
+   **Why HYP answers 920 is NOT settled** — the code contains no HYP error table and no
+   reference to 920 outside a test fixture. Do not "fix" the release call on a guess; settling
+   it needs HYP's table or a test-terminal probe. `scripts/hyp-j5-spike.js` proves nothing here
+   either way: it authorizes with a raw PAN rather than a token, and its cleanup `CancelTrans`
+   discards the result.
+   Consequence for support: **every card cancellation strands a live hold**, which then lapses
+   by itself at `paymentAuth.expiresAt` (~5 days). Nothing is owed, and a manual זיכוי would be
+   a real give-away — see the `refundRequired` warning above.
+   ⚠️ **To tell a J5 order's instrument apart, read `paymentData` — not `payment_provider`.** A
+   J5 order carries **no top-level `payment_provider` field at all** (`shouldAuthorize` keys on
+   the request's provider, which is never persisted onto the order).
+   `paymentData.walletType` is `APPLEPAY`/`GOOGLEPAY` on a wallet order and **absent** on a card
+   order, which instead carries `paymentData.ccType` + `paymentData.provider: "HYP"`;
+   `paymentAuth.walletType` mirrors it. Both instruments set `ccPaymentRefData.provider: "HYP"`,
+   so grouping on that — or on `payment_provider` — collapses the two into one undifferentiated
+   population and hides this split completely.
+   ⚠️ `paymentAuth.expiresAt` / `authorizedAt` / `captureAt` are **real BSON Dates** (all 3,448
+   J5 orders), unlike `orders.created`, which is an offset string. Bound a window on these with
+   a `Date`; bounding `created` with one returns 0 rows silently.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.
