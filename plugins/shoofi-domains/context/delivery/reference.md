@@ -47,8 +47,8 @@ Transitions: driver `approve`/`start`/`complete`/`cancel`/`waiting-in-store`
 
 ## 2b. Delivery-only bookings (store books a courier, no order)
 `services/delivery/delivery-only.js` + three `auth.required` routes in
-`routes/delivery/orders.js`, all scoped by the `app-name` header. Authoritative write-up:
-**`shoofi-server/docs/delivery-only-bookings.md`**.
+`routes/delivery/orders.js`, all scoped by the `app-name` header. **This section is the
+authoritative write-up** — the feature shipped without a `docs/` page in the server repo.
 
 | Route | Returns | Refusal |
 |---|---|---|
@@ -80,10 +80,18 @@ after a timeout confirms the existing booking instead of reading as "no courier 
 either way. Known limits: `.limit(200)` with no pagination, and the partner's عرض الكل
 checkbox is `useState(false)` so it resets on every visit.
 
-**Logs** (OpenSearch `shoofi-server-logs`): `[delivery-only] booked|book refused|book failed|
-book duplicate-inflight|book replay|book errored`, and `[delivery-cancel] bookId=… isDeliveryOnly=…
-driverId=…`. `/towns` refusals are deliberately **not** logged — the screen polls it on every
-open and focus, and every call is a refusal while the platform flag is off.
+**Logs: there are none worth searching.** A delivery-only booking that succeeds logs **nothing**,
+and so does every refusal — gate, town-not-serviceable, duplicate-inflight, `originalBookId` replay
+and `no_eligible_driver` each return their reason to the client and write no line. The only trace
+any of the three routes can leave is an unhandled throw:
+`console.error("delivery-only/{towns,book,list} failed:", err)`
+(`routes/delivery/orders.js:1040`, `:1204`, `:1257`). So **"why did this store get no courier" is
+not answerable from the logs** — read the `bookDelivery` row, or reproduce against
+`services/delivery/delivery-only.js`. There is no `[delivery-cancel]` log line either (only a
+comment mentioning the hook, `services/twin-order/twin-group-service.js:232`), and the one
+`[delivery-only]`-prefixed line in the whole server is in the accountant's territory:
+`routes/payments/admin-reports.js:1177`, warning that a booking carries a VAT-**exclusive** fee
+snapshot the store report will under-bill.
 
 **Tests:** `test/integration/delivery-only-region-fee.js`, `delivery-support-gate.js`,
 `store-delivery-only-expense.js`; `scripts/delivery-only-preflight.js` is a read-only prod
