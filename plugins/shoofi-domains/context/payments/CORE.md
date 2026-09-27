@@ -126,14 +126,33 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    `CC=<token>` + `Token=True` over GET, while `authorizeWalletToken` posts
    `ApplePay`/`WalletToken` and then swaps the authorization for a token via `getToken`
    (`services/payments/order-authorization.js` `authorizeWalletOrderPayment`).
-   **Why HYP answers 920 is NOT settled** — the code contains no HYP error table and no
-   reference to 920 outside a test fixture. Do not "fix" the release call on a guess; settling
-   it needs HYP's table or a test-terminal probe. `scripts/hyp-j5-spike.js` proves nothing here
-   either way: it authorizes with a raw PAN rather than a token, and its cleanup `CancelTrans`
-   discards the result.
+   **920 means "already transmitted", not "does not exist".** HYP's table gives it as
+   "Transaction cannot be cancelled (it was already transmitted or it does not exist)"
+   ([status codes](https://developers.hyp.co.il/pay/reference/response-status-codes)); the
+   second branch is excluded because **1,231 of 1,241 saved-card J5 holds were successfully
+   captured and no capture has ever failed** — the authorization plainly exists.
+   ⚠️ **"Transmitted" does not mean the hold is dead.** Card captures routinely succeed 16 min
+   (p50) to 35 min (p90) after authorization — the same window in which the seven voids were
+   refused (3.6–34.6 min). At the instant HYP refuses to void it, the hold is still perfectly
+   capturable. Transmitted means *no longer cancellable*, nothing more.
+   **What is still NOT settled is why a WALLET hold stays voidable.** `getToken` and the
+   instrument are perfectly confounded in production — every releasable hold had `getToken`
+   called on it and no refused one did — so telling them apart needs a HYP **test** terminal
+   (masof `00100…`, the guard at `scripts/hyp-j5-spike.js`), not more queries. Do not "fix" the
+   release call on a guess. Neither existing spike can settle it: `hyp-j5-spike.js` authorizes
+   with a raw PAN rather than a token, and both it and `scripts/vat-exempt-live-orders.js`
+   discard their cleanup `CancelTrans` result.
    Consequence for support: **every card cancellation strands a live hold**, which then lapses
    by itself at `paymentAuth.expiresAt` (~5 days). Nothing is owed, and a manual זיכוי would be
-   a real give-away — see the `refundRequired` warning above.
+   a real give-away — see the `refundRequired` warning above. Since the refusal is permanent and
+   expected, **a refused release is not an incident**: do not retry it, do not escalate it, and
+   quote `expiresAt` to the customer as the date their pending amount clears (the admin badge
+   renders it — `shoofi-delivery-web/src/utils/charge-state.ts`).
+   ⚠️ **Never "fall back to refund" on a refused release**, which the comment on
+   `cancelAuthorization` used to advise. `refundTransaction` issues a real `zikoyAPI` credit —
+   proven live on `snooshy-kfar-qasim 5089-3210` (₪147, 2026-09-13) — so against an uncaptured
+   hold it hands back money the customer never paid. The `wasCharged: false` guard in
+   `releaseOrderAuthorization` is what prevents it; keep it.
    ⚠️ **To tell a J5 order's instrument apart, read `paymentData` — not `payment_provider`.** A
    J5 order carries **no top-level `payment_provider` field at all** (`shouldAuthorize` keys on
    the request's provider, which is never persisted onto the order).
