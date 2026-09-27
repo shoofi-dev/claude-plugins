@@ -137,6 +137,40 @@ pickupTime + area.maxETA`.
   `services/delivery/driver-status-service.js:setDriverActiveStatus` (it writes
   `driverStatusHistory` in lock-step + WS-pushes `driver_status_updated`). Direct writes create phantom history.
 - **`isActive` (on shift/enabled) ≠ `isAvailable` ≠ `isOnline`** — three separate flags.
+- ⚠️ **Most of what the `isActive` stream looks like is normal operation. Measure before
+  you build an alert on it** (`driver-status-history`, 30 days to 2026-09-27: **1,660
+  switch-offs, 49 drivers**):
+  - **44% is the system, not a person.** `cron` 731 · `driver_app` 712 · `shoofi_support`
+    216 · `admin_web` 1. The hourly `driver-shift` cron switches off everyone whose slot
+    ended, so switch-offs peak at 23:00 (228), 01:00 (179) and 00:00 (165). Any "who did
+    this" feed that does not separate the sources is half cron rows a human must learn to
+    scroll past.
+  - **24% is flapping.** 391 switch-offs are the same driver back on inside **two minutes**;
+    661 inside ten. Rendered raw, one person contradicts himself twice a minute.
+  - **59% of switch-offs happen while the driver still holds an accepted, unfinished
+    delivery — and that is not an incident.** 982 of 1,660, ~33/day. It produced **0
+    orphaned deliveries** and **0 reassignments** in the whole window; median time from the
+    flip to that delivery completing is 6–15 min. `isActive:false` does not stop a driver
+    completing what he holds, and the cron switches drivers off exactly as they finish their
+    last run. The narrow version (uncollected, and then >20 min to finish) is still 13.7%
+    and still dominated by the cron. **Do not build a "went offline holding a delivery"
+    alert** — a naive definition manufactures a red row for something that is working, the
+    same trap as tuning the assignment penalty. There is also no orphaned-delivery detector
+    anywhere, and `setDriverActiveStatus` does not block, warn, reassign or notify on
+    deactivation; the only precedent is `routes/delivery/driver.js:227` refusing to DELETE a
+    driver who holds active orders.
+  - Checked and also not worth a row: dispatch handing work to an off driver happens **9
+    times in 30 days**, all 1–2 min after the flip (a push already in flight).
+- **Phone numbers:** `customers.phone` is a local `0XXXXXXXXX` — **240 of 244 drivers are
+  exactly `05` + 8 digits**. The four that are not are two junk values (`123456789`,
+  `12345678900012`) and two typos with an extra run of digits (`05337773030`,
+  `0547190078111111`); none belongs to a driver who has flipped his switch recently. A
+  `tel:`/`wa.me` builder must check the **`05` shape, not the length**: `123456789` is nine
+  digits, so "strip the leading zero, expect nine" accepts it and produces
+  `wa.me/972123456789` — a WhatsApp conversation with a stranger. There is no click-to-call
+  or WhatsApp for a driver anywhere on the server (`notification-service.js` has
+  `{websocket, push, email, sms}` and no WhatsApp channel; respond.io is customer-only), so
+  any such link is client-side.
 - **Location**: `POST /api/delivery/driver/location` writes `currentLocation` (GeoJSON) +
   `driverLocationHistory` (TTL) + broadcasts to admin/tracking. Driver app sends fg (10s) + background.
 - **Shifts** (`routes/driver-shift-manager.js`, `driverShifts` collection): booking system
