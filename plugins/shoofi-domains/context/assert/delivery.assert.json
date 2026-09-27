@@ -29,6 +29,7 @@
         "routes/analytics.js",
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
+        "services/audit/admin-audit-routes.js",
         "scripts/delivery-only-preflight.js",
         "docs/delivery-only-bookings.md"
       ],
@@ -77,6 +78,9 @@
           "isDeliveryOnlySupport",
           "acquireBookingLock"
         ],
+        "routes/delivery/company.js": [
+          "/api/delivery/company/:companyId/employee/add"
+        ],
         "routes/delivery/orders.js": [
           "/api/delivery/delivery-only/towns",
           "/api/delivery/delivery-only/book",
@@ -89,6 +93,16 @@
           "file": "consts/consts.js",
           "regex": "DELIVERY_STATUS",
           "desc": "authoritative delivery status enum"
+        },
+        {
+          "file": "routes/delivery/company.js",
+          "regex": "const \\{ phone, role, fullName, isActive, userName, isDriver",
+          "desc": "the employee ADD route is a hard allow-list - this destructure AND the newEmployee literal below it both have to name a field or it is dropped from the insert with no error, which is how vehicleInfo stayed unwritable at creation while the update route accepted it"
+        },
+        {
+          "file": "services/audit/admin-audit-routes.js",
+          "regex": "'/api/delivery/company:companyId/employee/add'",
+          "desc": "STILL BROKEN: the audit pattern is missing the / before :companyId, so creating a driver writes no admin-audit-log row while update/status/delete all do. If this ever gains the slash, the CORE note about the gap is stale"
         },
         {
           "file": "consts/consts.js",

@@ -190,6 +190,18 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     delivery-only booking, so anything keyed on `order.customerId`, `order.total` or
     `order.orderId` silently no-ops there. That is exactly how admin cancellation used to
     notify nobody while the driver was still driving to the store.
+12. **`POST /api/delivery/company/:companyId/employee/add` is a hard allow-list, twice
+    over** — a destructure and an object literal, both in `routes/delivery/company.js`. A
+    field present in the request body but absent from *either* is dropped with no error and
+    no 400. The update route, one screen away, has no such list and simply writes what it is
+    given, so the two disagree about what a driver record may contain: `vehicleInfo` was
+    settable on an existing courier and silently discarded at creation, for as long as the
+    field existed. Adding a field to the driver form means editing **both** places, and the
+    way to check is to create a courier and re-read him — not to read the update route.
+    (The matching audit gap is still live: `services/audit/admin-audit-routes.js` registers
+    `'/api/delivery/company:companyId/employee/add'`, missing the `/` before `:companyId`,
+    so this route writes **no** `shoofi.admin-audit-log` row while update, status and delete
+    all do. "Who created this driver, and with what" is unanswerable.)
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
