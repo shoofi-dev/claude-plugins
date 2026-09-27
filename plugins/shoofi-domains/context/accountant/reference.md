@@ -95,6 +95,26 @@ the contract dropdown label. Each figure carries the stored report's value for t
 delta (`compareWithStoredReport`; no report = null, never 0). Cached 5 min per range, Redis-locked,
 202 while another process computes. See shoofi-server `docs/financial-overview.md`.
 
+*Store population (2026-09) — by DATA, not by today's visibility.* Candidates are every non-mock
+store (`getAllNonMockStores` in `services/exec-dashboard/store-registry.js`; `isMockStore` is the
+only test-store convention, there is no deletion flag). Live stores (visible, not coming-soon) are
+always run through the engine; a non-live store is run only if `probeNonLiveStores` (compute.js)
+finds an order of ANY status, a compensation by `order.storeData.appName`, a pending carry-over, a
+delivery-only booking, or an overlapping stored report in a window **2 days wider** than the range
+each side (the engine snaps to business-day boundaries, so the probe must over-select). A store is
+kept when `metrics.storeHasData` says its live report is not all zeros: any non-zero ACTIVITY field
+(`STORE_ACTIVITY_FIELDS`: orders, revenue by method, drive-in, coins, product discounts, Shoofi
+coupons, campaigns, compensations both ways + carry-over, delivery-only fees, commission) keeps any
+store; CONTRACT charges (`monthlyCharges`/`oneTimeCharges`) keep only a live store — the monthly
+generator bills them to live stores and never to hidden ones (08/2026: ~16 closed hidden stores
+still carry an open ₪118 monthly row). Derived totals (`totalOutcomes`, `totalForTransfer`, …) are
+never consulted. A store with an EXACT-range stored report is always kept; a store whose engine
+throws is always kept (flagged). Why: filtering on `business_visible` dropped el-patron, qashtuta,
+royal-asado and crunchy-toost (₪4,111.92 owed, sent August reports) once they were hidden.
+`missingReports` lists kept stores with no stored report OVERLAPPING the range
+(`metrics.storedReportCoverage`: `exact` | `wider` (multi-month, e.g. abuissa-grills / the-x
+01.07–31.08) | `partial` | `none` — any overlap counts as present; only `exact` is diffed).
+
 ## 5. Store ↔ Shoofi tax invoices — `routes/hyp.js` / `utils/{hyp,greeninvoice,invoice-provider}.js`
 Provider = `amazonconfigs {app:"invoiceProvider"}.active` (`greeninvoice` default | `hyp`).
 - **Shoofi → store commission invoice**: amount = `totalOutcomes`. GreenInvoice type **320**
@@ -164,7 +184,9 @@ a human bridges it. Payout amount = store `balance` / driver `netTotal`.
 ## 9. Client — shoofi-delivery-web (admin) is the accountant's cockpit
 The reports/settlement/payout UI lives in the **admin** app: `views/admin/DriverPayments.tsx`,
 `DriverBonuses.tsx`, `CompensationManagement.tsx`, `driver-reports/`, `financial-overview/` (the live
-26-metric screen, 4 tabs: summary / stores / companies / delivery fees), plus store-report screens
+26-metric screen, tabs: summary / Shoofi expenses / stores / companies / delivery fees; the summary
+opens with "חנויות עם נתונים בלי דוח" (`MissingReports.tsx`, fed by `missingReports`), and hidden /
+coming-soon stores carry a red `VisibilityBadge`), plus store-report screens
 and `generate-stores-summaries.tsx`; `app-type: shoofi-admin`. This is where a human generates,
 approves, sends reports, and exports the MASAV Excel. (Full-stack: server computes, admin drives.)
 

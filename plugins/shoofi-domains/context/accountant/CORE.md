@@ -181,6 +181,17 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    a term added to `totalOutcomes` and not to that list shows up as a non-zero
    `billingReconciliationDelta`, which is the point of the list.
 
+9. **The live overview's store population is by DATA, never by today's `business_visible`.**
+   `services/financial-overview/compute.js` enumerates every non-mock store
+   (`getAllNonMockStores`) and keeps those whose live report is not all zeros
+   (`storeHasData` in `services/financial-overview/metrics.js`). The range is usually in the
+   past, and a store hidden after it traded is still owed for that period — filtering on
+   visibility silently shrank the liability total (08/2026: four hidden stores, ₪4,111.92 on
+   sent reports, gone from the screen). Contract charges alone keep only a LIVE store (the
+   generator never bills a hidden one); derived totals never decide inclusion. Do not
+   "optimise" back to `getLiveStores` — narrow the non-live PROBE instead, and only towards
+   over-selection. Details: reference §4.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.

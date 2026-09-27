@@ -18,7 +18,8 @@
         "services/financial-overview/compute.js",
         "services/financial-overview/metrics.js",
         "services/financial-overview/contract-charges.js",
-        "routes/financial-overview.js"
+        "routes/financial-overview.js",
+        "services/exec-dashboard/store-registry.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -52,20 +53,27 @@
         ],
         "services/financial-overview/compute.js": [
           "computeFinancialOverview",
-          "getFinancialOverview"
+          "getFinancialOverview",
+          "probeNonLiveStores"
         ],
         "services/financial-overview/metrics.js": [
           "storeMetrics",
           "driverMetrics",
           "deliveryFeeSplit",
           "compareWithStoredReport",
-          "flattenApprovedItems"
+          "flattenApprovedItems",
+          "storeHasData",
+          "storedReportCoverage",
+          "STORE_ACTIVITY_FIELDS"
         ],
         "services/financial-overview/contract-charges.js": [
           "classifyOneTimeCharges"
         ],
         "routes/driver-reports.js": [
           "generateDriverReportData"
+        ],
+        "services/exec-dashboard/store-registry.js": [
+          "getAllNonMockStores"
         ]
       },
       "patterns": [
@@ -148,6 +156,16 @@
           "file": "services/financial-overview/compute.js",
           "regex": "status:\\s*\"4\",\\s*isDeliveryOnly:\\s*\\{\\s*\\$ne:\\s*true\\s*\\}",
           "desc": "delivery-fee population is the settlement one (delivered, not delivery-only), not the dashboard's completedAt"
+        },
+        {
+          "file": "services/financial-overview/compute.js",
+          "regex": "await getAllNonMockStores\\(appDb\\)",
+          "desc": "CORE invariant 9: the overview's store candidates are every non-mock store, not the live-today registry (getLiveStores dropped hidden stores that were still owed money)"
+        },
+        {
+          "file": "services/financial-overview/compute.js",
+          "regex": "metrics\\.storeHasData\\(rd, \\{ live: s\\.live \\}\\)",
+          "desc": "CORE invariant 9: inclusion is decided on the engine output (not all zeros), with contract charges counting only for live stores"
         },
         {
           "file": "utils/order-pricing.js",
