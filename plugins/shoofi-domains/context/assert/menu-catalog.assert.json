@@ -125,6 +125,11 @@
         },
         {
           "file": "routes/menu.js",
+          "regex": "PRODUCT_CANDIDATE_LIMIT",
+          "desc": "doc CORE: the per-store dish prefilter cap that slices in natural order before the scorer runs — if it goes, someone found a way to rank in the DB and the claim must be re-checked"
+        },
+        {
+          "file": "routes/menu.js",
           "regex": "soldByWeight: 1",
           "desc": "doc CORE invariant 7 / reference §4: the by-weight flag is projected to clients by every menu shape"
         },

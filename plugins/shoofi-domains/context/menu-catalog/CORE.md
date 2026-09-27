@@ -173,6 +173,15 @@ against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store D
 - The definite article is glued on (`السلطان`, `אלסולטאנ`) — users type the bare noun.
 - Matching + ranking live in `services/search/text-search.js` (pure, unit-tested); the
   endpoint is `POST /api/menu/search` in `routes/menu.js`. See `docs/menu-search.md`.
+- **Dish results are capped BEFORE they are ranked, and the cap is not a relevance cut.**
+  Store names are all scored in memory; dish names are prefiltered by regex per store DB and
+  then scored by the same ladder — but `PRODUCT_CANDIDATE_LIMIT` (`routes/menu.js`) is a plain
+  `.limit()` with no `sort`, because Mongo cannot sort by relevance. So in a catalogue with
+  more matches than the cap, the answer is decided by **insertion order** and the scorer never
+  sees the rest: the dish the customer typed can be dropped while a hundred weaker ones are
+  returned. Measured on production: a common grocery word reaches 156 matches in the largest
+  store and passes 60 in 14 stores. Widening the prefilter without raising the cap trades a
+  missing dish for a wrong top dish.
 - `routes/global-search.js` is **dead and broken**: it filters `shoofi.stores` on
   `nameAR`/`nameHE`/`name`, none of which exist (the fields are `name_ar`/`name_he`), so it
   returns `[]` for every input, and it has no caller in any app. Don't cite it as prior art.
