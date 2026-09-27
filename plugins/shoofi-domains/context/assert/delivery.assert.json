@@ -308,6 +308,11 @@
           "desc": "admin cancel is offered only on an open delivery-only booking"
         },
         {
+          "file": "src/views/admin/delivery-companies/DeliveryCompanyEmployeeForm.tsx",
+          "regex": "vehicleInfoTouchedRef\\.current\\s*\\?\\s*adminVehicleInfoPatch",
+          "desc": "the admin form posts ONLY the two vehicleInfo keys it owns, and only when the admin touched one - the server merges the patch over the stored doc, so echoing the driver app's model/plateNumber back silently reverts them to whatever they were when this form loaded"
+        },
+        {
           "file": "src/utils/driver-vehicle.ts",
           "regex": "value: 'سيارة', label: 'רכב'",
           "desc": "the admin vehicle select stores the driver app's Arabic value under a Hebrew label - only the label is ours to choose; changing the value is a two-app data migration"

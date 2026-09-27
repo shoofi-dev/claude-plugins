@@ -209,6 +209,18 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     whichever app ships a new option first. `boxesCount` is the count of delivery boxes;
     empty is stored as **null, not 0**, because a courier nobody has filled in must not read
     as a courier carrying none.
+    ⚠️ **The merge cuts the other way too: a client must send ONLY its own keys.** Because
+    the route merges the patch over the *stored* document, omitting a key is what preserves
+    it — and echoing one back re-asserts a value read when that screen loaded. The employee
+    GET is unprojected (`routes/delivery/company.js`, a bare `findOne`), so the admin form
+    holds the driver's `model` / `plateNumber` as well; posting them meant an admin who
+    edited a phone number reverted a plate number the courier had fixed minutes earlier, with
+    no error and no history row. The admin form therefore sends `{type, boxesCount}` only,
+    and only when the admin touched one of them (`adminVehicleInfoPatch` +
+    `vehicleInfoTouchedRef` in `shoofi-delivery-web/src/utils/driver-vehicle.ts` and
+    `DeliveryCompanyEmployeeForm.tsx`) — the same shape as that form's `isActive` split. A
+    deliberate clear is still a value and must travel: `''` from the "ללא" option, `null`
+    from an emptied number field.
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
   `isDeliveryOnlySupport` field, so the gate returns `platform_disabled`/`store_disabled` for
