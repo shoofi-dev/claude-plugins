@@ -136,6 +136,41 @@ summary(5)/closing(9); amounts → agorot (`Math.round(amount*100)`); Hebrew nam
 `accounting.bankAccount` (via the Excel). **There is no automated report→MASAV linkage in code** —
 a human bridges it. Payout amount = store `balance` / driver `netTotal`.
 
+## 7b. Hashavshevet export (movein.dat) — `services/accountant-export/`, `utils/hashavshevet-movein.js`
+`GET /api/payments/admin/accountant/movein?month=YYYY-MM&tab=stores|drivers` (route in
+`routes/payments/admin-reports.js`; button "הורד DAT" on the admin "חשבוניות שופי לרואה חשבון"
+screen, `views/admin/invoices/AccountantInvoices.tsx`). The accountant's journal-import file for the
+documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` + what was left out).
+- **Byte format** (`utils/hashavshevet-movein.js`), reverse-engineered from the accountant's own
+  export and byte-tested against an excerpt of it (`test/fixtures/movein-example-excerpt.dat`):
+  Windows-1255, Hebrew in **logical** order, CRLF; line 1 = 180 × `0`; one 178-char record per
+  document, records separated by an **empty line**; all fields right-aligned. Offsets: ref [0,8),
+  date DDMMYY [8,14), value date [14,25), `"  $"` [25,28), name (first 22 chars) [28,50), debit
+  accts [50,58)+[58,66), credit accts [66,74)+[74,82), debit amts [82,94)+[94,106), credit amts
+  [106,118)+[118,130) (2 decimals; zero = bare `0`), spaces to 178.
+- **Month = the DOCUMENT date** (end of the report end date's month, as `create-invoice` dates it),
+  not the reports list's date-range overlap — a multi-month report is exported once.
+- **Amounts are EZcount's, not ours** (`ezcountInclusiveTotals`): per item line net =
+  round(price/1.18, 4), VAT = round(net×0.18, 4); document net and VAT = those sums rounded to 2;
+  gross = net + VAT. `storeInvoiceTotals` rebuilds the line prices `create-invoice` sends
+  (`settlementInvoiceLinePrices` — a mirror; keep it in step) and, when they don't add up to
+  `totalOutcomes`, uses the one-line rule on the total. Reproduced **259/259** system-issued
+  May–June 2026 invoices exactly. `round2(totalOutcomes)` is wrong by an agora on ~1 in 6.
+- **Stores tab** (`STORE_INVOICE_ACCOUNTS`, proven by the example): invoice = debit the store's
+  `accounting.accountantFileNumber` gross / credit **50001** net + **40002** VAT; ref `"9"+docNumber`
+  (`hypInvoiceDocNumber`). Credit note mirrored, ref `"12"+docNumber` (prefix seen only on manual
+  credit notes). History entries reversed by a credit note export both documents; cancelled
+  without one, or GreenInvoice (no doc number) → listed as `excluded`.
+- **Refusal:** any document whose store has no usable file number (1–8 chars, no whitespace) →
+  **422 `blocked`** with the list; no partial file (a movein import is not idempotent).
+- **Drivers tab**: company→Shoofi documents are Shoofi's **purchase** side; the expense /
+  input-VAT accounts and ref prefix are unknown → `DRIVER_INVOICE_ACCOUNTS` all `null` →
+  **422 `missing-config`** until the accountant supplies them. The purchase layout (debit expense
+  net + input VAT, credit company gross) is the credit-note layout and is unverified.
+- **It is not the full HYP ledger.** Documents issued by hand in HYP (receipts, manual invoices,
+  manual credit notes) and any HYP document whose number never reached our DB are absent — the
+  accountant's May–June file had 26 such records out of 285.
+
 ## 8. Data model
 - **`shoofi.storeReports`** — `{storeId, appName, dateRange, reportType, status(draft|approved|sent),
   reportData{creditCardRevenue, cashRevenue, coins*, driveIn*, couponsFromShoofi,
@@ -153,7 +188,9 @@ a human bridges it. Payout amount = store `balance` / driver `netTotal`.
   appNameBackfill{pendingReportCarryover}}`. `payingParty !== compensationFor` is enforced on add/edit
   (`services/compensations/validate-parties.js`). `compensationFor:'shoofi'` = the store (or driver) owes
   Shoofi — store report outcome `compensationsToShoofi`, driver report `totalDriverCharges`; no coupon.
-- **Store `accounting`** (store's own DB): `bankAccount{bank,branch,accountNumber,companyId,
+- **Store `accounting`** (store's own DB): `accountantFileNumber` (the accountant's מספר תיק = the
+  Hashavshevet customer account the movein export debits; also on `delivery-company.store`),
+  `bankAccount{bank,branch,accountNumber,companyId,
   businessType('exempt'|'licensed')}`, `billingContacts[]`, `contract{commissionTiers[],
   coinsCommissionPercent, monthlyPayments[], onetimePayments[]}`, `store.hyp{ua_uuid,api_key,access_token,status}`.
 - **`shoofi.amazonconfigs`** — `{app:"greeninvoice"|"hyp"|"invoiceProvider"|"amazon"}` (provider creds/switch; never print).
@@ -182,6 +219,17 @@ approves, sends reports, and exports the MASAV Excel. (Full-stack: server comput
    divergence is a payout risk. Worth a single source of truth?
 6. **No automated report→MASAV linkage** — payout amounts are re-keyed into an Excel by hand
    (`masav.js`), an error-prone gap. Leave manual, or is closing it desired later?
+
+7. **`create-invoice` does not itemize `carryoverToCustomers` / `carryoverToDrivers`** (`routes/hyp.js`)
+   although both are inside `totalOutcomes`, the invoiced amount — so on such invoices the item lines
+   do not add up to the document total and EZcount's `auto_balance` covers the gap. Seen on 31 of the
+   259 May–June 2026 invoices (e.g. 10473: lines 2181.48, invoiced 2214.48, carryoverToDrivers 33).
+   Found 2026-09-27; `routes/hyp.js` is do-not-touch — needs a decision.
+8. **Duplicate HYP settlement invoices never recorded in our DB.** The accountant's May–June 2026
+   export holds 19 invoices (10562–10582, dated 30/06/26, batch of 2026-07-07) with the same store
+   and amount as the invoice our DB records for that store's June report (e.g. brixta 10576 and
+   10580, both ₪545.04). Our DB knows only the later one. Unless cancelled at HYP, those stores were
+   invoiced twice for June. Found 2026-09-27 — needs a human to check HYP and decide.
 
 ## 11. Definition of done
 Inherit `_shared-guardrails.md` §7. For accountant specifically: for ANY change to a payout or

@@ -18,7 +18,10 @@
         "services/financial-overview/compute.js",
         "services/financial-overview/metrics.js",
         "services/financial-overview/contract-charges.js",
-        "routes/financial-overview.js"
+        "routes/financial-overview.js",
+        "utils/hashavshevet-movein.js",
+        "services/accountant-export/movein.js",
+        "services/accountant-export/accounts.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -66,6 +69,20 @@
         ],
         "routes/driver-reports.js": [
           "generateDriverReportData"
+        ],
+        "utils/hashavshevet-movein.js": [
+          "ezcountInclusiveTotals",
+          "buildFile",
+          "salesInvoiceRecord",
+          "salesCreditNoteRecord",
+          "purchaseInvoiceRecord"
+        ],
+        "services/accountant-export/movein.js": [
+          "collectStoreDocuments",
+          "collectDriverDocuments",
+          "storeInvoiceTotals",
+          "settlementInvoiceLinePrices",
+          "documentDateOf"
         ]
       },
       "patterns": [
@@ -158,6 +175,26 @@
           "file": "routes/payments/admin.js",
           "regex": "productDiscount = Math\\.max\\(0, originalOrderPrice - chargedOrderPrice\\)",
           "desc": "CORE invariant 3: productDiscount is derived from the order's own originalOrderPrice vs charged price — nothing else (not a combo's display savings) feeds it"
+        },
+        {
+          "file": "utils/hashavshevet-movein.js",
+          "regex": "body\\.join\\(LINE_END \\+ LINE_END\\)",
+          "desc": "movein records are separated by an EMPTY line — byte-tested against the accountant's own export"
+        },
+        {
+          "file": "services/accountant-export/accounts.js",
+          "regex": "revenueAccount:\\s*\"50001\"",
+          "desc": "stores-tab accounts (50001 revenue / 40002 output VAT) are the accountant's, proven by their export — never guess them"
+        },
+        {
+          "file": "services/accountant-export/accounts.js",
+          "regex": "expenseAccount:\\s*null",
+          "desc": "drivers-tab accounts are unknown until the accountant supplies them; the export refuses (422 missing-config) meanwhile — when they land, update reference §7b"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "/api/payments/admin/accountant/movein",
+          "desc": "the accountant's Hashavshevet export endpoint (reference §7b)"
         }
       ]
     }
