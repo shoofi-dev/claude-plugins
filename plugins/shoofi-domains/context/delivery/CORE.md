@@ -190,7 +190,25 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     delivery-only booking, so anything keyed on `order.customerId`, `order.total` or
     `order.orderId` silently no-ops there. That is exactly how admin cancellation used to
     notify nobody while the driver was still driving to the store.
-
+12. **`customers.vehicleInfo` has TWO writers — merge it, never replace it.** The courier's
+    own profile screen (`shoofi-shoofir/screens/delivery-driver/profile.tsx`) posts
+    `{type, model, plateNumber}` and the admin driver form posts `{type, boxesCount}`, both
+    to `POST /api/delivery/company/employee/update/:id`. That route deep-merges over the
+    stored object (`routes/delivery/company.js`) and `normalizeVehicleInfo`
+    (`lib/delivery/helpers.js`) returns only the keys actually sent, precisely so neither
+    screen blanks the other's fields. Writing the whole sub-object returns 200 and the other
+    half is simply gone next time somebody looks.
+    ⚠️ **Its `type` vocabulary is the driver app's Arabic strings** — `سيارة`,
+    `دراجة نارية`, `دراجة` — because that screen's dropdown has `label === value`. The admin
+    select stores the same values under Hebrew labels. A normalised code (`car`/`scooter`)
+    is three silent regressions: his dropdown shows nothing selected and his next save
+    overwrites yours, his Arabic UI prints the literal code, and
+    `DeliveryCompanyEmployeesList.getVehicleIcon` (which substring-matches the Arabic) draws
+    nothing. Renaming the vocabulary is a two-app data migration, not an edit. The server
+    deliberately does **not** validate `type` against a list — an allow-list would reject
+    whichever app ships a new option first. `boxesCount` is the count of delivery boxes;
+    empty is stored as **null, not 0**, because a courier nobody has filled in must not read
+    as a courier carrying none.
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
   `isDeliveryOnlySupport` field, so the gate returns `platform_disabled`/`store_disabled` for

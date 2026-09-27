@@ -9,6 +9,7 @@
         "routes/delivery/driver.js",
         "routes/delivery/admin.js",
         "routes/delivery/company.js",
+        "lib/delivery/helpers.js",
         "routes/delivery/geography.js",
         "routes/driver-shift-manager.js",
         "routes/geo.js",
@@ -41,6 +42,10 @@
         ],
         "services/delivery/driver-status-service.js": [
           "setDriverActiveStatus"
+        ],
+        "lib/delivery/helpers.js": [
+          "normalizeVehicleInfo",
+          "normalizeBoxesCount"
         ],
         "services/driver-shift/shift-service.js": [
           "getPermanentDriverSlotsForDay",
@@ -89,6 +94,16 @@
           "file": "consts/consts.js",
           "regex": "DELIVERY_STATUS",
           "desc": "authoritative delivery status enum"
+        },
+        {
+          "file": "routes/delivery/company.js",
+          "regex": "\\.\\.\\.employee\\.vehicleInfo",
+          "desc": "vehicleInfo is MERGED, never replaced - the driver app owns type/model/plateNumber and the admin form owns boxesCount in the same sub-object, so a replace blanks one screen's fields with a 200"
+        },
+        {
+          "file": "lib/delivery/helpers.js",
+          "regex": "if \\(value === undefined \\|\\| value === null \\|\\| value === \"\"\\) return null",
+          "desc": "an empty box count stores as null, not 0 - a courier nobody has filled in must not read as a courier carrying no boxes"
         },
         {
           "file": "consts/consts.js",
@@ -214,6 +229,7 @@
     },
     "shoofi-shoofir": {
       "files": [
+        "screens/delivery-driver/profile.tsx",
         "hooks/useDriverLocationTracking.ts",
         "stores/delivery-driver/index.ts",
         "consts/shared.ts",
@@ -227,6 +243,11 @@
           "file": "consts/shared.ts",
           "regex": "DELIVERY_STATUS",
           "desc": "driver client copy of delivery status enum"
+        },
+        {
+          "file": "screens/delivery-driver/profile.tsx",
+          "regex": "label: 'سيارة', value: 'سيارة'",
+          "desc": "vehicleInfo.type's stored vocabulary IS this dropdown's Arabic strings (label === value). The admin driver form stores the same values under Hebrew labels, so switching either side to a normalised code blanks this select, prints the raw code in the driver's Arabic UI, and stops the admin employees-list icon matching"
         },
         {
           "file": "components/delivery-driver/DriverReassignModal.tsx",
@@ -274,6 +295,8 @@
     },
     "shoofi-delivery-web": {
       "files": [
+        "src/utils/driver-vehicle.ts",
+        "src/views/admin/delivery-companies/DeliveryCompanyEmployeeForm.tsx",
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
         "src/views/admin/settings/ShoofiSettings.tsx"
@@ -283,6 +306,11 @@
           "file": "src/views/admin/analytics/DeliveryListAnalytics.tsx",
           "regex": "CLOSED_DELIVERY_STATUSES",
           "desc": "admin cancel is offered only on an open delivery-only booking"
+        },
+        {
+          "file": "src/utils/driver-vehicle.ts",
+          "regex": "value: 'سيارة', label: 'רכב'",
+          "desc": "the admin vehicle select stores the driver app's Arabic value under a Hebrew label - only the label is ours to choose; changing the value is a two-app data migration"
         },
         {
           "file": "src/views/admin/delivery-areas/CityAreasList.tsx",
