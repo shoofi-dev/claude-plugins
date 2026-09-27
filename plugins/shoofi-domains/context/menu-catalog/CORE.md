@@ -173,6 +173,18 @@ against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store D
 - The definite article is glued on (`السلطان`, `אלסולטאנ`) — users type the bare noun.
 - Matching + ranking live in `services/search/text-search.js` (pure, unit-tested); the
   endpoint is `POST /api/menu/search` in `routes/menu.js`. See `docs/menu-search.md`.
+- ⚠️ **Every regex source in `text-search.js` is also sent to MONGO, whose engine is PCRE2 —
+  and PCRE2 rejects `\u`** (*"PCRE2 does not support \F, \L, \l, \N{name}, \U, or \u"*). A code
+  point has to reach a source as the character itself; `"\\u0591"` in a JS string leaves the two
+  characters `\u` in the pattern. **V8 accepts both, so this breaks ONLY in production**, and
+  silently: `routes/menu.js` catches a failed store query **per store** and returns `null` for
+  it, and the spec's fake Mongo runs the regex in Node (`cond.test(value)`). That pair took dish
+  search to **zero dishes in all 291 store DBs for two weeks** after 478c4818 while restaurant
+  search kept working — store names are scored in memory and never reach a database, dish names
+  are prefiltered in one. Two consequences: a regression test has to assert on
+  `mongoRegex.source` / `plainRegex.source`, because no behavioural test in that repo can reach
+  this class of bug; and if dish results ever vanish again, grep the logs for
+  `menu search: store skipped` before reading any code.
 - `routes/global-search.js` is **dead and broken**: it filters `shoofi.stores` on
   `nameAR`/`nameHE`/`name`, none of which exist (the fields are `name_ar`/`name_he`), so it
   returns `[]` for every input, and it has no caller in any app. Don't cite it as prior art.

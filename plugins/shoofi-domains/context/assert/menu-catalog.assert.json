@@ -32,7 +32,8 @@
         "utils/combo-validation.js",
         "services/menu/combo-snapshots.js",
         "utils/client-features.js",
-        "docs/combo-deals.md"
+        "docs/combo-deals.md",
+        "services/search/text-search.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -95,6 +96,13 @@
         "utils/client-features.js": [
           "hasClientFeature",
           "parseClientFeatures"
+        ],
+        "services/search/text-search.js": [
+          "createMatcher",
+          "tolerantSource",
+          "COMBINING_MARKS_SOURCE",
+          "mongoRegex",
+          "plainRegex"
         ]
       },
       "patterns": [
@@ -122,6 +130,11 @@
           "file": "routes/menu.js",
           "regex": "api/menu/search",
           "desc": "doc CORE: the live catalog search endpoint"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "menu search: store skipped",
+          "desc": "doc CORE: the per-store swallow that makes an invalid regex look like 'no dishes matched' — if this log line goes, the PCRE2 claim's failure mode has changed and the doc must say so"
         },
         {
           "file": "routes/menu.js",
