@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@a0e8bdb2 / 2026-09-23",
+  "lastVerified": "shoofi-server@dd8be298 / 2026-09-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -32,7 +32,22 @@
         "utils/combo-validation.js",
         "services/menu/combo-snapshots.js",
         "utils/client-features.js",
-        "docs/combo-deals.md"
+        "docs/combo-deals.md",
+        "services/ordering-intelligence/index-builder.js",
+        "services/ordering-intelligence/dish-types.js",
+        "services/ordering-intelligence/suggest-service.js",
+        "routes/for-you.js",
+        "utils/crons/suggest-index-cron.js",
+        "bin/build-suggest-index.js",
+        "docs/for-you.md",
+        "services/ordering-intelligence/taxonomy.js",
+        "services/ordering-intelligence/product-labeler.js",
+        "services/ordering-intelligence/craving.js",
+        "services/ordering-intelligence/suggest.js",
+        "utils/crons/product-labels-cron.js",
+        "routes/admin/dish-taxonomy.js",
+        "bin/label-products.js",
+        "services/ai/complete.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -95,6 +110,60 @@
         "utils/client-features.js": [
           "hasClientFeature",
           "parseClientFeatures"
+        ],
+        "services/ordering-intelligence/index-builder.js": [
+          "buildSuggestIndex",
+          "buildStoreDocs",
+          "foodServiceCategoryIds",
+          "FOOD_SERVICE_CATEGORY_NAMES",
+          "INDEX_COLLECTION"
+        ],
+        "services/ordering-intelligence/dish-types.js": [
+          "classifyProduct",
+          "dishTypesInText",
+          "normalizeSearchText",
+          "setDishTypes"
+        ],
+        "services/ordering-intelligence/suggest-service.js": [
+          "applyLiveMenu",
+          "candidateQuery",
+          "suggestForCustomer"
+        ],
+        "utils/crons/suggest-index-cron.js": [
+          "startSuggestIndexCron",
+          "runSuggestIndex",
+          "SCHEDULE"
+        ],
+        "services/ordering-intelligence/taxonomy.js": [
+          "ensureSeeded",
+          "loadActiveDishTypes"
+        ],
+        "services/ordering-intelligence/product-labeler.js": [
+          "decideStatus",
+          "contentHash",
+          "runProductLabeling",
+          "effectiveLabel",
+          "refreshProposals",
+          "productLabelRuns",
+          "replyRows",
+          "proposalAliases",
+          "reapplyStatusRules"
+        ],
+        "services/ordering-intelligence/craving.js": [
+          "parseCraving",
+          "satisfies",
+          "cravingQuery",
+          "cravingLabel"
+        ],
+        "utils/crons/product-labels-cron.js": [
+          "startProductLabelsCron",
+          "runProductLabelsJob",
+          "SCHEDULE",
+          "startProductLabelsJob"
+        ],
+        "routes/admin/dish-taxonomy.js": [
+          "checkAdminRole",
+          "auth.required"
         ]
       },
       "patterns": [
@@ -317,6 +386,386 @@
           "file": "utils/order-stock.js",
           "regex": "if \\(sel\\?\\.productId\\) add\\(sel\\.productId, qty\\)",
           "desc": "doc CORE invariant 10 / docs/stock-management.md: a combo line moves its components' stock too, via the one expansion decrement/restore/amend share"
+        },
+        {
+          "file": "services/ordering-intelligence/index-builder.js",
+          "regex": "const INDEX_COLLECTION = \"suggestProductIndex\"",
+          "desc": "doc CORE invariant 11 / reference §2: the derived collection's name in the central shoofi DB"
+        },
+        {
+          "file": "services/ordering-intelligence/index-builder.js",
+          "regex": "isHidden: \\{ \\$ne: true \\}, productType: \\{ \\$ne: \"combo\" \\}",
+          "desc": "doc CORE invariant 11: only non-hidden, non-combo products are indexed"
+        },
+        {
+          "file": "services/ordering-intelligence/index-builder.js",
+          "regex": "business_visible: \\{ \\$ne: false \\}",
+          "desc": "doc CORE invariant 11: only visible stores are indexed"
+        },
+        {
+          "file": "services/ordering-intelligence/index-builder.js",
+          "regex": "deleteMany\\(\\{ appName, builtAt: \\{ \\$ne: builtAt \\} \\}\\)",
+          "desc": "doc reference §2: rows not rewritten this run are swept per store — the index is disposable, never edited by hand"
+        },
+        {
+          "file": "services/ordering-intelligence/index-builder.js",
+          "regex": "c\\.isSchoolProject === true",
+          "desc": "doc CORE invariant 11: school-project-only products are skipped"
+        },
+        {
+          "file": "services/ordering-intelligence/dish-types.js",
+          "regex": "require\\(\"\\.\\./search/text-search\"\\)",
+          "desc": "doc CORE invariant 11: dish types reuse the search normaliser, so spelling folds agree"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "row\\.isHidden === true",
+          "desc": "doc CORE invariant 11: the live re-check drops a product hidden since the last build"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "row\\.productType === \"combo\"",
+          "desc": "doc CORE invariant 11: the live re-check drops a product turned into a combo since the last build"
+        },
+        {
+          "file": "utils/crons/suggest-index-cron.js",
+          "regex": "const SCHEDULE = \"20 \\*/3 \\* \\* \\*\"",
+          "desc": "doc CORE invariant 11 / reference §7c: rebuilt every 3 hours at :20"
+        },
+        {
+          "file": "utils/crons/suggest-index-cron.js",
+          "regex": "cron:suggest-index",
+          "desc": "doc reference §7c: the Redis lock key"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "api/for-you/suggest",
+          "desc": "doc reference §7: the suggestion endpoint"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "\"isChatSuggestEnabled\",\\n\\s*\"isChatVoiceEnabled\"",
+          "desc": "doc CORE invariant 11: the two For-you platform flags are in SHOOFI_CONFIG_PUBLIC_FIELDS — drop them and the app never sees the switch"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "row\\.isInStore !== true",
+          "desc": "doc CORE invariant 11: a MISSING isInStore is unavailable — the app greys out any falsy value and search requires true"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "row\\.price > 0",
+          "desc": "doc CORE invariant 11 / invariant 8: price 0 means not for sale — never suggested"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "\\.find\\(\\{ isHidden: \\{ \\$ne: true \\}, isSchoolProject: \\{ \\$ne: true \\} \\}",
+          "desc": "doc CORE invariant 11: the live re-check reads the store's visible categories with the same filter /api/menu applies"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "applyProductDiscount\\(row, discountMap\\)",
+          "desc": "doc CORE invariant 11 / invariant 3: the card price is the category-discounted menu price, not product.price"
+        },
+        {
+          "file": "services/ordering-intelligence/index-builder.js",
+          "regex": "\\(product\\.supportedCategoryIds \\|\\| \\[\\]\\)",
+          "desc": "doc reference §2: supportedCategoryIds only — no categoryId fallback, matching /api/menu"
+        },
+        {
+          "file": "services/ordering-intelligence/index-builder.js",
+          "regex": "c && c\\.isHidden !== true",
+          "desc": "doc CORE invariant 11: hidden categories do not make a product suggestible"
+        },
+        {
+          "file": "services/ordering-intelligence/taxonomy.js",
+          "regex": "const COLLECTION = \"dishTaxonomy\"",
+          "desc": "doc CORE invariant 12 / reference §2: the dish-type list collection"
+        },
+        {
+          "file": "services/ordering-intelligence/taxonomy.js",
+          "regex": "\\$setOnInsert: \\{",
+          "desc": "doc CORE invariant 12: seed types are inserted with $setOnInsert only — an admin's edit to a seed type is never undone"
+        },
+        {
+          "file": "services/ordering-intelligence/taxonomy.js",
+          "regex": "find\\(\\{ status: \"active\" \\}",
+          "desc": "doc CORE invariant 12: only ACTIVE dish types feed the classifier — a proposed type never reaches a customer"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "const APPLY_CONFIDENCE = 0\\.7;",
+          "desc": "doc CORE invariant 12: decideStatus — below 0.7 a label waits for review"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "const OVERRULE_CONFIDENCE = 0\\.85;",
+          "desc": "doc CORE invariant 12: decideStatus — 0.85 to overrule a disagreeing keyword rule"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "const PROPOSAL_MIN_PRODUCTS = 3;",
+          "desc": "doc CORE invariant 12: a proposed type surfaces once 3 products carry it"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "if \\(label\\.proposedType\\) return \"review\";",
+          "desc": "doc CORE invariant 12: a label proposing a new type is never applied without a person"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "const LABELS = \"productLabels\";",
+          "desc": "doc reference §2: the label collection"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "const RUNS = \"productLabelRuns\";",
+          "desc": "doc reference §2: the run / cost log collection"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "const unchanged = prev\\?\\.contentHash === p\\.contentHash;",
+          "desc": "doc CORE invariant 12: cost follows change — only products whose content hash changed are re-sent"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "if \\(unchanged && prev\\.status === \"admin\"\\) return false;",
+          "desc": "doc CORE invariant 12: an admin decision is never re-sent while the product is unchanged — not even under force"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "backend: \"api\"",
+          "desc": "doc CORE invariant 12: the labeller is metered-API only, never the bridge"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "const BATCH_SIZE = 40;",
+          "desc": "doc CORE invariant 12: batches of 40"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "const CONCURRENCY = 3;",
+          "desc": "doc CORE invariant 12: 3 batches in parallel"
+        },
+        {
+          "file": "services/ordering-intelligence/index-builder.js",
+          "regex": "status: \\{ \\$in: \\[\"applied\", \"admin\"\\] \\}",
+          "desc": "doc CORE invariant 12: the index trusts only applied|admin labels — review labels never reach customers"
+        },
+        {
+          "file": "services/ordering-intelligence/index-builder.js",
+          "regex": "dishTypeSource",
+          "desc": "doc CORE invariant 11 / reference §2: every index doc records where its dish type came from"
+        },
+        {
+          "file": "routes/admin/dish-taxonomy.js",
+          "regex": "\"proposedType\\.key\": key, status: \\{ \\$ne: \"admin\" \\}",
+          "desc": "doc CORE invariant 12: approving a type applies it to the labels that proposed it, never over an admin decision"
+        },
+        {
+          "file": "routes/admin/dish-taxonomy.js",
+          "regex": "checkAdminRole\\(\\[\"master\", \"admin\", \"manager\"\\]\\)",
+          "desc": "doc reference §7: every dish-taxonomy / product-labels admin route is auth.required + checkAdminRole"
+        },
+        {
+          "file": "utils/crons/product-labels-cron.js",
+          "regex": "const SCHEDULE = \"10 4 \\* \\* 0\"",
+          "desc": "doc CORE invariant 12 / reference §7d: weekly, Sunday 04:10"
+        },
+        {
+          "file": "utils/crons/product-labels-cron.js",
+          "regex": "cron:product-labels",
+          "desc": "doc reference §7d: the Redis lock key"
+        },
+        {
+          "file": "services/ordering-intelligence/craving.js",
+          "regex": "d\\.sweet == null && d\\.dishType === \"dessert\"",
+          "desc": "doc CORE invariant 13: unlabelled products — a dessert counts as sweet"
+        },
+        {
+          "file": "services/ordering-intelligence/craving.js",
+          "regex": "d\\.light == null && d\\.dishType === \"salad\"",
+          "desc": "doc CORE invariant 13: unlabelled products — a salad counts as light"
+        },
+        {
+          "file": "services/ordering-intelligence/craving.js",
+          "regex": "if \\(doc\\.protein != null\\) return doc\\.protein === craving\\.protein;",
+          "desc": "doc CORE invariant 13: a labelled protein decides; the name-word fallback is only for unlabelled products"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "stripFillers\\(craving\\.rest\\)",
+          "desc": "doc CORE invariant 13: only what is LEFT after the craving words are removed is matched against names"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "replyCode: \"craving_unavailable\"",
+          "desc": "doc CORE invariant 13: nothing open satisfies the filters → say so, never the closest spelling"
+        },
+        {
+          "file": "services/ai/complete.js",
+          "regex": "usage: res && res\\.usage",
+          "desc": "doc reference §7d: the API backend returns token usage — productLabelRuns' cost record depends on it"
+        },
+        {
+          "file": "utils/crons/product-labels-cron.js",
+          "regex": "await runSuggestIndex\\(appDb\\)",
+          "desc": "doc CORE invariant 12 / reference §7d: the post-label index rebuild goes through the cron:suggest-index lock — two concurrent builds delete each other's rows"
+        },
+        {
+          "file": "routes/admin/dish-taxonomy.js",
+          "regex": "res\\.status\\(409\\)",
+          "desc": "doc reference §7: a manual run while one holds the lock answers 409, not a silent 202"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "effort: \"low\"",
+          "desc": "doc CORE invariant 12: the labeller runs at effort low (the measured cost profile)"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "return opts\\.force \\|\\| !unchanged;",
+          "desc": "doc CORE invariant 12: force is the ONLY path that re-sends unchanged products"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "\\.slice\\(0, 4\\)",
+          "desc": "doc CORE invariant 12: at most 4 searchTerms per product"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "status: \"proposed\",\\n\\s*source: \"claude\",",
+          "desc": "doc reference §2: refreshProposals deletes Claude proposals no longer carried by enough labels"
+        },
+        {
+          "file": "services/ai/complete.js",
+          "regex": "output_config: \\{ effort \\}",
+          "desc": "doc CORE invariant 12 / reference §7d: effort reaches the API as output_config.effort"
+        },
+        {
+          "file": "bin/label-products.js",
+          "regex": "!dryRun && flag\\(\"index\"\\)",
+          "desc": "doc reference §7d: the script rebuilds the index only with --index (outside the cron:suggest-index lock)"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "const AGREE_CONFIDENCE = 0\\.5;",
+          "desc": "doc CORE invariant 12: decideStatus — Claude agreeing with the rules applies at 0.5"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "if \\(!label\\.dishType && !rulesDishType\\) return \"applied\";",
+          "desc": "doc CORE invariant 12: neither Claude nor the rules claim a type → applied (untyped)"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "const aliases = proposalAliases\\(labels\\);",
+          "desc": "doc CORE invariant 12 / reference §2: duplicate proposals are folded before the evidence is counted"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "\\{ status: \\{ \\$in: \\[\"applied\", \"review\"\\] \\} \\}",
+          "desc": "doc CORE invariant 12: reapplyStatusRules never touches admin labels"
+        },
+        {
+          "file": "bin/label-products.js",
+          "regex": "flag\\(\"reapply\"\\)",
+          "desc": "doc reference §7d: --reapply re-decides statuses without calling the model"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "if \\(label\\.fromApprovedProposal && label\\.dishType\\)",
+          "desc": "doc CORE invariant 12: a label in an admin-approved proposed type applies at 0.5"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "if \\(opts\\.reviewOnly\\) return prev\\?\\.status === \"review\";",
+          "desc": "doc CORE invariant 12 / reference §7d: --review re-sends only labels waiting for review"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "promotedToApprovedType",
+          "desc": "doc CORE invariant 12: reapplyStatusRules promotes labels proposing a now-active type"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "activeNow\\.has\\(raw\\.proposedType\\.key\\)",
+          "desc": "doc CORE invariant 12: a type approved during a run is applied at write time"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "Treat them as STRONG evidence",
+          "desc": "doc CORE invariant 12: store category names are strong evidence in the prompt"
+        },
+        {
+          "file": "routes/admin/dish-taxonomy.js",
+          "regex": "fromApprovedProposal: true",
+          "desc": "doc CORE invariant 12: approving a type marks its labels fromApprovedProposal"
+        },
+        {
+          "file": "bin/label-products.js",
+          "regex": "reviewOnly: flag\\(\"review\"\\)",
+          "desc": "doc reference §7d: the --review flag"
+        },
+        {
+          "file": "routes/admin/dish-taxonomy.js",
+          "regex": "confidence: \\{ \\$gte: AGREE_CONFIDENCE \\}",
+          "desc": "doc CORE invariant 12: approving a type applies only its labels at >= AGREE_CONFIDENCE; the rest go to review, matching decideStatus"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "const activeNow = new Set\\(\\(await loadActiveDishTypes\\(shoofiDb, \\{ force: true \\}\\)\\)",
+          "desc": "doc CORE invariant 12: the write-time active-type check bypasses the 10-min cache"
+        },
+        {
+          "file": "services/ordering-intelligence/product-labeler.js",
+          "regex": "const skipped = batch\\.filter\\(",
+          "desc": "doc CORE invariant 12: products missing from a readable reply are re-sent, never left with a stale label"
+        }
+      ]
+    },
+    "shoofi-app": {
+      "files": [
+        "hooks/useOpenStoreAtProduct.ts",
+        "screens/menu/components/GeneralCategoriesList.tsx",
+        "__tests__/components/general-categories-open-product.test.tsx",
+        "helpers/for-you-copy.ts"
+      ],
+      "symbols": {},
+      "patterns": [
+        {
+          "file": "screens/menu/components/GeneralCategoriesList.tsx",
+          "regex": "cat\\.subCategories",
+          "desc": "doc reference §8: tile-grid stores find a productId through generalCategories[].subCategories[].products — general categories carry no products of their own"
+        },
+        {
+          "file": "hooks/useOpenStoreAtProduct.ts",
+          "regex": "navigate\\(\"menuScreen\"",
+          "desc": "doc reference §8: a For-you card opens menuScreen with productId, never the broken meal route"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_reply_craving_unavailable",
+          "desc": "doc CORE invariant 13: the app renders the craving_unavailable reply code"
+        }
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/views/admin/dish-types/DishTypes.tsx",
+        "src/apis/admin/dish-taxonomy.ts"
+      ],
+      "symbols": {},
+      "patterns": [
+        {
+          "file": "src/apis/admin/dish-taxonomy.ts",
+          "regex": "/admin/dish-taxonomy",
+          "desc": "doc reference §8: the admin page calls the dish-taxonomy endpoints"
+        },
+        {
+          "file": "src/apis/admin/dish-taxonomy.ts",
+          "regex": "/admin/product-labels/review",
+          "desc": "doc reference §8: the admin review list for labels in status review"
         }
       ]
     }

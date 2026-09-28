@@ -22,8 +22,14 @@ Primary files:
 - `utils/combo-validation.js`, `services/menu/combo-snapshots.js`, `utils/client-features.js`
   — combo deals: the product kind at the write boundary, the menu snapshot + old-client
   strip, and the capability header (§2, §4, §6, §6b)
+- `services/ordering-intelligence/` (+ `routes/for-you.js`, `utils/crons/suggest-index-cron.js`,
+  `bin/build-suggest-index.js`) — the "For you" suggestion index, dish types and the live
+  re-check (§2 `suggestProductIndex`, §7, §7c); plus the dish labelling —
+  `taxonomy.js`, `product-labeler.js`, `craving.js`, `routes/admin/dish-taxonomy.js`,
+  `utils/crons/product-labels-cron.js`, `bin/label-products.js` (§2 `dishTaxonomy` /
+  `productLabels` / `productLabelRuns`, §7, §7d)
 - Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/explore-cache-invalidation.md`,
-  `docs/combo-deals.md`
+  `docs/combo-deals.md`, `docs/for-you.md`
 
 **You must NOT touch without explicit human review** (per `CLAUDE.md` guardrails):
 - Order creation / status transitions (`routes/order.js`), payments, auth.
@@ -153,6 +159,97 @@ the product's category ids so its rows get `categoryName` too.
 ### `translations` — i18n labels: `{ key, ar, he }`.
 ### `images` — auxiliary image library: `{ data:{uri}, type, subType }`.
 ### central `shoofi.stores` — store registry (used by cross-store search & `initDb`).
+
+### central `shoofi.suggestProductIndex` — the "For you" candidate index (derived, disposable)
+One document per suggestible product of every food-service store (CORE invariant 11):
+`{ appName, productId (string), nameAR, nameHE, nameNorm, categoryNames[], dishType|null,
+dishTypeSource (claude|admin|rules|null), course, sweet, spicy, vegetarian, light, protein,
+searchTermsNorm[], price, img|null, qty30d, orders30d, storeOrders30d, builtAt }`. Indexes
+(created by the builder, not by `DatabaseInitializationService`): `{ appName:1, productId:1 }`
+unique, `{ appName:1, dishType:1 }`, `{ appName:1, searchTermsNorm:1 }`. Written ONLY by `buildSuggestIndex`
+(`services/ordering-intelligence/index-builder.js`): per store, `bulkWrite` of `replaceOne`
+upserts, then `deleteMany({ appName, builtAt: { $ne: builtAt } })`; at the end,
+`deleteMany({ appName: { $nin: kept } })`.
+
+How each field is derived — read this before trusting one:
+- **Store selection:** `shoofi.stores` `{ appName exists, business_visible != false }`, kept when
+  one of `store.categoryIds` is a central `shoofi.categories` doc (non-school-project) whose
+  normalised `nameHE`/`nameAR` is in `FOOD_SERVICE_CATEGORY_NAMES`. Per store DB via the
+  injected `dbFor` = `getOrInitializeDb(appName, appDb)`.
+- **Product selection:** `products.find({ isHidden: {$ne:true}, productType: {$ne:"combo"} })`;
+  categories = `supportedCategoryIds` only (no `categoryId` fallback — `/api/menu` never reads
+  it), resolved against the store's `categories` (projected `nameAR, nameHE, isSchoolProject,
+  isHidden, discountPercent`) with hidden categories dropped; skipped when none remain or all
+  that remain are `isSchoolProject === true`.
+- `categoryNames` = both-language names of those categories; `nameNorm` =
+  `normalizeSearchText(nameAR + " " + nameHE)`.
+- **Labels:** per store, `shoofi.productLabels.find({ appName, status: { $in: ["applied",
+  "admin"] } })`. With a trusted label: `dishType` = the label's (may be null),
+  `dishTypeSource` = `admin` for an admin label else `claude`, the six attribute fields and
+  `searchTermsNorm` copied from it. Without one: rules below, `dishTypeSource: "rules"` (or null
+  when the rules find nothing), attributes `null`, `searchTermsNorm: []`. The build first
+  force-reloads the active taxonomy (`loadActiveDishTypes`), so approved types' words classify.
+- rules `dishType` = `classifyProduct` (`dish-types.js`): earliest keyword hit in `nameAR`, then
+  `nameHE`, then category names. Single-word keywords match as word PREFIXES (plurals), also
+  after stripping `ال`/`אל` and one glued Hebrew prefix letter (`הובלמשכ`); keywords shorter
+  than 3 chars after normalisation are dropped (so `דג` alone never matches). Keys: burger,
+  shawarma, tortilla, mexican, pizza, falafel, schnitzel, sushi, grill, fried_chicken, pasta,
+  asian, fish, hummus, breakfast, sandwich, salad, and `meal:false` dessert, drink, side — the
+  SEED list; the live list is `shoofi.dishTaxonomy` `status: "active"` (below), swapped in with
+  `setDishTypes`. A keyword written `=word` matches a whole word only (`=קרפ` so carpaccio is not
+  a crêpe).
+- `price` = `product.price` coerced to a number, then `applyProductDiscount` with a map built
+  from the store's non-hidden, non-school-project categories (the same set `/api/menu` prices
+  against) — the displayed price at build time, a ranking hint only; `img` = `img[0].uri`.
+- `qty30d` / `orders30d` / `storeOrders30d`: the store's `orders` with `COMPLETED_STATUSES`,
+  `created >=` an Israel-offset STRING 30 days back, `isSchoolProject != true`, grouped on
+  `order.items.item_id` (a string) — the same rules as `services/menu/best-sellers.js`,
+  including `$toInt` on `qty`.
+
+**Reading it:** `suggestForCustomer` (`suggest-service.js`) runs ONE `find` on it, scoped to the
+open stores' `appName`s and an `$or` of what the mode can use, ranks in memory, then
+`applyLiveMenu` re-reads the winners from each store's `products` (projection `nameAR, nameHE,
+price, img[0], isHidden, isInStore, productType, supportedCategoryIds`) and, in parallel, the
+store's `categories` with `{ isHidden: {$ne:true}, isSchoolProject: {$ne:true} }` (projection
+`discountPercent`). A row survives only if it exists, is not hidden, is not a combo, has at least
+one of its `supportedCategoryIds` among those visible categories, has `isInStore === true`, and a
+discounted `price > 0`. The card takes that discounted `price` (plus `originalPrice` /
+`discountPercent` when a discount applies) — CORE invariant 3 — and the live names and image.
+
+### central `shoofi.dishTaxonomy` — the dish-type list as data (CORE invariant 12)
+`{ _id: key, key, label_ar, label_he, meal, words[], status: "active"|"proposed"|"rejected",
+source: "seed"|"claude"|"admin", productCount, storeCount, examples[{appName, productId, nameAR,
+nameHE}], firstSeenAt, updatedAt, reviewedAt, reviewedBy }`. `ensureSeeded` upserts every seed
+type with **`$setOnInsert` only** (runs inside `loadActiveDishTypes`, so on first read and every
+10-min refresh — cheap, never overwrites). Proposed rows are written by `refreshProposals` in
+`product-labeler.js` (only when `≥ PROPOSAL_MIN_PRODUCTS` labels carry the same
+`proposedType.key`, and never over an existing non-proposed row); the same function deletes
+`status: "proposed", source: "claude"` rows whose key fewer than 3 current labels still carry.
+Before counting it merges duplicates: `proposalAliases(labelDocs)` (pure) unions proposal keys
+whose normalised `label_he` or `label_ar` match and maps each alias to the key carried by the most
+products (ties: alphabetical); the aliased labels' `proposedType` is rewritten to the canonical one.
+Production 2026-09-28 merged samboosek/sambousek, burekas/boureka, kubbeh/kibbeh.
+`parseLabels(text, activeKeys, proposedTypes)` maps a pending proposal's key — found in either
+`dishType` or `proposedType` of a reply row — onto the stored proposal, so labels keep one key. Approve / reject / patch via the
+admin endpoints (§7); approve and patch force-reload the classifier on that instance, other
+instances pick it up within 10 min.
+
+### central `shoofi.productLabels` — Claude's per-product labels (CORE invariant 12)
+`{ appName, productId, nameAR, nameHE, contentHash, dishType, proposedType?, course, sweet, spicy,
+vegetarian, light, protein, searchTerms[], searchTermsNorm[], confidence, rulesDishType,
+fromApprovedProposal,
+status: "applied"|"review"|"admin", model, runId, labeledAt, reviewedBy?, reviewedAt? }`. Indexes:
+`{appName, productId}` unique, `{status}`, `{"proposedType.key"}`. Product source is
+`storeProducts`: non-hidden, non-combo products in at least one non-hidden, non-school category
+(the same set the index uses). `course` ∈ main/side/drink/dessert/snack/sauce/other; `protein` ∈
+chicken/beef/lamb/fish/seafood/cheese/egg/none/mixed. `decideStatus(label, rulesDishType)` and
+the `contentHash` relabel rule: CORE invariant 12. Readers: `index-builder.js` (trusted only),
+`GET /api/admin/product-labels/review` (`status: "review"`).
+
+### central `shoofi.productLabelRuns` — one document per labelling run
+`{ startedAt, finishedAt, status: "running"|"done"|"failed", model, error?, stores, products,
+pending, labeled, applied, review, calls, errors, inputTokens, outputTokens, proposals }`. Dry runs
+write none. Read by `GET /api/admin/product-labels/runs` (the admin page's cost history).
 
 ## 3. Category → product hierarchy & ordering
 Two levels: `general-categories` → `categories` (linked by
@@ -371,6 +468,9 @@ the cache read.
 - `POST /api/admin/catalog-lint/run` — `{ appName }` for one store, else every store; admin token; returns the run stats
 - `GET  /api/getTranslations`, `POST /api/translations/{update,add,delete}`
 - `POST /api/global-search` — central store name search
+- `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng} }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price }, dishType, reason, confidence }], personalized }` (`routes/for-you.js`, `auth.optional`). Only a customer `app-type` (`shoofi-shopping` or none) personalises. Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
+- Dish taxonomy / labels admin (`routes/admin/dish-taxonomy.js`; every route `auth.required` + `checkAdminRole(["master","admin","manager"])`):
+  `GET /api/admin/dish-taxonomy` (seeds on first use), `POST /api/admin/dish-taxonomy/:key/approve` (→ active; its proposing labels get the type + `fromApprovedProposal`, `applied` at confidence ≥ 0.5 else `review`; admin labels untouched), `POST /api/admin/dish-taxonomy/:key/reject` (proposed only), `PATCH /api/admin/dish-taxonomy/:key`, `GET /api/admin/product-labels/review[?appName=]`, `POST /api/admin/product-labels/resolve { appName, productId, dishType }` (→ `status: "admin"`; `dishType` active or null), `GET /api/admin/product-labels/runs`, `POST /api/admin/product-labels/run [{ maxProducts, stores[] }]` — `startProductLabelsJob` (same `cron:product-labels` lock and locked index rebuild as the cron) answers as soon as it knows: `202 { started: true }` (running in the background), `409` a run already holds the lock, `503` no `ANTHROPIC_API_KEY`.
 
 ## 7b. Nightly catalog lint — the cron and the app event contract
 `utils/crons/catalog-lint-cron.js` — `30 4 * * *` Asia/Jerusalem, registered in `app.js` inside
@@ -390,10 +490,52 @@ open rather than resolved on no evidence. One store failing is logged and the ru
 `properties.extraName`; a customer is `userId`, falling back to `user_visit_id` (device) when
 logged out. Rename a property in the app and the BLOCKED rule silently finds nothing.
 
+## 7c. "For you" index build — the cron and the dry run
+`utils/crons/suggest-index-cron.js` — `SCHEDULE = "20 */3 * * *"` Asia/Jerusalem, registered in
+`app.js` with the other crons (`NODE_ENV=production && ENABLE_CRONS=true`), Redis lock
+`cron:suggest-index` (45-min TTL), plus a one-shot ~2 min after boot when the collection is
+empty. `node bin/build-suggest-index.js <envfile> [--customers=N]` is a read-only dry run that
+prints coverage (stores, products, % with a dish type, stores with popularity evidence);
+`--write` rebuilds for real. One store failing is logged and the run continues; its old rows
+survive. Design, evidence rules and flags: `docs/for-you.md` (shoofi-server).
+
+## 7d. Weekly dish labelling — the cron and the script
+`utils/crons/product-labels-cron.js` — `SCHEDULE = "10 4 * * 0"` (Sunday 04:10 Asia/Jerusalem),
+registered in `app.js` with the other crons (`ENABLE_CRONS`), Redis lock `cron:product-labels`
+(4-h TTL). `startProductLabelsJob(appDb, opts)` → `{ started: true, done }` or
+`{ started: false, reason: "no-api-key" | "locked" }`; `runProductLabelsJob` (the cron) waits on
+it. A started job runs `runProductLabeling`, then `runSuggestIndex` from
+`suggest-index-cron.js` — the index rebuild takes the `cron:suggest-index` lock like the 3-hourly
+build. Metered API only (`services/ai/complete.js` `backend: "api"`, `effort: "low"` →
+`output_config.effort`; `complete` returns `usage` token counts, absent on the bridge).
+`node bin/label-products.js <envfile> [--dry-run] [--max=N] [--store=appName ...] [--force]
+[--index] [--reapply] [--review]` — **writes labels and proposed dish types by default**; only `--dry-run` is
+read-only (it counts what would be sent and does not even seed `dishTaxonomy`). `--reapply` calls no
+model and needs no key: `reapplyStatusRules` re-decides the status of every `applied`/`review`
+label from its stored fields with the current `decideStatus` (admin labels untouched), after
+first promoting labels whose `proposedType.key` is now an active type (returns
+`promotedToApprovedType`), then refreshes proposals; it writes. `--review` (`opts.reviewOnly`)
+relabels only products whose label is `status: "review"` — it calls the model and costs tokens. `--force` relabels unchanged
+products (a full pass; admin rows with an unchanged hash are still skipped — CORE invariant 12).
+The script does **not** rebuild the "For you" index by default — the next server build (3-hourly,
+under `cron:suggest-index`) picks the labels up. `--index` opts in to a `buildSuggestIndex` run
+from the script, OUTSIDE that lock (off-server the Redis lock falls back to in-memory, so it
+could not protect a script anyway): use it only when no server can be building at the same time,
+since two concurrent builds delete each other's fresh rows. Tests: `test/integration/product-labels.js`.
+
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
-- **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b).
+- **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":
+  `POST /api/for-you/suggest` from `components/for-you/` + `screens/for-you/`, gated on the
+  platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled`; a card tap navigates to
+  `menuScreen` with `productId` (`hooks/useOpenStoreAtProduct.ts`), and the menu list opens the
+  sheet by matching `products[]._id`: `AllCategoriesList` searches `categoryList[].products`;
+  for tile-grid stores (`store.hasGeneralCategories`) `GeneralCategoriesList` receives the
+  general categories, which carry NO `products` of their own, so it searches
+  `generalCategories[].subCategories[].products` (and any direct `products`). Covered by
+  `__tests__/components/general-categories-open-product.test.tsx`. Never navigate to the
+  `meal` route for this — it is broken.
 - **Partner app** (`shoofi-partner`): product write + ordering endpoints; sends `app-type: shoofi-partner` to see hidden products; listens for `product_updated`.
-- **Admin web** (`shoofi-delivery-web`/`shoofi-admin`): category CRUD, product ordering/migration, translations CRUD, stock screen (`update/quantity`), store config toggles (`isStockManagment`, `hasGeneralCategories`).
+- **Admin web** (`shoofi-delivery-web`/`shoofi-admin`): category CRUD, product ordering/migration, translations CRUD, stock screen (`update/quantity`), store config toggles (`isStockManagment`, `hasGeneralCategories`). "סוגי מנות (בשבילך)" at `/admin/dish-types` (`src/views/admin/dish-types/DishTypes.tsx`, API wrappers `src/apis/admin/dish-taxonomy.ts`): approve/reject/edit dish types, the "מוצרים לבדיקה" review list, run history with token counts, and a manual run. Platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled` under Settings → Shoofi.
 
 ## 9. Known status (human-confirmed) — what's a bug vs. by-design
 Each item below was reviewed with the product owner. Respect these verdicts.
