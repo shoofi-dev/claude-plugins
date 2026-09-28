@@ -50,6 +50,35 @@ scope documents above it — `cityAreas.isActive` and `parentCities.isActive` re
 `{$ne: false}`, so absent means active *there*. Same field name, opposite default, one collection
 apart. Anything reasoning about whether an area was serving must use `isActive === true`.
 
+**`areas.price` is the TARIFF, not what the customer was charged — and nothing reconciles the
+two.** The fee is quoted on the CLIENT: the app reads `availableDrivers.area.price` off
+`POST /api/delivery/available-drivers` (`routes/delivery/driver.js` →
+`services/delivery/availability.js`) and puts it on the order as `shippingPrice`;
+`routes/order.js` spreads it into the order document verbatim, and
+`utils/order-pricing-shadow.js` takes `shippingPrice` as an **input** to
+`calculateOrderPricing`, so `serverPricing.driftDetected: false` says nothing about the
+delivery fee. The order carries **no** `areaId` at all — the area is resolved a second time,
+independently, at partner-accept, and embedded as `book-delivery.area`
+(`services/delivery/book-delivery.js`, from `order.order.geo_positioning`). So the price is
+decided at checkout from whatever point the app had, and the area is decided minutes later
+from the submitted point: **two resolutions, no error if they disagree.**
+`delivery-company.book-delivery.area.price` is the authority; reconcile against it, never
+against `orders.shippingPrice`:
+```js
+db.getSiblingDB("delivery-company").getCollection("book-delivery").aggregate([
+  { $match: { created: { $gte: "<YYYY-MM-DD>T00:00:00+03:00" } } },   // offset STRING
+  { $project: { bookId: 1, appName: 1, "area.name": 1,
+                ap: "$area.price", sp: "$order.shippingPrice" } },
+  { $match: { $expr: { $and: [ { $ne: ["$sp", 0] }, { $ne: ["$ap", "$sp"] } ] } } },
+])
+```
+`sp: 0` is excluded because a free-delivery coupon leaves `shippingPrice` untouched and
+lands in `appliedCoupon.discountAmount` — a genuine 0 there is a different defect. The
+drift runs **both ways** (customers over- and under-charged), and the store/driver side
+reads the same stale field, not the tariff (`lib/payments/calc.js`,
+`routes/driver-reports.js` both on `order.shippingPrice`), so settlement inherits it.
+Confirmed 2026-09-28 on `2463-4798`: area `כפר קאסם - לב הארץ` @25, charged 20.
+
 ## Delivery-only — a courier with no order behind it
 A store can book a driver for goods **Shoofi never sold**: owner picks a town, gives a phone
 and a ready-time, a courier goes. `services/delivery/delivery-only.js` +

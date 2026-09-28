@@ -30,7 +30,9 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "utils/order-pricing-shadow.js",
+        "lib/payments/calc.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -209,6 +211,21 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "utils/order-pricing-shadow.js",
+          "regex": "const\\s+shippingPrice\\s*=\\s*orderDoc\\.shippingPrice",
+          "desc": "the shadow pricer takes shippingPrice as an INPUT, so driftDetected says nothing about the delivery fee"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "area:\\s*result\\.area",
+          "desc": "book-delivery embeds the area resolved at accept - area.price is the authoritative tariff, not orders.shippingPrice"
+        },
+        {
+          "file": "lib/payments/calc.js",
+          "regex": "delivery\\?\\.order\\?\\.shippingPrice",
+          "desc": "driver/company settlement reads the order shippingPrice, not areas.price, so a mis-quoted fee flows into payouts"
         }
       ]
     },
