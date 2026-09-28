@@ -313,6 +313,23 @@ boundary and say so in the PR.
    → that store's dishes. Separately, when any product scores `TIER.WORD_START`+ on the typed
    words, products below `TIER.CONTAINS` (fuzzy-only, e.g. "بيتا" for "جبيتا") are dropped,
    however popular or familiar — found when "جبيتا من gcp" ranked another store's pita first.
+15. **CLAUDE IN THE CHAT IS OPT-IN, CAPPED, AND PICKS ONLY FROM OUR SHORTLIST** (`ai-chat.js`).
+   Only typed messages, and only while `isChatAiEnabled` is true on the platform config doc
+   (server-read; not in `SHOOFI_CONFIG_PUBLIC_FIELDS`). Off, over `chatAiDailyBudgetUsd` (default 5,
+   Israel day, summed from `aiUsage` rows with feature `for-you-chat`, cached 1 min), a 12 s timeout,
+   an API error or an unreadable reply → `aiChatTurn` returns null and the rules answer unchanged.
+   Claude sees a shortlist (≤ 40: `scoreText` matches, then the customer's own dishes, then popular —
+   open stores only), what the rules understood (craving attributes, named store, dish types, and
+   whether anything matched), a taste summary and ≤ 6 history turns; it returns
+   `{reply, pick:["p<n>"]}` and ids outside the list are dropped. Cards keep our reasons and pass
+   `applyLiveMenu`. Reply `replyCode: "ai_reply"` with `replyParams.text`, `ai: true`. Chips never call it.
+16. **EVERY CLAUDE CALL IS LOGGED AND PRICED** (`services/ai/usage-log.js`, `pricing.js`).
+   `complete.js` writes one `shoofi.aiUsage` row per call — `feature` (the caller's `label`), model,
+   backend, tokens, `costUsd` at list prices when it ran (bridge = 0), ms, ok/error, `meta` — for
+   every AI feature, not only For you. Fire-and-forget (a failed write never fails the call); TTL 180
+   days; the sink is registered at boot (`app.js`) and by `bin/label-products.js`. Admin
+   "שימוש ב-Claude" (`GET /api/admin/ai-usage`, admin roles) reads it. When a price changes, change
+   `PRICES` in `pricing.js`.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
