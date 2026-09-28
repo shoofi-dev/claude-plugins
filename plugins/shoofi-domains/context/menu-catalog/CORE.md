@@ -197,10 +197,14 @@ boundary and say so in the PR.
      whose menu does not contain the product.
    - Nothing writes the menu cache; no cache key to clear. Catalog writes do not need to touch
      the index — the next build and the live re-check cover them.
-   - **Two platform flags gate the client:** `isChatSuggestEnabled` (home entry + chat) and
-     `isChatVoiceEnabled` (mic, UI only) on the central platform config document (app-name
-     `shoofi`), exposed only because they are in `SHOOFI_CONFIG_PUBLIC_FIELDS`
-     (`routes/store.js`). Both default off. The server endpoint itself does not read them.
+   - **Three platform flags gate the client:** `isChatSuggestEnabled` (home entry + chat),
+     `isChatVoiceEnabled` (mic, UI only) and `isChatSuggestForAll` (staged rollout) on the
+     central platform config document (app-name `shoofi`), exposed only because they are in
+     `SHOOFI_CONFIG_PUBLIC_FIELDS` (`routes/store.js`). All default off. The app shows the home
+     entry only when `isChatSuggestEnabled && (isChatSuggestForAll || customer.isShoofiEmployee)`
+     (`screens/explore.tsx`, the same staged-rollout shape as `isTwinEnabledForAll` at checkout;
+     `isShoofiEmployee` comes from `GET /api/customer/details`). The server endpoint itself does not
+     read any of them — the gate is client-side.
 12. **DISH LABELS: A MACHINE PROPOSES, ONLY TRUSTED LABELS REACH CUSTOMERS.** Three central
    collections, all derived and all owned by `services/ordering-intelligence/`:
    - **`shoofi.dishTaxonomy`** — the dish-type list as data (`taxonomy.js`, `_id` = key,

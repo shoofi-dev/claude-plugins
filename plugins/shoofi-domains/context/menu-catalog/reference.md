@@ -526,7 +526,8 @@ since two concurrent builds delete each other's fresh rows. Tests: `test/integra
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":
   `POST /api/for-you/suggest` from `components/for-you/` + `screens/for-you/`, gated on the
-  platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled`; a card tap navigates to
+  platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled` / `isChatSuggestForAll` (entry shown to
+  Shoofi employees only until the last is on); a card tap navigates to
   `menuScreen` with `productId` (`hooks/useOpenStoreAtProduct.ts`), and the menu list opens the
   sheet by matching `products[]._id`: `AllCategoriesList` searches `categoryList[].products`;
   for tile-grid stores (`store.hasGeneralCategories`) `GeneralCategoriesList` receives the
@@ -535,7 +536,7 @@ since two concurrent builds delete each other's fresh rows. Tests: `test/integra
   `__tests__/components/general-categories-open-product.test.tsx`. Never navigate to the
   `meal` route for this — it is broken.
 - **Partner app** (`shoofi-partner`): product write + ordering endpoints; sends `app-type: shoofi-partner` to see hidden products; listens for `product_updated`.
-- **Admin web** (`shoofi-delivery-web`/`shoofi-admin`): category CRUD, product ordering/migration, translations CRUD, stock screen (`update/quantity`), store config toggles (`isStockManagment`, `hasGeneralCategories`). "סוגי מנות (בשבילך)" at `/admin/dish-types` (`src/views/admin/dish-types/DishTypes.tsx`, API wrappers `src/apis/admin/dish-taxonomy.ts`): approve/reject/edit dish types, the "מוצרים לבדיקה" review list, run history with token counts, and a manual run. Platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled` under Settings → Shoofi.
+- **Admin web** (`shoofi-delivery-web`/`shoofi-admin`): category CRUD, product ordering/migration, translations CRUD, stock screen (`update/quantity`), store config toggles (`isStockManagment`, `hasGeneralCategories`). "סוגי מנות (בשבילך)" at `/admin/dish-types` (`src/views/admin/dish-types/DishTypes.tsx`, API wrappers `src/apis/admin/dish-taxonomy.ts`): approve/reject/edit dish types, the "מוצרים לבדיקה" review list, run history with token counts, and a manual run. Platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled` / `isChatSuggestForAll` ("For You — Open To All Customers"; off = Shoofi employees only) under Settings → Shoofi.
 
 ## 9. Known status (human-confirmed) — what's a bug vs. by-design
 Each item below was reviewed with the product owner. Respect these verdicts.
