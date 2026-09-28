@@ -598,7 +598,7 @@
         },
         {
           "file": "services/ordering-intelligence/suggest.js",
-          "regex": "stripFillers\\(mention\\.rest\\)",
+          "regex": "stripFillers\\((craving|mention)\\.rest\\)",
           "desc": "doc CORE invariant 13: only what is LEFT after the craving words are removed is matched against names (craving and store words both removed first — invariant 14)"
         },
         {
