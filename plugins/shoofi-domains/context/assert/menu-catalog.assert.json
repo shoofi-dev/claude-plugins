@@ -47,7 +47,8 @@
         "utils/crons/product-labels-cron.js",
         "routes/admin/dish-taxonomy.js",
         "bin/label-products.js",
-        "services/ai/complete.js"
+        "services/ai/complete.js",
+        "services/ordering-intelligence/store-mention.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -164,6 +165,9 @@
         "routes/admin/dish-taxonomy.js": [
           "checkAdminRole",
           "auth.required"
+        ],
+        "services/ordering-intelligence/store-mention.js": [
+          "detectStoreMentions"
         ]
       },
       "patterns": [
@@ -595,7 +599,7 @@
         {
           "file": "services/ordering-intelligence/suggest.js",
           "regex": "stripFillers\\((craving|mention)\\.rest\\)",
-          "desc": "doc CORE invariant 13: only what is LEFT after the craving words are removed is matched against names"
+          "desc": "doc CORE invariant 13: only what is LEFT after the craving words are removed is matched against names (craving and store words both removed first — invariant 14)"
         },
         {
           "file": "services/ordering-intelligence/suggest.js",
@@ -721,6 +725,31 @@
           "file": "services/ordering-intelligence/product-labeler.js",
           "regex": "const skipped = batch\\.filter\\(",
           "desc": "doc CORE invariant 12: products missing from a readable reply are re-sent, never left with a stale label"
+        },
+        {
+          "file": "services/ordering-intelligence/store-mention.js",
+          "regex": "MAX_STORES_PER_WORD = 3",
+          "desc": "doc CORE invariant 14: a word naming more than 3 stores is too generic"
+        },
+        {
+          "file": "services/ordering-intelligence/store-mention.js",
+          "regex": "isDish\\(token\\)",
+          "desc": "doc CORE invariant 14: a dish word is never a store mention"
+        },
+        {
+          "file": "services/ordering-intelligence/store-mention.js",
+          "regex": "for \\(const size of \\[3, 2\\]\\)",
+          "desc": "doc CORE invariant 14: whole phrases before single words"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "best >= TIER\\.WORD_START \\? scored\\.filter\\(\\(s\\) => s\\.relevance >= TIER\\.CONTAINS\\)",
+          "desc": "doc CORE invariant 14: fuzzy-only matches dropped when a close match exists"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "appName: \\{ \\$in: mention\\.appNames \\}",
+          "desc": "doc CORE invariant 14: a named store's products are all fetched"
         }
       ]
     },

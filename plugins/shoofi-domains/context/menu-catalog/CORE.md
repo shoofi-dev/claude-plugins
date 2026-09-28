@@ -297,6 +297,19 @@ boundary and say so in the PR.
    of a different food. The app renders it as `for_you_reply_craving_unavailable`
    (`shoofi-app/helpers/for-you-copy.ts`).
 
+14. **A STORE NAMED IN A CRAVING NARROWS; A NEAR-SPELLING IS A LAST RESORT** (`store-mention.js`,
+   `suggest.js` text mode). `detectStoreMentions(craving.rest, openStores)` finds open stores the
+   text names — whole 3- then 2-word phrases first ("burger house"), then single words as typed,
+   without Arabic "ال" and without a glued Hebrew מ/ב/ש/ל — using only close matches
+   (`TIER.WORD_START`+ on name_ar / name_he / appName slug). Those words, with the connector before
+   them ("من", "מ", "from", "at", "של"), leave the dish search and the pool is limited to those
+   stores (`candidateQuery` also fetches all of their products). Guards: a dish-type word is never a
+   store even when a store is named after it ("טורטיה"), a phrase of only dish words is not a store,
+   and a word matching more than 3 stores is too generic. Only a store and nothing else ("من gcp")
+   → that store's dishes. Separately, when any product scores `TIER.WORD_START`+ on the typed
+   words, products below `TIER.CONTAINS` (fuzzy-only, e.g. "بيتا" for "جبيتا") are dropped,
+   however popular or familiar — found when "جبيتا من gcp" ranked another store's pita first.
+
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
 against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store DBs):
