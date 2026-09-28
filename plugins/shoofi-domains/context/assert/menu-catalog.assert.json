@@ -750,6 +750,11 @@
           "file": "services/ordering-intelligence/suggest-service.js",
           "regex": "appName: \\{ \\$in: mention\\.appNames \\}",
           "desc": "doc CORE invariant 14: a named store's products are all fetched"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "\"isChatSuggestForAll\"",
+          "desc": "doc CORE invariant 11: the staged-rollout flag is public, or the app can never open For you to all customers"
         }
       ]
     },
@@ -776,6 +781,11 @@
           "file": "helpers/for-you-copy.ts",
           "regex": "for_you_reply_craving_unavailable",
           "desc": "doc CORE invariant 13: the app renders the craving_unavailable reply code"
+        },
+        {
+          "file": "screens/explore.tsx",
+          "regex": "isChatSuggestForAll \\|\\| !!userDetailsStore\\?\\.userDetails\\?\\.isShoofiEmployee|isChatSuggestForAll\\s*\\|\\|\\s*!!userDetailsStore",
+          "desc": "doc CORE invariant 11: home entry gated to Shoofi employees until isChatSuggestForAll"
         }
       ]
     },
