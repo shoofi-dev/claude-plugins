@@ -24,9 +24,15 @@
         "bin/build-suggest-index.js",
         "bin/label-products.js",
         "utils/crons/product-labels-cron.js",
-        "routes/admin/dish-taxonomy.js"
+        "routes/admin/dish-taxonomy.js",
+        "routes/admin/ai-usage.js",
+        "services/ai/usage-log.js",
+        "services/ai/pricing.js"
       ],
-      "shoofi-partner": ["screens/admin/product", "screens/menu"],
+      "shoofi-partner": [
+        "screens/admin/product",
+        "screens/menu"
+      ],
       "shoofi-app": [
         "screens/menu",
         "components/for-you",
@@ -35,7 +41,12 @@
         "helpers/for-you-copy.ts",
         "hooks/useOpenStoreAtProduct.ts"
       ],
-      "shoofi-delivery-web": ["src/views/admin/dish-types/", "src/apis/admin/dish-taxonomy.ts"]
+      "shoofi-delivery-web": [
+        "src/views/admin/dish-types/",
+        "src/apis/admin/dish-taxonomy.ts",
+        "src/views/admin/ai-usage/",
+        "src/apis/admin/ai-usage.ts"
+      ]
     },
     "orders": {
       "shoofi-server": [
@@ -148,7 +159,10 @@
         "src/views/admin/settings/DeliverySettings.tsx",
         "src/consts/shared.ts"
       ],
-      "shoofi-partner": ["hooks/useAvailableDrivers.ts", "screens/book-delivery/"]
+      "shoofi-partner": [
+        "hooks/useAvailableDrivers.ts",
+        "screens/book-delivery/"
+      ]
     },
     "customers": {
       "shoofi-server": [
@@ -173,8 +187,18 @@
         "stores/user-details/",
         "stores/address/"
       ],
-      "shoofi-partner": ["screens/login", "screens/verify-code", "stores/auth/", "stores/user-details/"],
-      "shoofi-shoofir": ["screens/login", "screens/verify-code", "stores/auth/", "stores/user-details/"],
+      "shoofi-partner": [
+        "screens/login",
+        "screens/verify-code",
+        "stores/auth/",
+        "stores/user-details/"
+      ],
+      "shoofi-shoofir": [
+        "screens/login",
+        "screens/verify-code",
+        "stores/auth/",
+        "stores/user-details/"
+      ],
       "shoofi-delivery-web": [
         "src/contexts/AdminAuthContext.tsx",
         "src/views/admin/users/",

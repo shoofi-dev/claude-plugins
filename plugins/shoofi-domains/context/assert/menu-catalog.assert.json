@@ -48,7 +48,11 @@
         "routes/admin/dish-taxonomy.js",
         "bin/label-products.js",
         "services/ai/complete.js",
-        "services/ordering-intelligence/store-mention.js"
+        "services/ordering-intelligence/store-mention.js",
+        "services/ordering-intelligence/ai-chat.js",
+        "services/ai/usage-log.js",
+        "services/ai/pricing.js",
+        "routes/admin/ai-usage.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -168,6 +172,17 @@
         ],
         "services/ordering-intelligence/store-mention.js": [
           "detectStoreMentions"
+        ],
+        "services/ordering-intelligence/ai-chat.js": [
+          "aiChatTurn",
+          "buildShortlist",
+          "parseChatReply",
+          "loadChatAiConfig"
+        ],
+        "services/ai/usage-log.js": [
+          "recordUsage",
+          "setUsageDb",
+          "usageRow"
         ]
       },
       "patterns": [
@@ -755,6 +770,41 @@
           "file": "routes/store.js",
           "regex": "\"isChatSuggestForAll\"",
           "desc": "doc CORE invariant 11: the staged-rollout flag is public, or the app can never open For you to all customers"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "enabled: doc\\?\\.isChatAiEnabled === true",
+          "desc": "doc CORE invariant 15: Claude chat only when the flag is explicitly on"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": ">= config\\.dailyBudgetUsd",
+          "desc": "doc CORE invariant 15: the daily budget stops Claude calls"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "n <= shortlistSize",
+          "desc": "doc CORE invariant 15: ids outside the shortlist are dropped"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "await aiChatTurn\\(",
+          "desc": "doc CORE invariant 15: a typed message tries Claude first, then the rules"
+        },
+        {
+          "file": "services/ai/complete.js",
+          "regex": "recordUsage\\(",
+          "desc": "doc CORE invariant 16: every Claude call is logged"
+        },
+        {
+          "file": "services/ai/usage-log.js",
+          "regex": "expireAfterSeconds: RETENTION_SECONDS",
+          "desc": "doc CORE invariant 16: usage rows expire (180 days)"
+        },
+        {
+          "file": "app.js",
+          "regex": "setUsageDb\\(db\\.shoofi\\)",
+          "desc": "doc CORE invariant 16: the usage sink is registered at boot"
         }
       ]
     },
@@ -786,13 +836,20 @@
           "file": "screens/explore.tsx",
           "regex": "isChatSuggestForAll \\|\\| !!userDetailsStore\\?\\.userDetails\\?\\.isShoofiEmployee|isChatSuggestForAll\\s*\\|\\|\\s*!!userDetailsStore",
           "desc": "doc CORE invariant 11: home entry gated to Shoofi employees until isChatSuggestForAll"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "replyCode === \"ai_reply\"",
+          "desc": "doc CORE invariant 15: Claude's reply is shown as written"
         }
       ]
     },
     "shoofi-delivery-web": {
       "files": [
         "src/views/admin/dish-types/DishTypes.tsx",
-        "src/apis/admin/dish-taxonomy.ts"
+        "src/apis/admin/dish-taxonomy.ts",
+        "src/views/admin/ai-usage/AiUsage.tsx",
+        "src/apis/admin/ai-usage.ts"
       ],
       "symbols": {},
       "patterns": [
