@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@67de3718 + feat/for-you-suggestions / 2026-09-28
+last-verified: shoofi-server@dd8be298 / 2026-09-28
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
