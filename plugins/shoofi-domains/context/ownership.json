@@ -17,10 +17,25 @@
         "utils/order-stock.js",
         "utils/combo-validation.js",
         "utils/client-features.js",
-        "services/menu/combo-snapshots.js"
+        "services/menu/combo-snapshots.js",
+        "services/ordering-intelligence/",
+        "routes/for-you.js",
+        "utils/crons/suggest-index-cron.js",
+        "bin/build-suggest-index.js",
+        "bin/label-products.js",
+        "utils/crons/product-labels-cron.js",
+        "routes/admin/dish-taxonomy.js"
       ],
       "shoofi-partner": ["screens/admin/product", "screens/menu"],
-      "shoofi-app": ["screens/menu"]
+      "shoofi-app": [
+        "screens/menu",
+        "components/for-you",
+        "screens/for-you",
+        "stores/for-you/",
+        "helpers/for-you-copy.ts",
+        "hooks/useOpenStoreAtProduct.ts"
+      ],
+      "shoofi-delivery-web": ["src/views/admin/dish-types/", "src/apis/admin/dish-taxonomy.ts"]
     },
     "orders": {
       "shoofi-server": [
