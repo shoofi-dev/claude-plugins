@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@a0e8bdb2 / 2026-09-23
+last-verified: shoofi-server@dd8be298 / 2026-09-28
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -15,11 +15,17 @@ Server: `routes/menu.js`, `routes/product.js`, `routes/category.js`, the catalog
 `utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`,
 `utils/catalog-lint.js` (the extras lint rules), `services/catalog/catalog-lint.js` (the
 worklist writer + nightly run), `routes/admin/catalog-lint.js`, `utils/crons/catalog-lint-cron.js`,
-and the combo-deals trio `utils/combo-validation.js`, `services/menu/combo-snapshots.js`,
-`utils/client-features.js`.
+the combo-deals trio `utils/combo-validation.js`, `services/menu/combo-snapshots.js`,
+`utils/client-features.js`, and the "For you" suggestions — `services/ordering-intelligence/`
+(the catalog-facing parts are `index-builder.js`, `dish-types.js` and the live re-check in
+`suggest-service.js`; ranking/taste/open-stores ride along), `routes/for-you.js`,
+`utils/crons/suggest-index-cron.js`, `bin/build-suggest-index.js`, and the dish labelling behind
+it — `services/ordering-intelligence/{taxonomy,product-labeler,craving}.js`,
+`utils/crons/product-labels-cron.js`, `routes/admin/dish-taxonomy.js`, `bin/label-products.js`
+(admin web: `src/views/admin/dish-types/DishTypes.tsx`, `src/apis/admin/dish-taxonomy.ts`).
 Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/sold-by-weight.md`,
 `docs/menu-import-issues.md` (the worklist — now also documents the `lint` phase),
-`docs/combo-deals.md`.
+`docs/combo-deals.md`, `docs/for-you.md`.
 Mostly **server-first**: catalog data is server-owned and clients render it — but if a task
 needs a client change (partner product screens, customer menu display), do it full-stack,
 one PR per repo.
@@ -151,6 +157,185 @@ boundary and say so in the PR.
    no Haat/xlsx import of combos. The order side — `calculateComboExtrasPrice`,
    `expandStockLines`, amend scope — is orders CORE invariants 11–12; `utils/order-stock.js`
    is the shared review boundary named in Scope.
+11. **THE SUGGESTION INDEX IS A DISPOSABLE PROJECTION; WHAT A CUSTOMER SEES IS RE-READ LIVE.**
+   `shoofi.suggestProductIndex` (central DB, one doc per product, `{ appName, productId }` unique)
+   feeds the "For you" home-screen cards (`POST /api/for-you/suggest`, `docs/for-you.md`). It is
+   rebuilt from the store DBs by `buildSuggestIndex` (`services/ordering-intelligence/index-builder.js`)
+   every 3 h at :20 (`utils/crons/suggest-index-cron.js`, `ENABLE_CRONS`, Redis lock
+   `cron:suggest-index`; plus once ~2 min after boot if empty). **Never edit it by hand and never
+   read it as the truth about a product** — rows no longer produced are deleted per store
+   (`builtAt` sweep), and stores that left the set are deleted wholesale (a store that merely
+   *failed* a run keeps its rows).
+   - **Which stores:** `shoofi.stores` with `business_visible !== false` AND in a food-service
+     general category (`FOOD_SERVICE_CATEGORY_NAMES`, exact normalised name match — restaurant
+     "דגים" counts, "חנות דגים" does not). Groceries, butchers, flowers, pharmacy never appear.
+   - **Which products:** not `isHidden`, not `productType: "combo"` (v1), in at least one existing
+     **non-hidden** store category by `supportedCategoryIds` (the legacy single `categoryId` is not
+     read — `/api/menu` never matches on it), and not school-project-only. Out-of-stock products
+     ARE indexed — stock is live state.
+   - **Price and image in the index are hints for ranking, not display.** `price` is the
+     category-discounted price (`applyProductDiscount`, invariant 3) as of the build; `img` is
+     `img[0].uri`. The card's price always comes from the live re-check.
+   - **`dishType`** comes from a TRUSTED Claude label when one exists (`shoofi.productLabels`
+     with `status` `applied` or `admin` — invariant 12), else from the keyword rules
+     (`dish-types.js` `classifyProduct`: product names first, category names only when the names
+     say nothing; keywords go through `normalizeSearchText` from `services/search/text-search.js`,
+     so the search's spelling folds apply). `dishTypeSource` records `claude` / `admin` / `rules`.
+     A trusted label also fills `course, sweet, spicy, vegetarian, light, protein` and
+     `searchTermsNorm`; without one they are `null` / `[]` (unknown, not false). `meal: false`
+     types (drink/side/dessert) are never offered on their own.
+   - **The live re-check is the invariant.** Before cards leave the server, `applyLiveMenu`
+     (`suggest-service.js`) re-reads, per store that made the cut (≤ 6), the chosen `products`
+     AND the store's visible `categories` (`isHidden != true`, `isSchoolProject != true` — the
+     same filter `/api/menu` applies). It drops a product that is deleted, `isHidden: true`, a
+     combo, in no visible category (by `supportedCategoryIds`), `isInStore !== true` (a MISSING
+     `isInStore` is unavailable — the app greys out any falsy value and search requires `true`),
+     or priced `<= 0` ("not for sale", invariant 8). The card's `price` is
+     `applyProductDiscount(row, buildCategoryDiscountMap(visibleCategories))` — the menu's number —
+     with `originalPrice`/`discountPercent` when discounted; names and image are the live row's.
+     Any new `/api/menu` visibility rule must be mirrored here, or a suggestion opens a store
+     whose menu does not contain the product.
+   - Nothing writes the menu cache; no cache key to clear. Catalog writes do not need to touch
+     the index — the next build and the live re-check cover them.
+   - **Three platform flags gate the client:** `isChatSuggestEnabled` (home entry + chat),
+     `isChatVoiceEnabled` (mic, UI only) and `isChatSuggestForAll` (staged rollout) on the
+     central platform config document (app-name `shoofi`), exposed only because they are in
+     `SHOOFI_CONFIG_PUBLIC_FIELDS` (`routes/store.js`). All default off. The app shows the home
+     entry only when `isChatSuggestEnabled && (isChatSuggestForAll || customer.isShoofiEmployee)`
+     (`screens/explore.tsx`, the same staged-rollout shape as `isTwinEnabledForAll` at checkout;
+     `isShoofiEmployee` comes from `GET /api/customer/details`). The server endpoint itself does not
+     read any of them — the gate is client-side.
+12. **DISH LABELS: A MACHINE PROPOSES, ONLY TRUSTED LABELS REACH CUSTOMERS.** Three central
+   collections, all derived and all owned by `services/ordering-intelligence/`:
+   - **`shoofi.dishTaxonomy`** — the dish-type list as data (`taxonomy.js`, `_id` = key,
+     `status: active | proposed | rejected`, `source: seed | claude | admin`). Seeded from the
+     hand-written `DISH_TYPES` in `dish-types.js` **with `$setOnInsert` only**, so an admin's edit
+     to a seed type is never undone by a deploy. `loadActiveDishTypes` feeds ONLY `status: "active"`
+     types to the classifier (`setDishTypes`, cached 10 min per process; forced after an admin
+     approve/edit and at the start of each index build and label run). **A `proposed` type never
+     reaches a customer**: it is created by the labeller once `PROPOSAL_MIN_PRODUCTS` (3) products
+     carry it (the system prompt lists the pending proposals and Claude must reuse their keys, so
+     one dish does not split into several proposals; before counting, `refreshProposals` folds
+     duplicates — `proposalAliases` unions proposal keys sharing a normalised `label_he` or
+     `label_ar` and rewrites the aliases' `proposedType` to the key carried by the most products,
+     e.g. samboosek→sambousek; it then deletes a `proposed` + `source: "claude"` row once fewer
+     than 3 current labels carry its key), and
+     becomes active only through `POST /api/admin/dish-taxonomy/:key/approve`
+     (admin web "סוגי מנות"), which also sets `dishType` + `fromApprovedProposal: true`
+     on the labels that proposed it (never on an `admin` label; labels with `confidence ≥ AGREE_CONFIDENCE` (0.5, exported from `product-labeler.js`) become
+     `applied`, the rest `review` — the same answer `decideStatus` gives). A
+     proposal approved while a run is going is caught twice: `runProductLabeling` re-reads the
+     active types before writing (`activeNow`, `loadActiveDishTypes` with `force: true`, so an
+     approval on any instance is seen) and turns a proposal of an active key into `dishType`, and
+     `reapplyStatusRules` promotes any label whose `proposedType.key` is now active
+     (`promotedToApprovedType`; 108 on production 2026-09-28). The index picks those products up at its next build.
+   - **`shoofi.productLabels`** — one per `(appName, productId)`, written only by
+     `runProductLabeling` (`product-labeler.js`) and the admin resolve endpoint. **Relabel rule:**
+     each label stores `contentHash` (sha1 of nameAR, nameHE, the first 200 chars of each
+     description, sorted category names); a product is re-sent to Claude only when that hash
+     changes — renaming a product, editing its description, or renaming/moving its category all
+     count. **`decideStatus(label, rulesDishType)`, first match wins:** (1) a `proposedType` →
+     `review`; (2) `fromApprovedProposal` with a `dishType` (an admin approved the type, Claude
+     put the product in it) → `applied` if `confidence ≥ AGREE_CONFIDENCE (0.5)`, else `review`;
+     (3) Claude's `dishType` equals the rules' → the same 0.5 test; (4) neither Claude nor the rules
+     claim a type → `applied` (the product stays untyped, its attributes are still used); (5)
+     `confidence < APPLY_CONFIDENCE (0.7)` → `review`; (6) disagreeing with a rules type and
+     `confidence < OVERRULE_CONFIDENCE (0.85)` → `review`; otherwise `applied`. A normal relabel
+     writes `fromApprovedProposal: false` unless the reply proposes a now-active key. `review` means the rules' answer
+     stays in force. **Changing these rules needs no model call:** `reapplyStatusRules`
+     (`bin/label-products.js --reapply`, no API key) first promotes labels proposing a now-active
+     type, then re-decides every non-admin label from its stored fields — including the `rulesDishType` stored at labelling time, not today's rules —
+     and refreshes proposals. Run it after any `decideStatus` change or production drifts from
+     the code (2026-09-28: 1,022 labels review → applied; review 2,346 → 1,324). **An admin decision (`status: "admin"`, `POST /api/admin/product-labels/resolve`,
+     `dishType` must be an active type or null) stands until the product's content hash changes** —
+     then the product is relabelled like any other. The pending filter never re-sends an admin row
+     whose hash is unchanged — **not even under `force`** (`bin/label-products.js --force`,
+     "after a prompt change — costs a full pass"), which re-sends every other unchanged product.
+     **Only `applied` and `admin` are trusted**
+     (`index-builder.js` reads `status: { $in: ["applied", "admin"] }`; `effectiveLabel`); `review`
+     labels are invisible to customers.
+   - **`shoofi.productLabelRuns`** — one per run: `startedAt, finishedAt, status (running | done |
+     failed), model`, the counters (`stores, products, pending, labeled, applied, review, calls,
+     errors, proposals`) and **`inputTokens` / `outputTokens`** — the cost record.
+   - **Metered API rule.** The labeller calls `services/ai/complete.js` with `backend: "api"`
+     (`MODELS.best`, `ANTHROPIC_API_KEY`, token counts from the returned `usage`) — bulk and cron
+     work never goes through the bridge, which is for a person waiting on a screen — with
+     `effort: "low"` (`complete.js` passes it as `output_config.effort`, API backend only).
+     Products go as a JSON array; the reply may be a JSON array or one object per line
+     (`replyRows`). Batches of 40, 3 in parallel, `MAX_TOKENS` 12000, a cut-off
+     (`stopReason: "max_tokens"`) or unreadable batch is halved and retried (depth ≤ 3), and products the model silently left
+     out of an otherwise readable reply are re-sent as their own batch (depth < 3) — otherwise they
+     would keep their old label; a run
+     stops queuing at `PRODUCT_LABELS_MAX` (default 15000) products. `searchTerms`: at most 4,
+     never sizes/quantities, store names or words already in the product's name. First full
+     production pass, 2026-09-28 (effort low): 9,210 products, 311 calls, 1.43M input / 0.87M
+     output tokens, 61 min, ≈ $11.5, 25 proposed types. Weekly runs after that cost only the
+     week's new and edited products. `reviewOnly` (`--review`) re-sends ONLY labels in `review`
+     (after a prompt fix aimed at them): 1,076 products, 130 calls, 429k / 123k tokens. After the
+     prompt fixes and the approval of all 23 proposals (43 active types), production stood at 8,873
+     applied / 535 review (9 proposal singletons, 389 low confidence, 137 disagreements).
+     **Prompt rules that matter:** store category names are STRONG evidence (a product under a
+     drinks category is a drink even when its name is only a brand, "XL"/"BLU"), a brand name is no
+     reason to lower confidence, and prompt examples must not include real product names as
+     counter-examples — the `searchTerms` example once listed "xl" as a size and Claude read the
+     product "XL" as one.
+     Cost must follow CHANGE: the only path that re-sends unchanged products is the explicit
+     `force` option — never make it a default or wire it to a cron without a human decision on
+     spend. Weekly cron Sunday 04:10 Asia/Jerusalem (`utils/crons/product-labels-cron.js`,
+     `ENABLE_CRONS`, lock `cron:product-labels`), then the index is rebuilt through
+     `runSuggestIndex` — i.e. under the `cron:suggest-index` lock, because two concurrent builds
+     delete each other's fresh rows (each sweeps `builtAt != mine`). On demand:
+     `POST /api/admin/product-labels/run` (`202` started, `409` a run holds the lock, `503` no
+     key) or `node bin/label-products.js`. Every admin endpoint is `auth.required` +
+     `checkAdminRole`.
+13. **A CRAVING'S DESCRIPTIVE WORDS ARE FILTERS, NEVER SPELLINGS** (`craving.js`). In text mode,
+   `parseCraving` removes attribute words (sweet, spicy, vegetarian, light/healthy — Arabic, Hebrew,
+   Latin) and one protein word (chicken, beef, fish) from the text and turns them into filters on
+   the index labels (`satisfies`, and `cravingQuery` as the Mongo prefilter); **only what remains is
+   matched against names**, so "حلو" can never find "بطاطا حلوة". Fallbacks for unlabelled products
+   (label field `null`): `sweet` ← `dishType === "dessert"`, `light` ← `dishType === "salad"`, a
+   protein filter ← the protein word as a token of the product's name; `spicy` and `vegetarian`
+   have no fallback (only `true` passes). Claude's `searchTermsNorm` also match remaining typed
+   words. When nothing open passes the filters the reply is `replyCode: "craving_unavailable"`
+   with `replyParams.craving` (the label pair) and popular/fill cards — never the closest spelling
+   of a different food. The app renders it as `for_you_reply_craving_unavailable`
+   (`shoofi-app/helpers/for-you-copy.ts`).
+
+14. **A STORE NAMED IN A CRAVING NARROWS; A NEAR-SPELLING IS A LAST RESORT** (`store-mention.js`,
+   `suggest.js` text mode). `detectStoreMentions(craving.rest, openStores)` finds open stores the
+   text names — whole 3- then 2-word phrases first ("burger house"), then single words as typed,
+   without Arabic "ال" and without a glued Hebrew מ/ב/ש/ל — using only close matches
+   (`TIER.WORD_START`+ on name_ar / name_he / appName slug). Those words, with the connector before
+   them ("من", "מ", "from", "at", "של"), leave the dish search and the pool is limited to those
+   stores (`candidateQuery` also fetches all of their products). Guards: a dish-type word is never a
+   store even when a store is named after it ("טורטיה"), a phrase of only dish words is not a store,
+   and a word matching more than 3 stores is too generic. Only a store and nothing else ("من gcp")
+   → that store's dishes. Separately, when any product scores `TIER.WORD_START`+ on the typed
+   words, products below `TIER.CONTAINS` (fuzzy-only, e.g. "بيتا" for "جبيتا") are dropped,
+   however popular or familiar — found when "جبيتا من gcp" ranked another store's pita first.
+   **Names are matched against every store in the area, open or closed** (`getAreaStores` →
+   `{open, closed}`; closed = not open, busy or coming soon), but only open stores are suggested or
+   fetched. When the only store named is closed, text mode answers `replyCode: "store_closed"` with
+   `replyParams.stores` and the same dish from open stores (popular fill when nothing matches), and
+   the Claude chat is told "named X, which is CLOSED now" — found when GCP was closed at 09:48 and
+   its name fell into the dish search.
+15. **CLAUDE IN THE CHAT IS OPT-IN, CAPPED, AND PICKS ONLY FROM OUR SHORTLIST** (`ai-chat.js`).
+   Only typed messages, and only while `isChatAiEnabled` is true on the platform config doc
+   (server-read; not in `SHOOFI_CONFIG_PUBLIC_FIELDS`). Off, over `chatAiDailyBudgetUsd` (default 5,
+   Israel day, summed from `aiUsage` rows with feature `for-you-chat`, cached 1 min), a 12 s timeout,
+   an API error or an unreadable reply → `aiChatTurn` returns null and the rules answer unchanged.
+   Claude sees a shortlist (≤ 40: `scoreText` matches, then the customer's own dishes, then popular —
+   open stores only), what the rules understood (craving attributes, named store, dish types, and
+   whether anything matched), a taste summary and ≤ 6 history turns; it returns
+   `{reply, pick:["p<n>"]}` and ids outside the list are dropped. Cards keep our reasons and pass
+   `applyLiveMenu`. Reply `replyCode: "ai_reply"` with `replyParams.text`, `ai: true`. Chips never call it.
+16. **EVERY CLAUDE CALL IS LOGGED AND PRICED** (`services/ai/usage-log.js`, `pricing.js`).
+   `complete.js` writes one `shoofi.aiUsage` row per call — `feature` (the caller's `label`), model,
+   backend, tokens, `costUsd` at list prices when it ran (bridge = 0), ms, ok/error, `meta` — for
+   every AI feature, not only For you. Fire-and-forget (a failed write never fails the call); TTL 180
+   days; the sink is registered at boot (`app.js`) and by `bin/label-products.js`. Admin
+   "שימוש ב-Claude" (`GET /api/admin/ai-usage`, admin roles) reads it. When a price changes, change
+   `PRICES` in `pricing.js`.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
