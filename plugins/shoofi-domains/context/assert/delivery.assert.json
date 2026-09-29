@@ -30,7 +30,8 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "services/driver-shift/driver-duty.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -82,6 +83,11 @@
           "/api/delivery/delivery-only/book",
           "/api/delivery/delivery-only/list",
           "isDeliveryOnly"
+        ],
+        "services/driver-shift/driver-duty.js": [
+          "getDriverCityAreas",
+          "getDriverCityAreaIds",
+          "isDriverBookedInShift"
         ]
       },
       "patterns": [

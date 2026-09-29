@@ -35,7 +35,19 @@ at the booking handoff — never edit `routes/order.js`).
 **Coverage is keyed on `area.cityId` = the PICKUP zone.** A company is dispatchable only if it
 has **BOTH** `supportedCities` (permission) **AND** `supportedAreas` (the wired connection) —
 `supportedCities` alone is not enough. Driver `personalSupportedAreas`, when non-empty,
-**fully replaces** company coverage.
+**fully replaces** company coverage — **for DISPATCH**
+(`services/delivery/assignDriver.js:160-161`).
+**Shift/duty city-area resolution is the opposite, deliberately: a UNION.**
+`getDriverCityAreas` (`services/driver-shift/driver-duty.js:43`) resolves which REGIONS a
+driver belongs to as company `supportedCityAreas` ∪ `cityAreas` matching company
+`supportedCities` ∪ `cityAreas` containing the `area.cityId` of each
+`personalSupportedAreas` entry. It is what decides whether a driver may self-activate,
+which shifts he may book, and whether the availability board reports him as "on without a
+roster". Do **not** "fix" it into a replacement to match the dispatch rule: it was a union
+to repair driver `6a395100b1e374000da2d0e1`, whose company covers Kafr Qasim while every
+shift he is booked into is Tayibe, reachable only through his personal areas — under
+replacement semantics he was refused on every single self-activation. Two rules, two
+questions: *where may an order be routed to him* vs *where is he allowed to work*.
 **ID trap:** `area.cityId` is a **string**, cities/`supportedCities` are **ObjectIds** — always
 normalize (`getId()` / `.toString()`).
 **`isActive` trap — an area is dispatchable only on a STRICT `true`.** `findBestAreaForLocation`
