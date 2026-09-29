@@ -157,7 +157,7 @@ summary(5)/closing(9); amounts → agorot (`Math.round(amount*100)`); Hebrew nam
 a human bridges it. Payout amount = store `balance` / driver `netTotal`.
 
 ## 7b. Hashavshevet export (movein.dat) — `services/accountant-export/`, `utils/hashavshevet-movein.js`
-`GET /api/payments/admin/accountant/movein?month=YYYY-MM&tab=stores|drivers` (route in
+`GET /api/payments/admin/accountant/movein?month=YYYY-MM&tab=stores|drivers[&docs=k1,k2]` (route in
 `routes/payments/admin-reports.js`; button "הורד DAT" on the admin "חשבוניות שופי לרואה חשבון"
 screen, `views/admin/invoices/AccountantInvoices.tsx`). The accountant's journal-import file for the
 documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` + what was left out).
@@ -181,9 +181,20 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   (`hypInvoiceDocNumber`). Credit note mirrored, ref `"12"+docNumber` (prefix seen only on manual
   credit notes). History entries reversed by a credit note export both documents; cancelled
   without one, or GreenInvoice (no doc number) → listed as `excluded`.
-- **Refusal:** any document whose store has no usable file number (1–8 chars, no whitespace) →
-  **422 `blocked`** with the list; no partial file (a movein import is not idempotent).
-- **Drivers tab**: company→Shoofi documents are Shoofi's **purchase** side; the expense /
+- **No מספר תיק = skipped, not fatal** (owner decision 2026-09-29): a document whose store/company
+  has no usable file number (1–8 chars, no whitespace) is left out of the file and listed in
+  `skipped` with its document keys; the UI shows it as a note. Because a movein import is not
+  idempotent, the note warns not to re-import the whole month and offers "הורד רק את המסמכים שחסרו",
+  which re-requests with `docs=<those keys>` (keys: `type:docNumber` for stores — one HYP sequence;
+  `type:companyId:docNumber` for companies — per-company numbering; max 500).
+  Every document skipped → **422 `nothing-exportable`** (no header-only file). A document that can't
+  be written exactly whatever the accountant does (bad document number, non-positive amount) still
+  → **422 `blocked`**, whole file refused.
+- **Drivers tab**: "חשבונית חברה" / "חשבונית פיצויים" are issued BY each company from its own HYP
+  account (`create-company-invoice` → `createInvoiceOnBehalf`, customer = Shoofi), for money Shoofi
+  pays out (`earningsByCreditCard`; compensations/bonuses/top-up); numbered per company. They are the
+  counterpart of the stores tab's "חשבונית חנות", not of Shoofi's invoices, and the accountant's
+  file contains neither kind (verified 2026-09-28). They are Shoofi's **purchase** side; the expense /
   input-VAT accounts and ref prefix are unknown → `DRIVER_INVOICE_ACCOUNTS` all `null` →
   **422 `missing-config`** until the accountant supplies them. The purchase layout (debit expense
   net + input VAT, credit company gross) is the credit-note layout and is unverified.
