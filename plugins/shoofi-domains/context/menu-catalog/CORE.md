@@ -313,6 +313,12 @@ boundary and say so in the PR.
    → that store's dishes. Separately, when any product scores `TIER.WORD_START`+ on the typed
    words, products below `TIER.CONTAINS` (fuzzy-only, e.g. "بيتا" for "جبيتا") are dropped,
    however popular or familiar — found when "جبيتا من gcp" ranked another store's pita first.
+   **Names are matched against every store in the area, open or closed** (`getAreaStores` →
+   `{open, closed}`; closed = not open, busy or coming soon), but only open stores are suggested or
+   fetched. When the only store named is closed, text mode answers `replyCode: "store_closed"` with
+   `replyParams.stores` and the same dish from open stores (popular fill when nothing matches), and
+   the Claude chat is told "named X, which is CLOSED now" — found when GCP was closed at 09:48 and
+   its name fell into the dish search.
 15. **CLAUDE IN THE CHAT IS OPT-IN, CAPPED, AND PICKS ONLY FROM OUR SHORTLIST** (`ai-chat.js`).
    Only typed messages, and only while `isChatAiEnabled` is true on the platform config doc
    (server-read; not in `SHOOFI_CONFIG_PUBLIC_FIELDS`). Off, over `chatAiDailyBudgetUsd` (default 5,
