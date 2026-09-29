@@ -164,8 +164,30 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
       `expectedDeliveryAt` ~24 hours in the **past** — 284 production rows, 2025-07 to 2025-10,
       none in 2026 (late-night orders now take the delayed path). Treat
       `expectedDeliveryAt < created` as unmeasurable; it is impossible by construction.
-    The shared reader that gets all of this right is `services/delivery/late-delivery.js`
-    (`pickupInstantOf`, `parsePromisedEta`) — use it rather than re-deriving.
+    - ⚠️ **`moment(pickupTime, "HH:mm").utcOffset(offsetHours)` does NOT resolve the clock
+      to an Israel instant, and the name of that variable is a lie.**
+      `utils/utc-time.js:getUTCOffset()` returns **minutes** (180), not hours, despite every
+      call site naming the result `offsetHours`; and `moment(str, "HH:mm")` parses in the
+      **server's** timezone — UTC on the droplet, Israel on a developer's laptop — while
+      `.utcOffset()` only re-*displays* the same instant. On a UTC box
+      `moment("17:40","HH:mm").utcOffset(180).format()` is `2026-09-29T20:40:00+03:00`: three
+      hours out. The same-store batch window
+      (`services/delivery/delayed-assignment.js:236`, `:244`) survives only because **both**
+      its operands carry the identical error and it cancels in the `diff`. Any comparison with
+      **one** clock and one real instant — a pickup-feasibility check, an "is he late"
+      predicate — does not cancel, and is exactly right on the laptop and silently three hours
+      wrong in production. Use `momentTZ.tz(value, ISRAEL_TZ)` (`utils/business-day.js`) and
+      resolve the clock through the shared reader below; never `set({hour, minute})` either
+      (`utils/crons/delivery-pickup-checker.js:54-62` still does, and it discards `"24:06"`).
+    The shared reader that gets all of this right is `services/delivery/late-delivery.js` —
+    `pickupInstantFromClock` and its two exported wrappers, `pickupInstantOf` (the **preserved**
+    clock, `originalPickupTime`) and `currentPickupInstantOf` (the **live** clock, store delays
+    included), plus `parsePromisedEta`. Use them rather than re-deriving. Which wrapper matters:
+    accountability for a promise reads the preserved clock, an assignment-time feasibility
+    question reads the live one, because a declared store delay really does give the courier
+    longer. `currentPickupInstantOf` takes the whole delivery, so `{ pickupTime, created }` is
+    enough to call it from code that has the two fields but not the document
+    (`services/delivery/delayed-assignment.js` does exactly that).
 11. **`bookDelivery.storeReadyAt` does not exist — nothing writes it, ever.** 0 of 82,414
     production documents carry the field and no code in any Shoofi repo assigns it. It is not
     legacy; it was never written. Three report consumers nonetheless read it off a delivery and

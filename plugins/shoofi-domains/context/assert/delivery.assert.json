@@ -23,6 +23,8 @@
         "docs/delivery-areas-model.md",
         "services/database/DatabaseInitializationService.js",
         "services/delivery/late-delivery.js",
+        "utils/utc-time.js",
+        "utils/business-day.js",
         "routes/order.js",
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
@@ -64,6 +66,7 @@
           "DEFAULT_PICKUP_GRACE_MIN",
           "LATE_DELIVERY_PROJECTION",
           "pickupInstantOf",
+          "currentPickupInstantOf",
           "parsePromisedEta",
           "reassignmentOf",
           "classifyDelivery"
@@ -169,6 +172,16 @@
           "file": "services/delivery/late-delivery.js",
           "regex": "if \\(pickup\\.isBefore\\(created\\)\\) pickup\\.add\\(1, \"day\"\\)",
           "desc": "the midnight roll-forward: a pickup clock earlier than the booking means the next day (1,774 rows)"
+        },
+        {
+          "file": "utils/utc-time.js",
+          "regex": "return israelOffsetMinutes;",
+          "desc": "getUTCOffset returns MINUTES (180) despite every call site naming the result offsetHours - if this ever becomes hours, every moment().utcOffset(offsetHours) in the delivery services silently shifts by ~3h"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "moment\\(pickupTime, 'HH:mm'\\)\\.utcOffset\\(offsetHours\\)",
+          "desc": "the same-store batch window parses the pickup clock in the SERVER's timezone, not Israel's - correct only because both operands carry the identical error and it cancels in the diff; a comparison against one real instant must use late-delivery's pickup-instant readers instead"
         },
         {
           "file": "services/delivery/late-delivery.js",
