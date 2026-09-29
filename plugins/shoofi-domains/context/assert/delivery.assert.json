@@ -57,7 +57,9 @@
           "assignDriverAt"
         ],
         "services/delivery/book-delivery.js": [
-          "originalBookId"
+          "originalBookId",
+          "findBestDeliveryCompany",
+          "coverageRadius"
         ],
         "services/delivery/late-delivery.js": [
           "LATE_THRESHOLD_MIN",
