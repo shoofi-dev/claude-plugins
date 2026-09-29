@@ -115,20 +115,39 @@ order-load penalty + same-store batching bonus (config in `deliveryConfig {type:
 `findBestDeliveryCompany` (`book-delivery.js`) selects the store→company by **haversine
 vs `company.coverageRadius`** (not a geo index) then load+distance. Price/ETA:
 `POST /api/delivery/company/price-by-location` (`geography.js`) resolves geometry→areas→
-`company.supportedAreas` → `{areaId, price, minOrder, eta}`. `expectedDeliveryAt =
-pickupTime + area.maxETA`.
-> ⚠️ **A missing or non-numeric `maxETA` does NOT fail — it produces a promise equal to
-> `pickupTime`.** `maxETA` is stored as whatever the admin UI sent (`geography.js` assigns
-> `req.body.maxETA` untyped), and `moment.add(NaN, 'minutes')` is a **silent no-op** that
-> leaves the moment valid — it does not produce `"Invalid date"`. So `expectedDeliveryAt`
-> comes out well-formed and exactly equal to the pickup time: a promise to deliver the
-> instant the courier collects. The immediate-assignment path (`book-delivery.js`) has no
-> fallback; the pending path (`delayed-assignment.js`) uses `|| 30`, which rescues
-> null/undefined/empty but **not** a non-numeric string like `"abc"`. Any on-time metric
-> must drop these — they score late essentially always, so counting them measures a config
-> gap, not courier performance. Detect by comparing `expectedDeliveryAt`'s `HH:mm` to the
-> stored `pickupTime` (see `services/exec-dashboard/delivery-metrics.js:parsePromisedEta`).
-> Verified by execution against moment 2.30.1, not inferred.
+`company.supportedAreas` → `{areaId, price, minOrder, eta}`.
+
+**`expectedDeliveryAt = pickupTime + max(area.maxETA, 8 min + km/18 km/h)`** — the
+store→customer distance, with the admin's `maxETA` as a **floor**. One implementation,
+`services/delivery/delivery-promise.js:computeDeliveryPromise`, called by both writers
+(`delayed-assignment.js:createPendingDelivery` and `book-delivery.js:bookDelivery`); the
+constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeedKmh` in
+`deliveryConfig {type:'driver-assignment'}`. It was a flat `pickupTime + area.maxETA` until
+2026-09-29, which made lateness climb straight through the distance bands (29.3% at 0-1 km
+→ 62.7% at 5+ km over 25,753 completed deliveries) while the promise moved ~2 minutes.
+> ⚠️ **The floor is load-bearing, not a detail: this computation may only ever LENGTHEN a
+> promise.** Every consumer — the customer's order timer, the ops late alert
+> (`routes/delivery/admin.js:104`, `:881`), the overdue term in driver scoring
+> (`driver-load.js`) — is safe against it precisely because it can never hand back a
+> tighter number than `maxETA`. Anything unusable (no coordinates, a `Number(null)`-style
+> zero pair, a distance over 60 km) degrades to the floor alone, which is the pre-2026-09-29
+> value. Do not "simplify" it into a plain distance formula.
+> ⚠️ **`expectedDeliveryAt` is NOT recomputed on reassignment** (`admin.js:150`, `:358`,
+> `driver.js:266`) and that is deliberate — the promise is made to the customer at booking
+> and the app has already shown it. The one legitimate mutator is
+> `POST /api/order/update-delay`, which **SHIFTS** it and preserves
+> `originalExpectedDeliveryAt`; see the verdict at `routes/order.js:6749-6754`.
+> ⚠️ **Historical rows (pre-2026-09-29) can carry a promise equal to `pickupTime`.** `maxETA`
+> is stored as whatever the admin UI sent (`geography.js` assigns `req.body.maxETA` untyped),
+> and `moment.add(NaN, 'minutes')` is a **silent no-op** that leaves the moment valid — it
+> does not produce `"Invalid date"`. The old immediate path had no fallback at all and the
+> old pending path's `|| 30` did not rescue `"abc"`. Any on-time metric must still drop these
+> — they score late essentially always, so counting them measures a config gap, not courier
+> performance. Detect by comparing `expectedDeliveryAt`'s `HH:mm` to the stored `pickupTime`
+> (`services/delivery/late-delivery.js:isZeroEtaPromise`). Verified by execution against
+> moment 2.30.1, not inferred. `computeDeliveryPromise` cannot produce the value (it floors
+> at 1 minute), so the ~27 bookings/quarter in `maxETA: 0` areas that used to be excluded as
+> unmeasurable now **re-enter** the late-delivery denominator.
  Geo helpers in `lib/delivery/helpers` (`computeSupportedAreasForCities`,
 `resolveParentCityGeometryId`, `populateAreaGeometry`, `calculateDistance`, …).
 
