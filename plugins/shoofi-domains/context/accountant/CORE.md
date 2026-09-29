@@ -19,7 +19,9 @@ invoices, and bank payouts. Distinct from `payments` (money IN).
 Server: `routes/payments/{admin-reports,admin,summaries}.js`, `routes/driver-reports.js`,
 `routes/admin/masav.js`, `routes/hyp.js` (EZcount invoicing), `lib/payments/calc.js`,
 `utils/{vat,greeninvoice,invoice-provider}.js`, `services/financial-overview/` (the live overview —
-it RUNS the two report engines over any range; never re-derive money there). Client: the
+it RUNS the two report engines over any range; never re-derive money there), and the accountant's
+Hashavshevet export `services/accountant-export/` + `utils/hashavshevet-movein.js` (reference §7b —
+its amounts are EZcount's per-line rounding, never `round2(totalOutcomes)`). Client: the
 reports/payout screens and `views/admin/financial-overview/` in `shoofi-delivery-web`.
 **🔒 CLAUDE.md do-not-touch overlap:** `routes/hyp.js`, `utils/hyp.js`,
 `utils/invoice-provider.js`, `lib/payments/`. You depend on `routes/order.js` for order
