@@ -183,6 +183,10 @@
           "recordUsage",
           "setUsageDb",
           "usageRow"
+        ],
+        "services/ordering-intelligence/open-stores.js": [
+          "getAreaStores",
+          "splitByOpen"
         ]
       },
       "patterns": [
@@ -805,6 +809,21 @@
           "file": "app.js",
           "regex": "setUsageDb\\(db\\.shoofi\\)",
           "desc": "doc CORE invariant 16: the usage sink is registered at boot"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "replyCode: \"store_closed\"",
+          "desc": "doc CORE invariant 14: a named closed store is said to be closed"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "\\[\\.\\.\\.storesByApp\\.values\\(\\), \\.\\.\\.closedStores\\]",
+          "desc": "doc CORE invariant 14: names are matched against closed stores too"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "which is CLOSED now",
+          "desc": "doc CORE invariant 14: the Claude chat is told a named store is closed"
         }
       ]
     },
@@ -841,6 +860,11 @@
           "file": "helpers/for-you-copy.ts",
           "regex": "replyCode === \"ai_reply\"",
           "desc": "doc CORE invariant 15: Claude's reply is shown as written"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_reply_store_closed",
+          "desc": "doc CORE invariant 14: the app words a store_closed reply"
         }
       ]
     },
