@@ -109,6 +109,17 @@ invariant 2; `assignmentWindowMinutes` is **15** there, not the code's 10) **or 
 pendings; the claim is atomic (`updateOne {isPendingAssignment:true}` → `matchedCount===0`
 means another container won). Scored path (`delayed-assignment.js`) ranks by distance +
 order-load penalty + same-store batching bonus (config in `deliveryConfig {type:'driver-assignment'}`).
+**`routeDeviation` has a floor of 0 and the clamp on it never fires.** It is
+`d(driver,store) + d(driver,customer) − d(store,customer)`, which is **≥ 0 for every driver
+position** by the triangle inequality, so the `Math.max(0, routeDeviation)` guarding the weighted
+term only absorbs floating-point noise (measured min `2.7e-10` over a grid covering the service
+area). It reaches 0 only when the driver sits exactly on the store→customer line. Consequence for
+anything that substitutes a synthetic driver position: the deviation term **rises**, it does not
+cancel, so the score delta of moving a driver to a point `P` is
+`3.5·d(P,store) + 1.5·d(P,customer) − 0.5·d(store,customer)` at the production weights
+(3.0 / 1.0 / 0.5) — **two** distance terms move, not one. The only substitution that would zero
+the deviation is `storeLocation` itself, which also zeroes `distanceToStore` and makes the
+substituted driver the **best** candidate on the board; never use it as a fallback position.
 **Idempotency**: de-dupe on `originalBookId`; never bypass the atomic claim.
 
 ## 4. Coverage / price / ETA

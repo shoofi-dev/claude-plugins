@@ -131,6 +131,16 @@
           "desc": "dispatch is scheduled at pickupTime minus assignmentWindowMinutes - the same quantity the late-delivery grace measures from the other end"
         },
         {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "const routeDeviation = \\(distanceToStore \\+ distanceToCustomer\\) - storeToCustomer",
+          "desc": "routeDeviation is d(driver,store)+d(driver,customer)-d(store,customer), so it is >= 0 for EVERY driver position by the triangle inequality. If this formula changes, the reference note that the Math.max(0,...) clamp never fires - and the 3.5/1.5/-0.5 score delta derived from it - must be rechecked"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "Math\\.max\\(0, routeDeviation\\)",
+          "desc": "the clamp that only ever absorbs float noise; it is not a mechanism for collapsing the deviation term to zero"
+        },
+        {
           "file": "services/driver-shift/shift-service.js",
           "regex": "endHour\\s*\\+=\\s*24",
           "desc": "business day crosses midnight; every slot is stored under the STARTING date"
