@@ -157,7 +157,8 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
 - `store` (company) — `location, coverageRadius, supportedCities[ObjectId], supportedAreas
   [{areaId,price,minOrder,eta}], isControlledByAdmin, manualAssignmentOnly, accounting`.
 - `customers` (drivers) — `role, isActive, isAvailable, isOnline, companyId(string),
-  currentLocation, lastLocationUpdate, personalSupportedAreas[areaId], maxOrdersByAdmin,
+  currentLocation, lastLocationUpdate, lastFixAt, locationMetadata,
+  personalSupportedAreas[areaId], maxOrdersByAdmin,
   storeAssignmentMode, assignedStoreAppNames[]`.
 - Geo: `cities, parentCities, cityAreas, areas, areasGeometry`. Ops: `driverStatusHistory,
   driverLocationHistory(TTL), driverShifts, driverDailyHours, deliveryConfig`.

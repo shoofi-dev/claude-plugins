@@ -204,6 +204,26 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
 - **BY DESIGN — keep it off:** the scored-assignment **recency filter is intentionally
   disabled** in `services/delivery/delayed-assignment.js` (stale-location drivers stay eligible
   so assignment isn't starved). Do not re-enable without an explicit task.
+- **How old a courier's position is: `lastFixAt`, and mind the rollout gap.** Two timestamps sit
+  side by side in the same `$set` in `POST /api/delivery/driver/location`
+  (`routes/delivery/driver.js`) and they mean different things. **`lastFixAt`** is a BSON **Date**
+  and is the **device** fix time, so it is the real recency — the driver app replays failed posts
+  from AsyncStorage, so one request can carry a fix that is hours old. **`lastLocationUpdate`** is
+  an **offset string** and is the server **receive** time, kept that way deliberately so existing
+  consumers keep working; a phone re-POSTing a cached fix therefore looks fresh by that measure
+  forever. Prefer `lastFixAt`.
+  But do **not** read it alone: it shipped 2026-09-12, and of the 224 couriers holding a
+  `currentLocation` on 2026-09-29 only **83** had it — **141 had none**, the oldest of those
+  carrying a `lastLocationUpdate` 319 days old. Any staleness rule that keys on `lastFixAt`
+  exclusively silently ignores the couriers most likely to be stale. Fall back to
+  `lastLocationUpdate` when `lastFixAt` is absent: for a courier who has not posted in weeks both
+  are equally old, and the receive-time weakness only appears on a phone that IS posting — which
+  has `lastFixAt`. `parseDeviceFixTime` also falls back to receive time for an absent, unparseable
+  or implausible client timestamp, so `lastFixAt` is not a guarantee of device provenance either.
+  ⚠️ **Compare both as instants, never as strings.** `lastLocationUpdate` carries its offset, so
+  a lexicographic `$gte` (which is what the disabled filter above used) mis-windows across
+  Israeli DST. Only `lastLocationUpdate` is indexed (`utils/init-location-indexes.js`);
+  `lastFixAt` is not, so filter in JS after the fetch rather than in the query.
 - **FIXED:** the partner app's `DELIVERY_STATUS` was off by one (showed "delivered" at pickup);
   it now matches the server. Server `consts/consts.js` is the single source of truth.
 - **Awareness:** a legacy `updateDelivery` path uses different status literals; `driver-inactivate-cron`
