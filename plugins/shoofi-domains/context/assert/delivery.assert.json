@@ -203,7 +203,22 @@
         {
           "file": "routes/delivery/admin.js",
           "regex": "updateData\\.isPendingAssignment\\s*=\\s*false",
-          "desc": "a cancelled delivery stops being a delayed-assignment candidate (CORE invariant 10)"
+          "desc": "a delivery that leaves the dispatch queue stops being a delayed-assignment candidate (CORE invariant 10)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "PENDING_ASSIGNMENT_EXCLUDED_STATUSES",
+          "desc": "the one list of statuses that take a booking out of the dispatch queue (CORE invariant 10)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "function isAwaitingAssignment",
+          "desc": "queue membership is tested through this helper, not the raw isPendingAssignment flag (CORE invariant 10)"
+        },
+        {
+          "file": "routes/admin/delivery-config.js",
+          "regex": "PENDING_ASSIGNMENT_EXCLUDED_STATUSES",
+          "desc": "the admin pending screen filters on the same statuses as the scheduler scan (CORE invariant 10)"
         },
         {
           "file": "routes/delivery/orders.js",

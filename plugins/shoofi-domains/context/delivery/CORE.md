@@ -181,11 +181,31 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
     runs — which looks identical to a correction that is simply rare.
 
-10. **A cancelled delivery must lose `isPendingAssignment`.** `processPendingAssignments`
-    scans `{isPendingAssignment: true, assignDriverAt: {$lte: now}}`; the status filter added
-    there is a second line of defence, not the fix — and `$nin` still matches documents with
-    no `status` field. Every cancel path (`routes/order.js`, `routes/delivery/admin.js`) writes
-    `isPendingAssignment: false` or the cancel un-cancels itself minutes later.
+10. **`isPendingAssignment` is a queue-membership CLAIM TOKEN, not a status — and every exit
+    from the queue must burn it, not only cancel.** `processPendingAssignments`
+    (`services/delivery/delayed-assignment.js`) dispatches on
+    `{isPendingAssignment: true, assignDriverAt: {$lte: now}}` every 60s, so a booking that
+    keeps the token is re-dispatched forever. Cancels are the obvious case (the cancel
+    un-cancels itself minutes later), but until 2026-09 the *forward* transitions —
+    approve, collect, deliver, waiting-in-store — wrote a status and a timestamp and left the
+    token set. Two bookings marked DELIVERED by support through
+    `POST /api/delivery/order/status/update`, neither of which ever had a driver, reached
+    85,296 dispatch attempts each: 97.6% of every row in
+    `delivery-company.assignment-decisions`, which makes that collection unreadable as a
+    measure of dispatch pressure until you filter them out. The token is minted in exactly
+    one place (`createPendingDelivery`, always alongside status `"1"`), so
+    **`WAITING_FOR_APPROVE` is the only status a genuinely-queued booking can hold** — the
+    status filter in the scan excludes all seven others. That filter is a second line of
+    defence, not the fix; and keep it a `$nin`, never an `$in` of `"1"`, because `$nin` also
+    matches documents with no `status` field and a malformed pending row must stay
+    dispatchable rather than silently vanish. Two places read the token where the status
+    filter cannot help, because they are different queries: the twin sequence-2 defer gate
+    reads the *peer's* flag (a stranded peer defers a live booking forever, logged only as
+    `DEFERRED`, which raises no alert), and `GET /api/admin/delivery-config/pending` lists the
+    admin "ready for assignment" screen. Both must test queue membership — use
+    `isAwaitingAssignment()` / `PENDING_ASSIGNMENT_EXCLUDED_STATUSES`, exported from
+    `delayed-assignment.js`. Do **not** add anything to the atomic claim filter itself
+    (invariant 2) while doing so.
 11. **Never assume a delivery has an order.** `deliveryOrder.order` is absent on every
     delivery-only booking, so anything keyed on `order.customerId`, `order.total` or
     `order.orderId` silently no-ops there. That is exactly how admin cancellation used to
