@@ -104,6 +104,21 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
 3. **Never write `customers.isActive` directly** — always `setDriverActiveStatus`
    (`services/delivery/driver-status-service.js`), which writes `driverStatusHistory` in
    lock-step and pushes a websocket update. Direct writes create phantom history.
+   **A BLOCK is one of the writers, and it is not "an admin".** `blockDriver`
+   (`services/delivery/driver-block-service.js`) switches an already-active driver off
+   through the same chokepoint with `source: 'driver_block'`, `updateType: 'driver-blocked'`
+   — so the actor vocabulary on `driver-status-history` is **six** values, not the obvious
+   five (`driver_app`, `shoofi_support`, `admin_web`, `shift_admin`, `cron`,
+   `driver_block`). Any map keyed on the first five silently files a block under "other";
+   `services/delivery/driver-availability-feed.js` did exactly that, on the one screen whose
+   entire job is saying who did this.
+   It matters because a block is the **only availability flip that carries a real reason**.
+   `setDriverActiveStatus` takes an optional `reason`, written to the history row **only**
+   when a caller supplies one, and `blockDriver` is the only caller that does — it passes the
+   block's own `reason` string through. Everything else has none, and "none was recorded" is
+   the correct reading of an absent `reason`: never infer one from `source` or `updateType`.
+   A block is also **not** `isActive` — it is what stops him flipping it
+   (`shoofi-server/docs/driver-blocks.md`).
 4. **`isActive` ≠ `isAvailable` ≠ `isOnline`** — three separate flags, don't conflate.
 5. **Twins always go pending** and (single mode) must share ONE driver: the
    `twinPickupSequence:1` side drives selection, the peer mirrors it, and `assignDriverAt` is

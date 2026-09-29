@@ -19,6 +19,8 @@
         "services/delivery/book-delivery.js",
         "services/delivery/delayed-assignment.js",
         "services/delivery/driver-status-service.js",
+        "services/delivery/driver-block-service.js",
+        "services/delivery/driver-availability-feed.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
         "services/database/DatabaseInitializationService.js",
@@ -189,6 +191,26 @@
           "file": "services/monitoring/centralized-flow-monitor.js",
           "regex": "logger\\.error\\('Failed to track centralized flow event:', error\\);\\s*\\n\\s*throw error;",
           "desc": "trackOrderFlowEvent rethrows - an unwrapped await on a dispatch route 5xxs the request after the write committed and skips the driver notifications"
+        },
+        {
+          "file": "services/delivery/driver-block-service.js",
+          "regex": "source: 'driver_block'",
+          "desc": "blockDriver flips isActive through setDriverActiveStatus with its OWN source - so driver_block is a sixth actor on driver-status-history, not 'an admin', and a map keyed on the other five files it as 'other'"
+        },
+        {
+          "file": "services/delivery/driver-block-service.js",
+          "regex": "reason: block\\.reason",
+          "desc": "a block is the only availability flip that carries a real reason - it passes the block's own reason string onto the status-history row"
+        },
+        {
+          "file": "services/delivery/driver-status-service.js",
+          "regex": "if \\(trimmedReason\\) record\\.reason = trimmedReason;",
+          "desc": "reason is written ONLY when a caller supplies one - an empty reason on every row would make 'none was given' and 'the field exists' indistinguishable"
+        },
+        {
+          "file": "services/delivery/driver-availability-feed.js",
+          "regex": "driver_block: 'block'",
+          "desc": "the feed's actor map must name driver_block, or the one flip that carries a reason renders as 'other' on the screen whose job is saying who did this"
         },
         {
           "file": "services/delivery/delivery-only.js",
