@@ -142,6 +142,16 @@
         },
         {
           "file": "services/delivery/delivery-promise.js",
+          "regex": "parsed !== null && parsed > 0",
+          "desc": "area.maxETA of 0 is UNSET, not a floor of zero - the pending path read parseInt(maxETA || 30), so a zero has always meant 30 minutes in production and honouring it would make the promise SHORTER than the code being replaced, which is the one thing the floor rule forbids"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "futureLocationAvailableAt = parsePromisedEta\\(",
+          "desc": "the customer promise IS the courier's modelled free time, so it feeds estimateArrivalAtStore and the pickupHeadroom term - lengthening a promise relaxes the overdue term and tightens the headroom term on the same courier (CORE invariant 13)"
+        },
+        {
+          "file": "services/delivery/delivery-promise.js",
           "regex": "MAX_PLAUSIBLE_DELIVERY_KM",
           "desc": "a distance beyond 60 km is a bad coordinate, not a long delivery - a literal (0,0) pair is a valid lat/lng 5,120 km from Kfar Qasim and would otherwise price as a 17,077-minute promise"
         },

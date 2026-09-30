@@ -137,6 +137,22 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
 > tighter number than `maxETA`. Anything unusable (no coordinates, a `Number(null)`-style
 > zero pair, a distance over 60 km) degrades to the floor alone, which is the pre-2026-09-29
 > value. Do not "simplify" it into a plain distance formula.
+> ⚠️ **`maxETA: 0` is UNSET, not a floor of zero** (`areaFloorMinutes` tests `> 0`) — the one
+> place a real zero is not honoured, and the reason is the rule above. The pending path read
+> `parseInt(area?.maxETA || 30)`, so a zero has always meant **30 minutes** in production;
+> honouring it would let the distance term alone govern and promise ~18 min at 3 km, which is
+> *shorter* than today. Zeros are machine-minted, not typed — `routes/delivery/admin.js:2294`
+> fills a gap area with `refArea?.maxETA || 0` and `:2306` rounds a ratio onto one.
+> ⚠️ **The promise is a DISPATCH lever, not only a customer-facing number.** A courier's
+> modelled free time is `parsePromisedEta` on the run he is already carrying
+> (`delayed-assignment.js:calculateDriverScore`, the `usingFutureLocation` branch), which
+> feeds `estimateArrivalAtStore` → the `pickupHeadroom` term (invariant 13). So a longer
+> promise **relaxes the overdue term (−15/order) and tightens the headroom term (+1 pt per
+> minute, capped at 20)** on the same courier — "it can only lengthen" is a statement about
+> the promise, never about the score. It also decides WHICH in-flight order is taken as his
+> future location (latest promise wins), so a far drop can now outrank a nearer one booked
+> later and move `distanceToStore` itself. Covered by
+> `test/integration/delivery-promise-dispatch-interaction.js`.
 > ⚠️ **`expectedDeliveryAt` is NOT recomputed on reassignment** (`admin.js:150`, `:358`,
 > `driver.js:266`) and that is deliberate — the promise is made to the customer at booking
 > and the app has already shown it. The one legitimate mutator is
@@ -152,7 +168,8 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
 > (`services/delivery/late-delivery.js:isZeroEtaPromise`). Verified by execution against
 > moment 2.30.1, not inferred. `computeDeliveryPromise` cannot produce the value (it floors
 > at 1 minute), so the ~27 bookings/quarter in `maxETA: 0` areas that used to be excluded as
-> unmeasurable now **re-enter** the late-delivery denominator.
+> unmeasurable now **re-enter** the late-delivery denominator — a falling `unmeasurable`
+> count is that fix landing, and the pre/post-2026-09-29 populations are not comparable.
  Geo helpers in `lib/delivery/helpers` (`computeSupportedAreasForCities`,
 `resolveParentCityGeometryId`, `populateAreaGeometry`, `calculateDistance`, …).
 
