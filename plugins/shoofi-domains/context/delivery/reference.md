@@ -107,8 +107,13 @@ route the order to a company **admin**, not a driver (`assignmentMethod:'manual-
 invariant 2; `assignmentWindowMinutes` is **15** there, not the code's 10) **or the order is a twin**
 (twins ALWAYS pend). The **assignment-scheduler** (60s, Redis-locked) processes due
 pendings; the claim is atomic (`updateOne {isPendingAssignment:true}` → `matchedCount===0`
-means another container won). Scored path (`delayed-assignment.js`) ranks by distance +
-order-load penalty + same-store batching bonus (config in `deliveryConfig {type:'driver-assignment'}`).
+means another container won). Scored path (`delayed-assignment.js`) ranks by distance to store +
+distance to customer + route deviation + order-load penalty + same-store batching bonus +
+uncollected penalty + overdue penalty + **pickup-headroom penalty** (config in
+`deliveryConfig {type:'driver-assignment'}`; see CORE invariants 12-13 — a new weight must be
+defaulted at the read site as well as in `DEFAULT_CONFIG`, and the arrival estimate is scored,
+so `assumedDriverSpeedKmh` is a dispatch lever). Two-tier sort: over-cap couriers go last
+regardless of score, so no score term can pull one past a courier below the cap.
 **Idempotency**: de-dupe on `originalBookId`; never bypass the atomic claim.
 
 ## 4. Coverage / price / ETA

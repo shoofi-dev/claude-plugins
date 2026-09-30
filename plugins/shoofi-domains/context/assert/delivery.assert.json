@@ -19,6 +19,7 @@
         "services/delivery/book-delivery.js",
         "services/delivery/delayed-assignment.js",
         "services/delivery/delivery-promise.js",
+        "services/delivery/driver-load.js",
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
         "docs/delivery-areas-model.md",
@@ -55,7 +56,19 @@
         ],
         "services/delivery/delayed-assignment.js": [
           "isPendingAssignment",
-          "assignDriverAt"
+          "assignDriverAt",
+          "getAssignmentConfig",
+          "scoringWeights",
+          "assumedDriverSpeedKmh",
+          "estimatedArrivalAtStore",
+          "pickupHeadroom",
+          "PICKUP_HEADROOM_TARGET_MIN",
+          "MAX_PICKUP_HEADROOM_PENALTY",
+          "currentPickupInstantOf",
+          "scoreBreakdown"
+        ],
+        "services/delivery/driver-load.js": [
+          "byConcurrencyTierThenScore"
         ],
         "services/delivery/book-delivery.js": [
           "originalBookId"
@@ -141,6 +154,41 @@
           "file": "services/delivery/delayed-assignment.js",
           "regex": "computeDeliveryPromise\\(",
           "desc": "the pending path must NOT compute the promise itself - it used to add parseInt(area?.maxETA || 30), which rescued null/undefined but not a non-numeric string, and disagreed with the immediate path"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "scoringWeights:\\s*\\{\\s*\\.\\.\\.DEFAULT_CONFIG\\.scoringWeights",
+          "desc": "getAssignmentConfig MERGES the stored scoringWeights per key - a wholesale swap ships any new weight as undefined in production, since the live document holds only the three original weights (CORE invariant 12)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "config\\.scoringWeights\\?\\.pickupHeadroom \\?\\?",
+          "desc": "the new weight is defaulted at the READ site as well, because the simulator and the specs pass their own config and never go through getAssignmentConfig (CORE invariant 12)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "overduePenalty \\+ pickupHeadroomPenalty",
+          "desc": "the arrival estimate is SCORED, not a diagnostic - pickupHeadroomPenalty is a term of totalScore, which is why assumedDriverSpeedKmh is a dispatch lever (CORE invariant 13)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "MAX_PICKUP_HEADROOM_PENALTY = 20",
+          "desc": "the headroom penalty is capped in POINTS so it stays a preference and never a filter - an unassigned delivery is never inserted at all, so there is no pending record to retry from (CORE invariant 13)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "PICKUP_HEADROOM_TARGET_MIN = 10",
+          "desc": "10 minutes of headroom is where the lateness curve flattens (25% late at or above it, 32-37% below), so the term is inert for the ordinary majority of allocations (CORE invariant 13)"
+        },
+        {
+          "file": "services/delivery/late-delivery.js",
+          "regex": "currentPickupInstantOf",
+          "desc": "the single implementation that turns a bare HH:mm pickup clock into an instant against bookDelivery.created - the headroom term uses it rather than re-deriving (CORE invariants 10, 13)"
+        },
+        {
+          "file": "scripts/analyze-assignments.js",
+          "regex": "pickupHeadroom",
+          "desc": "the score-distribution report sums scoreBreakdown key by key, so a component missing here is dropped from avgTotal too and the percentages stay plausible while describing nothing (CORE invariant 13)"
         },
         {
           "file": "services/delivery/delayed-assignment.js",

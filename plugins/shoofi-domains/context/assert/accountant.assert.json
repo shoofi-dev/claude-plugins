@@ -213,6 +213,11 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "/api/payments/admin/accountant/movein",
           "desc": "the accountant's Hashavshevet export endpoint (reference §7b)"
+        },
+        {
+          "file": "services/accountant-export/movein.js",
+          "regex": "listUnder\\(skippedByParty, doc, doc\\.partyAccount",
+          "desc": "a missing/invalid מספר תיק SKIPS the document (listed, re-downloadable via docs=) — it does not block the file (owner decision 2026-09-29); reference §7b"
         }
       ]
     }
