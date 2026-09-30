@@ -18,6 +18,7 @@
         "services/delivery/assignDriver.js",
         "services/delivery/book-delivery.js",
         "services/delivery/delayed-assignment.js",
+        "services/delivery/delivery-promise.js",
         "services/delivery/driver-load.js",
         "services/delivery/driver-status-service.js",
         "consts/consts.js",
@@ -72,6 +73,12 @@
         "services/delivery/book-delivery.js": [
           "originalBookId"
         ],
+        "services/delivery/delivery-promise.js": [
+          "computeDeliveryPromise",
+          "expectedDeliveryAtFrom",
+          "areaFloorMinutes",
+          "MAX_PLAUSIBLE_DELIVERY_KM"
+        ],
         "services/delivery/late-delivery.js": [
           "LATE_THRESHOLD_MIN",
           "DEFAULT_PICKUP_GRACE_MIN",
@@ -124,14 +131,39 @@
           "desc": "db.bookDelivery is bound to the hyphenated book-delivery collection"
         },
         {
-          "file": "services/delivery/book-delivery.js",
-          "regex": "\\.add\\(parseInt\\(result\\.area\\?\\.maxETA\\), 'minutes'\\)",
-          "desc": "the immediate-assignment path adds maxETA with NO fallback - a missing or non-numeric value is a silent no-op, so expectedDeliveryAt comes out equal to pickupTime rather than invalid"
+          "file": "services/delivery/delivery-promise.js",
+          "regex": "Math\\.max\\(floorMinutes, transitMinutes\\)",
+          "desc": "area.maxETA is a FLOOR under the distance-derived promise, never a ceiling - this is what makes the computation safe for every consumer, because it can only ever lengthen a promise and never shorten one"
+        },
+        {
+          "file": "services/delivery/delivery-promise.js",
+          "regex": "Math\\.max\\(\\s*1,",
+          "desc": "the promise is floored at 1 minute past pickup so it can never land on the pickup clock, which late-delivery.isZeroEtaPromise reads as 'no promise was made' and silently drops from the scorecard"
+        },
+        {
+          "file": "services/delivery/delivery-promise.js",
+          "regex": "parsed !== null && parsed > 0",
+          "desc": "area.maxETA of 0 is UNSET, not a floor of zero - the pending path read parseInt(maxETA || 30), so a zero has always meant 30 minutes in production and honouring it would make the promise SHORTER than the code being replaced, which is the one thing the floor rule forbids"
         },
         {
           "file": "services/delivery/delayed-assignment.js",
-          "regex": "\\.add\\(parseInt\\(area\\?\\.maxETA \\|\\| 30\\), 'minutes'\\)",
-          "desc": "the pending path's || 30 fallback rescues null/undefined/empty maxETA but not a non-numeric string - the asymmetry with the immediate path is the point"
+          "regex": "futureLocationAvailableAt = parsePromisedEta\\(",
+          "desc": "the customer promise IS the courier's modelled free time, so it feeds estimateArrivalAtStore and the pickupHeadroom term - lengthening a promise relaxes the overdue term and tightens the headroom term on the same courier (CORE invariant 13)"
+        },
+        {
+          "file": "services/delivery/delivery-promise.js",
+          "regex": "MAX_PLAUSIBLE_DELIVERY_KM",
+          "desc": "a distance beyond 60 km is a bad coordinate, not a long delivery - a literal (0,0) pair is a valid lat/lng 5,120 km from Kfar Qasim and would otherwise price as a 17,077-minute promise"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "computeDeliveryPromise\\(",
+          "desc": "the immediate-assignment path must NOT compute the promise itself - it used to add parseInt(result.area?.maxETA) with no fallback at all, and moment.add(NaN) is a silent no-op, so such a booking got a promise equal to its own pickup time"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "computeDeliveryPromise\\(",
+          "desc": "the pending path must NOT compute the promise itself - it used to add parseInt(area?.maxETA || 30), which rescued null/undefined but not a non-numeric string, and disagreed with the immediate path"
         },
         {
           "file": "services/delivery/delayed-assignment.js",
