@@ -150,8 +150,8 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    - **`storeDiscount` carries two different units and no field says which.**
      Shekels normally; percentage points when `type === 'percentage'`. There is no
      validation bounding it to 0-100 in that case — `lib/schemas/newCoupon.json` sets
-     only `minimum: 0`, and `routes/coupon.js:1364` bounds the split only for
-     `fixed_amount`. **`splitType: 'percentage'` is the exception:** those coupons
+     only `minimum: 0`, and `routes/coupon.js:1462` (create) / `:1702` (update) bound the
+     split only for `fixed_amount`. **`splitType: 'percentage'` is the exception:** those coupons
      resolve the share into shekels before the order is written
      (`routes/coupon.js:48-74`, `:345`), so `storeDiscount` on the applied snapshot is
      already an amount. Any reader dividing by 100 must exclude them or it bills ₪0.14
