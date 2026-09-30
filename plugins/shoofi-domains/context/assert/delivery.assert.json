@@ -71,7 +71,9 @@
           "byConcurrencyTierThenScore"
         ],
         "services/delivery/book-delivery.js": [
-          "originalBookId"
+          "originalBookId",
+          "findBestDeliveryCompany",
+          "coverageRadius"
         ],
         "services/delivery/delivery-promise.js": [
           "computeDeliveryPromise",

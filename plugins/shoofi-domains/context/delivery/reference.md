@@ -118,7 +118,12 @@ regardless of score, so no score term can pull one past a courier below the cap.
 
 ## 4. Coverage / price / ETA
 `findBestDeliveryCompany` (`book-delivery.js`) selects the store→company by **haversine
-vs `company.coverageRadius`** (not a geo index) then load+distance. Price/ETA:
+vs `company.coverageRadius`** (not a geo index) then load+distance. ⚠️ **In production this
+path cannot match anything**: its guard is `if (!company?.location?.coordinates ||
+!company.coverageRadius) return null` (`book-delivery.js:802`) and neither field exists on any
+of the 173 companies (§7), so it returns `null` unconditionally. Its only live caller is
+`utils/store-service.js:154`. Flagged 2026-09-29, awaiting a human verdict — do not "fix" it by
+inventing coverage values. Price/ETA:
 `POST /api/delivery/company/price-by-location` (`geography.js`) resolves geometry→areas→
 `company.supportedAreas` → `{areaId, price, minOrder, eta}`.
 
@@ -195,8 +200,13 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   expectedDeliveryAt, area(embedded), company(embedded), driver(embedded), bookId,
   originalBookId, appName, customerLocation, order(snapshot), twinGroupId,
   twinPickupSequence, twinAssignmentMode, twinPeer, twinDegraded, *DelayNotified*}`.
-- `store` (company) — `location, coverageRadius, supportedCities[ObjectId], supportedAreas
+- `store` (company) — `supportedCities[ObjectId], supportedAreas
   [{areaId,price,minOrder,eta}], isControlledByAdmin, manualAssignmentOnly, accounting`.
+  ⚠️ **No `location` and no `coverageRadius`** — verified 2026-09-29 as the union of every key
+  across all 173 documents. Do not reach for `company.location` as a fallback position for a
+  courier: it is `undefined` for every company, so `company.location.coordinates[0]` throws,
+  and inside `calculateDriverScore` that lands in the catch and returns `score: 9999` with
+  `distanceToStore: 0` — silently mis-ranking instead of erroring.
 - `customers` (drivers) — `role, isActive, isAvailable, isOnline, companyId(string),
   currentLocation, lastLocationUpdate, personalSupportedAreas[areaId], maxOrdersByAdmin,
   storeAssignmentMode, assignedStoreAppNames[]`.

@@ -240,6 +240,16 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
 - **BY DESIGN — keep it off:** the scored-assignment **recency filter is intentionally
   disabled** in `services/delivery/delayed-assignment.js` (stale-location drivers stay eligible
   so assignment isn't starved). Do not re-enable without an explicit task.
+- **A delivery company has NO location.** `delivery-company.store` carries no `location` and no
+  `coverageRadius` — verified 2026-09-29 across all 173 documents. So "assume the courier is at
+  his depot" is not an available fallback, however natural it sounds: `company` IS attached to
+  every scored candidate (`delayed-assignment.js`, where `{...driver, company}` is built), which
+  makes `driver.company.location` look free and correct right up to the point it throws. In
+  `calculateDriverScore` that throw is caught and returns `score: 9999` / `distanceToStore: 0`,
+  so the failure is a silently mis-ranked fleet, not an error anyone sees. Use the **pickup
+  zone's** interior point instead (`cities.geometry` → `pointInsideGeometry`, never
+  `computePolygonCentroid`). Consequence worth knowing: `findBestDeliveryCompany` guards on both
+  missing fields and therefore returns `null` for every input in production (reference §4).
 - **FIXED:** the partner app's `DELIVERY_STATUS` was off by one (showed "delivered" at pickup);
   it now matches the server. Server `consts/consts.js` is the single source of truth.
 - **Awareness:** a legacy `updateDelivery` path uses different status literals; `driver-inactivate-cron`
