@@ -289,6 +289,11 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "services/delivery/driver-status-service.js",
+          "regex": "async function setDriverActiveStatus",
+          "desc": "the deactivation path takes no account of the driver's active deliveries, on purpose - 59% of switch-offs happen while he holds one and it produced 0 orphaned deliveries in 30 days. If a bookDelivery read appears here, somebody has built the alert reference.md 5 says not to"
         }
       ]
     },
