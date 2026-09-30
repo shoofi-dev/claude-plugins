@@ -208,7 +208,8 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   and inside `calculateDriverScore` that lands in the catch and returns `score: 9999` with
   `distanceToStore: 0` — silently mis-ranking instead of erroring.
 - `customers` (drivers) — `role, isActive, isAvailable, isOnline, companyId(string),
-  currentLocation, lastLocationUpdate, personalSupportedAreas[areaId], maxOrdersByAdmin,
+  currentLocation, lastLocationUpdate, lastFixAt, locationMetadata,
+  personalSupportedAreas[areaId], maxOrdersByAdmin,
   storeAssignmentMode, assignedStoreAppNames[]`.
 - Geo: `cities, parentCities, cityAreas, areas, areasGeometry`. Ops: `driverStatusHistory,
   driverLocationHistory(TTL), driverShifts, driverDailyHours, deliveryConfig`.
