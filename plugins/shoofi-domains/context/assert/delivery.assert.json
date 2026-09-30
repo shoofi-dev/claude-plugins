@@ -257,6 +257,26 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "'deliveryOnlyFee\\.driverAmount':\\s*1",
+          "desc": "CORE invariant 14: the driver list projects the LEAF only - adding the bare deliveryOnlyFee parent beside it is a path collision (31250), the server rejects the whole find and the handler's catch turns it into a flat 400 that empties every driver's list"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "\"deliveryOnlyFee\\.storeAmount\":\\s*1",
+          "desc": "CORE invariant 14: the store's delivery-only list projects the other leaf alone - what Shoofi charges the driver is not the store's business, and one form per projection is also what keeps it legal"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "message:\\s*\"Error getting delivery list\"",
+          "desc": "CORE invariant 14: POST /api/delivery/list flattens any throw into a bare 400, which is why a projection path collision reads as an empty driver list rather than an error"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "^\\s*deliveryOnlyFee:\\s*1,",
+          "desc": "CORE invariant 14: the admin board projects the BARE PARENT alone (it settles with the store AND the driver) - never add a deliveryOnlyFee.x leaf beside it"
         }
       ]
     },

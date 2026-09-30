@@ -226,6 +226,24 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+14. **The `bookDelivery` projections are whitelists, and naming a parent field together with
+    one of its own leaf keys is a SERVER ERROR** — `Path collision at <field>.<leaf>`, code
+    31250, from MongoDB 4.4 onward. `mongodb@3` does not parse or de-duplicate a projection;
+    it serialises the document verbatim, so the driver version rescues nothing and the server
+    rejects the whole `find`. Where it bites is `POST /api/delivery/list`
+    (`routes/delivery/orders.js`, the projection block at `:916-1023`), whose try/catch
+    flattens any throw into a flat `400 {"message":"Error getting delivery list"}` — so the
+    mistake surfaces as **every driver's order list going empty, with no readable error
+    anywhere**, not as something an operator can diagnose.
+    The existing code already avoids it deliberately, and that is the rule: **one form per
+    projection, never both** — leaf keys on the driver surfaces, the bare parent on the admin
+    board. `deliveryOnlyFee` is projected as `'deliveryOnlyFee.driverAmount'` alone in the
+    driver list, `"deliveryOnlyFee.storeAmount"` alone in the store's delivery-only list, and
+    as the bare `deliveryOnlyFee` parent alone on the admin board (`routes/analytics.js`) —
+    the admin is the one party that settles with the store **and** the driver, so it is the
+    only surface that wants every sub-field. `manualDeliveryFee` follows the same split for
+    the same reason. Before adding any dotted key, check whether its parent is already in
+    that projection object (and vice versa).
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
