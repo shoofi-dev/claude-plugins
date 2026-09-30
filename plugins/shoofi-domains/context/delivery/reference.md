@@ -114,6 +114,27 @@ uncollected penalty + overdue penalty + **pickup-headroom penalty** (config in
 defaulted at the read site as well as in `DEFAULT_CONFIG`, and the arrival estimate is scored,
 so `assumedDriverSpeedKmh` is a dispatch lever). Two-tier sort: over-cap couriers go last
 regardless of score, so no score term can pull one past a courier below the cap.
+
+**`routeDeviation` has a floor of 0 and the clamp on it never fires.** It is
+`d(driver,store) + d(driver,customer) − d(store,customer)`, which is **≥ 0 for every driver
+position** by the triangle inequality, so the `Math.max(0, routeDeviation)` guarding the weighted
+term only absorbs floating-point noise (measured min `2.7e-10` over a grid covering the service
+area). It reaches 0 only when the driver sits exactly on the store→customer line.
+
+This is the rule for **anything that substitutes a synthetic driver position** (the stale-GPS
+degrade is the live example): the deviation term **rises**, it does not cancel. Moving a driver to
+a point `P` costs `3.5·d(P,store) + 1.5·d(P,customer) − 0.5·d(store,customer)` from the three
+geometric weights (3.0 / 1.0 / 0.5) — so **two** distance terms move, not one.
+⚠️ **And since the arrival estimate became scored, a fourth term moves too.** `d(P,store)` feeds
+`estimatedArrivalAtStore`, which feeds `pickupHeadroom`, which charges
+`(60 / assumedDriverSpeedKmh) × pickupHeadroom` per km — 2.4 points/km at the shipped defaults.
+So a synthetic position costs **5.9 points per km, not 3.5**, until `MAX_PICKUP_HEADROOM_PENALTY`
+(20) caps the headroom share. Any estimate of what re-pricing a driver's position will do has to
+count all four.
+
+The only substitution that would zero the deviation is `storeLocation` itself, which also zeroes
+`distanceToStore` and makes the substituted driver the **best** candidate on the board; never use
+it as a fallback position.
 **Idempotency**: de-dupe on `originalBookId`; never bypass the atomic claim.
 
 ## 4. Coverage / price / ETA
