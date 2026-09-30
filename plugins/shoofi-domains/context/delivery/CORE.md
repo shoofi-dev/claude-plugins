@@ -227,6 +227,28 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
 
+## ⚠️ A TRANSIENT status is invisible to a snapshot count — `"5"` is the trap
+`DELIVERY_STATUS.WAITING_IN_STORE` (`"5"`) appears on **0 of 95,139** `book-delivery`
+documents. That figure is correct, and it does **not** mean the state is unused: `"5"` is
+**transient**, overwritten by `"3"` the moment the courier collects, so a sweep of
+mostly-finished rows can only ever count zero of it. The path is live — the driver app has
+the button in `shoofi-shoofir/components/delivery-driver/OrderCard.tsx` and
+`TwinOrderCard.tsx`, and `POST /api/delivery/driver/order/waiting-in-store`
+(`routes/delivery/orders.js:656`) sets it.
+
+What `"5"` genuinely lacks is a **timestamp** — that route writes `status` and nothing else —
+so it can be shown as a courier's *current* state but never placed on a timeline.
+
+This has already cost one real bug: the live support board collapsed `"5"` into "accepted" on
+the strength of the zero count, so an agent asking why a pickup was late was told the courier
+had accepted the job when the data said he was standing in the restaurant. **Before
+concluding a status is dead, ask whether it is terminal or transient** — only a terminal
+status can be counted this way. (`"1"` and `"2"` are transient for the same reason; `"4"` and
+the negatives are terminal.)
+
+Note `shoofi-shoofir/consts/shared.ts` omits `"5"` from its own copy of the enum entirely, so
+`DELIVERY_STATUS_TEXT["5"]` is `undefined` in the very app that sets it.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
   `isDeliveryOnlySupport` field, so the gate returns `platform_disabled`/`store_disabled` for

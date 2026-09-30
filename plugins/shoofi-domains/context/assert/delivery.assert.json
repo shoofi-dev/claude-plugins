@@ -231,6 +231,16 @@
           "desc": "dispatch requires a STRICT isActive === true on an area - {$ne: false} is a different, wrong set"
         },
         {
+          "file": "routes/delivery/orders.js",
+          "regex": "api/delivery/driver/order/waiting-in-store",
+          "desc": "status 5 IS live and reachable - it appears on 0 of 95,139 rows because it is TRANSIENT, overwritten by 3 on collection, not because nobody sets it"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "\\$set: \\{ status: DELIVERY_STATUS\\.WAITING_IN_STORE \\}",
+          "desc": "status 5 stamps NO timestamp - it can be a courier's current step but never a timeline row"
+        },
+        {
           "file": "services/delivery/book-delivery.js",
           "regex": "\\.format\\(\"HH:mm\"\\)",
           "desc": "pickupTime is stored as a bare HH:mm wall clock, which wraps past midnight - it is not a timestamp"
@@ -322,6 +332,11 @@
           "file": "components/delivery-driver/OrderCard.tsx",
           "regex": "isDeliveryOnly\\s*\\?",
           "desc": "the driver card swaps the order table for the pay/collect money block on a manual booking"
+        },
+        {
+          "file": "components/delivery-driver/TwinOrderCard.tsx",
+          "regex": "waiting-in-store",
+          "desc": "the driver app really does set status 5 - proof it is transient rather than unused"
         }
       ]
     },
