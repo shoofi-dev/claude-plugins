@@ -136,6 +136,40 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       stripped with the other bookkeeping fields before `order.items` is written, so the
       persisted item shape never carries it.
 
+## ⚠️ The order document has TWO levels, and `storeData` is on the outer one
+An order document is the submitted body spread at its **root**, and the client puts the cart
+payload under a key also called `order`. So there is an `order.order`, and which level a field
+sits on is not guessable from its name:
+
+| Field | Path |
+|---|---|
+| `payment_method`, `payment_provider`, `receipt_method`, `address`, `locationText`, `geo_positioning`, `items`, `commentToCourier` | **`order.order.*`** (inner) |
+| **`storeData.{name_he, name_ar, phone, storeName, storeId, location, minReady, maxReady}`** | **`order.storeData.*`** (ROOT) |
+| `orderId`, `total`, `orderPrice`, `shippingPrice`, `customerDetails`, `status`, `created`, `paymentAuth`, `ccPaymentRefData`, `twinGroup`, `fraud*` | root |
+
+`storeData` is built as a **sibling** of `order`, not inside it —
+`shoofi-app/stores/cart/index.ts` sets `cartData.storeData = {...}` next to `cartData.order`,
+and `orderDoc` spreads `...parsedBodey` at the root (`routes/order.js`). Server readers agree
+(`routes/order.js`: `parsedBodey?.storeData`, `order.storeData || {}`) and so does the live
+admin card (`shoofi-delivery-web/src/components/Cards/CardOrder.tsx`, which reads
+`order.storeData?.name_ar` and `order.storeData?.phone`).
+
+**Why this one is expensive to get wrong: the store phone has no fallback.** The store
+*name* can be recovered from `shoofi.stores` via the registry, so a wrong path degrades to a
+working screen. The **phone exists only on this client-sent snapshot** — the registry
+projection in `services/exec-dashboard/store-registry.js` carries no phone — so a Mongo
+projection of `order.storeData.phone` returns nothing, costs nothing, throws nothing, and
+every "call the restaurant" button on the screen is silently dead. That shipped once on the
+live support board and got as far as a passing test, because the test fixture nested
+`storeData` the same wrong way.
+
+⚠️ **Not to be confused with `bookDelivery.order.storeData`, which IS correct** — there
+`order` is the whole embedded order document, so `storeData` is at *its* root. Same-looking
+path, different base object.
+
+Corollary for tests: a fixture that mirrors the code's assumption proves nothing. Assert the
+real shape **and** that the wrong one yields null.
+
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
 `shoofi-app/stores/cart/index.ts` and nothing about it reaches the server until submit, so

@@ -70,6 +70,16 @@
         },
         {
           "file": "routes/order.js",
+          "regex": "parsedBodey\\?\\.storeData",
+          "desc": "the server reads storeData off the ROOT of the submitted body, confirming it is a sibling of order and not nested inside it - order.order.storeData does not exist"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "storeData: order\\.storeData \\|\\| \\{\\}",
+          "desc": "second root-level storeData reader - the path is order.storeData, one level up from order.order.*"
+        },
+        {
+          "file": "routes/order.js",
           "regex": "persistentAlertsService\\.sendPersistentAlert",
           "desc": "the store-owner new-order alert is delegated to utils/persistent-alerts.js, not sent through services/notification directly"
         },
@@ -248,6 +258,11 @@
           "file": "stores/cart/index.ts",
           "regex": "if\\s*\\(order\\?\\.isRamadanIftar\\)",
           "desc": "isRamadanIftar attached only when true (CORE invariant 9)"
+        },
+        {
+          "file": "stores/cart/index.ts",
+          "regex": "cartData\\.storeData\\s*=",
+          "desc": "storeData is a ROOT-level sibling of cartData.order, never nested inside it - so the order document path is order.storeData.phone and NOT order.order.storeData.phone, and the store phone has no other source (the registry projection carries none), so a wrong path silently kills every call-the-restaurant button"
         },
         {
           "file": "stores/cart/index.ts",
