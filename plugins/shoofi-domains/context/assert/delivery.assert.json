@@ -18,6 +18,8 @@
         "services/delivery/assignDriver.js",
         "services/delivery/book-delivery.js",
         "services/delivery/delayed-assignment.js",
+        "services/delivery/delivery-promise.js",
+        "services/delivery/driver-load.js",
         "services/delivery/driver-status-service.js",
         "utils/init-location-indexes.js",
         "consts/consts.js",
@@ -61,10 +63,30 @@
         ],
         "services/delivery/delayed-assignment.js": [
           "isPendingAssignment",
-          "assignDriverAt"
+          "assignDriverAt",
+          "getAssignmentConfig",
+          "scoringWeights",
+          "assumedDriverSpeedKmh",
+          "estimatedArrivalAtStore",
+          "pickupHeadroom",
+          "PICKUP_HEADROOM_TARGET_MIN",
+          "MAX_PICKUP_HEADROOM_PENALTY",
+          "currentPickupInstantOf",
+          "scoreBreakdown"
+        ],
+        "services/delivery/driver-load.js": [
+          "byConcurrencyTierThenScore"
         ],
         "services/delivery/book-delivery.js": [
-          "originalBookId"
+          "originalBookId",
+          "findBestDeliveryCompany",
+          "coverageRadius"
+        ],
+        "services/delivery/delivery-promise.js": [
+          "computeDeliveryPromise",
+          "expectedDeliveryAtFrom",
+          "areaFloorMinutes",
+          "MAX_PLAUSIBLE_DELIVERY_KM"
         ],
         "services/delivery/late-delivery.js": [
           "LATE_THRESHOLD_MIN",
@@ -128,14 +150,74 @@
           "desc": "db.bookDelivery is bound to the hyphenated book-delivery collection"
         },
         {
-          "file": "services/delivery/book-delivery.js",
-          "regex": "\\.add\\(parseInt\\(result\\.area\\?\\.maxETA\\), 'minutes'\\)",
-          "desc": "the immediate-assignment path adds maxETA with NO fallback - a missing or non-numeric value is a silent no-op, so expectedDeliveryAt comes out equal to pickupTime rather than invalid"
+          "file": "services/delivery/delivery-promise.js",
+          "regex": "Math\\.max\\(floorMinutes, transitMinutes\\)",
+          "desc": "area.maxETA is a FLOOR under the distance-derived promise, never a ceiling - this is what makes the computation safe for every consumer, because it can only ever lengthen a promise and never shorten one"
+        },
+        {
+          "file": "services/delivery/delivery-promise.js",
+          "regex": "Math\\.max\\(\\s*1,",
+          "desc": "the promise is floored at 1 minute past pickup so it can never land on the pickup clock, which late-delivery.isZeroEtaPromise reads as 'no promise was made' and silently drops from the scorecard"
+        },
+        {
+          "file": "services/delivery/delivery-promise.js",
+          "regex": "parsed !== null && parsed > 0",
+          "desc": "area.maxETA of 0 is UNSET, not a floor of zero - the pending path read parseInt(maxETA || 30), so a zero has always meant 30 minutes in production and honouring it would make the promise SHORTER than the code being replaced, which is the one thing the floor rule forbids"
         },
         {
           "file": "services/delivery/delayed-assignment.js",
-          "regex": "\\.add\\(parseInt\\(area\\?\\.maxETA \\|\\| 30\\), 'minutes'\\)",
-          "desc": "the pending path's || 30 fallback rescues null/undefined/empty maxETA but not a non-numeric string - the asymmetry with the immediate path is the point"
+          "regex": "futureLocationAvailableAt = parsePromisedEta\\(",
+          "desc": "the customer promise IS the courier's modelled free time, so it feeds estimateArrivalAtStore and the pickupHeadroom term - lengthening a promise relaxes the overdue term and tightens the headroom term on the same courier (CORE invariant 13)"
+        },
+        {
+          "file": "services/delivery/delivery-promise.js",
+          "regex": "MAX_PLAUSIBLE_DELIVERY_KM",
+          "desc": "a distance beyond 60 km is a bad coordinate, not a long delivery - a literal (0,0) pair is a valid lat/lng 5,120 km from Kfar Qasim and would otherwise price as a 17,077-minute promise"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "computeDeliveryPromise\\(",
+          "desc": "the immediate-assignment path must NOT compute the promise itself - it used to add parseInt(result.area?.maxETA) with no fallback at all, and moment.add(NaN) is a silent no-op, so such a booking got a promise equal to its own pickup time"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "computeDeliveryPromise\\(",
+          "desc": "the pending path must NOT compute the promise itself - it used to add parseInt(area?.maxETA || 30), which rescued null/undefined but not a non-numeric string, and disagreed with the immediate path"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "scoringWeights:\\s*\\{\\s*\\.\\.\\.DEFAULT_CONFIG\\.scoringWeights",
+          "desc": "getAssignmentConfig MERGES the stored scoringWeights per key - a wholesale swap ships any new weight as undefined in production, since the live document holds only the three original weights (CORE invariant 12)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "config\\.scoringWeights\\?\\.pickupHeadroom \\?\\?",
+          "desc": "the new weight is defaulted at the READ site as well, because the simulator and the specs pass their own config and never go through getAssignmentConfig (CORE invariant 12)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "overduePenalty \\+ pickupHeadroomPenalty",
+          "desc": "the arrival estimate is SCORED, not a diagnostic - pickupHeadroomPenalty is a term of totalScore, which is why assumedDriverSpeedKmh is a dispatch lever (CORE invariant 13)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "MAX_PICKUP_HEADROOM_PENALTY = 20",
+          "desc": "the headroom penalty is capped in POINTS so it stays a preference and never a filter - an unassigned delivery is never inserted at all, so there is no pending record to retry from (CORE invariant 13)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "PICKUP_HEADROOM_TARGET_MIN = 10",
+          "desc": "10 minutes of headroom is where the lateness curve flattens (25% late at or above it, 32-37% below), so the term is inert for the ordinary majority of allocations (CORE invariant 13)"
+        },
+        {
+          "file": "services/delivery/late-delivery.js",
+          "regex": "currentPickupInstantOf",
+          "desc": "the single implementation that turns a bare HH:mm pickup clock into an instant against bookDelivery.created - the headroom term uses it rather than re-deriving (CORE invariants 10, 13)"
+        },
+        {
+          "file": "scripts/analyze-assignments.js",
+          "regex": "pickupHeadroom",
+          "desc": "the score-distribution report sums scoreBreakdown key by key, so a component missing here is dropped from avgTotal too and the percentages stay plausible while describing nothing (CORE invariant 13)"
         },
         {
           "file": "services/delivery/delayed-assignment.js",
