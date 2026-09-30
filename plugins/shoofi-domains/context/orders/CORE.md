@@ -167,6 +167,14 @@ live support board and got as far as a passing test, because the test fixture ne
 `order` is the whole embedded order document, so `storeData` is at *its* root. Same-looking
 path, different base object.
 
+⚠️ **Finding the right level is not the end of it.** Two further traps on the same object are
+covered by the unmerged branch `docs/orders-storedata-is-not-the-registry-id`: its `_id`
+belongs to the per-tenant `store` collection and **not** to the central `shoofi.stores`
+registry (0 of 6 sampled stores matched), and because it rides in on the request body, older
+orders carry an **unsanitised** store snapshot — so it must never be echoed verbatim from a
+customer-authenticated endpoint. Read both before building on this object; if that branch
+merges first, fold these two notes together.
+
 Corollary for tests: a fixture that mirrors the code's assumption proves nothing. Assert the
 real shape **and** that the wrong one yields null.
 
