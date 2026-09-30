@@ -31,7 +31,8 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "lib/delivery/helpers.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -257,6 +258,21 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "name:\\s*driver\\.fullName\\s*\\|\\|\\s*driver\\.name",
+          "desc": "the driver-locations read collapses fullName||name into a response field called `name`"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "\\.filter\\(driver\\s*=>\\s*driver\\.location\\s*!==\\s*null\\)",
+          "desc": "a driver with no usable fix is dropped from /drivers/locations, so he cannot be searched on the live map"
+        },
+        {
+          "file": "lib/delivery/helpers.js",
+          "regex": "const\\s+PUBLIC_DRIVER_FIELDS\\s*=\\s*\\[",
+          "desc": "the shared driver whitelist carries no name/phone; the locations route must keep its own inline projection"
         }
       ]
     },
@@ -324,7 +340,8 @@
       "files": [
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/views/admin/driver-locations/DriverLocationsMap.tsx"
       ],
       "patterns": [
         {
@@ -341,6 +358,16 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isDeliveryOnlySupport",
           "desc": "the platform-wide delivery-only switch lives in admin Settings"
+        },
+        {
+          "file": "src/views/admin/driver-locations/DriverLocationsMap.tsx",
+          "regex": "driverMatchesSearch",
+          "desc": "the live driver map is searchable by driver name and phone"
+        },
+        {
+          "file": "src/views/admin/driver-locations/DriverLocationsMap.tsx",
+          "regex": "digitsOnly\\(driver\\.phone\\)\\.includes\\(termDigits\\)",
+          "desc": "phone search compares digits only on both sides (one stored phone carries a leading space)"
         }
       ]
     }
