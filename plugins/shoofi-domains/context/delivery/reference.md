@@ -202,6 +202,28 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   storeAssignmentMode, assignedStoreAppNames[]`.
 - Geo: `cities, parentCities, cityAreas, areas, areasGeometry`. Ops: `driverStatusHistory,
   driverLocationHistory(TTL), driverShifts, driverDailyHours, deliveryConfig`.
+- `driverLocationHistory` — `{driverId(**string**, not ObjectId), latitude, longitude(floats),
+  createdAt(Date), expiresAt(30d TTL), isStale}`. ~4.5M documents. A rejected stale fix is
+  still inserted (`isStale: true`), so any "has he moved" query must exclude those or a
+  duplicate of an older position reads as a courier standing still.
+
+### ⚠️ Indexes are created in ONE place, and `utils/init-location-indexes.js` is DEAD
+Every index on the `delivery-company` collections is created in
+**`services/database/DatabaseInitializationService.js`**, at boot, `background: true`. That is
+the only place; add yours there.
+
+`utils/init-location-indexes.js` looks like the place and is not. **Nothing requires it** — not
+imported anywhere in the repo, not in `package.json` scripts — so it has never run, and the
+`{driverId, createdAt}` index it declares for `driverLocationHistory` did not exist on
+production. It also targets a collection named `bookDelivery` when the real name is
+`book-delivery`, which is a second reason to treat the whole file as abandoned rather than as
+a script somebody forgot to run.
+
+This matters because the collection is large and the obvious query over it is hot: the live
+support board's "has this courier moved" check aggregates a 6-minute window per courier on a
+15-second poll, which unindexed is a full scan of 4.5M documents per poll per open board.
+**Before writing any query against `driverLocationHistory`, check the index is declared in
+`DatabaseInitializationService.js`** — do not infer it from `init-location-indexes.js`.
 
 ## 8. Cross-domain edges (hand off, don't reach in)
 - **ORDERS (you're the callee)**: at partner-accept `routes/order.js` builds `deliveryData`

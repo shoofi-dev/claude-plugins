@@ -24,6 +24,7 @@
         "consts/consts.js",
         "docs/delivery-areas-model.md",
         "services/database/DatabaseInitializationService.js",
+        "utils/init-location-indexes.js",
         "services/delivery/late-delivery.js",
         "routes/order.js",
         "utils/crons/growth-snapshots.js",
@@ -129,6 +130,11 @@
           "file": "services/database/DatabaseInitializationService.js",
           "regex": "db\\.bookDelivery\\s*=\\s*db\\.collection",
           "desc": "db.bookDelivery is bound to the hyphenated book-delivery collection"
+        },
+        {
+          "file": "utils/init-location-indexes.js",
+          "regex": "db\\.collection\\('bookDelivery'\\)",
+          "desc": "utils/init-location-indexes.js is DEAD - it is required nowhere and not in package.json scripts, so it has never run, and it targets a collection named bookDelivery when the real name is book-delivery. Indexes are created only in services/database/DatabaseInitializationService.js; never infer an index exists from this file"
         },
         {
           "file": "services/delivery/delivery-promise.js",
