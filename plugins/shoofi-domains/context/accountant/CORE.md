@@ -112,6 +112,19 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `payments` domain, invariant 9. A change to what `exempt` means now moves two systems.
 5. **Report guards must stay on:** duplicate + **overlap across ALL statuses** (a sent report
    blocks a new overlapping one), orders-closed, and compensations-approved.
+   **But compensations-approved is real on the DRIVER side and DEAD on the STORE side.**
+   `validateDriverCompensationsApproved` (`routes/driver-reports.js:44-47`) windows `createdAt`
+   with `.toDate()`, so it fires: a single unapproved driver item makes the whole delivery
+   company's monthly generation `continue` — no report row and no payout.
+   `validateCompensationsApproved` (`routes/payments/admin-reports.js:177-197`) windows the
+   same field against `moment(...).format()` **offset strings**, while `compensations.createdAt`
+   is a BSON `Date` on 2,400 of 2,400 production documents. The query therefore matches nothing,
+   `unapprovedCount` stays 0, and the guard always answers `isValid: true`. Measured against
+   production for 09/2026: the string-bounded query returned **0** rows, the identical query
+   with `Date` bounds returned **155**. So an unapproved store compensation is **not** caught
+   before a store report is generated — never reason as if it were. Making it fire is a
+   **behaviour change that will start blocking real store reports**, so it belongs to its own
+   ticket, not to a side effect.
    **Delete is deliberately NOT status-gated** — a report can be sent and only then found
    wrong, and the fix is delete + regenerate. But delete **must release the carry-over
    compensations** that `/send` consumed (`appNameBackfill.pendingReportCarryover` back to

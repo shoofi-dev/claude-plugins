@@ -44,6 +44,7 @@
         "routes/payments/admin-reports.js": [
           "checkOverlappingReports",
           "validateOrdersClosed",
+          "validateCompensationsApproved",
           "calculateCommissionTiered",
           "generateStoreReportData",
           "totalForTransfer"
@@ -73,7 +74,8 @@
           "classifyOneTimeCharges"
         ],
         "routes/driver-reports.js": [
-          "generateDriverReportData"
+          "generateDriverReportData",
+          "validateDriverCompensationsApproved"
         ],
         "utils/hashavshevet-movein.js": [
           "ezcountInclusiveTotals",
@@ -133,6 +135,16 @@
           "file": "routes/driver-reports.js",
           "regex": "actualDriverPayment",
           "desc": "cash-vs-card driver payout branch"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "'order\\.storeData\\.appName':\\s*storeAppName,\\s*createdAt:\\s*\\{\\s*\\$gte:\\s*rangeStart,\\s*\\$lte:\\s*rangeEnd\\s*\\}",
+          "desc": "CORE invariant 5: the STORE-side compensations-approved guard windows createdAt against moment().format() offset STRINGS while the field is a BSON Date on all 2,400 prod docs, so it matches nothing and always reports isValid — if this becomes rangeStartDate/.toDate() the guard starts firing and invariant 5 must be rewritten"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "createdAt:\\s*\\{\\s*\\$gte:\\s*rangeStartDate,\\s*\\$lte:\\s*rangeEndDate\\s*\\}",
+          "desc": "CORE invariant 5: validateDriverCompensationsApproved windows createdAt with .toDate(), which is why the DRIVER-side guard really fires — one unapproved item makes the whole company's generation continue with no report and no payout"
         },
         {
           "file": "routes/payments/admin.js",
