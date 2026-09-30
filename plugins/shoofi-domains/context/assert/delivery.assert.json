@@ -32,7 +32,8 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "services/delivery/driver-load.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -102,6 +103,10 @@
           "/api/delivery/delivery-only/book",
           "/api/delivery/delivery-only/list",
           "isDeliveryOnly"
+        ],
+        "services/delivery/driver-load.js": [
+          "ACTIVE_ORDER_STATUSES",
+          "UNCOLLECTED_ORDER_STATUSES"
         ]
       },
       "patterns": [
@@ -289,6 +294,11 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "ACTIVE_ORDER_STATUSES\\s*=\\s*\\[\"1\",\\s*\"2\",\\s*\"3\",\\s*\"5\"\\]",
+          "desc": "the canonical in-flight status list, strings, INCLUDING \"5\" WAITING_IN_STORE - a hand-written [\"1\",\"2\",\"3\"] drops the driver standing in the restaurant, and three competing spellings are already live"
         }
       ]
     },
