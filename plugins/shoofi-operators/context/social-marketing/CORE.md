@@ -77,8 +77,19 @@ draft should assume a per-town account exists.
   `AI_TASK_ROLES` in `shoofi-server/services/ai-tasks/constants.js`, not the narrower
   `BRIDGE_DASHBOARD_ROLES`.
 - **This operator never publishes and never holds the Meta token.** Approval is what reaches
-  Meta, through a publishing path that is not yet built. Until it is, "approved" means a human
-  copies the text out — which is fine, and is not a reason to reach for the token.
+  Meta. Since 2026-10-01 that path exists in `shoofi-server` and the token lives only in that
+  server's env (`META_PAGE_ACCESS_TOKEN`, `META_PAGE_ID`, `META_IG_USER_ID`):
+  - a human presses **אשר לפרסום** on a post with a chosen caption → `POST
+    /api/admin/social-posts/:id/approve` snapshots the caption + rendered image onto a
+    `shoofi.socialPublications` row and the post becomes `approved`;
+  - the admin's **תזמון פרסומים** screen (`/admin/social-publications`) edits the caption,
+    picks Facebook / Instagram, schedules a time or publishes now;
+  - `utils/crons/social-publish-cron.js` sends due rows every minute through
+    `services/social-posts/meta-publisher.js` — the only module that talks to the Graph API.
+  An `ad` is refused (it belongs in Ads Manager); Instagram and stories need a rendered image.
+  A target that went out is never re-sent, and a send interrupted mid-way is marked failed
+  for a person to check rather than retried. None of this changes this operator's job: it
+  still produces drafts and stops at the human gate.
 
 ### 3a. How the gate is actually enforced (fixed 2026-09-21)
 `shoofi-server/routes/social-media-ideas.js` shipped with **no authentication middleware at
@@ -134,13 +145,15 @@ in `shoofi-server/CLAUDE.md`.
 ---
 
 ## 6. Out of scope right now
-No publishing to Meta. No Meta tokens, no App Review, no scheduling. No Hebrew content. No
+No publishing to Meta *by this operator* — publishing and scheduling are the server's, behind
+a human's approval (§3). No Meta tokens, no App Review. No Hebrew content. No
 per-town accounts. No paid-ads spend decisions. No competitor social collection — that is
 `competitive-intel`'s social phase, and it stays there. No image *generation*; drafts
 reference real product photos we already have.
 
 ## 7. Open questions a human still owns
-1. **The publishing path** — who builds it, and where the Meta token lives (never here).
+1. ~~The publishing path~~ — built 2026-10-01 in `shoofi-server` (§3); the token is that
+   server's env, never here. Still open: the Meta app review / system-user token itself.
 2. **Cadence**, once manual runs have been tested.
 3. **Hebrew**, for the 3.7%.
 4. ~~The auth gap in §3a~~ — fixed 2026-09-21; §3a now describes the gate as enforced.
