@@ -381,6 +381,10 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   approve-on-behalf with ready minutes, amend, master-only impersonation): handlers, gates and
   modals. Extracted from `CardOrder` so every admin screen runs the same actions — add an
   action there, not in a card,
+  `src/views/admin/live-ops/` — the live-ops board (`/admin/live-ops`, feature-flagged):
+  fraud review (`13`) and pending store approval (`6`, NOT `14` — that is an accepted future
+  order) beside the delivery tasks; approve/reject/approve-on-behalf are sent after a 5 s
+  undo window with the order card's payloads,
   `src/components/OrderMonitoring/OrderFlowDashboard.tsx`,
   `src/views/admin/settings/DeliverySettings.tsx`, `src/views/admin/fraud/FraudReview.tsx`.
 - **⚠️ Cross-repo consistency flags (candidate bugs — human verdict):**
