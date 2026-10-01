@@ -376,6 +376,11 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
 - **State**: not centralized — component-local `useState`; MobX only for store open/close.
 - **Key files**: `src/apis/admin/order/*`, `src/views/admin/orders.tsx`,
   `src/components/Cards/{CardOrder,CardTwinOrder}.tsx`,
+  `src/components/Cards/order-actions/{useOrderActions,OrderActionsMenu}.tsx` — the per-order
+  "⋯" actions (cancel + money decision, compensation, HYP re-charge, status update incl.
+  approve-on-behalf with ready minutes, amend, master-only impersonation): handlers, gates and
+  modals. Extracted from `CardOrder` so every admin screen runs the same actions — add an
+  action there, not in a card,
   `src/components/OrderMonitoring/OrderFlowDashboard.tsx`,
   `src/views/admin/settings/DeliverySettings.tsx`, `src/views/admin/fraud/FraudReview.tsx`.
 - **⚠️ Cross-repo consistency flags (candidate bugs — human verdict):**

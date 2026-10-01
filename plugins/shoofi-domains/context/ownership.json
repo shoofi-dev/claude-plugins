@@ -82,6 +82,7 @@
         "src/apis/admin/order",
         "src/views/admin/orders.tsx",
         "src/components/Cards/CardOrder.tsx",
+        "src/components/Cards/order-actions/",
         "src/components/Cards/CardTwinOrder.tsx",
         "src/components/OrderMonitoring/",
         "src/consts/shared.ts"
