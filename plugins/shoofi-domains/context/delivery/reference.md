@@ -273,7 +273,12 @@ no order.
 `app-type: shoofi-admin`. **Management**: `apis/admin/delivery/*` → `delivery/admin/{assign,
 reassign,cancel,drivers,orders,alerts}`; boards `DeliveryMonitor`, `DeliveryListAnalytics`,
 `OpsDashboard`. **Live driver map**: `GET delivery/drivers/locations` + WS
-(`views/admin/driver-locations/DriverLocationsMap.tsx`). **The area/coverage CONTROL PANEL**
+(`views/admin/driver-locations/DriverLocationsMap.tsx`); its pins and the restaurant↔customer
+colour pairing (`getOrderColor(bookId)`, a hash into a fixed 15-slot palette) live in
+`src/utils/driver-map-markers.ts` so every admin map draws the same order in the same colour.
+The live-ops board (`views/admin/live-ops/`) reads `POST analytics/deliveries` like the delivery
+list, resolves `pickupTime` (bare `"HH:mm"`, wraps at midnight) against `expectedDeliveryAt`,
+and re-assigns through `delivery/admin/reassign` with the same 409 `needsConfirmation` handshake. **The area/coverage CONTROL PANEL**
 lives here: `views/admin/delivery-areas/*` — full CRUD for cities, parent-cities, city-areas,
 delivery-areas, company-areas, geometries (draw/fill-gaps/suggest). **Config**:
 `views/admin/settings/DeliverySettings.tsx` (`admin/delivery-config`, `admin/twin-order-config`).
