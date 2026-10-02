@@ -80,7 +80,8 @@
         "services/delivery/book-delivery.js": [
           "originalBookId",
           "findBestDeliveryCompany",
-          "coverageRadius"
+          "coverageRadius",
+          "area: result.area"
         ],
         "services/delivery/delivery-promise.js": [
           "computeDeliveryPromise",
@@ -333,6 +334,11 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "area:\\s*result\\.area",
+          "desc": "bookDelivery.area is a frozen SNAPSHOT of the areas document the delivery was dispatched through (_id, name, cityId as a string, geometryId, price, minETA/maxETA, isActive and the populated dropoff geometry), written once at booking time and never back-filled. 95,506 of 95,540 production bookings carry it (2026-10-02). Anything holding the booking should read delivery.area.cityId for the PICKUP zone instead of calling findBestAreaForLocation again - and must treat its absence as a conditional, because area is an embedded document where a missing field reads undefined rather than throwing. A fresh lookup answers a different question: todays polygons and prices, not the ones the delivery actually went out through."
         }
       ]
     },

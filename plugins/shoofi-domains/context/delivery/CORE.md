@@ -50,6 +50,30 @@ scope documents above it — `cityAreas.isActive` and `parentCities.isActive` re
 `{$ne: false}`, so absent means active *there*. Same field name, opposite default, one collection
 apart. Anything reasoning about whether an area was serving must use `isActive === true`.
 
+**The booking already knows its area — don't re-derive it.** `bookDelivery.area` is a whole
+embedded **snapshot** of the `areas` document the delivery was dispatched through, written at
+booking time by `services/delivery/book-delivery.js`: `_id`, `name`, `cityId`, `geometryId`,
+`price`, `minETA`/`maxETA`, `isActive`, **and the populated dropoff `geometry`**. 95,506 of
+95,540 production bookings carry it (2026-10-02), with `cityId` a **string** on every one of
+them, exactly as on the live `areas` row — so `getId()` is still what makes it comparable to
+`cities._id`. Anything holding the booking and wanting the **pickup zone** should read
+`delivery.area.cityId` rather than calling `findBestAreaForLocation` again: that is two
+geospatial queries plus a `cities` scan to recover something already on the document.
+
+It is also the **more correct** answer, not merely the cheaper one. A fresh lookup resolves
+against *today's* polygons, prices and `isActive` flags; the snapshot is the area the delivery
+actually went out through. For anything retrospective — a settlement line, a report, a replay,
+an audit of why a courier was chosen — those are different questions and the snapshot is the
+one being asked about.
+
+Two caveats. The 34 bookings with no `area` are why reading it is a **conditional and never an
+assumption**: `area` is one of the embedded documents (`driver`, `company`, `area`, `order`)
+where a wished-for field reads `undefined` rather than throwing, so a guarded branch simply
+never runs and looks identical to a correction that is merely rare. And a snapshot can drift
+from the live row — a spot check of the 200 most recent bookings found no `cityId` drift and no
+missing live area, but a renamed or re-priced area is not back-filled, so **the snapshot is
+evidence about dispatch, never about the area's current configuration**.
+
 ## Delivery-only — a courier with no order behind it
 A store can book a driver for goods **Shoofi never sold**: owner picks a town, gives a phone
 and a ready-time, a courier goes. `services/delivery/delivery-only.js` +
