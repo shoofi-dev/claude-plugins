@@ -210,6 +210,20 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     delivery-only booking, so anything keyed on `order.customerId`, `order.total` or
     `order.orderId` silently no-ops there. That is exactly how admin cancellation used to
     notify nobody while the driver was still driving to the store.
+    **And the converse: a `bookDelivery` has no root-level `customerId` either — the only
+    copy of the central `shoofi.customers._id` is `order.customerId`, on the embedded order.**
+    Every booking path builds its payload from a `deliveryData` object carrying `fullName` and
+    `phone` only (`routes/order.js` partner-accept / `order/book-delivery` / future-order
+    release / `book-custom-delivery`, then `services/delivery/book-delivery.js` and
+    `delayed-assignment.js: createPendingDelivery` insert `{...deliveryData}`), so the root
+    field is never written: **0 of 95,688 production documents have one; 95,685 have
+    `order.customerId`.** `routes/analytics.js` has whitelisted a root `customerId: 1` since
+    the list was written, which reads as evidence the field exists — and is why
+    `DeliveryListAnalytics.tsx`'s `d.fullName || d.customerId` fallback and live-ops'
+    `normalizeTask` both keyed on it, the latter shipping a `CustomerLink` that degraded to
+    plain text on every single delivery row with no error anywhere. Resolve it as
+    `d.customerId || d.order?.customerId`, and project `'order.customerId': 1` or the client
+    is correct and inert (invariant 9).
 12. **A new `scoringWeights` key must be defaulted in TWO places or it ships dead.** The live
     `delivery-company.delivery-config {type:'driver-assignment'}` document holds exactly three
     weights — `{distanceToStore: 3, distanceToCustomer: 1, routeDeviation: 0.5}` — while

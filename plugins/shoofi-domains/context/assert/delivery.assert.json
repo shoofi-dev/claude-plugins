@@ -333,6 +333,11 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "'order\\.customerId': 1",
+          "desc": "bookDelivery has no root customerId (0 of 95,688 docs) - the central shoofi.customers._id reaches the admin deliveries list and live-ops ONLY via this projection key; drop it and the 'open customer summary' control renders as plain text with no error"
         }
       ]
     },
