@@ -384,7 +384,12 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   `src/views/admin/live-ops/` — the live-ops board (`/admin/live-ops`, feature-flagged):
   fraud review (`13`) and pending store approval (`6`, NOT `14` — that is an accepted future
   order) beside the delivery tasks; approve/reject/approve-on-behalf are sent after a 5 s
-  undo window with the order card's payloads,
+  undo window with the order card's payloads. Delivery rows show the STORE order's status
+  from `storeOrder.status` (the `analytics/deliveries` join), labelled with
+  `ORDER_STATUS_TEXT_HEBREW`; a "⚡ תאום" pill on both sides of a twin pair (orders:
+  `twinGroup.{groupId,role,peerOrderId,pickupSequence}`; deliveries: `twinGroupId`,
+  `twinPickupSequence`, `twinPeer.orderId`; none once degraded) opens the unchanged
+  `TwinOrderCard` in an overlay, seeded with the whole order,
   `src/components/OrderMonitoring/OrderFlowDashboard.tsx`,
   `src/views/admin/settings/DeliverySettings.tsx`, `src/views/admin/fraud/FraudReview.tsx`.
 - **⚠️ Cross-repo consistency flags (candidate bugs — human verdict):**
