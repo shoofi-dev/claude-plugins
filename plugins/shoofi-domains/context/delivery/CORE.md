@@ -251,13 +251,18 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
 - **A store's phone is NOT on `shoofi.stores`.** The registry carries a `phone` key on every
   document and it is **empty on all 259** — `/api/shoofiAdmin/store/add` and
   `/store/update/:id` write `phone || ''` and no admin screen sends one. The number staff
-  dial lives on the per-tenant `<appName>.store` singleton (217/255 populated) and is
-  snapshotted onto every order as **`storeData.phone`**: 914/928 recent orders and 300/300
-  recent `book-delivery` rows carry it, and it rides into the booking as
-  `order.storeData.phone` because `services/delivery/book-delivery.js` spreads the whole
-  order in. The platform's resolution order everywhere is `storeData.phone || store.phone`
-  (`routes/shoofi-admin.js` `/store/status`, `utils/hyp-pay.js`,
-  `services/competitors/our-stores.js`). ⚠️ Both delivery read paths are **whitelist
+  dial is the **"מספר טלפון" field on the admin's store-details screen** — delivery-web
+  `views/admin/stores/StoreData.tsx` → `POST /api/store/update` → the per-tenant
+  `<appName>.store` singleton (217/255 populated) — and it is snapshotted onto every order
+  as **`storeData.phone`**: 914/928 recent orders and 300/300 recent `book-delivery` rows
+  carry it, and it rides into the booking as `order.storeData.phone` because
+  `services/delivery/book-delivery.js` spreads the whole order in. The platform's
+  resolution order everywhere is `storeData.phone || store.phone` — tenant first, registry
+  as fallback (`routes/shoofi-admin.js` `/store/status` and `/store/all`,
+  `utils/hyp-pay.js`, `services/competitors/our-stores.js`). Keep that direction: a number
+  corrected on that screen has to take effect at once, and on 2026-10-02 the live value and
+  the order snapshots agreed for 189/189 stores, so the ordering only ever matters at the
+  moment of an edit. ⚠️ Both delivery read paths are **whitelist
   projections**, so `order.storeData.phone` has to be named explicitly in each —
   `routes/delivery/orders.js` (driver app) and `routes/analytics.js` (support boards). It
   was missing from the analytics one until 2026-10-02, which is why the admin live-ops
