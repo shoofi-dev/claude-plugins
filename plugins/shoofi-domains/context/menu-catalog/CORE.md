@@ -336,6 +336,41 @@ boundary and say so in the PR.
    days; the sink is registered at boot (`app.js`) and by `bin/label-products.js`. Admin
    "שימוש ב-Claude" (`GET /api/admin/ai-usage`, admin roles) reads it. When a price changes, change
    `PRICES` in `pricing.js`.
+17. **`isSchoolProject` IS TWO UNRELATED LAYERS, AND THE STORE-LEVEL CHECKBOX IS DEAD.**
+   The name appears on three different documents and only one of them decides whether a store
+   shows up in the app's school-meals list:
+   - **Per-store `categories.isSchoolProject`** — the MENU layer. `/api/menu` serves it as a
+     separate filtered view under its own cache key (invariant 2); products inherit it by
+     sitting in such a category via `supportedCategoryIds` (products carry no flag of their own).
+     Written by `routes/store.js`. This is what an admin means by "the store has a school group
+     with products under it" — and it is **not** what puts the store in the list.
+   - **Central `shoofi.categories` doc with `isSchoolProject: true`** — the MEMBERSHIP layer,
+     and the real one. A store is in the school list iff `shoofi.stores.categoryIds` contains
+     that category's `_id` (in production: `69166d51b6f375000dff73bc`, `בתי ספר`, pointing at
+     the `general-categories` doc `6909038148a2907f03860eb1`).
+   - **`shoofi.stores.isSchoolProjectSupport`** — the checkbox in the admin store form
+     (`shoofi-delivery-web .../stores/StoreForm.tsx`), written at `routes/shoofi-admin.js:859`
+     / `:1348`. **No customer-facing code path reads it.** Its only readers are settlement
+     (`routes/payments/admin.js`), social posts (`services/social-posts/post-service.js`) and
+     a menu item in the partner app. A store can have the checkbox on and still be absent from
+     the school list — that is the normal failure, not a bug.
+   Two more traps on the same path: the explore endpoints **hard-exclude** school categories
+   from `categoriesWithStoreIds` (`routes/shoofi-admin.js` v2 ~`:2140`, v1 ~`:1888`) and the app
+   builds `shoofiAdminStore.storesList` from that, not from the full `storesMap` — so a store
+   tagged with **nothing but** a school category is invisible everywhere. And the app sends
+   `&isSchoolProject=...` to `categories-with-stores-v2`, which **ignores it** (only
+   `routes/menu.js` and `routes/category.js` read `req.query.isSchoolProject`); honouring it
+   would also need the explore cache key to include it, or school and non-school payloads
+   cross-serve between customers in the same area.
+18. **`showInGeneralCategoryStrip` IS A DISPLAY FLAG — IT MAY REMOVE A CHIP, NEVER A STORE.**
+   Same for `showInHomeStrip`. Admins set them `false` on curation buckets (`Exclusive`,
+   `המומלצים`, `מבצעים`) that should not be offered as filter chips. `GeneralCategoryScreen`
+   therefore keeps two lists, via `shoofi-app/helpers/general-category-stores.ts`:
+   `memberCategories` (belongs to the general category → the content) and `stripCategories`
+   (the subset drawn as chips → the display); with no selectable chip it shows the union of the
+   members. Collapsing them is what took the whole school-meals screen dark — `בתי ספר` is the
+   only sub-category under its general category and carries the flag `false`, so a
+   membership filter on it left zero categories, no selection and no stores.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
@@ -404,6 +439,21 @@ against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store D
 are the customers' side of the same story (7-day window on `shoofi.apps-logs`
 `add_to_cart_blocked`). A `lint` row means the product IS in the catalog and is defective —
 re-importing fixes nothing; edit the product (or run the repair script, reference §4).
+
+## Recipe — "the school-meals restaurants list is empty"
+Check in this order (invariant 17); the reporter has almost always checked only step 4.
+1. **The customer is in school mode** — `shoofi.customers.schoolProject.isActive === true` for
+   that phone. Without it `/api/category/general/all` filters the tile out entirely
+   (`routes/category.js`) and the symptom looks identical.
+2. **The store is a MEMBER** — `shoofi.stores.categoryIds` contains the central school
+   category's `_id`. This is the step that is usually missing.
+3. **The store is otherwise available** — `business_visible: true` and `supportedCities`
+   covering the test address (`services/delivery/RestaurantAvailabilityService.js`). `isOpen`,
+   `isCoomingSoon` and `isMockStore` only affect sort order on this path, never inclusion.
+4. **The per-store menu layer** — a `categories` doc with `isSchoolProject: true` and products
+   under it. Necessary for the store's school MENU, irrelevant to the LIST.
+5. `shoofi.stores.isSchoolProjectSupport` is **not** a diagnostic — nothing customer-facing
+   reads it.
 
 ## Definition of done
 Inherit `_shared-guardrails.md` §7. Here specifically: name every write path you touched and

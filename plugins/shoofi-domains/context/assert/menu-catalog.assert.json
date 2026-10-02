@@ -52,7 +52,8 @@
         "services/ordering-intelligence/ai-chat.js",
         "services/ai/usage-log.js",
         "services/ai/pricing.js",
-        "routes/admin/ai-usage.js"
+        "routes/admin/ai-usage.js",
+        "routes/shoofi-admin.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -824,6 +825,21 @@
           "file": "services/ordering-intelligence/ai-chat.js",
           "regex": "which is CLOSED now",
           "desc": "doc CORE invariant 14: the Claude chat is told a named store is closed"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "isSchoolProject: \\{ \\$exists: false \\}",
+          "desc": "doc CORE invariant 17: the explore endpoints hard-exclude central school categories from categoriesWithStoreIds, so storesList never contains a school-only store"
+        },
+        {
+          "file": "routes/category.js",
+          "regex": "req\\.query\\.isSchoolProject === 'true'",
+          "desc": "doc CORE invariant 17: only the general-category tile route (and /api/menu) read req.query.isSchoolProject — explore v2 receives it and ignores it"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "isSchoolProject\\s*\\n?\\s*\\?\\s*\\[\\{ \\$match: \\{ isSchoolProject: true \\} \\}\\]|\\$match: \\{ isSchoolProject: true \\}",
+          "desc": "doc CORE invariant 17: the per-store MENU layer filters the store categories collection on isSchoolProject — a different layer from list membership"
         }
       ]
     },
@@ -832,7 +848,10 @@
         "hooks/useOpenStoreAtProduct.ts",
         "screens/menu/components/GeneralCategoriesList.tsx",
         "__tests__/components/general-categories-open-product.test.tsx",
-        "helpers/for-you-copy.ts"
+        "helpers/for-you-copy.ts",
+        "helpers/general-category-stores.ts",
+        "screens/GeneralCategoryScreen.tsx",
+        "__tests__/helpers/general-category-stores.test.ts"
       ],
       "symbols": {},
       "patterns": [
@@ -865,6 +884,16 @@
           "file": "helpers/for-you-copy.ts",
           "regex": "for_you_reply_store_closed",
           "desc": "doc CORE invariant 14: the app words a store_closed reply"
+        },
+        {
+          "file": "helpers/general-category-stores.ts",
+          "regex": "stripCategories: memberCategories\\.filter\\(isCategoryInGeneralCategoryStrip\\)",
+          "desc": "doc CORE invariant 18: showInGeneralCategoryStrip narrows the CHIP list only — memberCategories (the content) is never filtered by it"
+        },
+        {
+          "file": "screens/GeneralCategoryScreen.tsx",
+          "regex": "storesForGeneralCategory\\(\\{",
+          "desc": "doc CORE invariant 18: the general-category screen delegates the strip/membership split to the helper instead of filtering membership on the display flag"
         }
       ]
     },
@@ -873,7 +902,8 @@
         "src/views/admin/dish-types/DishTypes.tsx",
         "src/apis/admin/dish-taxonomy.ts",
         "src/views/admin/ai-usage/AiUsage.tsx",
-        "src/apis/admin/ai-usage.ts"
+        "src/apis/admin/ai-usage.ts",
+        "src/views/admin/stores/StoreForm.tsx"
       ],
       "symbols": {},
       "patterns": [
@@ -886,6 +916,11 @@
           "file": "src/apis/admin/dish-taxonomy.ts",
           "regex": "/admin/product-labels/review",
           "desc": "doc reference §8: the admin review list for labels in status review"
+        },
+        {
+          "file": "src/views/admin/stores/StoreForm.tsx",
+          "regex": "name=\"isSchoolProjectSupport\"",
+          "desc": "doc CORE invariant 17: the admin store form exposes isSchoolProjectSupport, which no customer-facing path reads — membership is stores.categoryIds"
         }
       ]
     }
