@@ -134,6 +134,24 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
    aligned to the later side. Breaking any of it splits a twin.
 6. **Manual-admin routing:** companies with `isControlledByAdmin && manualAssignmentOnly` route
    to a company **admin**, not a driver. Don't auto-assign them.
+   **The manual picker ranks on the SAME score as the automatic engine, and the two candidate
+   sets are not interchangeable.** `GET /api/delivery/admin/drivers` — the list behind every
+   "שיבוץ / שיבוץ מחדש" screen, and behind all four pickers in delivery-web — returns its
+   couriers best-first via `services/delivery/manual-assignment-ranking.js`, which scores
+   `findAllMatchingDrivers`' output with `calculateDriverScore` and orders it with
+   `byConcurrencyTierThenScore`. It used to come back in `byDriverLoad` order, which has no
+   distance term at all and no pickup feasibility, so an agent and the engine answered the same
+   question with two different rules. ⚠️ It does **not** call `findScoredDrivers`, and swapping
+   it would silently change who the agent can see: `findScoredDrivers` skips
+   `filterOutBlockedDrivers` (blocked couriers reappear), requires `currentLocation: {$exists:
+   true}` (a courier who has never posted a fix vanishes from a list he is in today — and the
+   manual path exists for exactly the cases the automatic one cannot serve), and reads the
+   company with no `{accounting: 0}` projection. Eligibility is unchanged; only the ORDER is.
+   Scoring is side-effect free and records **no** `assignment-decisions` row — that log is
+   scoped to automatic allocations (`assignment-decision-log.js`), and opening a list is not
+   one. The per-row `assignmentScore` is `null` on the branches with nothing to score against
+   (no `orderId`, or a booking with no `customerLocation`), and the clients must treat that null
+   as "we could not rank" rather than filling it in themselves.
    **`centralizedFlowMonitor.trackOrderFlowEvent` RETHROWS — always wrap it.** It logs and then
    `throw error` (`services/monitoring/centralized-flow-monitor.js:63-66`), so an `await`ed call
    with no local try/catch turns a monitoring failure into a 5xx on the dispatch route *after*
