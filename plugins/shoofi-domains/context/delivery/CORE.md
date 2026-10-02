@@ -248,6 +248,22 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     describing a score they no longer break down.
 
 ## Known status (human-confirmed — do NOT "fix")
+- **A store's phone is NOT on `shoofi.stores`.** The registry carries a `phone` key on every
+  document and it is **empty on all 259** — `/api/shoofiAdmin/store/add` and
+  `/store/update/:id` write `phone || ''` and no admin screen sends one. The number staff
+  dial lives on the per-tenant `<appName>.store` singleton (217/255 populated) and is
+  snapshotted onto every order as **`storeData.phone`**: 914/928 recent orders and 300/300
+  recent `book-delivery` rows carry it, and it rides into the booking as
+  `order.storeData.phone` because `services/delivery/book-delivery.js` spreads the whole
+  order in. The platform's resolution order everywhere is `storeData.phone || store.phone`
+  (`routes/shoofi-admin.js` `/store/status`, `utils/hyp-pay.js`,
+  `services/competitors/our-stores.js`). ⚠️ Both delivery read paths are **whitelist
+  projections**, so `order.storeData.phone` has to be named explicitly in each —
+  `routes/delivery/orders.js` (driver app) and `routes/analytics.js` (support boards). It
+  was missing from the analytics one until 2026-10-02, which is why the admin live-ops
+  board's "call the restaurant" button was dead for every row while the courier and
+  customer buttons beside it worked: an absent key renders as a disabled button, never an
+  error.
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
   `isDeliveryOnlySupport` field, so the gate returns `platform_disabled`/`store_disabled` for
   every store and the partner button is hidden platform-wide. The feature is built and merged;

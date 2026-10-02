@@ -286,6 +286,16 @@
         },
         {
           "file": "routes/analytics.js",
+          "regex": "'order\\.storeData\\.phone': 1",
+          "desc": "the store phone reaches a support board ONLY as the order's storeData snapshot (shoofi.stores.phone is empty on all 259) and this is a whitelist projection - drop the key and the live-ops call-the-restaurant button goes dead with no error"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "'order\\.storeData\\.phone': 1",
+          "desc": "same key on the driver-app list projection - the pickup card dials it"
+        },
+        {
+          "file": "routes/analytics.js",
           "regex": "eventType === .status_change. && ev\\.status === .3.",
           "desc": "the real store-ready source is orderFlowEvents status 3, keyed by orderNumber === bookDelivery.bookId - NOT a bookDelivery.storeReadyAt field, which nothing writes"
         },
