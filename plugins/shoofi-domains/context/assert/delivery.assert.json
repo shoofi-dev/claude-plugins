@@ -170,6 +170,16 @@
           "desc": "the customer promise IS the courier's modelled free time, so it feeds estimateArrivalAtStore and the pickupHeadroom term - lengthening a promise relaxes the overdue term and tightens the headroom term on the same courier (CORE invariant 13)"
         },
         {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "const committedOrders = activeOrders\\.filter",
+          "desc": "the position projection draws from EVERY in-flight delivery he still owes, not only the collected ones - it filtered on status === '3' until Oct 2026, so an uncollected order moved none of the four position-derived terms and the flat uncollectedOrderPenalty was the only thing standing in for the drop (CORE invariant 14)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "isUncollected\\(order\\) && batchableOrderIds\\.has",
+          "desc": "a batch-able same-store UNCOLLECTED order is exempt from the projection - one stop collects it with this one, so pricing him at its drop point would cancel the -10 sameStoreBonus with kilometres he never rides; an order already collected is a drive already under way and is NOT exempt (CORE invariant 14)"
+        },
+        {
           "file": "services/delivery/delivery-promise.js",
           "regex": "MAX_PLAUSIBLE_DELIVERY_KM",
           "desc": "a distance beyond 60 km is a bad coordinate, not a long delivery - a literal (0,0) pair is a valid lat/lng 5,120 km from Kfar Qasim and would otherwise price as a 17,077-minute promise"

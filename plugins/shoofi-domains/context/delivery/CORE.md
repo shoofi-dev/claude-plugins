@@ -246,6 +246,33 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+14. **A courier is priced from the drop he still OWES, and "owes" is not the same as
+    "carries".** `calculateDriverScore` replaces his GPS with the drop point of an in-flight
+    delivery and his free time with that delivery's `expectedDeliveryAt`
+    (`services/delivery/delayed-assignment.js`). Until Oct 2026 the set it drew from was
+    `activeOrders.filter(order => order.status === "3")` — only deliveries already
+    **collected** — so an order he had been given but not picked up (`"1"`, `"2"`, `"5"`,
+    `driver-load.UNCOLLECTED_ORDER_STATUSES`) moved his modelled position not at all. That
+    is not one term going quiet: `distanceToStore` (w 3.0), `distanceToCustomer` (1.0),
+    `routeDeviation` (0.5) and `pickupHeadroom` (1.0, via `estimateArrivalAtStore`'s
+    `availableFrom`) all came off that position and were optimistic together, while the only
+    term that noticed the commitment was the **flat** `uncollectedOrderPenalty` — the same 15
+    points whether the uncollected drop is 200 m away or in the next town. `6572-5279`
+    (GCP, 2026-10-01 22:09:32) is the worked example: the chosen courier was holding an
+    uncollected qamha order dropping in Jaljulia 4.7 km north and promised 22:26, and was
+    scored `distanceToStore: 0.72`, `pickupHeadroomMinutes: +11.7`, penalty 0, total 19.68,
+    winning by 0.75; an admin moved it by hand three minutes later. 1,358 of 4,596 scored
+    assignments between 31 Aug and 2 Oct 2026 have that shape, and 608 of the 1,272 with a
+    runner-up were decided by under 2 points. Two exemptions survive and are load-bearing:
+    a **batch-able same-store** uncollected order must NOT move him (one stop collects it
+    with this one, so projecting him to its drop would cancel the −10 `sameStoreBonus` with
+    kilometres he never rides — which is why the same-store block is computed *above* the
+    location block), and an order with **no `customerLocation`** is skipped so he keeps his
+    own fix and stays eligible for the stale-GPS degrade, which is guarded on
+    `usingFutureLocation`. The exemption is for uncollected orders only: an order already in
+    the car is a drive already under way, batched or not — the same asymmetry
+    `getOverduePenalty` draws. `uncollectedOrderPenalty` stays at 15 regardless; it prices
+    juggling two pickups, which is a different cost from the geography.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
