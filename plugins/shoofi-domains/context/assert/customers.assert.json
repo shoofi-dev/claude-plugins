@@ -18,7 +18,8 @@
         "utils/customer-orders.js",
         "docs/customer-orders-snapshot.md",
         "routes/order.js",
-        "package.json"
+        "package.json",
+        "services/customer/school-project-enrollment.js"
       ],
       "symbols": {
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
@@ -38,9 +39,19 @@
           "attributeCustomerToReferrer",
           "recordFirstOrderForReferrer"
         ],
-        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store"]
+        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store", "deactivateCustomersWithoutStudentsSafely"],
+        "services/customer/school-project-enrollment.js": [
+          "NO_STUDENT_LINKED",
+          "deactivateCustomersWithoutStudents",
+          "deactivateCustomersWithoutStudentsSafely"
+        ]
       },
       "patterns": [
+        {
+          "file": "services/customer/school-project-enrollment.js",
+          "regex": "\"schoolProject\\.studentIds\\.0\": \\{ \\$exists: false \\}",
+          "desc": "school-project customers with no student linked are deactivated; the filter tolerates a concurrent re-add"
+        },
         {
           "file": "routes/auth.js",
           "regex": "app-type",

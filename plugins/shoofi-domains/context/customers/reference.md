@@ -68,6 +68,23 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
   referral (`referralCode`, `referral{clickId,inviterCustomerId,…}`), flags
   (`isBlocked`, `isDeleted`+`deletedAt`, `cashRestricted`), location (`cityId`, `cityAreaId`),
   `schoolProject{…}`. **No `tokenExpiry` field** — expiry lives only inside the JWT.
+- **`schoolProject{schoolId, classId, isActive, studentIds[]}`** (school-project / "مدارس"
+  customers; all ids are strings). `isActive` alone puts the customer app into school mode
+  (schools category, pickup-only cart, student card at checkout), but the card is filled only
+  from `studentIds` → `POST /api/customer/get-students-by-ids`, which joins `shoofi.students`
+  (`isActive: true` only) → `schools` / `school-classes` (accessor `db.schoolClasses`). The
+  `schoolId`/`classId` on the customer are not read for the card.
+  **Invariant: `isActive` is false whenever no student is linked; re-adding a student
+  re-activates.** The admin deletes (`delete-school-project-customer`,
+  `delete-all-school-project-students`) pull the id and then call
+  `deactivateCustomersWithoutStudentsSafely` (`services/customer/school-project-enrollment.js`;
+  filter `studentIds.0 $exists:false`, so a concurrent re-add wins). `add-student` and
+  `create-school-project-batch` set `isActive: true` when they link a new student id.
+  Caveat: a batch re-upload of a student whose id is *already* in `studentIds` does not touch
+  the customer; a manually toggled-off customer (`toggle-school-project-active`) stays off.
+  Before this invariant, deletes left `isActive: true` with `studentIds: []` — an empty
+  checkout student card; `scripts/deactivate-school-customers-without-students.js` (dry-run
+  default) sweeps those.
 - **`shoofi.storeUsers`** (partners) — `phone`, `appName`, `roles[]`, `token`, `authCode`.
   ⚠️ **`storeUsers` is the accessor, not the collection.** `db.storeUsers` is bound to the
   collection literally named **`store-users`**
