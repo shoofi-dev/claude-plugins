@@ -130,6 +130,11 @@
           "desc": "only lastLocationUpdate is indexed - lastFixAt is not, so a recency rule filters in JS after the fetch rather than in the query"
         },
         {
+          "file": "routes/delivery/driver.js",
+          "regex": "shouldIncludeOffline",
+          "desc": "GET drivers/locations hides couriers whose lastLocationUpdate is older than 10 minutes, but includeOffline skips that filter entirely - so for the admin maps and the live-ops board a returned position carries NO recency guarantee and the client must age the fix itself"
+        },
+        {
           "file": "consts/consts.js",
           "regex": "COLLECTED_FROM_RESTAURANT:\\s*\"3\"",
           "desc": "COLLECTED = 3 (clients must match; partner was off-by-one)"
@@ -400,7 +405,9 @@
       "files": [
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/utils/driver-map-markers.ts",
+        "src/views/admin/live-ops/data/liveOpsApi.ts"
       ],
       "patterns": [
         {
@@ -417,6 +424,16 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isDeliveryOnlySupport",
           "desc": "the platform-wide delivery-only switch lives in admin Settings"
+        },
+        {
+          "file": "src/utils/driver-map-markers.ts",
+          "regex": "STALE_LOCATION_MINUTES\\s*=\\s*10",
+          "desc": "the web's single staleness window, matching the server's filter and LOCATION_FIX_RECOVERY_MS - every screen that ages a courier's position reuses this rather than picking its own number"
+        },
+        {
+          "file": "src/views/admin/live-ops/data/liveOpsApi.ts",
+          "regex": "includeOffline:\\s*true",
+          "desc": "the live-ops board asks for offline couriers, which turns the server's 10-minute staleness filter off - so the board itself must age every fix before claiming where a courier is"
         }
       ]
     }
