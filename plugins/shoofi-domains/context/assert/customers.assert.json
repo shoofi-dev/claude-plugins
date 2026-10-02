@@ -39,9 +39,10 @@
           "attributeCustomerToReferrer",
           "recordFirstOrderForReferrer"
         ],
-        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store", "deactivateCustomersWithoutStudentsSafely"],
+        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store", "deactivateCustomersWithoutStudentsSafely", "linkStudentToCustomer"],
         "services/customer/school-project-enrollment.js": [
           "NO_STUDENT_LINKED",
+          "linkStudentToCustomer",
           "deactivateCustomersWithoutStudents",
           "deactivateCustomersWithoutStudentsSafely"
         ]

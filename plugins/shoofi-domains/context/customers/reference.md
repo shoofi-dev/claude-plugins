@@ -79,9 +79,11 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
   `delete-all-school-project-students`) pull the id and then call
   `deactivateCustomersWithoutStudentsSafely` (`services/customer/school-project-enrollment.js`;
   filter `studentIds.0 $exists:false`, so a concurrent re-add wins). `add-student` and
-  `create-school-project-batch` set `isActive: true` when they link a new student id.
-  Caveat: a batch re-upload of a student whose id is *already* in `studentIds` does not touch
-  the customer; a manually toggled-off customer (`toggle-school-project-active`) stays off.
+  `create-school-project-batch` set `isActive: true` whenever they link a student — the batch's
+  same-class branch always writes via `linkStudentToCustomer` (`$addToSet` + `$set isActive`),
+  even when the id is already linked. **Being on an uploaded class list means active:** a
+  re-upload deliberately overrides a manual `toggle-school-project-active` off (decided
+  2026-10-03). The batch result reports `action: "unchanged"` when nothing changed.
   Before this invariant, deletes left `isActive: true` with `studentIds: []` — an empty
   checkout student card; `scripts/deactivate-school-customers-without-students.js` (dry-run
   default) sweeps those.
