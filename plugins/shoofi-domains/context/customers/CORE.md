@@ -114,6 +114,42 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    (`GET /api/customer/:customerId` gained `deletedAt` in shoofi-server
    `fix/HIGH-RISK-churn-360-account-status`; add the matching assert once that merges.)
 
+## School-project students — one phone holds ONE class
+A school upload writes **two** records per student: a row in `shoofi.students` and a
+`schoolProject` object on the `shoofi.customers` doc for the same phone
+(`POST /api/customer/create-school-project-batch`, `routes/customer.js`). The school and
+class come **only** from the request body's `schoolId`/`classId` — never from the uploaded
+file — and are validated against `shoofi.schools` / `shoofi.schoolClasses`. Per student the
+endpoint requires and stores **nothing but `{phone, fullName}`**: no ת.ז, no gender, no
+class name, no email. A spreadsheet column for any of those goes nowhere.
+
+Two de-duplication traps, both about **one parent phone serving two children**. Neither
+reports an error — both come back as `updated`, so nobody sees a problem:
+- **The `students` existence key is `{phone, schoolId, classId}` with no name.** Two
+  siblings on the same phone **in the same class collapse into one row**, and the second
+  name overwrites the first.
+- **`customers.schoolProject` is a single object, not an array.** A phone that appears in a
+  second class has its whole `schoolProject` **replaced** and `studentIds` reset to just the
+  new student. The earlier class's `students` row survives, linked to no customer. **Upload
+  order decides which class wins.** Multiple students per phone is only representable
+  *within one class*, via `$addToSet` on `schoolProject.studentIds` — which the first trap
+  means a single batch can never actually produce.
+
+**`isSchoolProject` is not a customer field.** It is a catalog flag on products/categories
+(menu-catalog's), and this endpoint never writes it. The customer app gates school-project
+mode on **`userDetails.schoolProject.isActive`**, served by `GET /api/customer/details`.
+
+The admin uploader is `shoofi-delivery-web src/views/admin/schools/SchoolsUpload.tsx`. It
+consumes exactly three Excel headers — `שם פרטי`, `שם משפחה`, `טלפון נייד` — and falls back
+to **positional** columns (index 2 last name, 3 first name, 9 mobile) when none match, so a
+wide file with a mistyped header reads the wrong column rather than failing. A template
+download on that screen is therefore deliberately 3 columns wide, because a narrow file
+cannot reach the positional fallback at all. **The server does no phone normalisation**
+(`sanitize` is `string-strip-html`, HTML only) and login matches on exact `{phone}`, so a
+record pre-created as `972…`/`+972…` is an orphan the student can never log into: the
+uploader's `0XXXXXXXXX` form is load-bearing, not cosmetic. This is **not** the
+`campaignPhones.phoneNormalized` last-9 key — there is no normalised phone key here.
+
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
 - **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin

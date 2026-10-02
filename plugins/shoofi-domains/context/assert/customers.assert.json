@@ -120,6 +120,26 @@
           "file": "routes/customer.js",
           "regex": "authCode: random4DigitsCode, token: null, isDeleted: false",
           "desc": "the OTP-REQUEST handler clears isDeleted before any code is verified, so isDeleted:false does not mean 'never asked to be deleted' - deletedAt is the durable marker"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "create-school-project-batch",
+          "desc": "the school upload endpoint - school and class come from the request body, never from the uploaded file"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "Phone and fullName are required",
+          "desc": "a school-project student stores nothing but {phone, fullName} - no national id, gender or class name is persisted anywhere, so a spreadsheet column for one goes nowhere"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "students\\.findOne\\(\\{\\s*phone: sanitizedPhone,\\s*schoolId: getId\\(schoolId\\)\\.toString\\(\\),\\s*classId: getId\\(classId\\)\\.toString\\(\\)",
+          "desc": "the students existence key is {phone, schoolId, classId} with NO name - two siblings on one parent phone in one class collapse into a single row, reported as updated rather than as an error"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "\\$set: \\{\\s*schoolProject: \\{[\\s\\S]{0,220}studentIds: \\[finalStudentId\\]",
+          "desc": "customers.schoolProject is a single object, so a phone appearing in a second class has it REPLACED and studentIds reset - upload order decides which class wins"
         }
       ]
     },
@@ -136,13 +156,19 @@
     "shoofi-delivery-web": {
       "files": [
         "src/contexts/AdminAuthContext.tsx",
-        "src/utils/http-interceptor/index.ts"
+        "src/utils/http-interceptor/index.ts",
+        "src/views/admin/schools/SchoolsUpload.tsx"
       ],
       "patterns": [
         {
           "file": "src/utils/http-interceptor/index.ts",
           "regex": "Bearer",
           "desc": "admin uses Bearer (RN apps use 'Token')"
+        },
+        {
+          "file": "src/views/admin/schools/SchoolsUpload.tsx",
+          "regex": "getColumnValue\\(\\[\"טלפון נייד\"",
+          "desc": "the admin uploader consumes exactly three Hebrew headers; anything else falls through to its positional fallback (phone at index 9), which is why its downloadable Excel template is only 3 columns wide"
         }
       ]
     }
