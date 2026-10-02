@@ -280,6 +280,24 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
   a lexicographic `$gte` (which is what the disabled filter above used) mis-windows across
   Israeli DST. Only `lastLocationUpdate` is indexed (`utils/init-location-indexes.js`);
   `lastFixAt` is not, so filter in JS after the fetch rather than in the query.
+- **`includeOffline` switches the 10-minute staleness filter OFF — and then the CALLER owns
+  freshness.** `GET /api/delivery/drivers/locations` normally hides couriers whose
+  `lastLocationUpdate` is older than 10 minutes, but that whole `$expr` is skipped when the query
+  carries `includeOffline` (`'true'` or `true` — `routes/delivery/driver.js`). Every admin screen
+  that wants disconnected couriers drawn sends it: the full driver map, and the live-ops board
+  (`shoofi-delivery-web src/views/admin/live-ops/data/liveOpsApi.ts`, `includeOffline: true`). For
+  those callers **a position in the response carries no recency guarantee at all** — so anything
+  derived from it ("he is at the restaurant", "he is not moving", an ETA) must age the fix itself
+  or it states an hour-old pin as a fact about now. That is a real bug this cost us: the live-ops
+  stage label said "במסעדה" for any courier on status `2` whose last fix happened to be within
+  150 m of the store, however old. 10 minutes is the platform's number in four places
+  (`LOCATION_FIX_RECOVERY_MS` and this filter in `routes/delivery/driver.js`,
+  `DEFAULT_STALE_LOCATION_MINUTES` in `services/delivery/delayed-assignment.js`, and
+  `STALE_LOCATION_MINUTES` in delivery-web `src/utils/driver-map-markers.ts`) — reuse it rather
+  than inventing a window. It is deliberately generous: the phone goes quiet exactly when the
+  courier stands still (`distanceInterval: 5` in shoofir `utils/locationBackgroundTask.ts`), which
+  is the state "waiting at the restaurant" describes, so a tight window flaps him out of it while
+  he is in the kitchen.
 - **A delivery company has NO location.** `delivery-company.store` carries no `location` and no
   `coverageRadius` — verified 2026-09-29 across all 173 documents. So "assume the courier is at
   his depot" is not an available fallback, however natural it sounds: `company` IS attached to
