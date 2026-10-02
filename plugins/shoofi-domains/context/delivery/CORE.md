@@ -152,6 +152,37 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
    one. The per-row `assignmentScore` is `null` on the branches with nothing to score against
    (no `orderId`, or a booking with no `customerLocation`), and the clients must treat that null
    as "we could not rank" rather than filling it in themselves.
+   **`POST /api/delivery/admin/reassign` now refuses a predicted-late assignment until an admin
+   acknowledges it**, through the `forceAssign` handshake that already existed for the store
+   rule. Two things about its shape are load-bearing. ⚠️ The 409 carries a **`confirmations`
+   ARRAY**, every reason at once, and there is still exactly **one** `forceAssign` flag — both
+   web clients retry precisely once and have no third state, so a second gate behind the first
+   answers the retry with another 409 and dead-ends the agent in a generic failure. And because
+   one flag clears every reason, the dialog must state every reason, or an admin confirming
+   "wrong store" silently also confirms "he will be late" (`buildConfirmText` in
+   delivery-web's `utils/driver-assignment-score.ts`). `message` still carries the first code so
+   a stale bundle keeps working. ⚠️ **"I don't know" is never "he's late":**
+   `assessPickupFeasibility` returns **null — which never blocks —** when the delivery has no
+   coordinates, the courier has no usable position, `pickupHeadroomMinutes` is null, scoring
+   throws, **or `estimatedArrivalBasis` is `neutral-location`**. That last exclusion is the
+   point: on a neutral basis the headroom came from a synthetic point because his GPS was too
+   old to believe, so gating on it would refuse hardest for exactly the couriers with dead
+   phones — the population the manual path exists to reach. This is not fussiness: a delivery
+   with no driver and `isPendingAssignment: false` has no automatic path back, so a refusal the
+   agent cannot clear strands it permanently. The threshold is `headroom < 0`, deliberately the
+   same condition as the `late_for_pickup` chip in the picker (15 of 270 production allocations
+   with a stored headroom on a real fix, 5.6%, were negative); a dialog stricter than the
+   warning beside it teaches an agent the colours mean nothing. The prediction is persisted to
+   `assignmentMetadata.pickupFeasibility` / `reassignmentMetadata.pickupFeasibility`, closing
+   an asymmetry where a scored allocation recorded everything and a manual one recorded only
+   who clicked. **Three manual paths are deliberately NOT gated** and each for its own reason:
+   `POST /api/delivery/admin/assign` (no `bookDelivery` yet, so no `area` and no `pickupTime`
+   to score; its picker passes an order id where a delivery id is expected so it never had a
+   score; and `AssignDriverModal`'s catch cannot read a 409), `POST
+   /api/twin-order/admin/assign-driver` (two pickups need a per-side answer that does not
+   exist), and the company-admin reassign in `routes/delivery/driver.js` (its only client,
+   shoofir's `DriverReassignModal`, cannot send `forceAssign`, so the gate would be unclearable
+   by the only person who meets it).
    **`centralizedFlowMonitor.trackOrderFlowEvent` RETHROWS — always wrap it.** It logs and then
    `throw error` (`services/monitoring/centralized-flow-monitor.js:63-66`), so an `await`ed call
    with no local try/catch turns a monitoring failure into a 5xx on the dispatch route *after*

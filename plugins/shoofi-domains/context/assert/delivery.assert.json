@@ -116,6 +116,7 @@
         ],
         "services/delivery/manual-assignment-ranking.js": [
           "rankDriversForManualAssignment",
+          "assessPickupFeasibility",
           "RANK_REASONS",
           "byConcurrencyTierThenScore"
         ]
@@ -350,6 +351,16 @@
           "file": "services/delivery/manual-assignment-ranking.js",
           "regex": "byConcurrencyTierThenScore",
           "desc": "the MANUAL picker (GET /api/delivery/admin/drivers) ranks on the same score AND the same comparator as the automatic engine - tier before score, so a courier at the concurrency cap loses to one below it however close he is. It scores findAllMatchingDrivers output deliberately rather than calling findScoredDrivers, which skips filterOutBlockedDrivers, requires currentLocation to exist and reads the company with no accounting projection. Eligibility unchanged, only the order. Writes nothing and records no assignment-decisions row."
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "driver_predicted_late_for_pickup",
+          "desc": "the reassign 409 carries a confirmations ARRAY - every reason at once - and is cleared by the ONE pre-existing forceAssign flag. A second acknowledgement flag dead-ends both web clients, which retry exactly once and have no third state; and because one flag clears every reason the dialog must state every reason, or an admin confirming wrong-store silently also confirms predicted-late. message still carries the first code for a stale bundle."
+        },
+        {
+          "file": "services/delivery/manual-assignment-ranking.js",
+          "regex": "assessPickupFeasibility",
+          "desc": "returns null - and null NEVER blocks an assignment - when the delivery has no coordinates, the courier has no usable position, pickupHeadroomMinutes is null, scoring throws, or estimatedArrivalBasis is neutral-location. The neutral-location exclusion is the important one: that headroom came from a synthetic point because the GPS fix was too old to believe, so gating on it refuses hardest for exactly the couriers with dead phones, which is the population the manual path exists to reach. A delivery with no driver and isPendingAssignment false has no automatic path back, so a refusal the agent cannot clear strands it permanently. Threshold is headroom < 0, the same condition as the late_for_pickup chip in the picker - keep them equal."
         }
       ]
     },
@@ -441,6 +452,11 @@
           "file": "src/views/admin/live-ops/logic/driver-ranking.ts",
           "regex": "score\\?\\.rank",
           "desc": "every driver picker honours the servers rank as a WHOLE ordering and never re-sorts it - the servers comparator puts the concurrency tier ahead of the score, so a locally improved order recommends a courier dispatch would refuse. The straight-line distance sort survives only as the fallback for a list the server could not score, and the screen labels which of the two it is showing."
+        },
+        {
+          "file": "src/utils/driver-assignment-score.ts",
+          "regex": "buildConfirmText",
+          "desc": "the reassign confirmation dialog is built from the servers confirmations list, never hardcoded, because one forceAssign retry clears every reason at once. Unknown reason codes are KEPT here, the opposite of the reason chips where an untranslated code is dropped - a confirmation nobody can read is still one they must be given, and dropping it leaves an unexplained are-you-sure."
         }
       ]
     }
