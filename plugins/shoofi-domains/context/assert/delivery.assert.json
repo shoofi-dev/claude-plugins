@@ -121,6 +121,26 @@
         },
         {
           "file": "routes/delivery/driver.js",
+          "regex": "deliveryTime:\\s*\\{\\s*\\$exists:\\s*true\\s*\\}",
+          "desc": "driver-stats averageDeliveryTime filters on bookDelivery.deliveryTime, a field NOTHING writes - 0 of 95,562 documents carry it (2026-10-02), so the number is permanently 0. Compute a drive duration from completedAt - startedAt instead. If this filter disappears, someone fixed it and CORE.md's DEAD FIELDS bullet is stale"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "avgDeliveryTime:\\s*\\{\\s*\\$avg:\\s*\"\\$deliveryDeltaMinutes\"\\s*\\}",
+          "desc": "deliveries-by-company averages bookDelivery.deliveryDeltaMinutes, also written nowhere - 0 of 95,562 documents (2026-10-02), so avgDeliveryTime is permanently null rather than a measured zero"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "status:\\s*DELIVERY_STATUS\\.COLLECTED_FROM_RESTAURANT,\\s*\\n\\s*startedAt:",
+          "desc": "the ACTUAL pickup instant is bookDelivery.startedAt, stamped with the status in one $set by the driver's /start. A real BSON Date, unlike pickupTime (bare \"HH:mm\") and expectedDeliveryAt (ISO + 03:00 offset) on the same document - never range-query the two shapes together"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "startedAt:\\s*1,\\s*\\n\\s*completedAt:\\s*1",
+          "desc": "the actual pickup/delivery instants must stay in the /api/analytics/deliveries projection whitelist - drop either key and the delivery list and the live-ops board silently render a status word with no hour beside it, with no error anywhere"
+        },
+        {
+          "file": "routes/delivery/driver.js",
           "regex": "lastLocationUpdate:\\s*timestamp,\\s*\\n\\s*lastFixAt:\\s*fixAt",
           "desc": "the two location timestamps are written together and mean different things: lastLocationUpdate = server RECEIVE time (offset string, deliberately unchanged for existing consumers), lastFixAt = DEVICE fix time (BSON Date). Any staleness rule must read lastFixAt first and fall back to lastLocationUpdate, because lastFixAt only shipped 2026-09-12 and 141 of 224 located couriers still lack it"
         },
@@ -400,13 +420,19 @@
       "files": [
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/views/admin/live-ops/data/liveOpsApi.ts"
       ],
       "patterns": [
         {
           "file": "src/views/admin/analytics/DeliveryListAnalytics.tsx",
           "regex": "CLOSED_DELIVERY_STATUSES",
           "desc": "admin cancel is offered only on an open delivery-only booking"
+        },
+        {
+          "file": "src/views/admin/live-ops/data/liveOpsApi.ts",
+          "regex": "status: \\[\"1\", \"2\", \"3\", \"5\"\\]",
+          "desc": "the live-ops board asks for ACTIVE delivery statuses only, so a delivered row leaves it on the next poll - anything about a DELIVERED delivery belongs on the delivery list, not here. Adding \"4\" is a product decision (~270 finished rows a day with no group to sit in), not a formatting change"
         },
         {
           "file": "src/views/admin/delivery-areas/CityAreasList.tsx",

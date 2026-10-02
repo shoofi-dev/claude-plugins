@@ -280,6 +280,34 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
   a lexicographic `$gte` (which is what the disabled filter above used) mis-windows across
   Israeli DST. Only `lastLocationUpdate` is indexed (`utils/init-location-indexes.js`);
   `lastFixAt` is not, so filter in JS after the fetch rather than in the query.
+- **DEAD FIELDS — "how long did the delivery take" is never stored, and two screens read a
+  number that is permanently empty.** Verified 2026-10-02 over all **95,562** `book-delivery`
+  documents: **0** carry `deliveryTime` and **0** carry `deliveryDeltaMinutes`. Nothing in the
+  repo writes either. They are nonetheless READ — `deliveryTime` at
+  `routes/delivery/driver.js:738,746` (the driver-stats `averageDeliveryTime`, so it is
+  permanently 0) and projected at `routes/delivery/orders.js:917`; `deliveryDeltaMinutes` is
+  averaged at `routes/analytics.js:117` (`/api/analytics/deliveries-by-company`, so
+  `avgDeliveryTime` there is permanently null). Neither errors, so both read as a real measured
+  zero. **Compute the duration from `completedAt − startedAt`** — both are BSON Dates, present
+  on 94,385 / 94,410 of those documents, and 94,320 rows yield a mean drive of **9.5 min**
+  (max 237). Same rule as `completedAt` being the definition of delivered rather than
+  `status: "4"`: the instant on the document is the authority, a stored duration is not.
+- **The actual pickup / delivery instants are `startedAt` / `completedAt` / `approvedAt`, and
+  they are a DIFFERENT TYPE from the promise on the same row.** `pickupTime` is a bare `"HH:mm"`
+  and `created` / `expectedDeliveryAt` are ISO strings carrying `+03:00`; these three are real
+  BSON Dates, written by `routes/delivery/orders.js` (`/approve` :142, `/start` :443,
+  `/complete` :545) and by the admin status override in `routes/delivery/admin.js`. `Date.parse`
+  reads both shapes correctly, but **never put the two in one Mongo range query** — it matches
+  nothing, silently. Reaching a screen is a separate problem: `POST /api/analytics/deliveries`
+  projects an explicit whitelist (`routes/analytics.js`), which fed both the delivery list and
+  the live-ops board a row with no actual times at all until 2026-10-02.
+- **The live-ops board can never show a delivered row.** `shoofi-delivery-web`
+  `src/views/admin/live-ops/data/liveOpsApi.ts` asks for delivery statuses `["1","2","3","5"]`,
+  so a row leaves the board on the next poll once the courier completes it. Anything about a
+  DELIVERED delivery belongs on the delivery list (`/admin/analytics/deliveries-list`), which
+  takes its statuses from the operator. Adding `"4"` to that list is a product decision — it is
+  ~270 finished rows a day arriving on a board whose four groups (late / at-risk / on-the-way /
+  pending) have nowhere to put them — not a formatting change.
 - **A delivery company has NO location.** `delivery-company.store` carries no `location` and no
   `coverageRadius` — verified 2026-09-29 across all 173 documents. So "assume the courier is at
   his depot" is not an available fallback, however natural it sounds: `company` IS attached to
