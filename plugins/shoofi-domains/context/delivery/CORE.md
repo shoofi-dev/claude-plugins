@@ -246,6 +246,20 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+14. **The delayed path REWRITES part of the booking, so a field absent from the data you hand
+    `bookDelivery()` can still exist on the stored row.** `createPendingDelivery`
+    (`services/delivery/delayed-assignment.js`) does not persist `deliveryData` verbatim: it
+    spreads it and then sets `status: "1"`, `isPendingAssignment`, `assignDriverAt`, `created`,
+    `area`, `bookId`, `appName`, `expectedDeliveryAt`, `expectedDeliveryBasis` — and
+    **`appliedCoupon: deliveryData.appliedCoupon || null`**, which MINTS the key on every
+    pending booking in the platform, coupon or no coupon. The immediate path in
+    `services/delivery/book-delivery.js` does the same. So "the caller left field X out" and
+    "field X is absent from the document" are two different claims, and only the second one is
+    what a `{$exists: true}` filter answers. It matters for any booking that must stay invisible
+    to a money aggregate: an explicitly-null key is still a key. Writing against the field
+    rather than its presence is the robust form — the one reader of this one,
+    `routes/order.js`'s coupon-order list, filters `{$ne: null, $exists: true}` and so is
+    unaffected by the minting.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
