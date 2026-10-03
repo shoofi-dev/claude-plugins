@@ -201,13 +201,21 @@ boundary and say so in the PR.
    - Nothing writes the menu cache; no cache key to clear. Catalog writes do not need to touch
      the index — the next build and the live re-check cover them.
    - **Three platform flags gate the client:** `isChatSuggestEnabled` (home entry + chat),
-     `isChatVoiceEnabled` (mic, UI only) and `isChatSuggestForAll` (staged rollout) on the
+     `isChatVoiceEnabled` (mic) and `isChatSuggestForAll` (staged rollout) on the
      central platform config document (app-name `shoofi`), exposed only because they are in
      `SHOOFI_CONFIG_PUBLIC_FIELDS` (`routes/store.js`). All default off. The app shows the home
      entry only when `isChatSuggestEnabled && (isChatSuggestForAll || customer.isShoofiEmployee)`
      (`screens/explore.tsx`, the same staged-rollout shape as `isTwinEnabledForAll` at checkout;
      `isShoofiEmployee` comes from `GET /api/customer/details`). The server endpoint itself does not
      read any of them — the gate is client-side.
+   - **Voice is on-device speech-to-text, then the typed path.** The mic shows only when
+     `isChatVoiceEnabled` AND the binary has the `ExpoSpeechRecognition` native module
+     (`isVoiceAvailable()` in `hooks/useVoiceInput.ts`, `expo-speech-recognition`); an older
+     binary that gets the JS by OTA hides the mic instead of crashing, so the package is only
+     ever `require`d lazily. Apple Speech / Android SpeechRecognizer in `ar-SA` / `he-IL`, with
+     the dish and store names on screen as recognizer hints (`contextualStrings`). The final
+     transcript is sent as ordinary `text` — the server cannot tell voice from typing, and no
+     audio reaches our servers. Flag on + old binary = no mic; it needs a store build.
 12. **DISH LABELS: A MACHINE PROPOSES, ONLY TRUSTED LABELS REACH CUSTOMERS.** Three central
    collections, all derived and all owned by `services/ordering-intelligence/`:
    - **`shoofi.dishTaxonomy`** — the dish-type list as data (`taxonomy.js`, `_id` = key,

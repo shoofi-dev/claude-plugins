@@ -901,7 +901,8 @@
         "hooks/useOpenStoreAtProduct.ts",
         "screens/menu/components/GeneralCategoriesList.tsx",
         "__tests__/components/general-categories-open-product.test.tsx",
-        "helpers/for-you-copy.ts"
+        "helpers/for-you-copy.ts",
+        "hooks/useVoiceInput.ts"
       ],
       "symbols": {},
       "patterns": [
@@ -934,6 +935,11 @@
           "file": "helpers/for-you-copy.ts",
           "regex": "for_you_reply_store_closed",
           "desc": "doc CORE invariant 14: the app words a store_closed reply"
+        },
+        {
+          "file": "hooks/useVoiceInput.ts",
+          "regex": "requireOptionalNativeModule\\(\"ExpoSpeechRecognition\"\\) \\? require\\(\"expo-speech-recognition\"\\)",
+          "desc": "doc CORE invariant 11: the speech package is required ONLY after the native module is confirmed — a top-level import crashes every older binary that gets this JS by OTA"
         }
       ]
     },
