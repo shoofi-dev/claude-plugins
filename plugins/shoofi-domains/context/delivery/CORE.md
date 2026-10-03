@@ -246,6 +246,28 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+14. **A stored notification's sentence lives in `body`. There is no `message` field —
+    and a driver-facing card that renders one shows a blank line.**
+    `notification-service.createNotificationRecord` writes
+    `{recipientId, appName, title, body, type, isRead, createdAt, data, deliveryStatus}`
+    (`services/notification/notification-service.js`) and `getUserNotifications` returns
+    the document untouched — no `body → message` mapping anywhere on the read path. Push
+    and websocket both carry `body` too, so a wrong field name here fails *only* in the
+    in-app list, which is why it survived: the push the driver's phone shows is correct.
+    `shoofi-shoofir/screens/delivery-driver/notifications.tsx` read `notification.message`
+    and rendered nothing for every row in the list until Oct 2026; the fallback helper is
+    `shoofi-shoofir/utils/notification-card.ts`.
+    The compounding trap is **what is left on the card when the sentence is blank**: the
+    driver-facing rows are `data.storeName`, `data.pickupTime`, `data.bookId`, and
+    `data.pickupTime` is the store's ready clock (invariant 10) — never an event time.
+    On an unassignment card ("تم إلغاء تعيين الطلب", `type: "order_cancelled_admin"`,
+    sent from `routes/delivery/admin.js` reassign and `routes/twin-order.js`
+    `notifyOldDriver`) that made the pickup clock the only clock on screen, and it got
+    read as "the minute the order was taken from me". Worked example: `bookId 9349-3057`,
+    unassigned at 20:32:49 with `pickupTime: "20:42"` — a support escalation asking how an
+    order could be removed ten minutes in the future. **Any card that carries a `data.*`
+    clock must also carry its own event clock from `createdAt`;** a relative label alone
+    ("الآن" for anything under an hour) is not one.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**

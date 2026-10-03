@@ -33,7 +33,8 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "services/notification/notification-service.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -333,6 +334,11 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "services/notification/notification-service.js",
+          "regex": "title,\\s*\\n\\s*body,",
+          "desc": "createNotificationRecord stores the sentence as `body` — there is no `message` field on any read path"
         }
       ]
     },
@@ -344,7 +350,9 @@
         "components/delivery-driver/DriverReassignModal.tsx",
         "components/delivery-driver/TwinOrderCard.tsx",
         "screens/delivery-driver/index.tsx",
-        "components/delivery-driver/OrderCard.tsx"
+        "components/delivery-driver/OrderCard.tsx",
+        "screens/delivery-driver/notifications.tsx",
+        "utils/notification-card.ts"
       ],
       "patterns": [
         {
@@ -366,6 +374,21 @@
           "file": "components/delivery-driver/OrderCard.tsx",
           "regex": "isDeliveryOnly\\s*\\?",
           "desc": "the driver card swaps the order table for the pay/collect money block on a manual booking"
+        },
+        {
+          "file": "utils/notification-card.ts",
+          "regex": "getNotificationBody",
+          "desc": "the stored sentence is `body`; the card must read it through this helper, never `message`"
+        },
+        {
+          "file": "screens/delivery-driver/notifications.tsx",
+          "regex": "getNotificationBody\\(notification\\)",
+          "desc": "the notification list renders the server-written `body`, not a `message` field that does not exist"
+        },
+        {
+          "file": "screens/delivery-driver/notifications.tsx",
+          "regex": "formatNotificationTime",
+          "desc": "the card carries its own event clock, so `data.pickupTime` is never the only clock on screen"
         }
       ]
     },
