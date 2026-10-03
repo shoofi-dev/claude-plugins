@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@dd8be298 / 2026-09-28
+last-verified: shoofi-server@6a87cf44 / 2026-10-03
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -22,10 +22,13 @@ the combo-deals trio `utils/combo-validation.js`, `services/menu/combo-snapshots
 `utils/crons/suggest-index-cron.js`, `bin/build-suggest-index.js`, and the dish labelling behind
 it — `services/ordering-intelligence/{taxonomy,product-labeler,craving}.js`,
 `utils/crons/product-labels-cron.js`, `routes/admin/dish-taxonomy.js`, `bin/label-products.js`
-(admin web: `src/views/admin/dish-types/DishTypes.tsx`, `src/apis/admin/dish-taxonomy.ts`).
+(admin web: `src/views/admin/dish-types/DishTypes.tsx`, `src/apis/admin/dish-taxonomy.ts`), and the
+monthly menu spellcheck — `utils/menu-spellcheck-text.js`, `services/catalog/menu-spellcheck.js`,
+`utils/crons/menu-spellcheck-cron.js`, `routes/admin/menu-spellcheck.js` (admin web:
+`src/views/admin/stores/MenuSpellcheck.tsx`, `src/apis/admin/menu-spellcheck.ts`).
 Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/sold-by-weight.md`,
 `docs/menu-import-issues.md` (the worklist — now also documents the `lint` phase),
-`docs/combo-deals.md`, `docs/for-you.md`.
+`docs/combo-deals.md`, `docs/for-you.md`, `docs/menu-spellcheck.md`.
 Mostly **server-first**: catalog data is server-owned and clients render it — but if a task
 needs a client change (partner product screens, customer menu display), do it full-stack,
 one PR per repo.
@@ -336,6 +339,22 @@ boundary and say so in the PR.
    days; the sink is registered at boot (`app.js`) and by `bin/label-products.js`. Admin
    "שימוש ב-Claude" (`GET /api/admin/ai-usage`, admin roles) reads it. When a price changes, change
    `PRICES` in `pricing.js`.
+17. **SPELLCHECK PROPOSES; A NAME CHANGES ONLY ON A PERSON'S ACCEPT, AND ONLY IF UNCHANGED**
+   (`services/catalog/menu-spellcheck.js`, `docs/menu-spellcheck.md`). A monthly cron
+   (`15 3 1 * *`, lock `cron:menu-spellcheck`, shared with the admin "run now") asks Claude
+   **Haiku** (`MODELS.fast`, never `effort` — Haiku rejects it) about product / extra / option
+   `nameAR`+`nameHE`. Verdicts are cached per `(lang|text, PROMPT_VERSION)` in
+   `shoofi.menuSpellChecks`, so each text is asked once across all stores; a deterministic guard
+   (`isPlausibleFix`: no added/removed word, ≤ 2 letters per word, not niqqud-only) and a second
+   Haiku "verify" call filter the proposals; an unanswered text gets no verdict, never "correct".
+   Rows live in the **central** `shoofi.menuSpellIssues` (one per slot) — a deliberate exception to
+   the per-store worklist of invariant 1, because the screen spans every store and accept needs
+   auth + audit. `acceptFixes` is the only catalog write: a compare-and-set on that ONE field
+   against the stored `rawText` (extras/options by `arrayFilters` on id + old name, never index;
+   duplicate or empty ids refused), a changed name → row `stale`, both cache keys cleared
+   (invariant 2), and a renamed out-of-stock option's NEW `nameAR` **added** to
+   `store.outOfStockExtras` (old name kept). Never route it through `POST /api/admin/product/update`
+   (whole-document `$set`, last writer wins). A dismissed or accepted text is not re-raised.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
@@ -372,6 +391,11 @@ against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store D
   `REQUIRED_GROUP_ALL_OUT_OF_STOCK` are critical: the add-to-cart button never enables.
 - **FACT:** out-of-stock extras are matched by option `nameAR`, exactly, no trim
   (`menuStore.outOfStockExtras.includes(opt.nameAR)`, RadioGroup/CheckboxGroup/PizzaToppingGroup).
+  So renaming an option's `nameAR` silently puts it back on sale unless the list is updated too
+  (the spellcheck accept does — invariant 17).
+- **FACT:** `POST /api/store-category/update/:id` overwrites `order`, `discountPercent`,
+  `isSchoolProject` and `isCampaign` from the body and clears **no** menu cache — a names-only
+  call zeroes the discount. Write category names with a targeted `$set`.
 - **FACT:** `maxCount: 0` on a `multi` means "no limit" to the app (`max && …`), but both admin
   editors default it to 1 and refuse `<= 0`, so the lint reports `< 1` as `MAX_COUNT_INVALID`
   (warning, not repaired).

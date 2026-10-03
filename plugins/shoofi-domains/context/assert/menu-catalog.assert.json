@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@dd8be298 / 2026-09-28",
+  "lastVerified": "shoofi-server@6a87cf44 / 2026-10-03",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -52,7 +52,12 @@
         "services/ordering-intelligence/ai-chat.js",
         "services/ai/usage-log.js",
         "services/ai/pricing.js",
-        "routes/admin/ai-usage.js"
+        "routes/admin/ai-usage.js",
+        "utils/menu-spellcheck-text.js",
+        "services/catalog/menu-spellcheck.js",
+        "utils/crons/menu-spellcheck-cron.js",
+        "routes/admin/menu-spellcheck.js",
+        "docs/menu-spellcheck.md"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -187,6 +192,24 @@
         "services/ordering-intelligence/open-stores.js": [
           "getAreaStores",
           "splitByOpen"
+        ],
+        "utils/menu-spellcheck-text.js": [
+          "collectNames",
+          "isPlausibleFix",
+          "parseReply",
+          "parseVerify",
+          "PROMPT_VERSION"
+        ],
+        "services/catalog/menu-spellcheck.js": [
+          "runSpellcheck",
+          "acceptFixes",
+          "dismissIssues",
+          "planWrite",
+          "verifyFlagged"
+        ],
+        "utils/crons/menu-spellcheck-cron.js": [
+          "startMenuSpellcheckJob",
+          "runMenuSpellcheck"
         ]
       },
       "patterns": [
@@ -824,6 +847,41 @@
           "file": "services/ordering-intelligence/ai-chat.js",
           "regex": "which is CLOSED now",
           "desc": "doc CORE invariant 14: the Claude chat is told a named store is closed"
+        },
+        {
+          "file": "utils/crons/menu-spellcheck-cron.js",
+          "regex": "SCHEDULE = \"15 3 1 \\* \\*\"",
+          "desc": "doc CORE invariant 17 / reference §7e: monthly on the 1st at 03:15"
+        },
+        {
+          "file": "utils/crons/menu-spellcheck-cron.js",
+          "regex": "cron:menu-spellcheck",
+          "desc": "doc reference §7e: the lock shared with the admin run-now"
+        },
+        {
+          "file": "services/catalog/menu-spellcheck.js",
+          "regex": "\\$addToSet: \\{ outOfStockExtras: newText \\}",
+          "desc": "doc CORE invariant 17: a renamed out-of-stock option stays out of stock"
+        },
+        {
+          "file": "services/catalog/menu-spellcheck.js",
+          "regex": "clearStore\\(`\\$\\{appName\\}_schoolProject`\\)",
+          "desc": "doc CORE invariant 17 / 2: accept clears both cache keys"
+        },
+        {
+          "file": "services/catalog/menu-spellcheck.js",
+          "regex": "\"o.id\": sameOption\\[0\\]\\.id, \\[`o.\\$\\{field\\}`\\]: rawText",
+          "desc": "doc CORE invariant 17: options are written by id + old name, never by index"
+        },
+        {
+          "file": "routes/admin/menu-spellcheck.js",
+          "regex": "checkAdminRole\\(\\[\"master\", \"admin\", \"manager\"\\]\\)",
+          "desc": "doc reference §7: spellcheck routes are admin-only"
+        },
+        {
+          "file": "services/audit/admin-audit-routes.js",
+          "regex": "/api/admin/menu-spellcheck/accept",
+          "desc": "doc reference §7: accept is in the audit route map"
         }
       ]
     },
@@ -873,7 +931,9 @@
         "src/views/admin/dish-types/DishTypes.tsx",
         "src/apis/admin/dish-taxonomy.ts",
         "src/views/admin/ai-usage/AiUsage.tsx",
-        "src/apis/admin/ai-usage.ts"
+        "src/apis/admin/ai-usage.ts",
+        "src/views/admin/stores/MenuSpellcheck.tsx",
+        "src/apis/admin/menu-spellcheck.ts"
       ],
       "symbols": {},
       "patterns": [
@@ -886,6 +946,11 @@
           "file": "src/apis/admin/dish-taxonomy.ts",
           "regex": "/admin/product-labels/review",
           "desc": "doc reference §8: the admin review list for labels in status review"
+        },
+        {
+          "file": "src/apis/admin/menu-spellcheck.ts",
+          "regex": "/admin/menu-spellcheck/accept",
+          "desc": "doc reference §7: the admin screen accepts fixes through the spellcheck endpoint"
         }
       ]
     }
