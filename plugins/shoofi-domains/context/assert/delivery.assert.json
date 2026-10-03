@@ -72,7 +72,9 @@
           "PICKUP_HEADROOM_TARGET_MIN",
           "MAX_PICKUP_HEADROOM_PENALTY",
           "currentPickupInstantOf",
-          "scoreBreakdown"
+          "scoreBreakdown",
+          "createPendingDelivery",
+          "appliedCoupon"
         ],
         "services/delivery/driver-load.js": [
           "byConcurrencyTierThenScore"
@@ -80,7 +82,8 @@
         "services/delivery/book-delivery.js": [
           "originalBookId",
           "findBestDeliveryCompany",
-          "coverageRadius"
+          "coverageRadius",
+          "appliedCoupon"
         ],
         "services/delivery/delivery-promise.js": [
           "computeDeliveryPromise",
