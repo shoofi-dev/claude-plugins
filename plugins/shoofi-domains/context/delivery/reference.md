@@ -282,7 +282,18 @@ and re-assigns through `delivery/admin/reassign` with the same 409 `needsConfirm
 lives here: `views/admin/delivery-areas/*` — full CRUD for cities, parent-cities, city-areas,
 delivery-areas, company-areas, geometries (draw/fill-gaps/suggest). **Config**:
 `views/admin/settings/DeliverySettings.tsx` (`admin/delivery-config`, `admin/twin-order-config`).
-Shift admin: `apis/admin/driver-shift-manager.ts`. `DELIVERY_STATUS` copy = `1..5`.
+Shift admin: `apis/admin/driver-shift-manager.ts`. `DELIVERY_STATUS` copy = **all eight**
+values, cancellations included (`src/consts/shared.ts:57-66`) — not `1..5`; the `status: -3`
+cancel two lines below is sent from this very copy. Its Hebrew labels are
+`DELIVERY_STATUS_TEXT_HEBREW` (`:77-86`), also all eight, and **that map is the only one a
+screen may render from**. A screen that keeps a local partial copy of it draws an EMPTY cell
+for the statuses it omits: `DeliveryListAnalytics.tsx` did exactly that with the three
+cancellations commented out and no `||` fallback, blanking 1,194 of 96,061 bookings — `-3` is
+the second most common status in `delivery-company.book-delivery` after `"4"`. Every other
+delivery-status renderer in the repo falls back to the raw value
+(`shared/opsDashboardUtils.ts`, `live-ops/logic/stepper.ts`), and so must any new one, because
+`"0"` is reachable and is in no enum: `POST /api/delivery/update` → `updateDelivery`
+(`services/delivery/book-delivery.js`) `$set`s the request body unvalidated and branches on it.
 **Delivery-only:** `DeliveryListAnalytics.tsx` marks these rows with a `ידנית` badge and shows a
 `ביטול משלוח` button — `isDeliveryOnly && !CLOSED_DELIVERY_STATUSES.includes(status)` — which
 POSTs `delivery/order/status/update` with `status: -3`. That route clears `isPendingAssignment`

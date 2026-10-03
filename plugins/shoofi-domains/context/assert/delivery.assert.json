@@ -400,13 +400,24 @@
       "files": [
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/consts/shared.ts"
       ],
       "patterns": [
         {
           "file": "src/views/admin/analytics/DeliveryListAnalytics.tsx",
           "regex": "CLOSED_DELIVERY_STATUSES",
           "desc": "admin cancel is offered only on an open delivery-only booking"
+        },
+        {
+          "file": "src/consts/shared.ts",
+          "regex": "CANCELLED_BY_ADMIN",
+          "desc": "admin client copy of the delivery status enum carries all eight values, cancellations included — reference.md C2 said 1..5"
+        },
+        {
+          "file": "src/consts/shared.ts",
+          "regex": "DELIVERY_STATUS_TEXT_HEBREW",
+          "desc": "the one Hebrew label map screens may render from; a local partial copy draws a blank cell for the statuses it omits"
         },
         {
           "file": "src/views/admin/delivery-areas/CityAreasList.tsx",
