@@ -48,7 +48,15 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    completion/revenue from it — join the store `orders` collection. Reuse
    `getSuccessfulOrdersByCustomerIds` (`utils/customer-orders.js`). See `docs/customer-orders-snapshot.md`.
 6. **Secondary never breaks primary** — coins, world-cup, attribution, notifications are
-   try/caught and swallowed. Never let one throw into the order path.
+   try/caught and swallowed. Never let one throw into the order path. **Notifications must
+   also never HOLD it:** the store-owner new-order alert is fired with
+   `fireStoreOwnerNotifications` (`routes/order.js`) and **not awaited** on every create
+   path, `updateCCPayment` and `finalizeApplePayOrder`, always after the order is persisted
+   at its final status. try/catch is not enough: a push that hangs never throws, and on
+   brixta 2026-10-03 an awaited one held the create response 128s/257s → app timeout →
+   customer resubmitted → duplicate orders. Push sends themselves have a hard timeout
+   (`PUSH_SEND_TIMEOUT_MS`, 10s, at most 1 retry, none after a timeout — reference §7).
+   Only the admin fraud-approval path in `/api/order/update` still awaits it.
 7. **Multi-tenant:** orders live in the **store** DB (`getOrInitializeDb(app-name)`);
    **customers are central** (`shoofi`). Don't cross them.
 8. **Twin peers** are mutated by `services/twin-order/*` directly, never via

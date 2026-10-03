@@ -82,7 +82,8 @@ lock (Redis `SET NX` + in-mem fallback + 30s dup check) → fraud checks → gen
 (no debit) → build `orderDoc` → **insert into store `orders`** (authoritative) →
 **stock decrement if status≠"0"** → first-order attribution → Apple Pay session
 self-heal → fraud persistence → **push `customers.orders[]` snapshot (central)** →
-notify store owner (**a repeating alert, not one push** — see §7) → flow event →
+notify store owner (**a repeating alert, not one push**, **fired in the background and
+never awaited** — `fireStoreOwnerNotifications`, see §7) → flow event →
 (CC/HYP branch: charge → set `6`/`1`/`13`, stock,
 coupon usage, coins, invoice) → success flow event → release lock in `finally`.
 Delivery is **not** booked here — it's booked at store-accept.
@@ -201,6 +202,29 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   written before the fix (the cleanup cron deletes alerts after 24h).
   `clearPersistentAlert` (on `isViewd`) is what stops it, and it is the `persistentAlerts`
   collection — not `notifications` — that holds the pending state.
+  ⚠️ **The alert never holds a customer response.** Every create path (cash / inline
+  Apple Pay, ZCredit token, HYP_TOKEN, HYP wallets), `/api/order/updateCCPayment` and
+  `finalizeApplePayOrder` call `fireStoreOwnerNotifications`, which starts
+  `sendStoreOwnerNotifications` and returns; its `.catch` (and the helper's own catches)
+  log `[STORE_ALERT_FAILED]` with `orderNumber`/`appName`/`stage`. Each call sits after the
+  order's final-status write, and nothing after it reads the result — keep both true. The
+  one awaited caller left is the fraud-approval branch of `/api/order/update` (13 → 6,
+  an admin request, already try/caught). Why: brixta 2026-10-03, an awaited alert on a
+  stalled Expo socket held the create response 128s and 257s, and the customer
+  resubmitted (5095-6430/7257-3591, 6096-0808/0490-5740).
+  **Push transport** (`services/notification/notification-service.js`
+  `sendPushNotification`): each Expo/Firebase attempt is raced against
+  `PUSH_SEND_TIMEOUT_MS` (default 10000); `retryAttempts = 2` = **at most one retry**,
+  and **no retry after a timeout** (the abandoned request is not cancelled — neither SDK
+  takes a signal). A timeout is a **failed** push: `results.push = 'failed'` and an
+  `orderFlowEvents` row `eventType: 'notification_push_failed'`, `status: 'failed'`,
+  `metadata.reason: 'timeout'`, `metadata.durationMs` (other failures carry
+  `reason: 'error'` / `'rejected'`; `push_sent` rows carry `durationMs` too). Log tags
+  (winston → OpenSearch `shoofi-server-logs`, fields folded into `message`):
+  `[PUSH_TIMEOUT]` error — recipientId, recipientType, notificationType, appName,
+  orderNumber, provider, elapsedMs, timeoutMs; `[PUSH_FAILED]` warn — thrown or
+  ticket-rejected attempt; `[PUSH_SLOW]` warn — any send over `PUSH_SLOW_WARN_MS`
+  (default 3000), even a successful one.
 - **FRAUD**: `order-fraud-*`, `fraud-config-loader`, `fraud-check-storage` →
   `shoofi.fraudChecks`/`deviceCustomers`/`ipCustomers`.
 - **GROWTH/COINS (secondary)**: `coinsService`, `worldCupService`, attribution — must never fail the order.
