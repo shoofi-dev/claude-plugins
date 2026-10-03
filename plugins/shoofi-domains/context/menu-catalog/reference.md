@@ -99,7 +99,7 @@ strings), `discountPercent` (**drives menu discounting**), `isSchoolProject`,
 read with `subCategories` (the matching `categories`) — only when
 `store.hasGeneralCategories` is true.
 
-### `extras` — store-level reusable options catalog (distinct from a product's embedded `extras`).
+### `extras` — declared in `DatabaseInitializationService.js`, **unused**: nothing in the server reads or writes it. Every option lives embedded in its product's `extras` array (§4); delivery-web's `ExtraGroup` is editor-side only.
 ### `store` (singleton `{id:1}`) — per-store config
 Catalog-relevant flags: `isStockManagment` (the stock gate — **source of truth is
 this per-store doc, NOT central `shoofi.stores`**), `hasGeneralCategories`,
@@ -466,6 +466,7 @@ the cache read.
 - `DELETE /api/admin/menu-import-issues/:id`
 - `GET  /api/admin/catalog-lint/summary` — open lint rows per store by severity (`{ totals, stores[] }`), admin token
 - `POST /api/admin/catalog-lint/run` — `{ appName }` for one store, else every store; admin token; returns the run stats
+- Menu spellcheck (`routes/admin/menu-spellcheck.js`; `auth.required` + `checkAdminRole(["master","admin","manager"])`, POSTs in the audit route map): `GET /api/admin/menu-spellcheck/issues?status=open|accepted|dismissed|resolved|stale&appName=&lang=ar|he` → `{ issues (≤2000), truncated, counts, lastRun }`; `POST /api/admin/menu-spellcheck/run [{ appName }]` → `202 { started, runId }` / `409 locked` / `503 no-api-key`; `POST /api/admin/menu-spellcheck/accept { ids, fixes? }` → `{ accepted, stale, failed, outOfStockKept, rows[] }`; `POST /api/admin/menu-spellcheck/dismiss { ids }` → `{ dismissed }` (§7e)
 - `GET  /api/getTranslations`, `POST /api/translations/{update,add,delete}`
 - `POST /api/global-search` — central store name search
 - `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng} }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price }, dishType, reason, confidence }], personalized }` (`routes/for-you.js`, `auth.optional`). Only a customer `app-type` (`shoofi-shopping` or none) personalises. Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
@@ -522,6 +523,31 @@ under `cron:suggest-index`) picks the labels up. `--index` opts in to a `buildSu
 from the script, OUTSIDE that lock (off-server the Redis lock falls back to in-memory, so it
 could not protect a script anyway): use it only when no server can be building at the same time,
 since two concurrent builds delete each other's fresh rows. Tests: `test/integration/product-labels.js`.
+
+## 7e. Monthly menu spellcheck — the cron, the cache and the accept write
+`utils/crons/menu-spellcheck-cron.js` — `SCHEDULE = "15 3 1 * *"` (1st of the month, 03:15
+Asia/Jerusalem), registered in `app.js` with the other crons; Redis lock `cron:menu-spellcheck`
+(3-h TTL). `startMenuSpellcheckJob(appDb, opts)` → `{ started: true, runId, done }` or
+`{ started: false, reason: "no-api-key" | "locked" }` (the admin route answers 202 with `runId`);
+`runMenuSpellcheck` (the cron) waits on `done`.
+`runSpellcheck` walks every `shoofi.stores` entry (mock templates included — their names are copied
+by `create-from-mock`), `collectNames` per product (product, `extras[i]` with a non-empty `id`, its
+`options[j]`, `combo.sections[k]` with a non-empty `id` — kind `comboSection`, section id in
+`extraId`) and `collectCategoryNames` per store category (kind `category`, `productId: ""`,
+slot keyed on the category id; rows carry `categoryName` and the store's `hasGeneralCategories`
+for the admin edit link). Both languages; skipped: empty, < 2 letters of the field's script,
+descriptions, central general categories, `areaOptions`. Unique `lang|text` keys are looked up in
+`shoofi.menuSpellChecks` (`PROMPT_VERSION` — bump it when a prompt changes meaning); the rest go
+to Haiku in batches of 80, 3 in parallel, `temperature: 0`, label `menu-spellcheck` (aiUsage).
+Reply parsing (`parseReply`) takes the first parseable JSON array and drops no-op and implausible
+fixes; `checkBatch` splits a cut-off/unreadable batch; `verifyFlagged` re-asks about the flagged
+pairs only. Rows: `shoofi.menuSpellIssues`, unique `slotKey = appName|productId|kind|extraId|optionIndex|field`,
+`status: open | accepted | dismissed | resolved | stale`, carrying `rawText` (the stored value, for
+the compare-and-set), `suggestion`, `reason` (Hebrew), display names and `categoryId` for the admin
+deep link `/admin/product/:appName/:categoryId/:productId`. Runs: `shoofi.menuSpellRuns`
+(progress written after every store). Dismiss and accept both cache the decided text as correct.
+Measured 2026-10-03 on 6 prod stores (~1.6k unique names): 19 calls, ≈ $0.03. Tests:
+`test/integration/menu-spellcheck.js`.
 
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":
