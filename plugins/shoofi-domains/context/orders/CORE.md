@@ -170,8 +170,8 @@ Checkout-screen events that explain the "reached checkout, didn't send" layer:
 - **`checkout_left`** — checkout lost focus (`reason`: `blur`|`unmount`) without a completed
   order: `seconds_on_screen`, `attempted`, and the payment method / shipping / timing / price
   the customer had at that moment.
-- **The checkout draft** (`shoofi-app/stores/checkout-draft`) keeps the payment METHOD and
-  the future slot across checkout remounts: in memory only, per cart store, 2 h, cleared on
+- **The checkout draft** (`shoofi-app/stores/checkout-draft`) keeps the shipping method, the
+  payment METHOD and the future slot across checkout remounts: in memory only, per cart store, 2 h, cleared on
   order completion. It never holds card data — the chosen card is the server-side default,
   re-read by `PaymentMethodCMP.getCCData`. With no draft, checkout pre-selects the customer's
   last successful method (AsyncStorage, per customer id), after checking it against
