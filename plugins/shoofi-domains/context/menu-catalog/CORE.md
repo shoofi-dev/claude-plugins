@@ -354,23 +354,36 @@ boundary and say so in the PR.
      (`routes/payments/admin.js`), social posts (`services/social-posts/post-service.js`) and
      a menu item in the partner app. A store can have the checkbox on and still be absent from
      the school list — that is the normal failure, not a bug.
-   Two more traps on the same path: the explore endpoints **hard-exclude** school categories
-   from `categoriesWithStoreIds` (`routes/shoofi-admin.js` v2 ~`:2140`, v1 ~`:1888`) and the app
-   builds `shoofiAdminStore.storesList` from that, not from the full `storesMap` — so a store
-   tagged with **nothing but** a school category is invisible everywhere. And the app sends
-   `&isSchoolProject=...` to `categories-with-stores-v2`, which **ignores it** (only
-   `routes/menu.js` and `routes/category.js` read `req.query.isSchoolProject`); honouring it
-   would also need the explore cache key to include it, or school and non-school payloads
-   cross-serve between customers in the same area.
+   One trap remains on the same path, and one has been fixed. **The explore feed is the app's
+   ONLY store list**: `shoofi-app/screens/explore.tsx` sets `shoofiAdminStore.storesList` from
+   `categoriesWithStoreIds` × `storesMap`, and `GeneralCategoryScreen` reads nothing else (its
+   own fetch is commented out). So a category stripped from that response takes its stores with
+   it, and a store tagged with **nothing but** a school category is invisible everywhere —
+   including on the school screen. `categories-with-stores-v2` now honours
+   `req.query.isSchoolProject === 'true'` and returns school categories **additively**
+   (`routes/shoofi-admin.js`, via `utils/explore-categories.js` —
+   `buildExploreCategoryQuery` / `buildExploreCacheKey`). Two things that fix depends on and
+   that any change here must preserve: the **cache key carries a `_school` suffix** when the
+   flag is set, or the first school customer in an area poisons it for every normal customer
+   for the 5-minute TTL; and the school category stays off the home screen **because of its
+   own data**, `showInHomeStrip: false` + `showInHomeBody: false`, which `explore.tsx` honours
+   (`isCategoryVisibleInStrip` / `isCategoryVisibleInBody`) — not because of any code in the
+   explore path. **The v1 endpoint (`categories-with-stores`, ~`:1888`) still strips school
+   categories unconditionally.** No client calls it; if one ever does, it inherits the bug.
 18. **`showInGeneralCategoryStrip` IS A DISPLAY FLAG — IT MAY REMOVE A CHIP, NEVER A STORE.**
    Same for `showInHomeStrip`. Admins set them `false` on curation buckets (`Exclusive`,
    `המומלצים`, `מבצעים`) that should not be offered as filter chips. `GeneralCategoryScreen`
    therefore keeps two lists, via `shoofi-app/helpers/general-category-stores.ts`:
    `memberCategories` (belongs to the general category → the content) and `stripCategories`
    (the subset drawn as chips → the display); with no selectable chip it shows the union of the
-   members. Collapsing them is what took the whole school-meals screen dark — `בתי ספר` is the
-   only sub-category under its general category and carries the flag `false`, so a
-   membership filter on it left zero categories, no selection and no stores.
+   members. Collapsing them can take a whole general-category screen dark: `בתי ספר` is the
+   only sub-category under its general category, so a membership filter on a display flag
+   leaves zero categories, no selection and no stores.
+   ⚠️ **Re-checked 2026-10-03: `בתי ספר` carries `showInGeneralCategoryStrip: true`** and has
+   since its last admin edit (`updatedAt` 2026-09-24; `routes/shoofi-admin.js` category
+   create/update are the only writers and both stamp `updatedAt`). So this invariant is a
+   design rule, not a live incident — do not diagnose an empty school list from it without
+   reading the flag out of `shoofi.categories` first.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
@@ -454,6 +467,16 @@ Check in this order (invariant 17); the reporter has almost always checked only 
    under it. Necessary for the store's school MENU, irrelevant to the LIST.
 5. `shoofi.stores.isSchoolProjectSupport` is **not** a diagnostic — nothing customer-facing
    reads it.
+
+**Do not stop at reading the documents — replay the chain.** It is ~60 lines of read-only
+node against production and it answers "what does this customer see right now", which no
+amount of field-reading does: `cities.$near` the test address → `shoofi.stores` on
+`{supportedCities: $in, business_visible: true}` → group by `categoryIds` → the app's
+`storesList` → `GeneralCategoryScreen`'s category filter. On 2026-10-03 that printed
+`candidate בתי ספר: strip=true stores=4 -> cacao, la-caika, albaraky-bakery, alzaeem-bakery`
+and settled a reopened ticket in one run. Note what it also showed: all four are reachable
+**only** because each sits in 7–20 non-school categories as well, so the list working is not
+evidence that school membership alone works.
 
 ## Definition of done
 Inherit `_shared-guardrails.md` §7. Here specifically: name every write path you touched and

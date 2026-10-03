@@ -53,7 +53,8 @@
         "services/ai/usage-log.js",
         "services/ai/pricing.js",
         "routes/admin/ai-usage.js",
-        "routes/shoofi-admin.js"
+        "routes/shoofi-admin.js",
+        "utils/explore-categories.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -829,12 +830,27 @@
         {
           "file": "routes/shoofi-admin.js",
           "regex": "isSchoolProject: \\{ \\$exists: false \\}",
-          "desc": "doc CORE invariant 17: the explore endpoints hard-exclude central school categories from categoriesWithStoreIds, so storesList never contains a school-only store"
+          "desc": "doc CORE invariant 17: the LEGACY v1 explore endpoint still hard-excludes central school categories from categoriesWithStoreIds — v2 is gated on the query flag instead"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "req\\.query\\.isSchoolProject === 'true'",
+          "desc": "doc CORE invariant 17: explore v2 reads the isSchoolProject flag the app sends — ignoring it is what made a school-only store invisible everywhere"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "buildExploreCacheKey\\(\\{",
+          "desc": "doc CORE invariant 17: explore v2's cache key is built by the helper so the school payload cannot cross-serve to a normal customer in the same area"
+        },
+        {
+          "file": "utils/explore-categories.js",
+          "regex": "isSchoolProject === true \\? \\{\\} :",
+          "desc": "doc CORE invariant 17: a school customer's explore feed carries school categories ADDITIVELY — the app's whole storesList is derived from that response"
         },
         {
           "file": "routes/category.js",
           "regex": "req\\.query\\.isSchoolProject === 'true'",
-          "desc": "doc CORE invariant 17: only the general-category tile route (and /api/menu) read req.query.isSchoolProject — explore v2 receives it and ignores it"
+          "desc": "doc CORE invariant 17: the general-category tile route gates the school tile on the client-supplied flag, never on customers.schoolProject.isActive"
         },
         {
           "file": "routes/menu.js",
