@@ -70,23 +70,33 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
   `schoolProject{…}`. **No `tokenExpiry` field** — expiry lives only inside the JWT.
 - **`schoolProject{schoolId, classId, isActive, studentIds[]}`** (school-project / "مدارس"
   customers; all ids are strings). `isActive` alone puts the customer app into school mode
-  (schools category, pickup-only cart, student card at checkout), but the card is filled only
-  from `studentIds` → `POST /api/customer/get-students-by-ids`, which joins `shoofi.students`
-  (`isActive: true` only) → `schools` / `school-classes` (accessor `db.schoolClasses`). The
-  `schoolId`/`classId` on the customer are not read for the card.
-  **Invariant: `isActive` is false whenever no student is linked; re-adding a student
-  re-activates.** The admin deletes (`delete-school-project-customer`,
-  `delete-all-school-project-students`) pull the id and then call
-  `deactivateCustomersWithoutStudentsSafely` (`services/customer/school-project-enrollment.js`;
-  filter `studentIds.0 $exists:false`, so a concurrent re-add wins). `add-student` and
-  `create-school-project-batch` set `isActive: true` whenever they link a student — the batch's
-  same-class branch always writes via `linkStudentToCustomer` (`$addToSet` + `$set isActive`),
-  even when the id is already linked. **Being on an uploaded class list means active:** a
-  re-upload deliberately overrides a manual `toggle-school-project-active` off (decided
-  2026-10-03). The batch result reports `action: "unchanged"` when nothing changed.
-  Before this invariant, deletes left `isActive: true` with `studentIds: []` — an empty
-  checkout student card; `scripts/deactivate-school-customers-without-students.js` (dry-run
-  default) sweeps those.
+  (schools category, pickup-only cart, student card at checkout); the card / student picker
+  (2+ students) is filled only from `studentIds` → `POST /api/customer/get-students-by-ids`,
+  which joins `shoofi.students` (`isActive: true` only) → `schools` / `school-classes`
+  (accessor `db.schoolClasses`) **per student**.
+  - **`studentIds` is the sole source of enrollment.** Siblings in different classes or
+    schools accumulate there: `create-school-project-batch` sends every existing customer
+    through `enrollStudentOnCustomer` (`$addToSet` + `$set isActive: true`) whatever school /
+    class they are in now; `add-student` also `$addToSet`s. Batch `action`: `added` (no
+    `schoolProject` before) / `updated` / `unchanged`. Until shoofi-server#270 the batch
+    *replaced* `schoolProject` when the uploaded class differed, unlinking the earlier sibling
+    (10 prod customers; repair: `scripts/link-missing-sibling-students.js`, dry-run default).
+  - **Customer-level `schoolId` / `classId` are vestigial**: set once (filled only when
+    missing, never overwritten) and read by no app; the only server reads are dead maps in the
+    `routes/order.js` school-orders report. Do not build on them.
+  - **Invariant: `isActive` is false whenever no student is linked; re-adding a student
+    re-activates.** The admin deletes (`delete-school-project-customer`,
+    `delete-all-school-project-students`) pull the id and then call
+    `deactivateCustomersWithoutStudentsSafely` (`services/customer/school-project-enrollment.js`;
+    filter `studentIds.0 $exists:false`, so a concurrent re-add wins). **Being on an uploaded
+    class list means active:** a re-upload deliberately overrides a manual toggle-off (decided
+    2026-10-03), even when the id is already linked. Before this invariant, deletes left
+    `isActive: true` with `studentIds: []` — an empty checkout student card;
+    `scripts/deactivate-school-customers-without-students.js` (dry-run default) sweeps those.
+  - **`toggle-school-project-active` is account-wide** (`toggleSchoolProjectActive`): the admin
+    student list sends the *student* `_id` as `customerId`, so it resolves by customer `_id`
+    first, then by `schoolProject.studentIds`; no school/class equality check. Toggling one
+    child's row turns school mode off/on for the whole customer (every linked sibling).
 - **`shoofi.storeUsers`** (partners) — `phone`, `appName`, `roles[]`, `token`, `authCode`.
   ⚠️ **`storeUsers` is the accessor, not the collection.** `db.storeUsers` is bound to the
   collection literally named **`store-users`**
