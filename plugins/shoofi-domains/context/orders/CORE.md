@@ -44,6 +44,30 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
 4. **Payment idempotency:** Apple Pay finalize is an atomic `findOneAndUpdate({status:"0"})`;
    the ZCredit callback can arrive **before** the order exists (self-heal path). Twin = one
    combined capture.
+
+   **Status `"0"` is FOUR populations, and "failed payment" is only one of them.** It is
+   not in `ORDER_STATUS` at all — it is the value an order is *inserted* with before the
+   charge resolves (`let orderStatus = isCreditCardPay ? "0" : "6"` in `routes/order.js`,
+   and the HYP path defaults to it too). So it covers: a declined charge; an order
+   **mid-gateway-round-trip right now**; an Apple Pay / async placeholder awaiting a
+   callback that may still succeed; and — the one that costs money — **an orphan: charged,
+   never finalised.** `routes/order.js` says it outright where it self-heals: *"an orphan
+   still reads status `"0"` but did take the money, so status alone cannot tell the two
+   apart"*, and the test it uses is `ccPaymentRefData?.status === 'success'` (the boolean
+   `.success` is the other spelling). `orders-metrics.js`'s `paymentFailureOf` gives it its
+   own bucket, `charged_not_finalised`.
+   Consequences for anything counting orders: `$ne: "0"` is right for a settled month and
+   **wrong for a live window**, because it drops money that was actually taken. If you need
+   it, read the two `ccPaymentRefData` leaves **individually** — never `ccPaymentRefData: 1`,
+   which drags the ZCredit terminal password and the customer's CVV into whatever you are
+   serving.
+
+   **The mirror image: a cancelled order that was never an order.** `routes/order.js`
+   cancels a stale Apple Pay placeholder to `CANCELLED` when a later session supersedes it,
+   stamping `supersededBySessionId` / `supersededReason`. It wears a cancelled status and
+   took nothing, so counting it inflates the order count and the cancellation count
+   together — a cancellation rate manufactured out of abandoned checkouts. Filter on
+   `supersededBySessionId`.
 5. **`customers.orders[]` is a create-time snapshot with NO status.** Never infer
    completion/revenue from it — join the store `orders` collection. Reuse
    `getSuccessfulOrdersByCustomerIds` (`utils/customer-orders.js`). See `docs/customer-orders-snapshot.md`.

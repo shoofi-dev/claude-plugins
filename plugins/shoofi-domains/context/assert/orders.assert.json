@@ -73,6 +73,21 @@
         },
         {
           "file": "routes/order.js",
+          "regex": "let orderStatus = isCreditCardPay \\? \"0\" : \"6\"",
+          "desc": "CORE invariant 4: status \"0\" is the INSERT-time pre-charge value and is absent from ORDER_STATUS, so it is four populations - declined, mid-round-trip, async placeholder, and orphan (charged but never finalised). `$ne: \"0\"` is right for a settled month and wrong for a live window"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "ccPaymentRefData\\?\\.status === \"success\"",
+          "desc": "CORE invariant 4: the gateway's own verdict is the ONLY thing that tells an orphan from an abandonment - status alone cannot. Read the .status / .success leaves individually; never project ccPaymentRefData whole, which carries the ZCredit terminal password and the customer's CVV"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "supersededBySessionId",
+          "desc": "CORE invariant 4: a stale Apple Pay placeholder is cancelled when a later session replaces it, so it wears a CANCELLED status having taken nothing - counting it inflates the order count and the cancellation count together"
+        },
+        {
+          "file": "routes/order.js",
           "regex": "persistentAlertsService\\.sendPersistentAlert",
           "desc": "the store-owner new-order alert is delegated to utils/persistent-alerts.js, not sent through services/notification directly"
         },
