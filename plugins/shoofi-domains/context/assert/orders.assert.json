@@ -233,7 +233,8 @@
         "components/checkout/FutureOrderPicker.tsx",
         "hooks/checkout/use-checkout-validate.ts",
         "screens/cart/cart.tsx",
-        "stores/checkout-draft/index.ts"
+        "stores/checkout-draft/index.ts",
+        "helpers/checkout-choice-availability.ts"
       ],
       "patterns": [
         {
@@ -288,8 +289,13 @@
         },
         {
           "file": "screens/checkout/index.tsx",
-          "regex": "if \\(isWallet && !isHypWallet\\) return;",
+          "regex": "if \\(isWallet && !isHypWallet\\)",
           "desc": "wallets are never pre-selected on a ZCredit-wallet store (CORE: the checkout draft)"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "\"checkout_choice_dropped\"",
+          "desc": "restored checkout choices are re-checked against live store flags and dropped when no longer offered (CORE: the checkout draft)"
         }
       ]
     },

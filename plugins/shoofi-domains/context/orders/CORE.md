@@ -177,7 +177,13 @@ Checkout-screen events that explain the "reached checkout, didn't send" layer:
   last successful method (AsyncStorage, per customer id), after checking it against
   `/payment-methods`; wallets are never pre-selected on a ZCredit-wallet store (they need the
   session the customer's tap creates). Logged as `checkout_choice_restored`
-  (`source`: `draft`|`last_used`). A restored slot the picker no longer offers is replaced
+  (`source`: `draft`|`last_used`). **Every restored choice is re-checked first**
+  against the cart store's live flags (`shoofi-app/helpers/checkout-choice-availability.ts`,
+  shared with the submit-time `isStoreSupportAction`): a method the admin switched off
+  while the customer was in the cart is left unset and logged as `checkout_choice_dropped`
+  (`reason`: `no_longer_offered`|`wallet_needs_tap`|`availability_unknown`).
+  Not covered: a customer who stays ON checkout while cash is switched off — the server's
+  order creation never checks `cash_support`/`cashRestricted`, so that order goes through. A restored slot the picker no longer offers is replaced
   with the first slot and logged as `order_timing_auto_changed`
   (`reason: restored_slot_unavailable`).
 - **`page_viewed` `Checkout`** carries `cart_store` and `browsed_store`. The future-order
