@@ -342,16 +342,17 @@ boundary and say so in the PR.
 17. **SPELLCHECK PROPOSES; A NAME CHANGES ONLY ON A PERSON'S ACCEPT, AND ONLY IF UNCHANGED**
    (`services/catalog/menu-spellcheck.js`, `docs/menu-spellcheck.md`). A monthly cron
    (`15 3 1 * *`, lock `cron:menu-spellcheck`, shared with the admin "run now") asks Claude
-   **Haiku** (`MODELS.fast`, never `effort` — Haiku rejects it) about product / extra / option
-   `nameAR`+`nameHE`. Verdicts are cached per `(lang|text, PROMPT_VERSION)` in
+   **Haiku** (`MODELS.fast`, never `effort` — Haiku rejects it) about category / product / extra /
+   option / combo-section `nameAR`+`nameHE`. Verdicts are cached per `(lang|text, PROMPT_VERSION)` in
    `shoofi.menuSpellChecks`, so each text is asked once across all stores; a deterministic guard
    (`isPlausibleFix`: no added/removed word, ≤ 2 letters per word, not niqqud-only) and a second
    Haiku "verify" call filter the proposals; an unanswered text gets no verdict, never "correct".
    Rows live in the **central** `shoofi.menuSpellIssues` (one per slot) — a deliberate exception to
    the per-store worklist of invariant 1, because the screen spans every store and accept needs
    auth + audit. `acceptFixes` is the only catalog write: a compare-and-set on that ONE field
-   against the stored `rawText` (extras/options by `arrayFilters` on id + old name, never index;
-   duplicate or empty ids refused), a changed name → row `stale`, both cache keys cleared
+   against the stored `rawText` (extras/options/combo sections by `arrayFilters` on id + old name,
+   never index; duplicate or empty ids refused; a category straight on `categories`, never via the
+   store-category update route), a changed name → row `stale`, both cache keys cleared
    (invariant 2), and a renamed out-of-stock option's NEW `nameAR` **added** to
    `store.outOfStockExtras` (old name kept). Never route it through `POST /api/admin/product/update`
    (whole-document `$set`, last writer wins). A dismissed or accepted text is not re-raised.

@@ -198,7 +198,8 @@
           "isPlausibleFix",
           "parseReply",
           "parseVerify",
-          "PROMPT_VERSION"
+          "PROMPT_VERSION",
+          "collectCategoryNames"
         ],
         "services/catalog/menu-spellcheck.js": [
           "runSpellcheck",
@@ -882,6 +883,16 @@
           "file": "services/audit/admin-audit-routes.js",
           "regex": "/api/admin/menu-spellcheck/accept",
           "desc": "doc reference §7: accept is in the audit route map"
+        },
+        {
+          "file": "services/catalog/menu-spellcheck.js",
+          "regex": "const target = row\\.kind === \"category\" \\? db\\.categories : db\\.products;",
+          "desc": "doc CORE invariant 17: a category fix writes categories directly, never the store-category update route"
+        },
+        {
+          "file": "services/catalog/menu-spellcheck.js",
+          "regex": "combo\\.sections\\.\\$\\[s\\]",
+          "desc": "doc reference §7e: combo sections are written by section id"
         }
       ]
     },

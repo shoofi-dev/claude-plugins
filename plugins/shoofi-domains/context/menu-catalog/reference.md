@@ -532,8 +532,11 @@ Asia/Jerusalem), registered in `app.js` with the other crons; Redis lock `cron:m
 `runMenuSpellcheck` (the cron) waits on `done`.
 `runSpellcheck` walks every `shoofi.stores` entry (mock templates included — their names are copied
 by `create-from-mock`), `collectNames` per product (product, `extras[i]` with a non-empty `id`, its
-`options[j]`; both languages; skipped: empty, < 2 letters of the field's script, descriptions,
-categories, combo `sections[]`, `areaOptions`). Unique `lang|text` keys are looked up in
+`options[j]`, `combo.sections[k]` with a non-empty `id` — kind `comboSection`, section id in
+`extraId`) and `collectCategoryNames` per store category (kind `category`, `productId: ""`,
+slot keyed on the category id; rows carry `categoryName` and the store's `hasGeneralCategories`
+for the admin edit link). Both languages; skipped: empty, < 2 letters of the field's script,
+descriptions, central general categories, `areaOptions`. Unique `lang|text` keys are looked up in
 `shoofi.menuSpellChecks` (`PROMPT_VERSION` — bump it when a prompt changes meaning); the rest go
 to Haiku in batches of 80, 3 in parallel, `temperature: 0`, label `menu-spellcheck` (aiUsage).
 Reply parsing (`parseReply`) takes the first parseable JSON array and drops no-op and implausible
