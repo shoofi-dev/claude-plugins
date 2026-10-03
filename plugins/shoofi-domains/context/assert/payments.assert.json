@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@561e3ca / 2026-07-28",
+  "lastVerified": "shoofi-server@92b1c8c4 (feat/school-payment-methods) / 2026-10-03",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -17,7 +17,8 @@
         "lib/schemas/creditCard.json",
         "services/twin-order/twin-payment-service.js",
         "routes/twin-order.js",
-        "routes/store.js"
+        "routes/store.js",
+        "utils/school-payment-methods.js"
       ],
       "symbols": {
         "utils/hyp-pay.js": [
@@ -47,6 +48,11 @@
           "issueInvoicesForTwin",
           "reconcileToCharge",
           "customerDocType"
+        ],
+        "utils/school-payment-methods.js": [
+          "filterSchoolPaymentMethods",
+          "validateSupportedPaymentMethods",
+          "SCHOOL_PAYMENT_METHOD_KEYS"
         ]
       },
       "patterns": [
@@ -89,6 +95,21 @@
           "file": "routes/store.js",
           "regex": "hyp_enabled",
           "desc": "platform tokenization rollout flag — NOT read by any charge path"
+        },
+        {
+          "file": "routes/payment-methods.js",
+          "regex": "filterSchoolPaymentMethods\\(supportedMethods",
+          "desc": "school-project requests run the school deny-list last, after the platform/store/OS/cash filters (CORE Method resolution step 4)"
+        },
+        {
+          "file": "utils/school-payment-methods.js",
+          "regex": "supported\\[method\\.supportKey\\] !== false",
+          "desc": "deny-list: only an explicit false hides a method; a partial object can never hide everything"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "schoolSettings\\.supportedPaymentMethods\\.\\$\\{key\\}",
+          "desc": "school-settings POST writes each method key with a dotted $set, so saving the hours never wipes the methods"
         }
       ]
     },
@@ -110,6 +131,23 @@
           "file": "components/payment-method/index.tsx",
           "regex": "hypEnabled|hyp_enabled",
           "desc": "hyp_enabled's only live consumer: which add-card tokenization flow to open"
+        },
+        {
+          "file": "helpers/get-supported-payment-methods.ts",
+          "regex": "\"school-project\"",
+          "desc": "the app sends its school mode as the school-project header to GET payment-methods"
+        }
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/views/admin/schools/SchoolSettings.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "src/views/admin/schools/SchoolSettings.tsx",
+          "regex": "admin/school-settings",
+          "desc": "the admin School settings screen edits shoofi.store{id:1}.schoolSettings (hours and school payment methods)"
         }
       ]
     }
