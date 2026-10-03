@@ -165,6 +165,16 @@
           "desc": "every term of totalOutcomes must be a BILLING_COMPONENT, or the dashboard's reconciliation delta lies"
         },
         {
+          "file": "routes/shoofi-admin.js",
+          "regex": "approvedAmount:\\s*item\\.approvedAmount\\s*\\|\\|\\s*0",
+          "desc": "CORE invariant 8: a compensation item is CREATED with approvedAmount 0 and status 0 and waits for a person, so a pending item's approvedAmount can never state what is in the queue - read items[].amount for that. 47.3% of approved Shoofi-paid items are signed off on a LATER day than the document's createdAt (704 of 1,332, ₪54,485), so any same-day or period-over-period figure built from status===1 alone is structurally half-formed and retro-fills closed days"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "item\\.status\\s*===\\s*0",
+          "desc": "CORE invariant 8: compensation item statuses are 0 pending / 1 approved / 2 declined, and the test must be a POSITIVE match on the one wanted - a declined item can still carry a non-zero approvedAmount (120 such items in production), so `!== 2` is not the same filter as `=== 1`"
+        },
+        {
           "file": "services/financial-overview/compute.js",
           "regex": "generateStoreReportData",
           "desc": "the live overview runs the store report ENGINE over the range — it must never re-derive settlement math"

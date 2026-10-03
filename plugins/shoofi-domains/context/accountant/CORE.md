@@ -183,6 +183,23 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    a term added to `totalOutcomes` and not to that list shows up as a non-zero
    `billingReconciliationDelta`, which is the point of the list.
 
+   **A compensation is APPROVED days after it is RECORDED, and that breaks any
+   same-day figure.** `compensations.createdAt` (BSON Date) is the settlement clock —
+   `services/financial-overview/metrics.js`, `exec-dashboard/spend-metrics.js` and
+   `admin-reports.js` all agree. But approval is a separate human act on a separate
+   clock, `items[].approvedAt` (an ISO **string**, not a Date), and it usually happens on
+   a different day: of the 1,332 approved Shoofi-paid items in production, **704 — ₪54,485,
+   47.3% — carry an `approvedAt` on a later day than their document's `createdAt`**, and 32
+   have no `approvedAt` at all. So **`status === 1` summed over a window that includes
+   today is structurally about half-formed**, and it retro-fills days that have already
+   closed. A monthly report does not notice; anything daily, live, or compared
+   period-over-period does, and it reads as a real drop rather than an approval queue.
+   Report the pending amount beside the approved one (`status === 0`, and read
+   `items[].amount` — a pending item's `approvedAmount` is 0 by construction,
+   `routes/shoofi-admin.js`), and compare on the sum.
+   ⚠️ The status test must be a **positive** match on 1, never `!== 2`: a *declined* item
+   can still carry a non-zero `approvedAmount` (120 such items in production).
+
 9. **The live overview's store population is by DATA, never by today's `business_visible`.**
    `services/financial-overview/compute.js` enumerates every non-mock store
    (`getAllNonMockStores`) and keeps those whose live report is not all zeros
