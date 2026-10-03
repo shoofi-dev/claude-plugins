@@ -553,7 +553,9 @@ Measured 2026-10-03 on 6 prod stores (~1.6k unique names): 19 calls, ≈ $0.03. 
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":
   `POST /api/for-you/suggest` from `components/for-you/` + `screens/for-you/`, gated on the
   platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled` / `isChatSuggestForAll` (entry shown to
-  Shoofi employees only until the last is on); a card tap navigates to
+  Shoofi employees only until the last is on; the mic is on-device speech-to-text in
+  `hooks/useVoiceInput.ts`, shown only when the binary has the native module, and its transcript
+  is sent as the same `text`); a card tap navigates to
   `menuScreen` with `productId` (`hooks/useOpenStoreAtProduct.ts`), and the menu list opens the
   sheet by matching `products[]._id`: `AllCategoriesList` searches `categoryList[].products`;
   for tile-grid stores (`store.hasGeneralCategories`) `GeneralCategoriesList` receives the
