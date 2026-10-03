@@ -375,6 +375,32 @@ against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store D
 - **FACT:** `maxCount: 0` on a `multi` means "no limit" to the app (`max && …`), but both admin
   editors default it to 1 and refuse `<= 0`, so the lint reports `< 1` as `MAX_COUNT_INVALID`
   (warning, not repaired).
+- **FACT — `isBestSellersEnabled` is a PLATFORM-WIDE kill switch, not a per-store flag. Check it
+  FIRST when "the most-ordered carousel is missing from a store menu".** It lives on the single
+  central config doc `shoofi.store {id: 1}`, is allowlisted out to the apps in
+  `SHOOFI_CONFIG_PUBLIC_FIELDS` (`shoofi-server/routes/store.js`), and the customer app reads it
+  off `shoofiAdminStore.storeData` — which is `POST /api/store` with `app-name: shoofi`
+  (`shoofi-app/stores/shoofi-admin/index.tsx`, `consts/shared.ts` `APP_NAME = 'shoofi'`), **not**
+  the store's own doc, even though `BestSellers.tsx` reads `appName` off `storeDataStore` one line
+  above. So one `false` hides the carousel on every store at once, and that component's own
+  comment ("a store turns it off deliberately") is misleading — no per-store control exists
+  anywhere. Absent means ON (`!== false`). The only writer is the admin's Shoofi-settings screen
+  (`shoofi-delivery-web/src/views/admin/settings/ShoofiSettings.tsx`), whose bulk
+  `POST /api/shoofiAdmin/store/update` `$set`s the whole form and writes **no audit row**, so
+  there is no record of who flipped it. `isReorderFromStoreEnabled`, `isStoriesEnabled` and
+  `isChatSuggestEnabled` have the identical shape. Measured 2026-10-03: stored `false` while the
+  server side was healthy — the real `computeBestSellers` returned a full list for **147 of 165**
+  `business_visible` stores (the other 18 have no completed order in the 90-day window), and all
+  147 lists fully survived the client's menu resolve, so the carousel renders 12 cards the moment
+  the switch flips. A diagnosis that stops at "the aggregation returns nothing" has looked in the
+  wrong place.
+- **FACT — the section is labelled "best sellers", never "most ordered", and the string is
+  hardcoded.** `shoofi-app/screens/menu/components/BestSellers.tsx` builds its title from a
+  ternary on the language — `"الأكثر مبيعاً"` / `"הנמכרים ביותר"` — bypassing i18n, so the wording
+  cannot be changed without an app release. The admin toggle controlling it says "most-ordered
+  products", and `shoofi-app/helpers/for-you-copy.ts` owns `"הכי מוזמנות"` / `"الأكثر طلباً"` for
+  the **home** For-You rail. So a ticket saying "הכי מוזמנים" can mean either surface — establish
+  which one before investigating.
 - **Backlog (confirmed, safe to act on when asked):**
   1. `GET /api/menu` and `POST /api/menu/refresh` build the menu **differently** — `refresh` is a
      real admin-triggered action that re-caches under the same key, so clicking it degrades the

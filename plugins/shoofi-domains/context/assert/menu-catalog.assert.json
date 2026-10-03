@@ -52,7 +52,8 @@
         "services/ordering-intelligence/ai-chat.js",
         "services/ai/usage-log.js",
         "services/ai/pricing.js",
-        "routes/admin/ai-usage.js"
+        "routes/admin/ai-usage.js",
+        "services/menu/best-sellers.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -824,6 +825,11 @@
           "file": "services/ordering-intelligence/ai-chat.js",
           "regex": "which is CLOSED now",
           "desc": "doc CORE invariant 14: the Claude chat is told a named store is closed"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "SHOOFI_CONFIG_PUBLIC_FIELDS[\\s\\S]{0,4000}?\"isBestSellersEnabled\"",
+          "desc": "doc known-status: isBestSellersEnabled is served to the apps only through the CENTRAL config allowlist - it is a platform-wide kill switch, never a per-store field"
         }
       ]
     },
@@ -832,7 +838,8 @@
         "hooks/useOpenStoreAtProduct.ts",
         "screens/menu/components/GeneralCategoriesList.tsx",
         "__tests__/components/general-categories-open-product.test.tsx",
-        "helpers/for-you-copy.ts"
+        "helpers/for-you-copy.ts",
+        "screens/menu/components/BestSellers.tsx"
       ],
       "symbols": {},
       "patterns": [
@@ -865,6 +872,16 @@
           "file": "helpers/for-you-copy.ts",
           "regex": "for_you_reply_store_closed",
           "desc": "doc CORE invariant 14: the app words a store_closed reply"
+        },
+        {
+          "file": "screens/menu/components/BestSellers.tsx",
+          "regex": "shoofiAdminStore\\.storeData as any\\)\\?\\.isBestSellersEnabled !== false",
+          "desc": "doc known-status: the carousel gate reads the CENTRAL shoofi config (shoofiAdminStore), not the store doc, and absent means ON"
+        },
+        {
+          "file": "screens/menu/components/BestSellers.tsx",
+          "regex": "const sectionTitle = lang === \"ar\"",
+          "desc": "doc known-status: the section title is hardcoded per language, not i18n - the wording cannot change without an app release"
         }
       ]
     },
@@ -873,7 +890,8 @@
         "src/views/admin/dish-types/DishTypes.tsx",
         "src/apis/admin/dish-taxonomy.ts",
         "src/views/admin/ai-usage/AiUsage.tsx",
-        "src/apis/admin/ai-usage.ts"
+        "src/apis/admin/ai-usage.ts",
+        "src/views/admin/settings/ShoofiSettings.tsx"
       ],
       "symbols": {},
       "patterns": [
@@ -886,6 +904,11 @@
           "file": "src/apis/admin/dish-taxonomy.ts",
           "regex": "/admin/product-labels/review",
           "desc": "doc reference §8: the admin review list for labels in status review"
+        },
+        {
+          "file": "src/views/admin/settings/ShoofiSettings.tsx",
+          "regex": "isBestSellersEnabled: response\\.isBestSellersEnabled \\?\\? true",
+          "desc": "doc known-status: the Shoofi-settings screen is the ONLY writer of isBestSellersEnabled and it defaults the flag to on when absent"
         }
       ]
     }
