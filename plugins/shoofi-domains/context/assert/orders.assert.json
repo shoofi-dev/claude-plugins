@@ -312,6 +312,24 @@
           "desc": "STABILITY PIN, not a regression detector - green both before and after shoofi-partner#22, which did not introduce it. Every notification the device receives while the app runs (including the server's store.wav creation push) runs the badge refresh. This is the ONLY reason that path sees a new order ~30s before the poll, which is the whole premise of the two assertions above and of the C3 warning; drop this wiring and the doc's explanation stops being true"
         }
       ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/components/OrderMonitoring/order-flow-events.ts",
+        "src/components/OrderMonitoring/OrderFlowDashboard.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "src/components/OrderMonitoring/order-flow-events.ts",
+          "regex": "CHANNEL_EVENT_PREFIXES",
+          "desc": "orderFlowEvents are split on the eventType prefix, never on actorType - actorType \"system\" IS the order process"
+        },
+        {
+          "file": "src/components/OrderMonitoring/order-flow-events.ts",
+          "regex": "notification_",
+          "desc": "notification_* / websocket_* are the only rows hidden by default on the monitoring timeline"
+        }
+      ]
     }
   }
 }

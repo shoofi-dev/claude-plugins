@@ -125,6 +125,25 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 - **`shoofi.orderFlowEvents`** = append-only audit timeline keyed on `orderNumber`
   (`order_created`, `payment_*`, `status_change`, `delivery_booked`, ...). Read via
   admin order-monitoring + the `investigate-order` skill.
+  ⚠️ **`actorType` is NOT a noise axis — split these events on `eventType`.** Nearly
+  everything the platform does to an order it does by itself, so `actorType: "system"`
+  is where the order's own process lives: over two days of production, every one of
+  1,527 `status_change` rows was `system` or `shoofi_support`, and so were
+  `payment_success`, `payment_failed`, `order_creation_success_response`,
+  `delivery_pending_assignment` and `delivery_driver_assigned`. The *noise* is the
+  **channel** — `notification_*` and `websocket_sent`, written once per recipient per
+  attempt, ~99% of a busy order's rows (order `5690-1102`: 2,708 of 2,710). Filter on
+  the `eventType` prefix; `shoofi-delivery-web/src/components/OrderMonitoring/order-flow-events.ts`
+  is the shared predicate. Filtering on `actorType !== "system"` is what made the
+  monitoring screen look empty (43% of orders drew ≤2 rows).
+  ⚠️ **`GET /api/admin/order-monitoring/summary/:orderNumber` returns the WHOLE event
+  set, uncapped** — 1.1–1.7 MB of JSON for a busy order
+  (`services/monitoring/centralized-flow-monitor.js` `getOrderStatusSummary`), and it
+  never 404s: a wrong identifier answers 200 with `{currentStatus:'unknown',
+  totalEvents:0, timeline:[]}`. `buildTimeline` emits the id as `id`, not `_id`.
+  ⚠️ **A `notification_*`/`websocket_sent` row can carry `orderNumber: null`** (2,224
+  and 1,288 respectively over two days) and then belongs to no order on any screen.
+  Lifecycle events are unaffected — every `status_change` had one.
 - **`delivery-company.bookDelivery`** keyed by `bookId` = order `orderId`; mirrors
   `DELIVERY_STATUS` (`1` waiting_approve … `3` collected/pickup … `4` delivered).
 - **`shoofi.twinOrderGroups`** links `orders.twinGroup` ↔ group `primary`/`secondary`.
