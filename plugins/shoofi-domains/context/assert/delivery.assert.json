@@ -33,7 +33,8 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "services/delivery/assignment-provenance.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -111,6 +112,12 @@
           "/api/delivery/delivery-only/book",
           "/api/delivery/delivery-only/list",
           "isDeliveryOnly"
+        ],
+        "services/delivery/assignment-provenance.js": [
+          "ASSIGNMENT_PROVENANCE_PROJECTION",
+          "getAssignmentProvenance",
+          "attachAssignmentProvenance",
+          "PROVENANCE_SOURCE"
         ]
       },
       "patterns": [
@@ -333,6 +340,36 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "services/delivery/assignment-provenance.js",
+          "regex": "MANUAL_ASSIGNMENT_METHOD\\s*=\\s*\"manual\"",
+          "desc": "the manual test is exact equality against 'manual' - a prefix/substring match would badge the 1,217 'manual-admin-routed' rows (invariant 6, the engine routing to a company admin) as an agent's choice"
+        },
+        {
+          "file": "services/delivery/assignment-provenance.js",
+          "regex": "UNKNOWN:\\s*\"unknown\"",
+          "desc": "absence of every provenance field is 'unknown', never 'auto' - 13,706 rows carry a courier and nothing else, and reading that as 'the system chose' is false for every pre-Oct-2026 manual booking"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "reassignmentMetadata\\s*=\\s*\\{[\\s\\S]{0,200}?reassignedBy:\\s*'admin'",
+          "desc": "a manual REASSIGNMENT records itself here and deliberately leaves assignmentMetadata alone, so these 12,053 rows still read assignmentMethod 'score-based' - anything keyed on assignmentMethod alone misses all of them"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "assignedBy:\\s*'admin'",
+          "desc": "a manual ASSIGNMENT to a pending delivery stamps assignedBy 'admin' - 38,243 rows, the same population as assignmentMethod 'manual'"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "\\.\\.\\.ASSIGNMENT_PROVENANCE_PROJECTION",
+          "desc": "the deliveries projection SPREADS the whitelist rather than listing the keys; a projection missing one degrades the row to \"unknown\" with no error anywhere. Never assignmentMetadata: 1 - that drags a per-driver scoring blob along on 42,753 documents"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "previousDriver:\\s*\\n?\\s*deliveryDoc\\.driver\\?\\._id",
+          "desc": "a twin reassignment records the displaced courier ONLY here (no reassignmentMetadata, no flow event) - the third of late-delivery.PREVIOUS_DRIVER_KEYS. A null value is a first assignment, not a reassignment"
         }
       ]
     },
@@ -400,7 +437,9 @@
       "files": [
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/components/ManualAssignmentBadge.tsx",
+        "src/utils/assignment-provenance.ts"
       ],
       "patterns": [
         {
@@ -417,6 +456,16 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isDeliveryOnlySupport",
           "desc": "the platform-wide delivery-only switch lives in admin Settings"
+        },
+        {
+          "file": "src/utils/assignment-provenance.ts",
+          "regex": "isManuallyAssigned[\\s\\S]{0,160}?assignmentProvenance\\?\\.isManual\\s*===\\s*true",
+          "desc": "the admin web reads isManual and never re-derives the rule from assignmentMetadata - the fact has four key spellings and a second implementation is how the delivery list and the live-ops board come to disagree about the same delivery"
+        },
+        {
+          "file": "src/utils/assignment-provenance.ts",
+          "regex": "Asia/Jerusalem",
+          "desc": "the tooltip's clock is pinned to Israel time, not the browser's - on a UTC machine it would otherwise read 10:29 for a 13:29 action, and the agent would compare it against the row's other times"
         }
       ]
     }

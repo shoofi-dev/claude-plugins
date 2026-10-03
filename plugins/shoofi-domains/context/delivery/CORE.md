@@ -246,6 +246,49 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+14. **"Did a person pick this courier" is `services/delivery/assignment-provenance.js`, and it
+    is the only reader — because a manual *reassignment* leaves `assignmentMetadata` reading
+    `score-based`.** 46,222 of 95,813 production rows (48.2%, 2026-10-03) are a human's choice,
+    recorded by five routes in four shapes:
+    - `assignmentMetadata.assignedBy: 'admin'` — an agent assigned a courier to a delivery that
+      had none, almost always one in the delayed-assignment pending queue. 38,243 rows, and
+      exactly the same population as `assignmentMethod: 'manual'` (0 rows on either side alone,
+      so either test alone is sufficient);
+    - `reassignmentMetadata.reassignedBy` — an agent *moved* an already-assigned delivery.
+      12,053 rows, and the non-pending branch of `POST /api/delivery/admin/reassign`
+      deliberately does **not** touch `assignmentMetadata`, since that object holds the scoring
+      blob of the decision being overridden. So these rows still read
+      `assignmentMethod: 'score-based'`, and anything keyed on `assignmentMethod` alone misses
+      every one of them. The literal string `'admin'` from `routes/delivery/admin.js`, a
+      stringified admin `_id` plus `reassignedByRole` from `routes/delivery/driver.js` (56 rows);
+    - `assignmentMetadata.previousDriver` — a twin reassignment. `routes/twin-order.js` writes no
+      `reassignmentMetadata` at all and no flow event, only this (the third of
+      `late-delivery.PREVIOUS_DRIVER_KEYS`). A **null** value is a first assignment, not a
+      reassignment: the key is written on every twin assignment.
+
+    Two traps. **`assignmentMethod: 'manual-admin-routed'` is AUTOMATIC** — invariant 6's
+    engine-routing-to-a-company-admin, 1,217 rows, no Shoofi agent involved — so the test is
+    `=== 'manual'`, never a prefix or substring match. And **absence of every field is
+    `unknown`, never `auto`**: 13,706 rows carry a courier and no provenance, so a screen that
+    reads absence as "the system chose" asserts something false about a population that includes
+    every manual booking made before Oct 2026. Note also that `isDeliveryOnly` is a manual
+    *booking* with an **automatic** assignment (`routes/delivery/orders.js` passes no
+    `driverId`), and the admin list already badges it "ידנית" for that unrelated reason —
+    do not conflate the two.
+
+    Endpoints hand the derived object to clients as `assignmentProvenance`
+    (`POST /api/analytics/deliveries`, `GET /api/delivery/admin/orders`,
+    `GET /api/delivery/order/:id`, `GET /api/twin-order/admin/group/:groupId/full`); the admin
+    web only renders it. A read that projects must spread `ASSIGNMENT_PROVENANCE_PROJECTION` —
+    **never `assignmentMetadata: 1`**, which drags a per-driver scoring blob along on 42,753
+    documents averaging 20 KB (same rule as `LATE_DELIVERY_PROJECTION`). `assignedByName` /
+    `reassignedByName` are additive and new, so every historical manual row has no name.
+
+    `delivery-company.assignment-decisions` cannot answer this question: it is deliberately
+    **not** written for manual assignments (`services/delivery/book-delivery.js` short-circuits
+    with `reasonSkipped: "manual driverId"`). The only record of *which* agent acted on the
+    older rows is `shoofi.admin-audit-log`, and it misses the shoofir company-admin reassign
+    entirely, which does not send `app-type: shoofi-admin`.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
