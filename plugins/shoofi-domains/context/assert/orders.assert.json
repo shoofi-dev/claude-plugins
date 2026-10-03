@@ -9,6 +9,7 @@
         "routes/order-fraud-checks.js",
         "routes/order-origin-validator.js",
         "routes/admin/order-monitoring.js",
+        "services/monitoring/centralized-flow-monitor.js",
         "routes/admin/twin-order-config.js",
         "services/twin-order/twin-group-service.js",
         "services/twin-order/twin-payment-service.js",
@@ -207,6 +208,21 @@
           "file": "routes/order-amend.js",
           "regex": "COMBO_SELECTION_INVALID",
           "desc": "doc CORE invariant 12: any comboIssues after repriceOrder is a 409, the same posture as PRODUCT_NOT_FOUND"
+        },
+        {
+          "file": "routes/admin/order-monitoring.js",
+          "regex": "db\\.orders\\.findOne\\(\\{ orderId: orderNumber \\}\\)",
+          "desc": "doc CORE invariant 13: the monitoring summary matches the two-segment orders.orderId, never originalOrderId or _id"
+        },
+        {
+          "file": "routes/admin/order-monitoring.js",
+          "regex": "summary\\.timeline\\?\\.find\\(e => e\\.sourceApp && e\\.sourceApp !== 'delivery-company'\\)\\?\\.sourceApp",
+          "desc": "doc CORE invariant 13: the store is DERIVED from the flow events, not taken from app-name - it works only because order events carry sourceApp = the tenant"
+        },
+        {
+          "file": "services/monitoring/centralized-flow-monitor.js",
+          "regex": "currentStatus: latestEvent\\?\\.status \\|\\| 'unknown'",
+          "desc": "doc CORE invariant 13: an order with no events is a successful empty summary, not a 404 - callers cannot tell 'not found' from 'found nothing' by status code"
         },
         {
           "file": "routes/order-amend.js",

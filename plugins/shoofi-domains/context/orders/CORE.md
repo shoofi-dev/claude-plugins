@@ -135,6 +135,24 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       them); `comboSelections` ride along untouched and are never diffed; `comboIssues` is
       stripped with the other bookkeeping fields before `order.items` is written, so the
       persisted item shape never carries it.
+13. **Order monitoring keys on the TWO-segment `orderId` and takes no `app-name`.**
+    `GET /api/admin/order-monitoring/summary/:orderNumber`
+    (`routes/admin/order-monitoring.js`) queries the central `shoofi.orderFlowEvents` by
+    `orderNumber`, which every writer fills from `order.orderId` (`"0760-0519"`) — the
+    three-segment `originalOrderId` and `_id` match nothing. The **store is derived, not
+    supplied**: `summary.timeline.find(e => e.sourceApp !== 'delivery-company')?.sourceApp`,
+    which works only because order events carry `sourceApp: appName` (the tenant);
+    `"delivery-company"` is the single literal (`routes/order.js`), so the comment listing
+    app ids in `services/monitoring/centralized-flow-monitor.js` is stale and misleading.
+    Two consequences for any caller: a number with no events returns **200 with an empty
+    summary** (`currentStatus: 'unknown'`, `totalEvents: 0`) — both enrichment blocks are
+    try/caught and swallowed, so "not found" and "found nothing" are indistinguishable from
+    the status code; and because `orderId` is a truncated random value with no uniqueness
+    index (`services/delivery/book-delivery.js`) while `orderFlowEvents` is one central
+    collection, a collision across two store DBs silently merges two tenants' timelines.
+    A caller that knows the store (the admin's `orderMonitoringLink`,
+    `shoofi-delivery-web/src/components/OrderMonitoring/order-monitoring-link.ts`) should
+    carry it and compare, not assume.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
