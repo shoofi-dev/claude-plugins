@@ -24,7 +24,10 @@
         "test/integration/order-pricing-parity.js",
         "docs/combo-deals.md",
         "test/integration/order-pricing-shadow-combo.js",
-        "test/integration/order-stock-combo.js"
+        "test/integration/order-stock-combo.js",
+        "services/notification/notification-service.js",
+        "test/integration/push-timeout.js",
+        "test/integration/order-create-nonblocking-store-alert.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -72,6 +75,31 @@
           "file": "routes/order.js",
           "regex": "persistentAlertsService\\.sendPersistentAlert",
           "desc": "the store-owner new-order alert is delegated to utils/persistent-alerts.js, not sent through services/notification directly"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const fireStoreOwnerNotifications = \\(orderDoc, req, appName\\) => \\{\\s*Promise\\.resolve\\(\\)\\s*\\.then\\(\\(\\) => sendStoreOwnerNotifications\\(orderDoc, req, appName\\)\\)\\s*\\.catch\\(",
+          "desc": "the store-owner alert is fired in the background with a .catch, not awaited (CORE invariant 6; brixta 2026-10-03 duplicate orders)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*await sendStoreOwnerNotifications\\((?:orderDoc|updatedOrder),)",
+          "desc": "NO create path, updateCCPayment or finalizeApplePayOrder awaits the store-owner alert - an awaited alert on a stalled push socket held the create response 128s/257s and the customer resubmitted. Only the fraud-approval call (argument `order`) may await it"
+        },
+        {
+          "file": "services/notification/notification-service.js",
+          "regex": "const DEFAULT_PUSH_TIMEOUT_MS = 10000;[\\s\\S]*?this\\.retryAttempts = 2;[\\s\\S]*?envMs\\('PUSH_SEND_TIMEOUT_MS', DEFAULT_PUSH_TIMEOUT_MS\\)",
+          "desc": "push sends have a 10s per-attempt deadline (PUSH_SEND_TIMEOUT_MS) and at most one retry (reference.md NOTIFICATIONS)"
+        },
+        {
+          "file": "services/notification/notification-service.js",
+          "regex": "if \\(error\\.code === 'PUSH_TIMEOUT'\\) \\{[\\s\\S]{0,300}?\\[PUSH_TIMEOUT\\][\\s\\S]{0,300}?throw error;",
+          "desc": "a timed-out push is logged [PUSH_TIMEOUT] and NOT retried"
+        },
+        {
+          "file": "services/notification/notification-service.js",
+          "regex": "reason: error\\?\\.code === 'PUSH_TIMEOUT' \\? 'timeout' : 'error'",
+          "desc": "a timeout is recorded as notification_push_failed with metadata.reason 'timeout' in orderFlowEvents"
         },
         {
           "file": "utils/crons/persistent-alerts-cron.js",
