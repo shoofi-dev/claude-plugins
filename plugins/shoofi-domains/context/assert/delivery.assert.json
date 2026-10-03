@@ -290,6 +290,11 @@
           "desc": "the real store-ready source is orderFlowEvents status 3, keyed by orderNumber === bookDelivery.bookId - NOT a bookDelivery.storeReadyAt field, which nothing writes"
         },
         {
+          "file": "routes/analytics.js",
+          "regex": "match\\.status = \\{ \\$in: status \\}",
+          "desc": "the delivery-list status filter passes the client's STRING statuses straight to $in - it misses the 72 production rows whose status is a BSON int -3 (1,107 string vs 1,179 total). If this line gains a type normalisation, invariant 1's under-count claim is stale"
+        },
+        {
           "file": "utils/crons/growth-snapshots.js",
           "regex": "storeReadyAt",
           "desc": "the surviving storeReadyAt locals here read order.completedAt / orderFlowEvents, never bookDelivery.storeReadyAt (0 of 82,414 rows) - if a bookDelivery read reappears, the net-of-kitchen-delay lie is back"

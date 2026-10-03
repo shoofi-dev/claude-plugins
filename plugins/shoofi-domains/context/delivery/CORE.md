@@ -85,6 +85,16 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
    approved → `3` collected/pickup → `4` delivered; `5` waiting-in-store; cancels `-1` driver,
    `-2` store, `-3` admin. **This is NOT `ORDER_STATUS`** (where DELIVERED = `12`) — never mix
    the two. Each client keeps its own copy; a change is a multi-repo PR.
+   **The stored value is a STRING on 95,989 production rows and a BSON `int` on 72 of them**
+   (all `-3`, created 2025-08-05 → 2025-11-30; no current writer produces them — every one
+   goes through the const). A string-only `$in` therefore under-counts silently: the delivery
+   list's own filter builds `match.status = { $in: status }` from the client's strings
+   (`routes/analytics.js:314-316`), so ticking "בוטל על ידי המנהל" returns 1,107 rows when
+   1,179 exist. **Any query that filters on `status` must accept both types**
+   (`{$in: ["-3", -3]}`); display is safe, because a JS object lookup coerces the key. The
+   cancels are not a corner either — `-3` is the second-largest status in the collection after
+   `4`, 1,089 of them `cancelledBy: "admin"`, so a label map or a report that omits it is
+   blanking a four-figure population, not an edge case.
 2. **Assignment idempotency:** de-dupe on `originalBookId`; the pending→assigned claim is an
    atomic `updateOne({isPendingAssignment:true})` (`matchedCount===0` = another container won).
    Never bypass either.
