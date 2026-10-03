@@ -124,7 +124,24 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   `docs/customer-orders-snapshot.md` before ANY logic about a customer's order status.
 - **`shoofi.orderFlowEvents`** = append-only audit timeline keyed on `orderNumber`
   (`order_created`, `payment_*`, `status_change`, `delivery_booked`, ...). Read via
-  admin order-monitoring + the `investigate-order` skill.
+  admin order-monitoring + the `investigate-order` skill. Three things about it:
+  - **Its two id fields mean different things.** `orderNumber` is the display
+    `orders.orderId` (`"0760-0519"`) — 0 of 11.7M production rows hold a three-segment
+    `originalOrderId`; `orderId` is the order's **ObjectId** (`getId(orderId)`,
+    `services/monitoring/centralized-flow-monitor.js`). Every read keys on `orderNumber`.
+  - **A timeline is incomplete, never empty.** ~18% of events (measured over 24h) carry
+    **no `orderNumber` at all** and are invisible to every read: the guard in
+    `services/notification/notification-service.js` is `if (data?.orderId ||
+    data?.orderNumber)` and it then writes `data.orderNumber || data.bookId`, so a push
+    payload carrying only the ObjectId is tracked with `orderNumber: undefined`. All of them
+    are `notification_*` / `websocket_sent`; `order_created` is clean (554/554). Missing
+    notification rows on a timeline are usually this, not a notification that never went out.
+  - **`db.orderFlowEvents` is `undefined`.** The collection is NOT registered in
+    `services/database/DatabaseInitializationService.js`; `centralized-flow-monitor.js` works
+    only because it reaches the collection itself (`getCentralDb()`). Code using the handle
+    500s: `GET /api/admin/order-monitoring/stats` (`routes/admin/order-monitoring.js`) and
+    `cleanupOldEvents` — which is why retention is in fact unbounded (oldest retained event
+    2025-07-24).
 - **`delivery-company.bookDelivery`** keyed by `bookId` = order `orderId`; mirrors
   `DELIVERY_STATUS` (`1` waiting_approve … `3` collected/pickup … `4` delivered).
 - **`shoofi.twinOrderGroups`** links `orders.twinGroup` ↔ group `primary`/`secondary`.

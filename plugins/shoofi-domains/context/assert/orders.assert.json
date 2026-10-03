@@ -9,6 +9,7 @@
         "routes/order-fraud-checks.js",
         "routes/order-origin-validator.js",
         "routes/admin/order-monitoring.js",
+        "services/notification/notification-service.js",
         "routes/admin/twin-order-config.js",
         "services/twin-order/twin-group-service.js",
         "services/twin-order/twin-payment-service.js",
@@ -222,6 +223,21 @@
           "file": "utils/order-stock.js",
           "regex": "expandStockLines\\(oldItems, \\{ minQty: 0 \\}\\)",
           "desc": "doc CORE invariant 12: the amend delta compares two expansions with minQty 0 — it must not invent a unit"
+        },
+        {
+          "file": "services/notification/notification-service.js",
+          "regex": "data\\.orderNumber \\|\\| data\\.bookId",
+          "desc": "doc reference §5 orderFlowEvents: a notification event is tracked when only data.orderId is present, so orderNumber is written undefined — ~18% of events are invisible to every monitoring read"
+        },
+        {
+          "file": "services/monitoring/centralized-flow-monitor.js",
+          "regex": "this\\.getCentralDb = \\(\\)",
+          "desc": "doc reference §5 orderFlowEvents: the monitor reaches the central collection itself — it does not use a registered db handle"
+        },
+        {
+          "file": "routes/admin/order-monitoring.js",
+          "regex": "db\\.orderFlowEvents\\.countDocuments",
+          "desc": "doc reference §5 orderFlowEvents: /stats uses db.orderFlowEvents, which is undefined because the collection is not registered in DatabaseInitializationService — the route 500s"
         }
       ]
     },
