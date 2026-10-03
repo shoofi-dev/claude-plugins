@@ -136,6 +136,28 @@ queue retries every **15s** (max 10). → **Store/settlement tax invoices are th
 - **Method resolution**: `helpers/get-supported-payment-methods.ts` → GET `payment-methods`;
   **the server decides** which methods are active (geo/store/coupon rules); client only
   merges icons. Coupon stores drop CASH; a twin cash filter is **commented out** (inactive).
+  The cart's school mode (`cartStore.getIsSchoolProject()`, AsyncStorage
+  `@storage_isSchoolProject`) is sent as the `school-project` header. The server then applies
+  the school deny-list described below.
+- **School payment methods** (server): `utils/school-payment-methods.js`.
+  - `filterSchoolPaymentMethods(methods, schoolSettings)` runs **last** in
+    `routes/payment-methods.js`, after the platform/store/OS/cash-restriction filters, and only
+    when `school-project` is true. It hides a method only when
+    `schoolSettings.supportedPaymentMethods[supportKey] === false`; a missing key, or no object
+    at all, keeps the method.
+    - Until 2026-10 this was an **allow-list** (`=== true`), so a partial object such as
+      `{cash_support:false}` hid every method. Prod never had the field, so the switch changed
+      nothing live.
+  - The admin screen is shoofi-delivery-web `views/admin/schools/SchoolSettings.tsx`. It always
+    sends all four keys, and defaults to on when the GET returns `supportedPaymentMethods: null`.
+  - `GET/POST /api/admin/school-settings` (`routes/shoofi-admin.js`) use `{id:1}`. The POST
+    writes `schoolSettings.orderStartTime`, `schoolSettings.orderEndTime` and
+    `schoolSettings.supportedPaymentMethods.<key>` as **separate dotted `$set`s**, and only for
+    the fields the body carries.
+    - The old handler replaced the whole `schoolSettings` object. Never go back to that: it
+      silently erased the methods every time someone saved the school hours.
+    - `validateSupportedPaymentMethods` rejects unknown keys and non-boolean values with a 400.
+  - **Not enforced at order creation.** This control is UI-only (see CORE "Method resolution").
 - **CC tokenization (live)**: HYP hosted WebView (`hooks/checkout/use-hyp-tokenize.ts`,
   `components/credit-card/HypTokenizeWebView.tsx`) — card entered in the hosted page, never
   in RN; result URL carrying `CCode` is intercepted (navigation blocked) and forwarded to

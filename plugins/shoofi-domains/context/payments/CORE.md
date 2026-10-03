@@ -115,6 +115,30 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    on — a gateway-issued document cannot take a `ua_uuid`, and `EZ.*` is an undocumented
    pass-through that can reject the whole charge, so do not try `EZ.ua_uuid`.
 
+## Method resolution — what the picker offers (UI-only)
+`GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
+icons. Filters run in this order, and each one can only remove methods:
+1. Platform flags on `shoofi.store{id:1}`. Credit card, Apple Pay and Google Pay are platform-only:
+   the per-store `creditcard_support` is **never read**. Cash needs both
+   `<store>.store.cash_support` and the platform `cash_support`.
+2. OS, and Google Pay withheld below app 1.0.23.
+3. Cash restrictions: `customers.cashRestricted`, plus the area's `cashRestricted` /
+   `cashRestrictedFirstOrder`.
+4. **School orders** (header `school-project: true`, sent by the app's cart in school mode):
+   `filterSchoolPaymentMethods` (`utils/school-payment-methods.js`) drops a method only when
+   `shoofi.store{id:1}.schoolSettings.supportedPaymentMethods[supportKey] === false`.
+   - **This is a deny-list.** A missing key keeps the method, so a partial object can never hide
+     everything. It is one platform-wide object, applied to every school order at every school
+     store.
+   - Edited on the admin "School settings" screen. `POST /api/admin/school-settings` writes
+     each key with a dotted `$set`, so saving the hours and saving the methods never wipe each
+     other. Keys are limited to `SCHOOL_PAYMENT_METHOD_KEYS`, with boolean values; anything
+     else is a 400.
+
+⚠️ **Hiding a method is UI-only.** `/api/order/create` does not check the payment method
+against any of these rules, for any order, school or not. A stale or tampered client can still
+send CASH. Enforcing the rules at order creation is a `routes/order.js` change and needs sign-off.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.
   HYP tokenization does not store CVV; this resolves as ZCredit is retired. **Do not
