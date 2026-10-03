@@ -120,6 +120,21 @@
           "desc": "authoritative delivery status enum"
         },
         {
+          "file": "services/delivery/late-delivery.js",
+          "regex": "COMPLETED_DELIVERY_MATCH\\s*=\\s*\\{\\s*completedAt:\\s*\\{\\s*\\$exists:\\s*true,\\s*\\$ne:\\s*null\\s*\\}",
+          "desc": "CORE invariant 14: the completed-delivery predicate is shared, not retyped - book-delivery has no index that can serve a completedAt RANGE (only feedback_cron_delivery_lookup contains it, prefixed on bookId), so every reader windows on `created` and merely requires completedAt to exist"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "db\\.bookDelivery\\.createIndex\\(\\{ created: 1 \\}",
+          "desc": "CORE invariant 14: `created` is the indexed clock on book-delivery, and there is deliberately NO completedAt index - a completedAt range is a COLLSCAN of ~96k documents averaging ~20 KB (area.geometry is a full polygon), and an index for one reader still costs a write 96,000 times over"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "!!deliveryData\\.twinGroupId\\s*\\|\\|",
+          "desc": "CORE invariant 14: book-delivery DOES carry a TOP-LEVEL twinGroupId - the caller may set it directly, which is why twin detection here is tolerant. 2,134 production rows have it, 2,126 of them twinAssignmentMode 'single' = one courier, two pickups, one drop-off, TWO rows. So a row count is LEGS (what the payouts pay on) and a trip count must collapse the group. delivery-metrics.js:1055-1058 asserts the opposite in words and is wrong; believe the field"
+        },
+        {
           "file": "routes/delivery/driver.js",
           "regex": "lastLocationUpdate:\\s*timestamp,\\s*\\n\\s*lastFixAt:\\s*fixAt",
           "desc": "the two location timestamps are written together and mean different things: lastLocationUpdate = server RECEIVE time (offset string, deliberately unchanged for existing consumers), lastFixAt = DEVICE fix time (BSON Date). Any staleness rule must read lastFixAt first and fall back to lastLocationUpdate, because lastFixAt only shipped 2026-09-12 and 141 of 224 located couriers still lack it"

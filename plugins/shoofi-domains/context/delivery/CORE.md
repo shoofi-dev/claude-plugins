@@ -246,6 +246,36 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+14. **Counting deliveries: window on `created`, and de-dupe twin legs on `twinGroupId`.**
+    Two traps sit on top of each other here.
+
+    **`completedAt` has no index that can serve a range.** `book-delivery` carries
+    `created_1` and `status_1_created_-1`; the only index containing `completedAt` is
+    `feedback_cron_delivery_lookup {bookId:1, status:1, completedAt:1}`, prefixed on
+    `bookId`. So `{completedAt: {$gte, $lt}}` is a COLLSCAN of 96,065 documents averaging
+    ~20 KB — `area.geometry` is a full polygon, so a projection saves the wire and not the
+    scan. That is why every reader on the platform windows on `created` and merely
+    *requires* `completedAt` to exist (`COMPLETED_DELIVERY_MATCH`,
+    `services/delivery/late-delivery.js`): the monthly exec card
+    (`services/exec-dashboard/delivery-metrics.js` → `snapshot.js`), the driver payouts
+    (`routes/driver-reports.js`) and the financial overview
+    (`services/financial-overview/compute.js`). Writing a fifth definition on the
+    `completedAt` clock also puts a booking created 06:50 and delivered 07:20 on a
+    *different business day* from its own order; 2.7% of completions land that way.
+
+    **`book-delivery` DOES carry a top-level `twinGroupId`** — 2,134 rows, 2,113 of them
+    with a `completedAt`, going back to 2026-05-13 — and 2,126 are
+    `twinAssignmentMode: "single"`: one courier, two pickups, one drop-off, **two rows**.
+    So a row count is *legs*, which is what the payouts pay on, and a trip count needs the
+    group collapsed; on a measured business day 7 of 246 rows (2.8%) were a second leg.
+    ⚠️ `delivery-metrics.js:1055-1058` asserts the opposite in words — *"book-delivery
+    carries no top-level twin key to dedupe on anyway"* — and it is simply false; believe
+    the field, not the comment. Never de-dupe on `bookId` instead: it is not unique across
+    tenants (`routes/delivery/orders.js`).
+
+    `services/exec-dashboard/daily-pulse.js` is the worked example of both once
+    `feat/exec-dashboard-daily-pulse` lands — it reports trips, legs and the order-less
+    subset side by side rather than picking one.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
