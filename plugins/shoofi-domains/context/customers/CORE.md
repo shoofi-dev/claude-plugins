@@ -20,6 +20,11 @@ shoofi-admin-users}.js`, `utils/{auth-service,admin-auth-service,app-name-helper
 `controllers/customerAddressController.js`. Clients: login/OTP/profile in all four apps.
 **Not yours:** order history content (`orders`), coins/rewards (growth), driver coverage
 fields (`delivery`) — you own the identity record they hang off.
+Also yours: the school-project enrollment (`services/customer/school-project-enrollment.js`)
+and the Google-Form registration sync (`services/school-registrations/`) — reference §4.
+**School registrations never auto-create schools or classes, never guess a class section, and
+the sheet id (a public link to students' names and phones) never goes on a publicly readable
+doc** (`store{id:1}` / `/api/admin/school-settings`).
 
 ## The model — ONE auth, FOUR audiences, routed by `app-type`
 Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `app-type` header
