@@ -69,6 +69,16 @@
       },
       "patterns": [
         {
+          "file": "routes/admin/school-registrations.js",
+          "regex": "const SCHOOL_SECTION_ROLES = \\[\"master\", \"admin\", \"manager\", \"viewer\"\\]",
+          "desc": "viewer works the schools section's registration routes"
+        },
+        {
+          "file": "routes/admin/school-registrations.js",
+          "regex": "const SYNC_SETTINGS_WRITE_ROLES = \\[\"master\", \"admin\", \"manager\"\\]",
+          "desc": "viewer may read but not change the registration-sync settings"
+        },
+        {
           "file": "services/school-registrations/registrations.js",
           "regex": "const FINAL = new Set\\(\\[\"added\", \"already_enrolled\", \"ignored\"\\]\\)",
           "desc": "a re-sync never rewrites an added / already_enrolled / ignored registration"

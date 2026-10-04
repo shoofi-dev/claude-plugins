@@ -152,6 +152,30 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
     fold match.
   - **Never auto-create schools or classes.** The admin creates them in the schools screens,
     then resolves the row or presses retry.
+  - **Roles on the schools section (decided 2026-10-04): `viewer` works it, and stays read-only
+    everywhere else.**
+    - Server: the registration routes take `SCHOOL_SECTION_ROLES` = master/admin/manager/viewer;
+      the sync-settings **write** takes master/admin/manager only (`SYNC_SETTINGS_WRITE_ROLES`).
+    - The older school routes have **no auth at all** today (known, parked — do not "fix" in
+      passing): `GET/POST /api/admin/schools`, `PUT/DELETE /api/admin/schools/:id`,
+      `GET/POST /api/admin/schools/:schoolId/classes`, `PUT/DELETE …/classes/:classId`,
+      `GET/POST /api/admin/school-settings` (hours **and** the #271 payment-methods deny-list),
+      `POST /api/customer/{school-students, add-student, create-school-project-batch,
+      delete-school-project-customer, delete-all-school-project-students,
+      toggle-school-project-active}`, `POST /api/payments/admin/school-students`; plus the
+      customer-app reads `POST /api/customer/{schools, school-classes, get-students-by-ids}`.
+      A viewer therefore already reaches them; nothing gates them by role.
+    - Client (delivery-web): the sidebar is the only role gate (`components/Sidebar/menu-access.ts`:
+      `SCHOOLS_MENU_ITEMS` carry admin/manager/viewer); routes are not role-guarded except the
+      accountant redirect. School settings are read-only for a viewer in the UI
+      (`canEditSchoolSettings`) — client-side only for the hours / payment methods.
+    - Audit: school writes are in the admin-audit map (`category: "schools"`), including the
+      student routes in `routes/customer.js` (names, phones and the uploaded list omitted). The
+      actor is the admin token's claims as **decoded, not verified** by the audit middleware —
+      on the unauthenticated routes it is only as trustworthy as the caller.
+    - Roles are a free-form array on `shoofi.shoofiAdminUsers.roles`; the UI's list is
+      admin/manager/senior/operator/viewer/editor/accountant (+ `master`, DB-only). There is no
+      server-side canonical list. `checkAdminRole` is an OR with no hierarchy.
   - Prod read-only dry run: `scripts/school-registrations-dry-run.js --env <abs path>` (runs the
     real sync against an in-memory copy). 2026-10-04: 60 rows → 4 added, 29 already enrolled,
     21 review (17 `class_ambiguous`), 3 invalid phones, 3 duplicates ignored.
