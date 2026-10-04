@@ -163,7 +163,8 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
       `POST /api/customer/{school-students, add-student, create-school-project-batch,
       delete-school-project-customer, delete-all-school-project-students,
       toggle-school-project-active}`, `POST /api/payments/admin/school-students`; plus the
-      customer-app reads `POST /api/customer/{schools, school-classes, get-students-by-ids}`.
+      customer-app reads `GET /api/customer/schools`, `POST /api/customer/{school-classes,
+      get-students-by-ids}` and `GET /api/admin/check-order-time-valid`.
       A viewer therefore already reaches them; nothing gates them by role.
     - Client (delivery-web): the sidebar is the only role gate (`components/Sidebar/menu-access.ts`:
       `SCHOOLS_MENU_ITEMS` carry admin/manager/viewer); routes are not role-guarded except the
