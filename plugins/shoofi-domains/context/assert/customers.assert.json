@@ -19,7 +19,12 @@
         "docs/customer-orders-snapshot.md",
         "routes/order.js",
         "package.json",
-        "services/customer/school-project-enrollment.js"
+        "services/customer/school-project-enrollment.js",
+        "services/school-registrations/normalize.js",
+        "services/school-registrations/sheet.js",
+        "services/school-registrations/registrations.js",
+        "routes/admin/school-registrations.js",
+        "utils/crons/school-registrations-sync-cron.js"
       ],
       "symbols": {
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
@@ -39,9 +44,21 @@
           "attributeCustomerToReferrer",
           "recordFirstOrderForReferrer"
         ],
-        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store", "deactivateCustomersWithoutStudentsSafely", "toggleSchoolProjectActive"],
+        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store", "deactivateCustomersWithoutStudentsSafely", "toggleSchoolProjectActive", "enrollStudentByPhone"],
+        "services/school-registrations/registrations.js": [
+          "school-registrations",
+          "school-registration-aliases",
+          "school-registration-sync-runs",
+          "school-registration-settings",
+          "runSync",
+          "resolveRegistration",
+          "getSyncSettings"
+        ],
+        "services/school-registrations/normalize.js": ["matchSchool", "matchClass", "normalizePhone", "NFKC"],
+        "utils/crons/school-registrations-sync-cron.js": ["*/15 * * * *", "cron:school-registrations-sync"],
         "services/customer/school-project-enrollment.js": [
           "NO_STUDENT_LINKED",
+          "enrollStudentByPhone",
           "linkStudentToCustomer",
           "enrollStudentOnCustomer",
           "findSchoolProjectCustomer",
@@ -51,6 +68,26 @@
         ]
       },
       "patterns": [
+        {
+          "file": "routes/admin/school-registrations.js",
+          "regex": "const SCHOOL_SECTION_ROLES = \\[\"master\", \"admin\", \"manager\", \"viewer\"\\]",
+          "desc": "viewer works the schools section's registration routes"
+        },
+        {
+          "file": "routes/admin/school-registrations.js",
+          "regex": "const SYNC_SETTINGS_WRITE_ROLES = \\[\"master\", \"admin\", \"manager\"\\]",
+          "desc": "viewer may read but not change the registration-sync settings"
+        },
+        {
+          "file": "services/school-registrations/registrations.js",
+          "regex": "const FINAL = new Set\\(\\[\"added\", \"already_enrolled\", \"ignored\"\\]\\)",
+          "desc": "a re-sync never rewrites an added / already_enrolled / ignored registration"
+        },
+        {
+          "file": "routes/admin/school-registrations.js",
+          "regex": "checkAdminRole\\(",
+          "desc": "the registration admin API (and the sheet id it stores) is admin-only"
+        },
         {
           "file": "services/customer/school-project-enrollment.js",
           "regex": "\"schoolProject\\.studentIds\\.0\": \\{ \\$exists: false \\}",

@@ -97,6 +97,89 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
     student list sends the *student* `_id` as `customerId`, so it resolves by customer `_id`
     first, then by `schoolProject.studentIds`; no school/class equality check. Toggling one
     child's row turns school mode off/on for the whole customer (every linked sibling).
+  - **One enrollment path: `enrollStudentByPhone`** (`services/customer/school-project-enrollment.js`)
+    — student by phone + school + class (found → reused; the batch upload refreshes its name
+    and `isActive`, the registration sync does not), customer by phone (found →
+    `enrollStudentOnCustomer`, else created with `schoolProject`). Both
+    `create-school-project-batch` and the Google-Form sync call it.
+- **School registrations (Google Form → students)** — `services/school-registrations/`
+  (`normalize.js`, `sheet.js`, `registrations.js`), cron
+  `utils/crons/school-registrations-sync-cron.js` (every 15 min, Asia/Jerusalem, Redis lock
+  `cron:school-registrations-sync` shared with the admin's write buttons), admin API
+  `routes/admin/school-registrations.js` (`/api/admin/school-registrations…`, `auth.required` +
+  `checkAdminRole`, audited with `fullName`/`phone` omitted), admin screen "רישומי תלמידים"
+  (delivery-web `src/views/admin/schools/SchoolRegistrations.tsx`).
+  - **Source: the sheet's PUBLIC CSV export** (`/gviz/tq?tqx=out:csv&sheet=…`), no Google
+    credentials — the product owner's choice. ⚠️ **Anyone with the link can read every
+    student's name and phone.** The sheet id is therefore kept off the publicly readable
+    `shoofi.store{id:1}` (returned whole by unauthenticated `GET /api/store/get/shoofi`) and
+    off `/api/admin/school-settings` (no auth): it lives in
+    **`shoofi.school-registration-settings{_id:"sync", enabled, sheetId, sheetName}`**, read and
+    written only via `/api/admin/school-registrations/settings`. Never log names or phones.
+  - **Kill switch:** nothing runs until a `sheetId` is saved; `enabled: false` stops the cron and
+    "sync now". The cron is registered with the others (`ENABLE_CRONS`) but is inert in prod
+    until configured.
+  - **`shoofi.school-registrations`**, one doc per sheet row: `rowKey` (sha256 of canonical
+    timestamp + raw phone + raw name; unique), `sheetRow` (display only), `raw{timestamp, name,
+    school, class, phone, owner, classCode}` exactly as in the sheet (columns mapped **by header
+    text**, a missing required column fails the run), `normalized{school, class, phone, name}`,
+    `match{schoolId, classId, candidates{schools[], classes[]}}`, `status`, `issues[]`,
+    `studentId`, `customerId`, `enrolledElsewhere`, `resolvedBy`, `history[]`,
+    `createdAt/updatedAt/lastSeenAt`. Runs: **`school-registration-sync-runs`**
+    (`startedAt/finishedAt/ok/error/counts`).
+  - **Statuses:** `added` (new student) · `already_enrolled` (student existed for phone + school
+    + class; linked if it was not) · `needs_review` · `invalid` (`invalid_phone`,
+    `missing_name`) · `ignored` · `error` (enroll threw; retried every sync). Issue codes:
+    `school_not_found`, `school_ambiguous`, `class_not_found`, `class_ambiguous`,
+    `invalid_phone`, `missing_name`, `duplicate_row` (same phone + name on an earlier row: same
+    class → auto-`ignored`, else review), `enrolled_other_class` (the same child — phone + name —
+    already a student in another class: review, never a second student), `enroll_failed`.
+  - **Re-sync rule:** `added` / `already_enrolled` / `ignored` and any `resolvedBy` row are
+    final — only `lastSeenAt` moves. Unresolved rows are re-matched every sync (a new alias or
+    class can resolve them; changed raw values are re-read). Writes are compare-and-set on
+    `updatedAt`. A fetch / parse failure (HTTP ≠ 200, HTML instead of CSV — the sheet stopped
+    being public —, missing columns) records a failed run and **changes no row**.
+  - **Matching:** fold only safe differences (NFKC — prod class names are stored with a
+    *decomposed* hamza, ا + U+0654 —, Arabic-Indic digits, أ/إ/آ→ا, ة→ه, ى→ي, quotes /
+    parentheses / harakat, a leading "مدرسة" and trailing "الابتدائيه…", a leading "الصف", the
+    leading "ال" of each word; built-in alias אלמנאר → المنار). **Auto-match only when exactly
+    one school and exactly one class of it match.** A section-less grade ("الرابع") or a digit vs
+    letter section ("الرابع 2" vs أ/ب) is **never guessed** → `class_ambiguous` with candidates.
+    The class-code column is appended when the class text has no section.
+  - **Aliases** (`shoofi.school-registration-aliases`, unique `(type, schoolId, key)`):
+    `{type:"school", schoolId:null, key, targetId}` / `{type:"class", schoolId, key, targetId}`,
+    written only when an admin resolves a row with "remember this spelling"; checked before the
+    fold match.
+  - **Never auto-create schools or classes.** The admin creates them in the schools screens,
+    then resolves the row or presses retry.
+  - **Roles on the schools section (decided 2026-10-04): `viewer` works it, and stays read-only
+    everywhere else.**
+    - Server: the registration routes take `SCHOOL_SECTION_ROLES` = master/admin/manager/viewer;
+      the sync-settings **write** takes master/admin/manager only (`SYNC_SETTINGS_WRITE_ROLES`).
+    - The older school routes have **no auth at all** today (known, parked — do not "fix" in
+      passing): `GET/POST /api/admin/schools`, `PUT/DELETE /api/admin/schools/:id`,
+      `GET/POST /api/admin/schools/:schoolId/classes`, `PUT/DELETE …/classes/:classId`,
+      `GET/POST /api/admin/school-settings` (hours **and** the #271 payment-methods deny-list),
+      `POST /api/customer/{school-students, add-student, create-school-project-batch,
+      delete-school-project-customer, delete-all-school-project-students,
+      toggle-school-project-active}`, `POST /api/payments/admin/school-students`; plus the
+      customer-app reads `GET /api/customer/schools`, `POST /api/customer/{school-classes,
+      get-students-by-ids}` and `GET /api/admin/check-order-time-valid`.
+      A viewer therefore already reaches them; nothing gates them by role.
+    - Client (delivery-web): the sidebar is the only role gate (`components/Sidebar/menu-access.ts`:
+      `SCHOOLS_MENU_ITEMS` carry admin/manager/viewer); routes are not role-guarded except the
+      accountant redirect. School settings are read-only for a viewer in the UI
+      (`canEditSchoolSettings`) — client-side only for the hours / payment methods.
+    - Audit: school writes are in the admin-audit map (`category: "schools"`), including the
+      student routes in `routes/customer.js` (names, phones and the uploaded list omitted). The
+      actor is the admin token's claims as **decoded, not verified** by the audit middleware —
+      on the unauthenticated routes it is only as trustworthy as the caller.
+    - Roles are a free-form array on `shoofi.shoofiAdminUsers.roles`; the UI's list is
+      admin/manager/senior/operator/viewer/editor/accountant (+ `master`, DB-only). There is no
+      server-side canonical list. `checkAdminRole` is an OR with no hierarchy.
+  - Prod read-only dry run: `scripts/school-registrations-dry-run.js --env <abs path>` (runs the
+    real sync against an in-memory copy). 2026-10-04: 60 rows → 4 added, 29 already enrolled,
+    21 review (17 `class_ambiguous`), 3 invalid phones, 3 duplicates ignored.
 - **`shoofi.storeUsers`** (partners) — `phone`, `appName`, `roles[]`, `token`, `authCode`.
   ⚠️ **`storeUsers` is the accessor, not the collection.** `db.storeUsers` is bound to the
   collection literally named **`store-users`**
