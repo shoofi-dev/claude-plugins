@@ -24,12 +24,21 @@
         "services/school-registrations/sheet.js",
         "services/school-registrations/registrations.js",
         "routes/admin/school-registrations.js",
-        "utils/crons/school-registrations-sync-cron.js"
+        "utils/crons/school-registrations-sync-cron.js",
+        "utils/admin-role.js"
       ],
       "symbols": {
-        "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
-        "utils/auth-service.js": ["generateJWT", "toAuthJSON"],
-        "utils/app-name-helper.js": ["getCustomerAppName"],
+        "services/database/DatabaseInitializationService.js": [
+          "store-users",
+          "persistent-alerts"
+        ],
+        "utils/auth-service.js": [
+          "generateJWT",
+          "toAuthJSON"
+        ],
+        "utils/app-name-helper.js": [
+          "getCustomerAppName"
+        ],
         "utils/customer-orders.js": [
           "COMPLETED_STATUSES",
           "CANCELLED_STATUSES",
@@ -44,7 +53,14 @@
           "attributeCustomerToReferrer",
           "recordFirstOrderForReferrer"
         ],
-        "routes/customer.js": ["validateAuthCode", "authCode", "switch-store", "deactivateCustomersWithoutStudentsSafely", "toggleSchoolProjectActive", "enrollStudentByPhone"],
+        "routes/customer.js": [
+          "validateAuthCode",
+          "authCode",
+          "switch-store",
+          "deactivateCustomersWithoutStudentsSafely",
+          "toggleSchoolProjectActive",
+          "enrollStudentByPhone"
+        ],
         "services/school-registrations/registrations.js": [
           "school-registrations",
           "school-registration-aliases",
@@ -54,8 +70,16 @@
           "resolveRegistration",
           "getSyncSettings"
         ],
-        "services/school-registrations/normalize.js": ["matchSchool", "matchClass", "normalizePhone", "NFKC"],
-        "utils/crons/school-registrations-sync-cron.js": ["*/15 * * * *", "cron:school-registrations-sync"],
+        "services/school-registrations/normalize.js": [
+          "matchSchool",
+          "matchClass",
+          "normalizePhone",
+          "NFKC"
+        ],
+        "utils/crons/school-registrations-sync-cron.js": [
+          "*/15 * * * *",
+          "cron:school-registrations-sync"
+        ],
         "services/customer/school-project-enrollment.js": [
           "NO_STUDENT_LINKED",
           "enrollStudentByPhone",
@@ -172,11 +196,29 @@
           "file": "routes/customer.js",
           "regex": "authCode: random4DigitsCode, token: null, isDeleted: false",
           "desc": "the OTP-REQUEST handler clears isDeleted before any code is verified, so isDeleted:false does not mean 'never asked to be deleted' - deletedAt is the durable marker"
+        },
+        {
+          "file": "utils/admin-role.js",
+          "regex": "requiredRoles\\.some\\(\\s*\\(role\\) =>\\s*user\\.roles && user\\.roles\\.includes\\(role\\)",
+          "desc": "checkAdminRole is a flat OR over the list — master does not imply admin"
+        },
+        {
+          "file": "utils/admin-role.js",
+          "regex": "return res\\.status\\(403\\)",
+          "desc": "checkAdminRole fails CLOSED on a non-intersecting roles array, unlike requireStoreRole"
+        },
+        {
+          "file": "routes/shoofi-admin-users.js",
+          "regex": "\"senior\"",
+          "desc": "senior is part of the live admin role vocabulary returned by GET /api/admin/users/roles"
         }
       ]
     },
     "shoofi-partner": {
-      "files": ["stores/auth/index.ts", "stores/user-details/index.tsx"],
+      "files": [
+        "stores/auth/index.ts",
+        "stores/user-details/index.tsx"
+      ],
       "patterns": [
         {
           "file": "stores/auth/index.ts",

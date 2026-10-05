@@ -119,6 +119,31 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    (`GET /api/customer/:customerId` gained `deletedAt` in shoofi-server
    `fix/HIGH-RISK-churn-360-account-status`; add the matching assert once that merges.)
 
+9. **`checkAdminRole` is a flat OR with NO hierarchy — `master` does not imply `admin`.**
+   The gate is `requiredRoles.some(r => user.roles.includes(r))` (`utils/admin-role.js`,
+   which says so in its own header), and it is copy-pasted byte-identically into
+   `routes/shoofi-admin-users.js`, `routes/fraud.js`, `routes/team-tasks.js`,
+   `routes/driver-shift-manager.js` and `routes/competitors.js`. It fails **closed** — no
+   `req.auth` is 401, a non-intersecting `roles` is 403 — which is the opposite of
+   partner-side `requireStoreRole` (`utils/store-membership.js`), so do not reason from one
+   to the other. Two consequences, and both bite:
+   - A list meant to include the owners must **name `master` explicitly**. `["admin"]`
+     locks out a master-only account. The same rule governs the admin web's
+     `isMenuItemVisible` and `RoleBasedAccess`, so forgetting it there shows the owner an
+     empty `<div>` rather than an error.
+   - `["master"]` is therefore a **replacement**, not a narrowing: everyone else, `admin`
+     included, becomes 403. That is how "owner-only" is expressed — the impersonation route
+     in `routes/shoofi-admin-users.js` and `routes/order-recharge.js`.
+     (Ten admin screens join them via a single `utils/master-only-routes.js` list mounted
+     ahead of every router, in shoofi-server `feat/master-only-admin-screens-HIGH-RISK`;
+     add the matching assert once that merges.)
+   The live vocabulary is **wider than the server's own list**: `GET /api/admin/users/roles`
+   returns `master|admin|manager|senior|operator|viewer|editor`, but **`accountant` is real
+   and in production** (`routes/driver-shift-manager.js`, and the admin web's
+   `RestrictedRoleGuard` / sidebar). `roles` is a pass-through from the request body with no
+   validation beyond "a non-empty array", and every gate reads it from the **token**, not the
+   DB — so a role added to a document does nothing until that admin logs in again.
+
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
 - **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin
