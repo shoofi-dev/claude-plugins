@@ -134,9 +134,14 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    - `["master"]` is therefore a **replacement**, not a narrowing: everyone else, `admin`
      included, becomes 403. That is how "owner-only" is expressed — the impersonation route
      in `routes/shoofi-admin-users.js` and `routes/order-recharge.js`.
-     (Ten admin screens join them via a single `utils/master-only-routes.js` list mounted
-     ahead of every router, in shoofi-server `feat/master-only-admin-screens-HIGH-RISK`;
-     add the matching assert once that merges.)
+     (Ten admin screens join them via a single `utils/restricted-admin-routes.js` list
+     mounted ahead of every router, in shoofi-server `feat/master-only-admin-screens-HIGH-RISK`;
+     add the matching assert once that merges. Each entry there carries its OWN allow-list
+     for the same reason — eight are `["master"]`, but the two invoice screens are
+     `["master","accountant"]`, because `accountant` already had them and a role list is a
+     replacement, so "tighten to master" silently *removes* a permission somebody holds.
+     Check who holds a role before narrowing a list: `shoofi.shoofi-admin-users` had 12 docs
+     on 2026-10-05 and one carried `accountant` and nothing else.)
    The live vocabulary is **wider than the server's own list**: `GET /api/admin/users/roles`
    returns `master|admin|manager|senior|operator|viewer|editor`, but **`accountant` is real
    and in production** (`routes/driver-shift-manager.js`, and the admin web's
