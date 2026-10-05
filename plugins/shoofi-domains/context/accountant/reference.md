@@ -43,6 +43,10 @@ status — the snapshot rule is respected); 4. **compensations approved**
 store's money (`payingParty` or `compensationFor` = `business`), over the report's own
 compensation window with BSON `Date` bounds. Before 2026-10 it compared Date fields to strings
 and never fired (CORE invariant 5).
+It also returns `pendingCompensations` (`[{compensationId, orderNumber, items}]`): the
+failure is pushed to the generate response, stored on the `store-report-failures` row and
+returned by `GET /reports/failed-stores`, and the admin (GenerateReports / ReportsList
+failed-stores view) links each one to `/admin/compensations?orderNumber=…`.
 Then `generateStoreReportData`  → insert `storeReports` `status:'draft'` → HTML→PDF→Spaces.
 
 **The money-critical totals** (`admin-reports.js`) — memorize:
