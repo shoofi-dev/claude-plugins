@@ -31,6 +31,8 @@
           "couponDeliveryPortion",
           "couponDeliverySplit",
           "isPercentageStoreDeliveryCoupon",
+          "shoofiCouponCredit",
+          "appliedCouponAmount",
           "calculateCommission",
           "getDateRange"
         ],
@@ -143,6 +145,21 @@
           "file": "routes/payments/admin.js",
           "regex": "discountAmount\\s*=\\s*\\(storeDiscount\\s*/\\s*100\\)\\s*\\*\\s*orderPrice",
           "desc": "CORE invariant 7: a percentage-type coupon bills the store a percentage of the ITEMS subtotal even when its discountType is 'delivery' — couponDeliverySplit deliberately diverges and takes the share off order.shippingPrice instead (owner ruling 2026-08-12)"
+        },
+        {
+          "file": "lib/payments/calc.js",
+          "regex": "Math\\.min\\(nominal,\\s*applied\\)",
+          "desc": "CORE invariant 7: couponsFromShoofi credits the discount APPLIED on the order, capped by Shoofi's share — never the coupon's nominal value per redemption (a partial-use coupon was credited in full at every store; owner decision 2026-10)"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "appliedAmount:\\s*appliedCouponAmount\\(appliedCoupon\\)",
+          "desc": "stores-export-new routes the customer-specific order_items credit through shoofiCouponCredit with the order's applied amount"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "shoofiDiscount\\s*=\\s*appliedCoupon\\.coupon\\.value\\s*\\|\\|\\s*0",
+          "desc": "CORE invariant 7: an empty shoofiDiscount on a customer-specific coupon falls back to coupon.value — INTENTIONAL, it credits back a store-paid COMP-* compensation coupon against its one-time compensationsToCustomers charge"
         },
         {
           "file": "routes/admin/masav.js",

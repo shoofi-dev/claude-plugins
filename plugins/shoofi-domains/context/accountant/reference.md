@@ -71,6 +71,15 @@ invoiceReceived/transferPerformed`. Carry-over comps marked collected only on **
 - **`effectiveDeliveryFee(delivery)`** (`calc.js`) = courier earning = `order.shippingPrice`;
   twin **single-mode primary** adds `combinationFeeBase` once (one driver, both pickups); split/secondary = base only.
 - **`couponDeliveryPortion`**  peels coupon-covered delivery out of cash/CC buckets.
+- **`shoofiCouponCredit({shoofiDiscount, couponType, orderPrice, appliedAmount})`** (`calc.js`)
+  = the per-order `couponsFromShoofi` credit for a customer-specific `order_items` coupon:
+  `min(nominal, applied)`, nominal = `shoofiDiscount` (percentage → `/100 * orderPrice`),
+  applied = **`appliedCouponAmount(appliedCoupon)`** (`discountAmount ?? coupon.discountAmount`);
+  applied missing → nominal (legacy). `stores-export-new` pushes the row as
+  `{amount, itemsAmount: amount, deliveryAmount: 0}`. An empty `shoofiDiscount` on a
+  customer-specific coupon falls back to `coupon.value` — deliberately, so a store-paid
+  `COMP-*` compensation coupon is credited back against its one-time
+  `compensationsToCustomers` charge (CORE invariant 7).
 - **`getDateRange`**  — business-day boundaries via `store.openHours` (March-2026 transition fix).
 - **Cost-bearers:** store bears commission+VAT+fees+its coupon share+store-paid comps; Shoofi
   bears customer coupons (reimburses store), Shoofi comps, driver min-guarantee, drive-in cut;
