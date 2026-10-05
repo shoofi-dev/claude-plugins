@@ -170,6 +170,29 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
 
+   **The other direction — `couponsFromShoofi` (Shoofi credits the store) — is the APPLIED
+   amount, capped by Shoofi's share** (owner decision 2026-10). For a customer-specific
+   `order_items` coupon, `stores-export-new` credits
+   `min(nominal, applied)` via `shoofiCouponCredit` (`lib/payments/calc.js`), where
+   `nominal = shoofiDiscount` (or `(shoofiDiscount/100) * orderPrice` for `type:
+   'percentage'`) and `applied = appliedCoupon.discountAmount ?? appliedCoupon.coupon.discountAmount`
+   (`appliedCouponAmount`). `applied` missing (legacy orders) → the nominal, unchanged.
+   Before this, every redemption was credited the nominal value, so a **partial-use**
+   coupon paid out its full value at every store it touched (IMGOJRNG: ₪200 credited for a
+   ₪49 use AND ₪200 for a ₪151 use; 27 rows / ₪1,775.5 Mar-Oct 2026). The pushed
+   `shoofiCouponsData` row carries `itemsAmount = credited, deliveryAmount = 0` so the PDF
+   columns reconcile with `amount`. Note the asymmetry with `campaigns` above, which is
+   still the nominal — that is a separate, undecided question; do not "align" them.
+   **The `coupon.value` fallback is CORRECT, do not remove it:** a customer-specific coupon
+   with an empty `shoofiDiscount` is treated as Shoofi-credited at `coupon.value`, even when
+   it has `storeDiscount` set. That is how a **store-paid compensation** balances: the store
+   is charged ONCE as `compensationsToCustomers` in the month the compensation is approved,
+   and each redemption of the resulting `COMP-*` coupon is credited back via
+   `couponsFromShoofi`, offsetting the food it handed over — net, the store bears the
+   compensation exactly once. (With the old nominal credit, a ₪200 COMP coupon spent ₪90
+   at the store refunded it ₪200: its real cost fell to ₪90.) Guarded in
+   `test/integration/settlement-guards.js`.
+
 8. **Compensation parties.** `compensationFor ∈ {customer, business, driver, shoofi}`,
    `payingParty ∈ {shoofi, business, driver}`, and **payer ≠ recipient** — enforced server-side
    on add and edit by `services/compensations/validate-parties.js`. `business → business` would
@@ -197,6 +220,11 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
+- **FIXED 2026-10, keep it that way:** `couponsFromShoofi` credits the discount APPLIED on
+  the order (capped by Shoofi's share), not the coupon's nominal value per redemption — see
+  invariant 7. **INTENTIONAL, do NOT "fix":** the customer-specific `coupon.value` fallback
+  that credits a store-paid `COMP-*` compensation coupon (it offsets the one-time
+  `compensationsToCustomers` charge).
 - **INTENTIONAL, do NOT "restore":** delete accepts **any** report status (2026-08-03). The
   old "only draft reports can be deleted" guard was removed on purpose so a wrong report that
   already went out to a store/driver can be regenerated. Deleting a report that carries an
