@@ -35,10 +35,14 @@ before touching any settlement math.
 ## 2. Store settlement reports — `routes/payments/admin-reports.js`
 **Generate**: `POST /api/payments/admin/reports/generate`  — per store (or all
 `business_visible` stores). Pre-generate **guards** (all skip on failure):
-1. exact-duplicate (same store+day-range) ; 2. **overlap vs NON-sent reports** ( —
-⚠️ a *sent* report does NOT block an overlapping new one, §10); 3. **orders-closed** ( —
+1. exact-duplicate (same store+day-range) ; 2. **overlap vs reports of ANY status**
+(`checkOverlappingReports` — a sent report blocks too; CORE invariant 5); 3. **orders-closed** ( —
 no store `orders` in `{"1","6"}` in range; reads the store-DB `orders` collection, which HAS
-status — the snapshot rule is respected); 4. compensations approved .
+status — the snapshot rule is respected); 4. **compensations approved**
+(`validateCompensationsApproved`): no item still pending (status not 1/2) that moves the
+store's money (`payingParty` or `compensationFor` = `business`), over the report's own
+compensation window with BSON `Date` bounds. Before 2026-10 it compared Date fields to strings
+and never fired (CORE invariant 5).
 Then `generateStoreReportData`  → insert `storeReports` `status:'draft'` → HTML→PDF→Spaces.
 
 **The money-critical totals** (`admin-reports.js`) — memorize:
@@ -51,10 +55,27 @@ totalOutcomes   = totalCommission + vat + oneTimeFees + monthlyFees + campaigns
                   - couponsFromShoofi - compensationsFromShoofi
 totalForTransfer = creditCardRevenue + driveInCreditCard - totalOutcomes   ← the MASAV/bank figure
 totalForInvoice  = creditCardRevenue + driveInCreditCard                    ← tax-invoice gross
-balance          = totalForTransfer   (÷1.18 if businessType === 'exempt')
+balance          = totalForTransfer   (no VAT adjustment for any businessType — CORE invariant 1)
 ```
 Revenue comes from an internal self-call to **`stores-export-new`** (§4, the real engine).
-Commission base = **pre-discount** price so coupons can't erode Shoofi's cut. `vat = totalCommission * 0.18`.
+Commission base = the FINAL items price charged (CORE invariant 3). `vat = calculateVAT(totalCommission)` (`utils/vat.js`).
+
+**Windows** (`services/compensations/report-window.js`, CORE invariant 10): orders, coins,
+coupons and delivery-only fees use `storeReportBounds` → `[start, end]` business-day bounds
+(offset strings). Compensations use `storeCompensationWindow` → `[start, endExclusive)` Dates,
+where `endExclusive` is the next day's business-day start — passed to the two
+`GET /api/shoofiAdmin/compensations` self-calls (`payers=['business']`,
+`recipients=['business']`) with `endExclusive=true`, and stored on the report as
+`reportData.compensationWindow`. Carry-over compensations
+(`appNameBackfill.pendingReportCarryover`) are deliberately NOT date-filtered.
+
+**Compensation lock** (`checkCompensationLock`, called from `rejectIfCompensationPeriodClosed`
+in `routes/shoofi-admin.js` on add / `edit/:id` + `PUT :id` / `approve-item` / `DELETE :id`):
+409 `compensation_period_closed` when a money-moving change (`affectedParties`) hits a
+compensation whose `createdAt` is inside an existing store report's window (by `appName`) or
+driver report's window (by `deliveryCompanyId` = `item.deliveryCompany._id`). Delete +
+regenerate the report to reopen. The admin web (`CompensationManagement.tsx`,
+`CompensationModal.tsx`) shows generic error toasts and does not yet surface the 409 message.
 
 **Lifecycle**: `draft →(approve)→ approved →(send: WhatsApp monthly_report to billingContacts)→
 sent`; `send-invoice`; `create-invoice` (§5); status toggles `reportSent/invoiceSent/
@@ -80,7 +101,7 @@ invoiceReceived/transferPerformed`. Carry-over comps marked collected only on **
 Read-only aggregations: `admin.js` `/overview`, `/partners` (flat 15%), `/drivers`, `/analytics`.
 **`POST /stores-export-new` (`admin.js`) is the real revenue source** feeding store reports:
 per store, over `orders` with `status ∈ {"2","3","10","11","12"}` (completed) in range —
-commission base `originalOrderPrice||orderPrice` (pre-discount), revenue by method **minus coins**
+commission base = the charged `orderPrice` (CORE invariant 3 — not pre-discount since 2026-08-04), revenue by method **minus coins**
 (`orderPrice - coinsValue`), coupon split from per-source `couponUsages` docs. `summaries.js`
 serves partner/driver self-service views via `calc.js`.
 
@@ -203,20 +224,23 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   accountant's May–June file had 26 such records out of 285.
 
 ## 8. Data model
-- **`shoofi.storeReports`** — `{storeId, appName, dateRange, reportType, status(draft|approved|sent),
+- **`shoofi.storeReports`** (collection `store-reports`) — `{storeId, appName, dateRange, reportType, status(draft|approved|sent),
   reportData{creditCardRevenue, cashRevenue, coins*, driveIn*, couponsFromShoofi,
   compensationsFromShoofi, totalIncomes, commission, coinsCommission, vatOnCommission, oneTime/
   monthlyCharges, campaigns, compensationsTo*, carryover*, driveInShoofi, totalOutcomes,
-  totalForTransfer, totalForInvoice, balance, commissionPercent, businessType}, reportSent,
+  totalForTransfer, totalForInvoice, balance, commissionPercent, businessType,
+  compensationWindow{start, endExclusive} (2026-10+; absent on older reports)}, reportSent,
   invoiceSent, invoiceReceived, transferPerformed, pdfUrl, greenInvoice*, hyp*Invoice*}`.
-- **`shoofi.driverReports`** — `{deliveryCompanyId, dateRange, reportData{totalDeliveries,
+- **`shoofi.driverReports`** (collection `driver-reports`) — `{deliveryCompanyId (string), dateRange, reportData{totalDeliveries,
   totalDriverPayment, earningsBy*, totalBonuses, totalCompensations, totalDriverCharges,
   totalMinGuaranteeTopUp, netTotal, driverPayments[]}, status, transferPerformed, pdfUrl}`.
 - **`delivery-company.driverDailyHours`** — `{driverId, date, activeMinutes, inShiftMinutes,
   inWorkingHoursMinutes, …}` (nightly cron; live fallback from `driverStatusHistory`+`driverShifts`).
 - **`shoofi.compensations`** — `{order, items:[{status(0|1|2), compensationFor('business'|'customer'|
   'driver'|'shoofi'), payingParty('shoofi'|'business'|'driver'), approvedAmount, driver, deliveryCompany}],
-  appNameBackfill{pendingReportCarryover}}`. `payingParty !== compensationFor` is enforced on add/edit
+  appNameBackfill{pendingReportCarryover}, createdAt (BSON Date — the settlement clock)}`. Attributed to the
+  report whose window contains `createdAt` (CORE invariant 10), locked once that report exists.
+  `payingParty !== compensationFor` is enforced on add/edit
   (`services/compensations/validate-parties.js`). `compensationFor:'shoofi'` = the store (or driver) owes
   Shoofi — store report outcome `compensationsToShoofi`, driver report `totalDriverCharges`; no coupon.
 - **Store `accounting`** (store's own DB): `accountantFileNumber` (the accountant's מספר תיק = the
@@ -239,10 +263,11 @@ and `generate-stores-summaries.tsx`; `app-type: shoofi-admin`. This is where a h
 approves, sends reports, and exports the MASAV Excel. (Full-stack: server computes, admin drives.)
 
 ## 10. ⚠️ Known risks / flagged for verdict (money-critical — do NOT silently "fix")
-1. **Overlap guard ignores `sent` reports**  — a `sent` report does NOT block a new
-   overlapping report → a **double-billing window**. Bug, or intended (allow re-issue)?
-2. **`DELETE report` status guard is commented out**  — a sent/invoiced report can be
-   deleted, **orphaning an issued tax invoice**. Almost certainly should be re-enabled — confirm.
+1. ~~**Overlap guard ignores `sent` reports**~~ — FIXED: `checkOverlappingReports` checks every
+   status (CORE Known status). Kept for history.
+2. **`DELETE report` accepts any status** — decided INTENTIONAL 2026-08-03 (CORE Known status):
+   a wrong sent report must be regenerable; an issued tax invoice is only warned about. Deleting
+   a report also reopens its compensations to edits (CORE invariant 10).
 3. **`reset-invoice`**  unsets invoice fields, re-enabling `create-invoice` → **double-invoice
    risk** if misused. Intended re-issue path? Guard it?
 4. **Hardcoded IDs** — GreenInvoice `businessId = '9058c694-…'`  and `itemId`/`catalogNum`
