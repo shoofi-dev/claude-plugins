@@ -411,6 +411,16 @@
         },
         {
           "file": "utils/combo-validation.js",
+          "regex": "const COMBO_SECTION_MAX_COUNT = 20",
+          "desc": "doc CORE invariant 10: the section slot-count ceiling is decided here and nowhere else (shoofi-delivery-web mirrors it)"
+        },
+        {
+          "file": "utils/combo-validation.js",
+          "regex": "count > COMBO_SECTION_MAX_COUNT",
+          "desc": "doc CORE invariant 10: validateComboShape enforces the ceiling, so a client can never be the stricter of the two"
+        },
+        {
+          "file": "utils/combo-validation.js",
           "regex": "COMBO_NESTED",
           "desc": "doc CORE invariant 10: no combo inside a combo (phase 1)"
         },
@@ -950,7 +960,9 @@
         "src/views/admin/ai-usage/AiUsage.tsx",
         "src/apis/admin/ai-usage.ts",
         "src/views/admin/stores/MenuSpellcheck.tsx",
-        "src/apis/admin/menu-spellcheck.ts"
+        "src/apis/admin/menu-spellcheck.ts",
+        "src/types/combo.ts",
+        "src/utils/combo-validation.ts"
       ],
       "symbols": {},
       "patterns": [
@@ -968,6 +980,11 @@
           "file": "src/apis/admin/menu-spellcheck.ts",
           "regex": "/admin/menu-spellcheck/accept",
           "desc": "doc reference §7: the admin screen accepts fixes through the spellcheck endpoint"
+        },
+        {
+          "file": "src/types/combo.ts",
+          "regex": "COMBO_SECTION_MAX_COUNT = 20",
+          "desc": "doc CORE invariant 10: the admin builder mirrors the server's ceiling and must never be stricter (it was 5 here with no server ceiling at all until 2026-10-05)"
         }
       ]
     }

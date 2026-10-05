@@ -118,15 +118,32 @@ boundary and say so in the PR.
    - **Every write runs `utils/combo-validation.js`, in order:** `parseComboBody`
      (`PRODUCT_TYPE_INVALID`, `COMBO_NOT_JSON`; a `combo` body on a regular product is
      **dropped**), `validateComboShape` (non-empty sections, unique section ids, a name,
-     numeric `order`, integer `count ≥ 1`, non-empty options, `productId` unique per section,
-     `surcharge ≥ 0` defaulting to 0 — and the definition is **normalised to exactly those
-     fields**, so a `product` snapshot a client echoes back from the menu is never persisted),
+     numeric `order`, integer `count` in `1..COMBO_SECTION_MAX_COUNT`, non-empty options,
+     `productId` unique per section, `surcharge ≥ 0` defaulting to 0 — and the definition is
+     **normalised to exactly those fields**, so a `product` snapshot a client echoes back from
+     the menu is never persisted),
      `validateComboProductFields` (`COMBO_SOLD_BY_WEIGHT`; `COMBO_PRICE_REQUIRED` — `price`
      must be > 0 because 0 means "not for sale", invariant 8), then `validateComboReferences`
      with **ONE** `products.find` projected `{ productType, soldByWeight }`:
      `COMBO_COMPONENT_NOT_FOUND`, `COMBO_SELF_REFERENCE`, `COMBO_NESTED` (no combo inside a
      combo), `COMBO_COMPONENT_SOLD_BY_WEIGHT`. Every refusal is
      `400 { message: "Invalid combo", code: "COMBO_INVALID", errors: [{ code, sectionId?, productId?, … }] }`.
+   - **`COMBO_SECTION_MAX_COUNT` (20) in `utils/combo-validation.js` is the ONLY place a
+     section's slot count is bounded, and a client may never be stricter.** It is not a
+     business rule — a twelve-burger family box is legitimate — it bounds the typo: `count`
+     drives `Array.from({ length: count })` in the apps' slot picker
+     (`shoofi-app/components/combo/ComboSection.tsx`) and the per-slot expansion in
+     `utils/order-stock.js`. ⚠️ Until 2026-10-05 the ceiling existed ONLY in
+     shoofi-delivery-web (`src/types/combo.ts`, 5) and not here at all, so the builder refused
+     deals the API would have taken and stores split one deal across two identically-named
+     sections to get under it (`afndena`'s 310₪ "בוקס משפחתי" is two `המבורגר` sections over the
+     same four options, `count: 5` + `count: 1`). The web constant now mirrors this one.
+     **The readers are deliberately unbounded**: `sectionSlotCount` in
+     `shoofi-app`/`shoofi-partner` `helpers/combo-pricing.ts` and `Math.max(1, count)` in
+     `utils/order-pricing.js` floor at 1 with no ceiling and trust whatever is stored. Do not
+     add a clamp in a renderer — it becomes a second opinion the pricer answers with
+     `COMBO_SLOT_COUNT_MISMATCH`. `count` may also exceed `options.length`; slots are
+     independent and one product may fill several.
    - **Demotion is a `$unset`.** Update keeps omit-to-skip: with neither `productType` nor
      `combo` in the request the stored kind is untouched (an image-only save from the partner
      app). The web form always sends `productType`, so `productType=regular` on a stored combo
