@@ -246,6 +246,31 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+14. **A shift's QUOTA is `maxDrivers`; `minDrivers` is the requirement — and the admin shifts
+    grid's denominator is `minDrivers`, so a cell reading `10/8` is a full shift, not an
+    over-booked one.** `POST /driver-shift-manager/shifts/book` refuses on
+    `DriverShift.isFull()` (`models/DriverShift.js`), which is
+    `bookedDrivers.filter(status === 'booked').length >= maxDrivers` — `minDrivers` gates
+    nothing. The engine sizes `maxDrivers` above `minDrivers` on purpose (headroom for
+    no-shows), so **every healthy full slot shows more enrolled drivers than `minDrivers`** and
+    a screen printing `booked/minDrivers` looks over-quota at exactly the moment it is correct.
+    `ShiftsCalendarGridView.tsx` prints that fraction; it now prints `maxDrivers` beside it,
+    via `shoofi-delivery-web/src/utils/shift-capacity.ts` — read a cell through
+    `readShiftCapacity`, never by eye. Measured 2026-10-06: of 34 shifts that day, **0** had
+    `booked > maxDrivers` while 20 sat exactly AT it. Real over-booking does exist in history —
+    69 rows between 2026-04-26 and 2026-08-04, all from regeneration lowering `maxDrivers`
+    under a booked roster, closed by `update.maxDrivers = Math.max(resized.maxDrivers,
+    bookedCount)` in `services/driver-shift/shift-service.js` — so `booked > maxDrivers` is a
+    real condition worth testing for, just not what a `10/8` cell means. Two live holes remain,
+    both unexercised in prod: `/admin/shifts/:shiftId/update` will set `maxDrivers` below the
+    current booked count with no check, and shift creation pushes **every** matching permanent
+    driver into `bookedDrivers` without truncating at `maxDrivers` (it only flips `status` to
+    `'full'`).
+    ⚠️ **Count `status === 'booked'`, never `status !== 'removed'`.** `BookedDriver.status`
+    also allows `'released'` (a freed seat), so the negative test disagrees with every
+    server-side counter — `isFull()`, the admin list endpoint, and the exec dashboard's
+    `computeShiftWeek`. No production row carries `'released'` today; the two counters simply
+    must not be allowed to drift.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**

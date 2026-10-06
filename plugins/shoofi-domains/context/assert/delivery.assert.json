@@ -33,7 +33,8 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "models/DriverShift.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -333,6 +334,21 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "models/DriverShift.js",
+          "regex": "isFull\\(\\)\\s*\\{[\\s\\S]{0,120}>=\\s*this\\.maxDrivers",
+          "desc": "the shift QUOTA a booking is refused at is maxDrivers, not minDrivers"
+        },
+        {
+          "file": "models/DriverShift.js",
+          "regex": "filter\\(d\\s*=>\\s*d\\.status\\s*===\\s*'booked'\\)",
+          "desc": "booked seats are counted as status === \"booked\", never \"not removed\""
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "Math\\.max\\(\\s*resized\\.maxDrivers\\s*,\\s*bookedCount\\s*\\)",
+          "desc": "re-levelling never lowers maxDrivers under the already-booked roster"
         }
       ]
     },
@@ -400,7 +416,8 @@
       "files": [
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/utils/shift-capacity.ts"
       ],
       "patterns": [
         {
@@ -417,6 +434,16 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isDeliveryOnlySupport",
           "desc": "the platform-wide delivery-only switch lives in admin Settings"
+        },
+        {
+          "file": "src/utils/shift-capacity.ts",
+          "regex": "isOverCapacity",
+          "desc": "the grid and list views read a shift through one capacity helper, which names the ceiling"
+        },
+        {
+          "file": "src/utils/shift-capacity.ts",
+          "regex": "d\\.status\\s*===\\s*'booked'",
+          "desc": "the client counts booked seats the same way the server does"
         }
       ]
     }
