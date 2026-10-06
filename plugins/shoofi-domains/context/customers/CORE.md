@@ -41,6 +41,20 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
 "user not found" cause. **Identity routing is by `app-type` throughout this domain**; an
 `app-name` on an identity call is usually inert (and sometimes misleading — see Known status).
 
+⚠️ **`storeUsers` is one document per (person, STORE), so "every partner" is not "every row".**
+A three-store owner is three documents carrying the same `phone`, and nothing joins them but
+that string. Any fan-out to partners — WhatsApp, SMS, push, an export — **must group on the
+phone first**, or the owner receives the message once per store he happens to own. The server
+already knows this where it matters: the OTP fan-out and the notification-token mirror both
+`updateMany({phone})` across siblings (`routes/customer.js`), precisely so the identity stays
+one person. The one live counter-example is the store close/busy SMS
+(`routes/store.js`, `storeUsers.find({appName})` then a plain loop), which is per-store by
+design and therefore does not hit it.
+
+Same reason, the other direction: **a phone change must move every sibling in one write.**
+Half a migration splits one identity in two — the OTP fan-out and the login store-picker then
+see two people and `switch-store` 403s the stores left behind.
+
 ## Invariants — never weaken
 1. **Customers are CENTRAL.** `getCustomerAppName` (`utils/app-name-helper.js`) **always**
    returns the `shoofi` DB, ignoring `appName`. **Intentional — do NOT "fix" it** to use the

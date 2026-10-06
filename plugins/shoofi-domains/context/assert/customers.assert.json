@@ -24,7 +24,8 @@
         "services/school-registrations/sheet.js",
         "services/school-registrations/registrations.js",
         "routes/admin/school-registrations.js",
-        "utils/crons/school-registrations-sync-cron.js"
+        "utils/crons/school-registrations-sync-cron.js",
+        "routes/store.js"
       ],
       "symbols": {
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
@@ -92,6 +93,11 @@
           "file": "services/customer/school-project-enrollment.js",
           "regex": "\"schoolProject\\.studentIds\\.0\": \\{ \\$exists: false \\}",
           "desc": "school-project customers with no student linked are deactivated; the filter tolerates a concurrent re-add"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "storeUsers\\.find\\(\\{[\\s\\S]{0,60}appName: appName,?\\s*\\}\\)",
+          "desc": "the store close/busy SMS fans out one message PER storeUsers ROW scoped to a single store - storeUsers is one doc per (person, store), so this shape is only correct because it is deliberately per-store; any fan-out meant to reach each PARTNER ONCE must group on the phone first or a multi-store owner is messaged once per store he owns"
         },
         {
           "file": "routes/auth.js",
