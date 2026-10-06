@@ -246,6 +246,23 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+14. **A new `RANK_REASONS` code needs exactly ONE Hebrew label, and without it the chip
+    vanishes with nothing failing.** `RANK_REASONS` in
+    `services/delivery/manual-assignment-ranking.js` is the server's contract for "why is
+    this courier here in the list"; the wording lives in the admin web, and
+    `reasonLabels()` in `shoofi-delivery-web/src/utils/driver-assignment-score.ts` does
+    `.map((code) => RANK_REASON_LABELS[code]).filter(Boolean)` — an unknown code is
+    **dropped rather than printed raw**. That is deliberate (a raw `late_for_pickup` in the
+    middle of a Hebrew line is worse than nothing), and it means a code nobody translated
+    disappears from every picker — the live-ops popover, `ReassignDriverModal`,
+    `AssignDriverModal` and the twin modal — silently, with no console warning and no
+    failing test. `RANK_REASON_LABELS` is the **single** definition: `live-ops/strings.ts`
+    re-exports it (`export { RANK_REASON_LABELS } from "utils/driver-assignment-score"`)
+    and `live-ops/logic/driver-ranking.ts` holds no label table at all, so there is one
+    place to edit and adding a second would put two vocabularies on four screens. Note also
+    that `scoreSummaryLine()` in the same file filters `idle`, `en_route` and `same_store`
+    out of the one-line form as context — a new code is treated as a warning and WILL show
+    there, which is right for a penalty and wrong for a bonus.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
