@@ -120,7 +120,8 @@
         "lib/payments/",
         "utils/vat.js",
         "utils/greeninvoice.js",
-        "utils/invoice-provider.js"
+        "utils/invoice-provider.js",
+        "services/compensations/"
       ],
       "shoofi-delivery-web": [
         "src/views/admin/DriverPayments.tsx",

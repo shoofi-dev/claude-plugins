@@ -18,7 +18,8 @@ invoices, and bank payouts. Distinct from `payments` (money IN).
 ## Scope
 Server: `routes/payments/{admin-reports,admin,summaries}.js`, `routes/driver-reports.js`,
 `routes/admin/masav.js`, `routes/hyp.js` (EZcount invoicing), `lib/payments/calc.js`,
-`utils/{vat,greeninvoice,invoice-provider}.js`, `services/financial-overview/` (the live overview —
+`utils/{vat,greeninvoice,invoice-provider}.js`, `services/compensations/report-window.js` (which
+report a compensation belongs to + the post-report lock, invariant 10), `services/financial-overview/` (the live overview —
 it RUNS the two report engines over any range; never re-derive money there), and the accountant's
 Hashavshevet export `services/accountant-export/` + `utils/hashavshevet-movein.js` (reference §7b —
 its amounts are EZcount's per-line rounding, never `round2(totalOutcomes)`). Client: the
@@ -116,6 +117,15 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    wrong, and the fix is delete + regenerate. But delete **must release the carry-over
    compensations** that `/send` consumed (`appNameBackfill.pendingReportCarryover` back to
    `true`), or the regenerated report silently drops those amounts.
+   **The compensations-approved guard (`validateCompensationsApproved`) must query with BSON
+   `Date` bounds** — `compensations.createdAt` is a Date, and until 2026-10 the guard passed
+   `moment().format()` strings, which never match a Date, so it found 0 compensations and
+   **never blocked a single report** (Sep 2026: 0 by string vs 156 by Date). It now uses the
+   report's own compensation window (invariant 10), the same store key as the report fetch
+   (`order.storeData.appName`), and counts only pending items that move the store's money
+   (`payingParty` or `compensationFor` is `business`). The driver report's guard
+   (`validateDriverCompensationsApproved`) already used Dates; it counts only
+   `compensationFor: 'driver'` items, not driver-PAID ones.
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
 7. **A store's coupon cost (`reportData.campaigns`) is the coupon's NOMINAL
@@ -216,6 +226,41 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    generator never bills a hidden one); derived totals never decide inclusion. Do not
    "optimise" back to `getLiveStores` — narrow the non-live PROBE instead, and only towards
    over-selection. Details: reference §4.
+
+10. **A compensation belongs to the report whose period contains its `createdAt` — never the
+    month it was approved in — and the windows tile with no overlap and no gap.**
+    `services/compensations/report-window.js` is the one place this is decided; the store
+    report fetch, the generate guard (invariant 5) and the post-report lock all call it.
+    - **Store:** `storeCompensationWindow` = `[report start, next day's start)` — the start is
+      the report's business-day start (`storeReportBounds`, extracted verbatim from
+      `generateStoreReportData`: snapped openHours + the openHours transition-month rule); the
+      **exclusive** end is that same function's start for the day after `endDate`, so
+      September ends at the exact instant October begins. The report passes these as exact
+      instants with `endExclusive=true` to `GET /api/shoofiAdmin/compensations`; without that
+      flag (the admin screen's date filter) a plain `endDate` is still stretched to 23:59:59.999.
+      Before 2026-10 the report's end was stretched too, so everything created on the 1st of
+      the next month after the store opened was billed in BOTH months (snooshy, ₪17, Oct 1
+      22:36 IL). Orders keep their own `[start, end]` window — unchanged.
+    - **Driver:** Israel calendar days, inclusive (`routes/driver-reports.js`) — already tiled;
+      mirrored by `driverCompensationWindow` for the lock only. A compensation touching both a
+      store and a driver can therefore land in different months on the two reports in the
+      first hours of the 1st; each report is still exactly-once.
+    - **The lock:** once a store or driver report (any status) covers a compensation's
+      `createdAt`, a change that moves money on it is refused **409**
+      (`code: 'compensation_period_closed'`, Hebrew message) by add / edit / approve-item /
+      delete in `routes/shoofi-admin.js` (`checkCompensationLock`). "Moves money" =
+      `affectedParties`: an item whose report footprint (status 1 + approvedAmount +
+      parties + company/driver) changes, a NEW item (even pending — it could never be
+      approved into any report), or deleting an approved item. Text edits and declining a
+      never-approved item stay open. Without the lock the change reached no report at all
+      (vapego-taibe, ₪2000 driver→business, edited 2026-09-19 after the August report — the
+      store was never credited). **The way out is delete + regenerate** (a deleted report no
+      longer locks) or a new compensation, which lands in the current period.
+      New reports store their exact window in `reportData.compensationWindow`; for older
+      reports the lock recomputes it from the store's CURRENT openHours.
+    Not covered: `services/payments/cancel-compensation.js` inserts compensations
+    automatically (createdAt = now) without the lock — it can only collide with a report
+    generated for a period that has not ended.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized

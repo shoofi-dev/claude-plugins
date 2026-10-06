@@ -15,6 +15,7 @@
         "utils/greeninvoice.js",
         "utils/invoice-provider.js",
         "services/compensations/validate-parties.js",
+        "services/compensations/report-window.js",
         "services/financial-overview/compute.js",
         "services/financial-overview/metrics.js",
         "services/financial-overview/contract-charges.js",
@@ -48,7 +49,8 @@
           "validateOrdersClosed",
           "calculateCommissionTiered",
           "generateStoreReportData",
-          "totalForTransfer"
+          "totalForTransfer",
+          "validateCompensationsApproved"
         ],
         "utils/invoice-provider.js": [
           "getActiveProvider"
@@ -93,6 +95,16 @@
         ],
         "services/exec-dashboard/store-registry.js": [
           "getAllNonMockStores"
+        ],
+        "services/compensations/report-window.js": [
+          "storeReportBounds",
+          "storeCompensationWindow",
+          "driverCompensationWindow",
+          "buildCreatedAtFilter",
+          "affectedParties",
+          "findCoveringStoreReport",
+          "findCoveringDriverReport",
+          "checkCompensationLock"
         ]
       },
       "patterns": [
@@ -235,6 +247,31 @@
           "file": "services/accountant-export/movein.js",
           "regex": "listUnder\\(skippedByParty, doc, doc\\.partyAccount",
           "desc": "a missing/invalid מספר תיק SKIPS the document (listed, re-downloadable via docs=) — it does not block the file (owner decision 2026-09-29); reference §7b"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "createdAt:\\s*\\{\\s*\\$gte:\\s*window\\.start,\\s*\\$lt:\\s*window\\.endExclusive\\s*\\}",
+          "desc": "CORE invariant 5: the compensations-approved guard queries createdAt (a BSON Date) with Date bounds over the report's own compensation window — the old string bounds matched nothing and the guard never fired"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "endExclusive:\\s*'true'",
+          "desc": "CORE invariant 10: the store report reads compensations over exact [start, next period start) bounds — without the flag the list endpoint stretches the end to 23:59:59 and the 1st of the next month is billed twice"
+        },
+        {
+          "file": "services/compensations/report-window.js",
+          "regex": "endExclusive:\\s*new Date\\(storeReportBounds\\(nextDay,\\s*nextDay,\\s*storeData\\)\\.start\\)",
+          "desc": "CORE invariant 10: a period's compensation window ends exactly where the next period's starts (same function), so consecutive reports tile with no overlap and no gap"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "endExclusive:\\s*req\\.query\\.endExclusive\\s*===\\s*'true'",
+          "desc": "CORE invariant 10: only the report's self-call gets exact exclusive bounds; the admin date filter keeps end-of-day stretching"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "rejectIfCompensationPeriodClosed\\(req,\\s*res,\\s*existingCompensation,\\s*null\\)",
+          "desc": "CORE invariant 10: deleting a compensation is refused once a report covering its createdAt exists (add/edit/approve-item are locked by the same helper)"
         }
       ]
     }
