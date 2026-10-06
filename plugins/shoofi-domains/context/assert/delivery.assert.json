@@ -333,6 +333,26 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "Invalid customer location coordinates",
+          "desc": "createPendingDelivery refuses to insert a pending booking whose customer coordinates do not parse — so a document waiting for assignment always carries both ends of the journey, and a blank map there is a READ that dropped them"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "storeLocation\\?\\.lat \\|\\| deliveryData\\?\\.storeLocation\\?\\.latitude",
+          "desc": "storeLocation is read as lat||latitude because both shapes exist in the wild; a GeoJSON storeLocation has neither key and aborts the booking"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "customerLocation: 1,\\s*\\n\\s*storeLocation: 1,",
+          "desc": "POST /api/analytics/deliveries is a projection whitelist; without these two keys live-ops, the delivery list and the ops dashboard get rows with no geometry, and a delivery waiting for assignment has no courier whose order list could backfill them"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "isApproximateLocation: true,",
+          "desc": "isApproximateLocation is written in exactly one literal, beside isDeliveryOnly: true — it implies delivery-only and never the converse; the point is a town centroid, not an address anybody typed"
         }
       ]
     },
@@ -400,7 +420,9 @@
       "files": [
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/views/admin/live-ops/logic/map-focus.ts",
+        "src/utils/geo-point.ts"
       ],
       "patterns": [
         {
@@ -417,6 +439,16 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isDeliveryOnlySupport",
           "desc": "the platform-wide delivery-only switch lives in admin Settings"
+        },
+        {
+          "file": "src/views/admin/live-ops/logic/map-focus.ts",
+          "regex": "task\\.unassigned \\? null : task\\.driverId",
+          "desc": "the live-ops map drawer decides whose map it is from the row's own `unassigned` test, not driverId — a delayed-assignment claim still carries a courier id, and reading it opened that courier's map for a row the list prints as 'no courier'"
+        },
+        {
+          "file": "src/utils/geo-point.ts",
+          "regex": "finiteNumber",
+          "desc": "one reader for all three stored coordinate shapes, refusing a half-missing pair rather than coercing null to 0 (which is a legitimate latitude)"
         }
       ]
     }

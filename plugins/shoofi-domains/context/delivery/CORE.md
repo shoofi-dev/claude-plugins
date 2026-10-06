@@ -247,6 +247,36 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
 
+14. **A booking always carries BOTH ends of the journey — but which admin read hands them
+    to you does not.** `createPendingDelivery` refuses to insert without them: it
+    `parseFloat`s `customerLocation.latitude/longitude` and
+    `storeLocation.lat||latitude / lng||longitude` and returns
+    `"Invalid customer/store location coordinates"` on a `NaN`, before the insert
+    (`services/delivery/delayed-assignment.js`). So a *document* waiting for assignment that
+    has no customer point is not a thing — and a screen that shows none is a READ that
+    dropped it. Three reads, three different answers:
+    `GET /api/delivery/order/:id` is **unprojected** (the whole document — which is why the
+    admin order-detail modal working proves nothing about the others);
+    `POST /api/analytics/deliveries` is a **projection whitelist** (it carried neither
+    coordinate until Oct 2026, so live-ops, the delivery list and the ops dashboard all read
+    rows with no geometry); and `GET /api/delivery/driver/:id/orders` carries both but filters
+    on `driver._id`. **Generalise that last one: any admin backfill keyed on the courier is
+    blind to exactly the pending-assignment population** — the state where "where is this
+    going?" is the whole question. The admin web's live-ops board had been filling its map
+    coordinates from the per-courier call for that reason, so the map button on a delivery
+    nobody had been sent to drew the restaurant pin and nothing else.
+    Two shape traps go with it. `customerLocation` is `{latitude, longitude}` from all four
+    production writers (`routes/order.js` × 4 via `order.order.geo_positioning`,
+    `delayed-assignment.js`, `routes/delivery/orders.js` via `pointInsideGeometry`,
+    `routes/delivery/admin.js`), while `storeLocation` is `{lat, lng}` in 7,999 of the last
+    8,000 bookings and **both** forms appear — the guard above reads `lat || latitude` for
+    exactly that reason, which also means a **GeoJSON** `storeLocation` has neither key and
+    *aborts the booking*. Neither field is the GeoJSON `shoofi.stores.location`; that is a
+    different document. And `isApproximateLocation` is written in exactly one literal, beside
+    `isDeliveryOnly: true` (`routes/delivery/orders.js`), so it **implies** delivery-only and
+    never the converse — a map drawing that point as a doorstep is stating a town centroid
+    nobody typed.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
   `isDeliveryOnlySupport` field, so the gate returns `platform_disabled`/`store_disabled` for
