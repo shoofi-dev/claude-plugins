@@ -33,7 +33,8 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "services/delivery/manual-assignment-ranking.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -333,6 +334,11 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "services/delivery/manual-assignment-ranking.js",
+          "regex": "RANK_REASONS",
+          "desc": "the server side of the contract: reason codes the admin web must translate"
         }
       ]
     },
@@ -400,7 +406,9 @@
       "files": [
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/utils/driver-assignment-score.ts",
+        "src/views/admin/live-ops/strings.ts"
       ],
       "patterns": [
         {
@@ -417,6 +425,21 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isDeliveryOnlySupport",
           "desc": "the platform-wide delivery-only switch lives in admin Settings"
+        },
+        {
+          "file": "src/utils/driver-assignment-score.ts",
+          "regex": "RANK_REASON_LABELS",
+          "desc": "the ONE Hebrew label table for the server's RANK_REASONS codes"
+        },
+        {
+          "file": "src/utils/driver-assignment-score.ts",
+          "regex": "RANK_REASON_LABELS\\[code\\]\\)[\\s\\S]{0,40}filter\\(Boolean\\)",
+          "desc": "an untranslated reason code is DROPPED, never printed raw - so a new code with no label vanishes from four pickers silently"
+        },
+        {
+          "file": "src/views/admin/live-ops/strings.ts",
+          "regex": "export \\{ RANK_REASON_LABELS \\} from",
+          "desc": "live-ops RE-EXPORTS the labels rather than holding a second table"
         }
       ]
     }
