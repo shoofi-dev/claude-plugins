@@ -282,6 +282,23 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 - **Awareness:** MASAV is **decoupled** from the reports — payout amounts are re-keyed into an
   Excel by a human; there is no automated report→MASAV link. Hardcoded GreenInvoice
   `businessId`/`itemId` constants exist.
+- **A MASAV file is built from a SECOND parse of the uploaded Excel.** The admin screen posts
+  the **raw workbook**, never its parsed rows (`MasavGenerator.tsx` `handleGenerate`), so the
+  preview a person approves and the `.201` the bank executes come from two independent parses
+  of the same bytes. They agree only because both sides share one recogniser —
+  `shoofi-server/utils/masav-columns.js` ↔ `shoofi-delivery-web/src/utils/masav-columns.ts`,
+  **change them together** — and because the client posts the mapping it used as `columnMap`.
+  When they diverged (2026-10-07) the screen showed 109 valid rows totalling ₪357,053.19 and
+  the server answered `Account must be 1-13 digits (got "")` 109 times: the client fell back to
+  the column's POSITION, the server to the literal key `'Account'`. There is now **no positional
+  fallback on either side** — a column that cannot be NAMED is refused (`COLUMNS_NOT_RECOGNISED`
+  with the detected headers), because guessing by position on a hand-built sheet with one extra
+  leading column pays a real bank account the wrong number behind a green preview. See
+  shoofi-server `docs/masav.md`.
+- **`padLeft()` in `routes/admin/masav.js` TRUNCATES, keeping the leading characters.** Every
+  value reaching a fixed-width MASAV slot must be bounded first or it is silently corrupted in
+  a file a bank executes: a 9-digit `institutionCode` becomes a different institution, an
+  over-large amount becomes a smaller one. `validateSettings()` / `validateRow()` refuse both.
 
 ## Recipe — change a payout or invoice amount
 1. **Trace the money first**: who collected (cash/card) → who is owed → which formula line.

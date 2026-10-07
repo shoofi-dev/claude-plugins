@@ -9,6 +9,7 @@
         "routes/payments/summaries.js",
         "routes/driver-reports.js",
         "routes/admin/masav.js",
+        "utils/masav-columns.js",
         "routes/hyp.js",
         "lib/payments/calc.js",
         "utils/vat.js",
@@ -105,6 +106,11 @@
           "findCoveringStoreReport",
           "findCoveringDriverReport",
           "checkCompensationLock"
+        ],
+        "utils/masav-columns.js": [
+          "resolveColumns",
+          "normalizeHeader",
+          "MASAV_FIELDS"
         ]
       },
       "patterns": [
@@ -272,6 +278,26 @@
           "file": "routes/shoofi-admin.js",
           "regex": "rejectIfCompensationPeriodClosed\\(req,\\s*res,\\s*existingCompensation,\\s*null\\)",
           "desc": "CORE invariant 10: deleting a compensation is refused once a report covering its createdAt exists (add/edit/approve-item are locked by the same helper)"
+        },
+        {
+          "file": "routes/admin/masav.js",
+          "regex": "require\\('\\.\\./\\.\\./utils/masav-columns'\\)",
+          "desc": "the MASAV file and the admin preview resolve Excel columns with ONE shared recogniser (mirrored at shoofi-delivery-web src/utils/masav-columns.ts) - two recognisers is how a green 109-row preview became 109 copies of 'Account must be 1-13 digits'"
+        },
+        {
+          "file": "routes/admin/masav.js",
+          "regex": "throw columnsNotRecognisedError\\(missing, detected\\)",
+          "desc": "NO positional fallback: a column that cannot be NAMED is refused, never guessed by position - a positional guess on a sheet with one extra leading column pays a real bank account the wrong number behind a green preview"
+        },
+        {
+          "file": "routes/admin/masav.js",
+          "regex": "parseColumnOverrides\\(req\\.body\\.columnMap\\)",
+          "desc": "the admin posts the column mapping its preview was built from, so the preview and the generated .201 agree by construction rather than by two recognisers concurring"
+        },
+        {
+          "file": "routes/admin/masav.js",
+          "regex": "validateSettings\\(\\{ institutionCode, payerInstitution, serialNumber \\}\\)",
+          "desc": "padLeft() truncates into a fixed-width MASAV slot keeping the LEADING chars, so a 9-digit institutionCode would become a different institution - header settings are bounded before they reach it"
         }
       ]
     }
