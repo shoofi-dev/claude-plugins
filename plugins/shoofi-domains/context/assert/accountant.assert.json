@@ -23,7 +23,8 @@
         "utils/hashavshevet-movein.js",
         "services/accountant-export/movein.js",
         "services/accountant-export/accounts.js",
-        "services/exec-dashboard/store-registry.js"
+        "services/exec-dashboard/store-registry.js",
+        "utils/order-number.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -105,6 +106,10 @@
           "findCoveringStoreReport",
           "findCoveringDriverReport",
           "checkCompensationLock"
+        ],
+        "utils/order-number.js": [
+          "shortOrderNumber",
+          "compensationOrderNumberQuery"
         ]
       },
       "patterns": [
@@ -272,6 +277,26 @@
           "file": "routes/shoofi-admin.js",
           "regex": "rejectIfCompensationPeriodClosed\\(req,\\s*res,\\s*existingCompensation,\\s*null\\)",
           "desc": "CORE invariant 10: deleting a compensation is refused once a report covering its createdAt exists (add/edit/approve-item are locked by the same helper)"
+        },
+        {
+          "file": "utils/order-number.js",
+          "regex": "THREE_SEGMENT\\s*=\\s*/\\^\\(\\\\d\\+\\)-\\(\\\\d\\+\\)-\\(\\\\d\\+\\)\\$/",
+          "desc": "the 8-digit order number is DERIVED from the long three-segment form (first + last segment) — a compensation stores no short number, so if this derivation moves every report PDF and admin screen shows a different id from the apps"
+        },
+        {
+          "file": "utils/order-number.js",
+          "regex": "if \\(OBJECT_ID\\.test\\(text\\)\\) return \"\"",
+          "desc": "a bare Mongo _id is never shortened into 8 characters that read like a real order number — compensation.order.orderId IS the _id (normalizeCompensationOrder overwrites it), so a naive shortening prints a fake order number on a store payout document"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "compensationOrderNumberQuery\\(searchOrderNumber\\)",
+          "desc": "the compensations screen displays the 8-digit number, so its search must expand a typed NNNN-NNNN to the stored three-segment form (262 of 2,431 rows) — reverting to a raw $regex on order.orderNumber makes the number on screen find nothing, and interpolates user input into a regex"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "shortOrderNumber\\(c\\.orderNumber\\)",
+          "desc": "the driver report PDF prints the 8-digit order number; the old `c.orderNumber || c.orderId` could print a bare 24-hex Mongo _id into a delivery company's payout document"
         }
       ]
     }
