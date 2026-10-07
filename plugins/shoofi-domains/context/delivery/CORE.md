@@ -246,6 +246,39 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+14. **Two ceilings, both equal to 2, with OPPOSITE enforcement — and blank means OFF.**
+    `services/delivery/driver-load.js` holds both and conflating them is how a courier ends up
+    over his limit. (a) `maxOrdersByAdmin` on `delivery-company.customers` is the **per-driver
+    hard cap** an admin types into the driver card, read only by `getDriverCapacity` and
+    enforced by `driverHasCapacity`, which is a **filter in both automatic engines that nothing
+    may override** — not the shortage ladder, not a burst. A blank / `0` / negative value means
+    the courier is **SWITCHED OFF, not uncapped** (113 of 246 production records; reading `0`
+    as "no limit" overstates available supply by ~40%), and a company **admin** with a blank
+    value is the one exemption, or manual-admin routing dies. (b)
+    `DEFAULT_MAX_CONCURRENT_ORDERS` / `config.maxConcurrentOrders` is the **platform-wide soft
+    cap**, a *tier* in `byConcurrencyTierThenScore`, never a filter. So the only way automatic
+    dispatch goes above 2 is a courier whose own `maxOrdersByAdmin` is 3+: he survives the hard
+    filter at 2 held, ranks last, and therefore wins exactly when nobody below the cap is left.
+    Raising a courier to 3 is how operations nominates him to absorb overflow; a courier left
+    at 2 is held to 2 in a shortage too. When every eligible courier is at his own cap the
+    engines return **no candidate** with `reasonCode: 'all_drivers_at_capacity'` and
+    `trace.atCapacityCount` — the scored engine's booking stays `isPendingAssignment: true` and
+    the 60s tick retries it, so a full fleet means "wait a minute", not "lost". ⚠️ Until
+    2026-10-07 a `MIN_ASSIGNABLE_CAPACITY` floor raised every stored `1` to `2` and both
+    engines followed the capacity filter with `if (!available.length) available = everybody`,
+    so a limit of 1 was unexpressible and a full fleet discarded every limit at once: 255 of
+    2,088 automatic assignments in the fortnight to then (12.2%) exceeded the admin's number,
+    one courier capped at 1 peaking at four held. If either behaviour reappears, the control
+    room's only lever on a chronically-late courier is gone again.
+    ⚠️ **No MANUAL path enforces capacity, and that is deliberate** —
+    `assignDriver.assignSpecificDriver`, `routes/delivery/admin.js` assign + reassign,
+    `routes/delivery/driver.js` (company admin), `routes/twin-order.js resolveDriver` and the
+    driver's own accept all check role / `isActive` only. A dispatcher overriding the cap by
+    hand is a decision a person is allowed to make. The picker
+    (`services/delivery/manual-assignment-ranking.js`) *reports* `capacity` and an
+    `OVER_CAPACITY` reason and enforces nothing; `services/delivery/availability.js` mirrors
+    dispatch coverage but not capacity at all, so it answers "is anyone eligible", never "is
+    anyone free".
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**

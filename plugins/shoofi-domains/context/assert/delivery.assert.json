@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/driver-max-orders-hard-limit / 2026-10-07",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -75,7 +75,11 @@
           "scoreBreakdown"
         ],
         "services/delivery/driver-load.js": [
-          "byConcurrencyTierThenScore"
+          "byConcurrencyTierThenScore",
+          "getDriverCapacity",
+          "driverHasCapacity",
+          "isWithinConcurrencyCap",
+          "DEFAULT_MAX_CONCURRENT_ORDERS"
         ],
         "services/delivery/book-delivery.js": [
           "originalBookId",
@@ -333,6 +337,41 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "return Math\\.floor\\(capacity\\)",
+          "desc": "a stored maxOrdersByAdmin is the number ENFORCED - if this becomes Math.max(capacity, N) again, the floor that made a limit of 1 unexpressible is back and CORE invariant 14 is false (255 of 2,088 automatic assignments in the fortnight to 2026-10-07 exceeded the admin's number because of it)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "return String\\(driver\\?\\.role\\) === \"admin\" \\? Infinity : 0",
+          "desc": "a blank/0/negative maxOrdersByAdmin means the courier is SWITCHED OFF, not uncapped (113 of 246 production records); a company admin with a blank value is the one exemption, or manual-admin routing dies (CORE invariant 14)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "REASONS\\.ALL_DRIVERS_AT_CAPACITY",
+          "desc": "the scored engine returns NO candidate when every eligible courier is at his own cap - it must never fall back to the whole list, which discarded every per-driver limit at once (CORE invariant 14)"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "REASONS\\.ALL_DRIVERS_AT_CAPACITY",
+          "desc": "the immediate engine carries the identical hard cap - this module exists because the two engines once held divergent copies of these rules and both were wrong (CORE invariant 14)"
+        },
+        {
+          "file": "services/delivery/assignment-decision-log.js",
+          "regex": "ALL_DRIVERS_AT_CAPACITY: \"all_drivers_at_capacity\"",
+          "desc": "'every courier is full' is a SUPPLY problem and must stay distinct from ALL_DRIVERS_SWITCHED_OFF, which is a settings screen (CORE invariant 14)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "const ACTIVE_ORDER_STATUSES = \\[\"1\", \"2\", \"3\", \"5\"\\]",
+          "desc": "the dispatch load count includes 5 WAITING_IN_STORE - leaving it out made a courier standing in two shops waiting for food look completely idle"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "function assignSpecificDriver",
+          "desc": "MANUAL assignment deliberately does NOT consult capacity (role + isActive only) - a dispatcher overriding the cap by hand is a person's decision, so the hard capacity filter must never be moved into this path (CORE invariant 14)"
         }
       ]
     },

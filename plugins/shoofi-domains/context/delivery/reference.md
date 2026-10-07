@@ -97,8 +97,13 @@ pickup zone (`area.cityId`) + dropoff geometry.
 **Driver eligibility** (`findAllMatchingDrivers`): company must match BOTH `supportedAreas`
 (areaId) AND `supportedCities` (cityId); `personalSupportedAreas` overrides. Then a
 store allow/block list (`storeAssignmentMode`/`assignedStoreAppNames`).
-**Load/selection**: counts active `bookDelivery` (status `1,2,3`) per driver, drops those
-at `maxOrdersByAdmin`, sorts ascending by load, **random tie-break**.
+**Load/selection**: counts active `bookDelivery` per driver over
+`driver-load.ACTIVE_ORDER_STATUSES` = `1,2,3,5` (**`5` WAITING_IN_STORE is in-flight** — a
+courier standing in two shops waiting for food used to look completely idle to dispatch),
+**hard-drops** those at their own `maxOrdersByAdmin` (CORE invariant 14 — this is not
+overridable, and an empty result is `all_drivers_at_capacity`, not "consider everybody"),
+then `byDriverLoad`: platform-cap tier → fewest uncollected → fewest total, with a
+**random tie-break** only among candidates equal on the whole key.
 **Manual-admin routing**: companies with `isControlledByAdmin && manualAssignmentOnly`
 route the order to a company **admin**, not a driver (`assignmentMethod:'manual-admin-routed'`).
 **Immediate vs delayed**: `book-delivery.js` picks delayed (`createPendingDelivery`,
