@@ -295,6 +295,22 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
   with the detected headers), because guessing by position on a hand-built sheet with one extra
   leading column pays a real bank account the wrong number behind a green preview. See
   shoofi-server `docs/masav.md`.
+- **Nothing in Shoofi emits the MASAV workbook — but the settlement-reports Excel export is
+  where it comes from.** `shoofi-delivery-web/src/views/admin/reports/ReportsList.tsx`
+  `downloadExcel` is the only export on the platform carrying payee bank details beside a
+  payout amount; its driver twin is `driver-reports/DriverReportsList.tsx`. A person prunes
+  it to six columns, reorders them and deletes the negative-balance rows by hand (*"ללא
+  מינוס"* — you cannot MASAV a minus), every month. That hand step is where a header goes
+  missing, and nothing records a MASAV run (no collection, no audit row, no stored `.201`),
+  so there is no way to diff this month's upload against last month's.
+- ⚠️ **That export carries TWO money columns, and they sit in the dangerous order:**
+  `סכום לחשבונית מס` (the pre-VAT INVOICE amount) is immediately **left** of
+  `יתרה להעברה בנקאית` (what we actually owe). Anything matching columns by name first-wins
+  picks the invoice amount. Both are money, only one is the payout, and nothing looks wrong
+  afterwards. The MASAV recogniser excludes `חשבונית` for exactly this; so must anything
+  else reading that export. Two neighbours of the same shape: `חשבונית` **contains**
+  `חשבון`, so `חשבונית התקבלה` (כן/לא) is claimable as a bank account number, and
+  `סוג עוסק` is a business *type* sitting one column from `מס׳ עוסק`, the tax number.
 - **`padLeft()` in `routes/admin/masav.js` TRUNCATES, keeping the leading characters.** Every
   value reaching a fixed-width MASAV slot must be bounded first or it is silently corrupted in
   a file a bank executes: a 9-digit `institutionCode` becomes a different institution, an
