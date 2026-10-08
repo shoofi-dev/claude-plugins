@@ -23,7 +23,9 @@
         "utils/hashavshevet-movein.js",
         "services/accountant-export/movein.js",
         "services/accountant-export/accounts.js",
-        "services/exec-dashboard/store-registry.js"
+        "services/exec-dashboard/store-registry.js",
+        "utils/driver-payment-access.js",
+        "utils/restricted-admin-routes.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -272,6 +274,31 @@
           "file": "routes/shoofi-admin.js",
           "regex": "rejectIfCompensationPeriodClosed\\(req,\\s*res,\\s*existingCompensation,\\s*null\\)",
           "desc": "CORE invariant 10: deleting a compensation is refused once a report covering its createdAt exists (add/edit/approve-item are locked by the same helper)"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "router\\.post\\(\"/api/payments/driver/summary\",\\s*auth\\.required",
+          "desc": "CORE invariant 11: the driver app's own earnings endpoint authenticates and authorises ITSELF — it must never go back to being gated by path in utils/restricted-admin-routes.js, where a role check 403s every courier"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "resolveDriverPaymentAccess\\(\\{\\s*req,\\s*deliveryDb:\\s*db,\\s*driverId\\s*\\}\\)",
+          "desc": "CORE invariant 11: who may read a driver's earnings depends on the driverId in the BODY (master / himself / his own company's couriers), so the gate is called inside the handler"
+        },
+        {
+          "file": "utils/driver-payment-access.js",
+          "regex": "if \\(callerId === target\\) return allow\\(\"self\"\\)",
+          "desc": "CORE invariant 11: a driver reading his OWN earnings is allowed — the exact rule the 2026-10-05 MASTER_ONLY gate broke for every courier on the platform"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "router\\.post\\(\"/api/payments/admin/drivers/summary\",\\s*auth\\.required",
+          "desc": "CORE invariant 11: despite the 'admin' in its path this endpoint has NO dashboard caller — it is shoofi-shoofir's delivery-company-admin view, so a Shoofi-role gate makes it unreachable"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "\"/api/driver-reports/admin/reports\"",
+          "desc": "CORE invariant 11: the generated driver report is admin-only — there is no driver-facing route for it, so the app shows gross delivery fees and never the net transfer"
         }
       ]
     }

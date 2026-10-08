@@ -262,6 +262,33 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     automatically (createdAt = now) without the lock — it can only collide with a report
     generated for a period that has not ended.
 
+11. **What a DRIVER can see of his own money is `POST /api/payments/driver/summary` —
+    the SAME endpoint the admin dashboard's תשלומי נהגים screen calls.** It is not an
+    admin endpoint (`routes/payments/summaries.js`); shoofi-shoofir's own earnings screen
+    (`screens/delivery-driver/payments.tsx`, tabs اليوم/الأسبوع/الشهر/مخصص) posts its own
+    `customerId` as `driverId` to it, and `/api/payments/driver/details` behind the per-day
+    drill-down. `/api/payments/admin/drivers/summary` is **only** shoofi-shoofir — the
+    delivery-company-admin variant — despite the `admin` in its path. **So a role gate
+    applied to any of the three by path hits every courier on the platform**, because a
+    driver JWT (`utils/auth-service.js`) is `{phone, id, exp}` and carries **no `roles` at
+    all**, so `checkAdminRole` 403s him. That is exactly what the 2026-10-05 owner-only
+    change did (three entries in `utils/restricted-admin-routes.js`, removed 2026-10-08
+    after a driver with ₪2,645 of unpaid October earnings reported a blank screen).
+    It was invisible for three days because the app's `fetchPaymentData` catch only
+    `console.error`s, `renderSummaryCards`/`renderDailyTable` both return `null` on empty,
+    and the interceptor reacts to 401 but not 403 — **a permission failure on a payouts
+    screen looks identical to "you earned nothing"**. Whoever may read these depends on the
+    `driverId` in the BODY (master / himself / his own company's couriers), so the gate
+    cannot live in a path list; it is `utils/driver-payment-access.js`.
+    The corollary matters when a driver asks about a *settled* month: the figure he sees is
+    computed LIVE from `delivery-company.book-delivery` every request, and
+    **there is no driver-facing route for the generated report document at all** — all 11
+    routes in `routes/driver-reports.js` are `/admin/…`. So `shoofi.driver-reports`
+    (`netTotal`, the ÷1.18 exempt division, the cash already pocketed) is invisible to him:
+    he sees gross delivery fees, never the net transfer. The two numbers differ by a lot
+    (one real driver, 2026-09: ₪7,831 of fees on his screen, ₪2,720.64 `netTotal` on the
+    report) and that gap is the usual reason a courier says the app shows the wrong money.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
