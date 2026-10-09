@@ -20,7 +20,7 @@ Primary files: `routes/order.js` (~7k lines), `routes/twin-order.js`,
 `routes/order-origin-validator.js`, `routes/admin/order-monitoring.js`,
 `routes/admin/twin-order-config.js`, `services/twin-order/*`,
 `utils/order-stock.js` (stock semantics), `utils/crons/*order*`,
-`utils/centralized-flow-monitor.js`. Status constants: `consts/consts.js`.
+`services/monitoring/centralized-flow-monitor.js`. Status constants: `consts/consts.js`.
 
 **⚠️ HIGH-RISK code (change via draft PR flagged HIGH-RISK; never merge):**
 - `POST /api/order/create` — the creation pipeline (`order.js`)
@@ -68,12 +68,25 @@ Buckets (`docs/customer-orders-snapshot.md`): **completed** `2,3,10,11,12` ·
 - **Future → in-progress** (`/start-preparing`) → `14`→`1`.
 - **Cancel/reject** → `4,5,7,8,9`; cascades stock restore + delivery cancel + refunds (§3, §6).
 - **Cron** `fix-stuck-orders` bumps stale `1` → `3` (delivery) or `2` (takeaway).
+- **The delivery leg never writes `orders.status`.** Driver `approve`/`waiting-in-store`/
+  `start`/`complete`/`cancel` (`routes/delivery/orders.js`) update only
+  `delivery-company.bookDelivery` (+ flow events / pushes); `complete` reads the store order
+  only to schedule the feedback push. So "delivered" = `bookDelivery.status "4"` +
+  `bookDelivery.completedAt` — the order stays at `3`/`2`. `10`/`11` come from the
+  partner's `order/update`; no live client sends `9`/`12` (label-only), though
+  `/api/order/update` still handles a `9` if one arrives.
 - **Twin cascade** mutates the peer side **directly via services**, not routes (avoids recursion).
 
 **Transition guards you must not weaken:** PENDING(`6`) only from FRAUD_REVIEW
 (`order.js`); `/update/viewd` rejects already-cancelled (`4732`);
 `start-preparing` only from `14`. Fields: `status`, `statusUpdatedAt`,
 `statusUpdateReason`, `completedAt`, `viewdAt`, `isViewd`, `isPrinted`, `orderDate`.
+**`readyMinutes` is NOT an order field** — accept takes it as a request param and does not
+persist it (~0% of prod orders carry it; only `/update-start-preparing` writes it, on future
+orders). Recover it from the `order_viewed` flow event's `metadata.readyMinutes`, or as
+`orderDate − viewdAt` (default branch only; `orderDate` is on the tablet's clock, `viewdAt`
+the server's). Anything reading `order.readyMinutes` (e.g. `computeOrderDelays` in
+`admin/order-monitoring.js`) gets `null`.
 
 ## 3. Order creation pipeline (understand; do not edit without sign-off)
 `POST /api/order/create` (`order.js`) — ordered side effects:
@@ -123,9 +136,17 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   back to the store `orders` by `orderId`→`_id`. Reuse
   `getSuccessfulOrdersByCustomerIds` (`utils/customer-orders.js`). Read
   `docs/customer-orders-snapshot.md` before ANY logic about a customer's order status.
+- **`shoofi.customers` has NO `phone` index in prod.** `utils/create-indexes.js` defines
+  `phone_index` but is a standalone script never run against `shoofi` — a lookup by phone
+  is a collection scan.
 - **`shoofi.orderFlowEvents`** = append-only audit timeline keyed on `orderNumber`
   (`order_created`, `payment_*`, `status_change`, `delivery_booked`, ...). Read via
-  admin order-monitoring + the `investigate-order` skill.
+  admin order-monitoring + the `investigate-order` skill. Traps:
+  - **No TTL, no retention.** `cleanupOldEvents` (`centralized-flow-monitor.js`) is never
+    called; history runs back to 2025-07-24 (~11.8M docs, 2026-10-06).
+  - **`order_viewed` `metadata.previousStatus` is always wrong** — `/update/viewd` reads it
+    from the order re-fetched *after* its `$set`, so it equals the new status. Pre-accept
+    status (normally `6`) is not recorded there; take it from the prior event.
 - **`delivery-company.bookDelivery`** keyed by `bookId` = order `orderId`; mirrors
   `DELIVERY_STATUS` (`1` waiting_approve … `3` collected/pickup … `4` delivered).
 - **`shoofi.twinOrderGroups`** links `orders.twinGroup` ↔ group `primary`/`secondary`.
@@ -298,7 +319,7 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
   in mind when reasoning about pending-payment/fraud states on the customer side.
 
 ## C2. shoofi-shoofir — the DRIVER app (React Native, MobX)
-Role: executes the **delivery leg**; drives the delivery-side status transitions.
+Role: executes the **delivery leg**; drives `bookDelivery` status only — never the order's.
 - **API client**: axios in `utils/http-interceptor/index.ts` — token `@storage_userToken`
   as `Authorization: "Token …"`; headers `app-type: shoofi-shoofir`, `app-name`
   default `"delivery-company"` (per-call overridable). Base `consts/api.js`.
@@ -309,8 +330,9 @@ Role: executes the **delivery leg**; drives the delivery-side status transitions
 - **Status scheme (important):** the driver UI works on the **bookDelivery
   `DELIVERY_STATUS`** numeric strings (`consts/shared.ts`: 1 waiting-approve, 2
   approved, 3 collected/pickup, 4 delivered, 5 waiting-in-store, -1 cancelled) —
-  **NOT** the customer `ORDER_STATUS` 0-15. The **server endpoints bridge** driver
-  actions to customer statuses (9/10/11/12). Don't conflate the two schemes.
+  **NOT** the customer `ORDER_STATUS` 0-15. **Nothing bridges them:** the driver endpoints
+  (`routes/delivery/orders.js`) write only `bookDelivery`, so `orders.status` never learns
+  about pickup/delivery (§2). Delivered = `bookDelivery.completedAt`. Don't conflate the two schemes.
 - **Twin**: two bookDelivery docs sharing `twinGroupId` render as one `TwinOrderCard`;
   `twinAssignmentMode` single|split (split = each driver sees only their side).
 - **Realtime**: `hooks/use-websocket.ts` (WS `?appType=shoofi-shoofir`), notifications
@@ -329,7 +351,7 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   as `"Token …"`, `app-type: shoofi-partner`, `app-name` = `@storage_storeDB` (per-call overridable).
 - **Endpoints** (`stores/orders/index.tsx`, controller `order/`): `admin/orders` (list),
   `admin/not-viewd` (incoming feed), **`update/viewd` = ACCEPT** (→ `6→1`, future `14→1`,
-  sets `readyMinutes`), `update` (forward/back status + note), `update-item-collected`,
+  sends `readyMinutes` — not persisted, §2), `update` (forward/back status + note), `update-item-collected`,
   `start-preparing` / `update-start-preparing`, `update-delay`, `printed`,
   `book-delivery`, `*-custom-delivery`, `addRefund`, `future-orders-ready`, `drive-in-arrival-confirm`.
 - **Transition rule**: ACCEPT goes through **`order/update/viewd`** (NOT `order/update`);
@@ -391,7 +413,8 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   (manual status/cancel/fraud-reject, stamped `updatedBySource:"shoofi_support"`),
   `order/update/viewd` (approve), `admin/order/delete/{id}`, `admin/impersonation/order-token`
   (open-as store/driver/customer, **master-only**), `admin/order-monitoring/summary/{orderNumber}`
-  (timeline), `twin-order/admin/{group/:id/full, degrade, undo-degrade, cancel, assign-driver}`,
+  (timeline; every `admin/order-monitoring/*` route is `auth.required` +
+  `checkAdminRole` with ALL admin roles — customer tokens 403, no token 401), `twin-order/admin/{group/:id/full, degrade, undo-degrade, cancel, assign-driver}`,
   `admin/twin-order-config` (GET/POST), `delivery/admin/{cancel,assign,reassign,drivers,orders}`.
 - **Refunds**: `order/addRefund` is **NOT** used here — admin refunds surface via twin
   `degrade`/`cancel` (`refundOwed`/`refundBreakdown`) and `shoofiAdmin/compensations/*`.
@@ -425,7 +448,8 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   `shoofi-server/consts/consts.js`. The **admin-web copy has already drifted** (above).
   A change to statuses is a **multi-repo PR** touching every client's constants.
 - **Driver app speaks `DELIVERY_STATUS`** (bookDelivery), everyone else speaks
-  `ORDER_STATUS`; the server bridges them. Don't cross the wires.
+  `ORDER_STATUS`; nothing bridges them — delivery progress lives only on `bookDelivery`.
+  Don't cross the wires.
 - **ACCEPT is `order/update/viewd`** (partner + admin); generic transitions are `order/update`.
 - Every client sends `app-name` (tenant) + its own `app-type`; the server branches on `app-type`.
 

@@ -34,7 +34,9 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
 1. **Status source of truth is the server** — `ORDER_STATUS` in `consts/consts.js`
    (`1` in-progress … `6` pending … `13` fraud-review, `14` future, `15` ramadan; completed
    bucket `2,3,10,11,12`, cancelled `4,5,7,8,9`). Each client repo keeps its **own copy** in
-   `consts/shared.ts` — a status change is a **multi-repo PR**.
+   `consts/shared.ts` — a status change is a **multi-repo PR**. The driver endpoints
+   never write `orders.status`: delivered = `bookDelivery.completedAt`, and
+   `readyMinutes` is not an order field (reference §2).
 2. **Transition guards:** PENDING(`6`) only from FRAUD_REVIEW; store-accept rejects
    already-cancelled; `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
    not `order/update`.
