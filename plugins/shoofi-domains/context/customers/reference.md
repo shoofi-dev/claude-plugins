@@ -246,6 +246,14 @@ self-referral) → friend coupon + `customerReferrals` audit row (`rewardStatus:
 cap-checked) → inviter coupon + notify. `revertFirstOrderForReferrer` on cancel. Coupons are
 `isCustomerSpecific:true` in `shoofi.coupons` — the growth/accountant domains see them as Shoofi-funded.
 
+**Readers of attribution.** The unit-economics dashboard (shoofi-server
+`services/unit-economics/collect.js`, `docs/unit-economics.md`) derives a customer's
+**acquisition channel** from these fields and nothing else: `referral.influencerCode` →
+influencer, `referral.inviterCustomerId` → referral, otherwise unattributed. Its **town** is
+`cityId` (else the default address's `cityId`) resolved through `parent-cities.cityIds`.
+Renaming either `referral` key, or writing attribution somewhere else, silently moves every
+attributed customer into "unattributed" on that screen's CAC table.
+
 ## C — Client repos (full-stack)
 All three RN apps share a **copied base** (same interceptor, stores, login/verify screens) —
 they differ only in `app-type`, default `app-name`, and post-login navigation.

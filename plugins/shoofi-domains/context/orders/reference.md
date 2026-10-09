@@ -162,6 +162,13 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   until a future/ramadan order arrives — see shoofi-dev/shoofi-partner#8. Date windows must be
   built as offset strings to compare correctly.
 
+- **Whole-history readers.** The unit-economics dashboard (shoofi-server
+  `services/unit-economics/`, `docs/unit-economics.md`) sweeps EVERY completed order in every
+  non-mock store DB (projection: `customerId`, `created`, `shippingPrice`, `appliedCoupon`,
+  `order.receipt_method`, `twinGroup.groupId`) and counts a twin group as one customer basket.
+  It relies on `COMPLETED_STATUSES` and on `created` being an Israel-offset ISO string (it reads
+  the local date off the first 13 characters, falling back to moment-timezone otherwise).
+
 ## 6. Idempotency & invariants — never break these
 1. **Stock**: `decrementOrderStock`/`restoreOrderStock` gated by the
    `stockDecremented && !stockRestored` pair (`order-stock.js`) + `store.isStockManagment`.
