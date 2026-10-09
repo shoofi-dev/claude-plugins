@@ -290,7 +290,18 @@ colour pairing (`getOrderColor(bookId)`, a hash into a fixed 15-slot palette) li
 `src/utils/driver-map-markers.ts` so every admin map draws the same order in the same colour.
 The live-ops board (`views/admin/live-ops/`) reads `POST analytics/deliveries` like the delivery
 list, resolves `pickupTime` (bare `"HH:mm"`, wraps at midnight) against `expectedDeliveryAt`,
-and re-assigns through `delivery/admin/reassign` with the same 409 `needsConfirmation` handshake. **The area/coverage CONTROL PANEL**
+and re-assigns through `delivery/admin/reassign` with the same 409 `needsConfirmation` handshake.
+Its **couriers-per-zone** chips (`live-ops/components/ZoneBar.tsx`, `logic/zones.ts`) re-implement
+the navbar zone bar (`components/Navbars/AdminNavbar.js`, inline, not exported) with the SAME reads
+and rules: `GET delivery/city-areas`, then per region `delivery/company/employees?cityAreaId=`
+(active = `isActive === true`, no location = no `lastLocationUpdate` in 10 min) and
+`delivery/city-area/:id/disabled-areas`. A region reads **shut when ANY `areas` connection in it is
+`isActive:false`** (there is no zone-level flag), and "כבה"/"הפעל" are
+`POST delivery/city-area/:id/bulk-toggle-areas {isActive}`, the navbar's own call, so the
+availability trace and the admin audit row are unchanged. That endpoint takes **no reason and no
+duration** (the server hard-codes the trace reason) and has **no role check**. Zones are re-read at
+most every 30 s, because `company/employees` counts every courier's open bookDelivery rows per call.
+**The area/coverage CONTROL PANEL**
 lives here: `views/admin/delivery-areas/*` — full CRUD for cities, parent-cities, city-areas,
 delivery-areas, company-areas, geometries (draw/fill-gaps/suggest). **Config**:
 `views/admin/settings/DeliverySettings.tsx` (`admin/delivery-config`, `admin/twin-order-config`).
