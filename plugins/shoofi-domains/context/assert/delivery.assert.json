@@ -30,6 +30,7 @@
         "utils/crons/growth-snapshots.js",
         "lib/churn-360/signals.js",
         "routes/analytics.js",
+        "routes/shoofi-admin.js",
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
@@ -353,6 +354,16 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "\\n\\s*appName: 1,",
+          "desc": "analytics/deliveries projects the ROOT appName - the only store key a store-booked (isDeliveryOnly) booking has, since it carries no embedded order; drop it and the admin's call-the-restaurant button is permanently disabled on every manual booking"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "phoneByAppName\\[s\\.appName\\] \\|\\| s\\.phone",
+          "desc": "the store registry's phone is OVERLAID from the per-tenant <appName>.store doc - shoofi.stores.phone is '' on all 259 stores, so any store-phone lookup must come through this endpoint, never shoofi.stores directly"
         }
       ]
     },

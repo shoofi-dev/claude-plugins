@@ -79,6 +79,24 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
   `exec-dashboard/delivery-metrics.js`) and add the two fees as their own settlement lines.
 - The store's list is filtered **server-side**: default = active work queue (`1,2,3,5`),
   عرض الكل = no status filter at all (not a date toggle), newest 200, `appName`-scoped.
+- ⚠️ **The ROOT `appName` is the only store key one of these rows has**, and every admin
+  read must project it. The store identifiers an admin screen reaches for — `order.appName`
+  and the checkout snapshot `order.storeData.phone` — both live inside the embedded order,
+  and there is none. `POST /api/analytics/deliveries` (`routes/analytics.js`) whitelisted only
+  the embedded forms until 2026-10-09, so every store-booked row resolved to **no store** in
+  the admin's registry lookup and the live-ops board's "call the restaurant" button rendered
+  permanently **disabled** — silently, as a projection whitelist always fails, and the row
+  still showed the right store NAME because `storeName` is projected separately. The
+  restaurant's number is never on `shoofi.stores` (`phone: ""` on all 259); it is the
+  per-tenant `<appName>.store.phone`, overlaid onto the registry by
+  `GET /api/shoofiAdmin/store/all` (`routes/shoofi-admin.js`) — keyed on `appName`.
+- **The live-ops board badges it** — the amber **"ידנית"** pill (`ManualBookingBadge`,
+  `live-ops/components/common.tsx`, same word as the delivery list's) and the order line
+  reading **"ללא הזמנה"** rather than "לא זמין". Without both, a store-booked row is
+  indistinguishable from a real order whose store-DB join failed: same disabled `#<bookId>`,
+  same null order status. ⚠️ It is **not** `ManualAssignmentBadge` (the ✋), which says a
+  person picked the COURIER; this says a person placed the BOOKING, whose courier the scored
+  engine still chose.
 
 ## Invariants — never weaken
 1. **`DELIVERY_STATUS` is authoritative in `consts/consts.js`**: `1` waiting-approve → `2`
