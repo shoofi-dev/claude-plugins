@@ -33,7 +33,9 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "services/delivery/availability.js",
+        "services/delivery/area-tariff.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -111,6 +113,14 @@
           "/api/delivery/delivery-only/book",
           "/api/delivery/delivery-only/list",
           "isDeliveryOnly"
+        ],
+        "services/delivery/availability.js": [
+          "checkStoreDeliveryAvailability"
+        ],
+        "services/delivery/area-tariff.js": [
+          "resolveDeliveryTariffCeiling",
+          "maxTariffForStoreZone",
+          "PLATFORM_MAX_TARIFF"
         ]
       },
       "patterns": [

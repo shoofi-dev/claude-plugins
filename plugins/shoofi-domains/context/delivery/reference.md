@@ -148,6 +148,34 @@ inventing coverage values. Price/ETA:
 `POST /api/delivery/company/price-by-location` (`geography.js`) resolves geometry→areas→
 `company.supportedAreas` → `{areaId, price, minOrder, eta}`.
 
+> ⚠️ **That endpoint is NOT what quotes a customer's shipping, and the two prices
+> disagree.** The figure the customer is charged comes from
+> `POST /api/delivery/available-drivers` (`routes/delivery/driver.js`) →
+> `checkStoreDeliveryAvailability` (`services/delivery/availability.js`) →
+> `findBestAreaForLocation` (`services/delivery/assignDriver.js`) → **`area.price`**,
+> which the app reads as `availableDrivers?.area?.price` and posts back as
+> `order.shippingPrice`. `price-by-location` reads the delivery COMPANY's own copy in
+> `supportedAreas[]` and needs a `companyId`. Measured 2026-10-09 over
+> `delivery-company.store` (the delivery-company documents, despite the collection
+> name): **3,656 of 17,871 company-area pairs carry a different price from the area
+> itself — 20.5%** — and the common shape is `supportedAreas[].price: 0` against a real
+> `areas.price` of ₪20-25. Quote a customer off `supportedAreas` and a fifth of them are
+> wrong, most of those free. `areas.price` is the tariff; n=217, min ₪15, max ₪100,
+> avg ₪36.35.
+>
+> ⚠️ **`checkStoreDeliveryAvailability` is expensive — do not call it just for a price.**
+> It wraps `findBestAreaForLocation` and then fires one `customers.find` **per supporting
+> company**; an area is listed by ~88 companies on average and 198 at worst. For a
+> tariff alone call `findBestAreaForLocation` directly (two indexed geo queries over a
+> 39-doc `areas-geometry` and an 18-doc `cities`), which is what
+> `services/delivery/area-tariff.js` does.
+>
+> ⚠️ **`order.shippingPrice` is client-quoted and validated nowhere.** Harmless while the
+> fee is only ADDED to the total; it stops being harmless the moment something is derived
+> from it — a free-delivery discount becomes an uncapped cash payout to the courier at
+> `routes/driver-reports.js:164`. Measured over 17,031 delivered bookings in 60 days it
+> equals `area.price` on 97.0%, so a server-side ceiling is inert on the honest path.
+
 **`expectedDeliveryAt = pickupTime + max(area.maxETA, 8 min + km/18 km/h)`** — the
 store→customer distance, with the admin's `maxETA` as a **floor**. One implementation,
 `services/delivery/delivery-promise.js:computeDeliveryPromise`, called by both writers
