@@ -139,6 +139,19 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      when the coupon was applied. Any read-time "who paid for this" derivation therefore
      produces a small **negative** Shoofi share on such orders. That is real over-billing
      surfacing — **do not clamp it at zero**, which only hides it.
+   - **A PUBLIC coupon carrying a `shoofiDiscount` has that share absorbed by NOBODY.**
+     The two branches are mutually exclusive on the same flag: the store branch requires
+     `!isSpecificToCustomers` (`:1188`) and the Shoofi-credit branch requires
+     `isSpecificToCustomers` (`:1209`). So on a coupon with `isCustomerSpecific: false`
+     and both discounts set, the store is billed its `storeDiscount` and Shoofi's share
+     is **billed to nobody and credited to nobody** — it leaves `campaigns`,
+     `couponsFromShoofi` and the financial overview all at once, silently, and the two
+     screens still reconcile against each other because they read the same engine
+     output. Nothing validates the pair, so this is a write-side invariant only:
+     **`shoofiDiscount` is meaningless unless `isCustomerSpecific` is true.** Store
+     promotions (`services/promotions/`, 2026-10) are forced fully store-funded for
+     exactly this reason — a promotion is public by definition, so joint funding needs
+     the `:1209` gate widened before it can be offered at all.
    - **A `percentage`-type coupon is billed as `(storeDiscount / 100) * orderPrice`**,
      where `orderPrice` is the **items subtotal** (`originalOrderPrice` — no shipping, no
      drive-in) — *even when the coupon's `discountType` is `delivery`*. So what the

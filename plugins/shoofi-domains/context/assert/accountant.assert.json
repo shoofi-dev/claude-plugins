@@ -23,7 +23,8 @@
         "utils/hashavshevet-movein.js",
         "services/accountant-export/movein.js",
         "services/accountant-export/accounts.js",
-        "services/exec-dashboard/store-registry.js"
+        "services/exec-dashboard/store-registry.js",
+        "services/promotions/promotion-service.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -105,6 +106,10 @@
           "findCoveringStoreReport",
           "findCoveringDriverReport",
           "checkCompensationLock"
+        ],
+        "services/promotions/promotion-service.js": [
+          "resolvePromotionSplit",
+          "buildAppliedCouponForPromotion"
         ]
       },
       "patterns": [
