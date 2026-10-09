@@ -110,7 +110,7 @@ pendings; the claim is atomic (`updateOne {isPendingAssignment:true}` → `match
 means another container won). Scored path (`delayed-assignment.js`) ranks by distance to store +
 distance to customer + route deviation + order-load penalty + same-store batching bonus +
 uncollected penalty + overdue penalty + **pickup-headroom penalty** (config in
-`deliveryConfig {type:'driver-assignment'}`; see CORE invariants 12-13 — a new weight must be
+`deliveryConfig {type:'driver-assignment'}`; see CORE invariants 14-15 — a new weight must be
 defaulted at the read site as well as in `DEFAULT_CONFIG`, and the arrival estimate is scored,
 so `assumedDriverSpeedKmh` is a dispatch lever). Two-tier sort: over-cap couriers go last
 regardless of score, so no score term can pull one past a courier below the cap.
@@ -172,7 +172,7 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
 > ⚠️ **The promise is a DISPATCH lever, not only a customer-facing number.** A courier's
 > modelled free time is `parsePromisedEta` on the run he is already carrying
 > (`delayed-assignment.js:calculateDriverScore`, the `usingFutureLocation` branch), which
-> feeds `estimateArrivalAtStore` → the `pickupHeadroom` term (invariant 13). So a longer
+> feeds `estimateArrivalAtStore` → the `pickupHeadroom` term (invariant 15). So a longer
 > promise **relaxes the overdue term (−15/order) and tightens the headroom term (+1 pt per
 > minute, capped at 20)** on the same courier — "it can only lengthen" is a statement about
 > the promise, never about the score. It also decides WHICH in-flight order is taken as his
@@ -211,8 +211,9 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
 
 ## 6. Crons (prod-only, Redis-locked; `docs/distributed-cron-jobs.md`)
 `assignment-scheduler` (60s — assign due pendings) · `delivery-pickup-checker` (3m) ·
-`delivery-completion-delay-checker` (4m) · `delivery-coverage-alert` (5m →
-`shoofi.deliveryCoverageAlerts`) · `store-delivery-availability` · `driver-shift` (hourly
+`delivery-completion-delay-checker` (4m) · `delivery-coverage-alert` (5m → `shoofi` DB, collection
+**`delivery-coverage-alerts`**; `db.deliveryCoverageAlerts` is only the property binding,
+`DatabaseInitializationService.js`) · `store-delivery-availability` · `driver-shift` (hourly
 deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
 `driver-inactivate` (**currently disabled** — commented out in app.js).
 
@@ -220,9 +221,18 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
 - `bookDelivery` — `{status, isPendingAssignment, assignDriverAt, pickupTime, created,
   expectedDeliveryAt, area(embedded), company(embedded), driver(embedded), bookId,
   originalBookId, appName, customerLocation, order(snapshot), twinGroupId,
-  twinPickupSequence, twinAssignmentMode, twinPeer, twinDegraded, *DelayNotified*}`.
+  twinPickupSequence, twinAssignmentMode, twinPeer, twinDegraded, *DelayNotified*,
+  assignedAt, completedAt(Date), isReadyForPickup, readyForPickupAt}`.
+  ⚠️ Fields that are not what they look like (CORE invariant 11): `readyForPickupAt` exists
+  only if a driver was already assigned when the store pressed ready — the full store-ready
+  source is `shoofi.orderFlowEvents` `status_change` status `"3"`. `company.storeName` and
+  `driver.name` are never populated — use `company.nameHE`/`nameAR`, `driver.fullName`.
+  There is **no driver-arrived-at-store field**: use the optional `delivery_waiting_in_store`
+  flow event or `driverLocationHistory` within 150 m of `storeLocation`. Assignment lag =
+  `assignedAt − max(assignDriverAt, created)` (CORE invariant 2), never `− assignDriverAt`.
 - `store` (company) — `supportedCities[ObjectId], supportedAreas
-  [{areaId,price,minOrder,eta}], isControlledByAdmin, manualAssignmentOnly, accounting`.
+  [{areaId,price,minOrder,eta}], isControlledByAdmin, manualAssignmentOnly, accounting,
+  nameHE, nameAR`.
   ⚠️ **No `location` and no `coverageRadius`** — verified 2026-09-29 as the union of every key
   across all 173 documents. Do not reach for `company.location` as a fallback position for a
   courier: it is `undefined` for every company, so `company.location.coordinates[0]` throws,
@@ -231,9 +241,11 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
 - `customers` (drivers) — `role, isActive, isAvailable, isOnline, companyId(string),
   currentLocation, lastLocationUpdate, lastFixAt, locationMetadata,
   personalSupportedAreas[areaId], maxOrdersByAdmin,
-  storeAssignmentMode, assignedStoreAppNames[]`.
+  storeAssignmentMode, assignedStoreAppNames[]`. A `role: "admin"` row is the company's
+  admin login and **also takes jobs** (~1,164 in 30 days on one account) — flag it in
+  per-driver tables (CORE invariant 6).
 - Geo: `cities, parentCities, cityAreas, areas, areasGeometry`. Ops: `driverStatusHistory,
-  driverLocationHistory(TTL), driverShifts, driverDailyHours, deliveryConfig`.
+  driverLocationHistory(30-day TTL on `expiresAt`), driverShifts, driverDailyHours, deliveryConfig`.
 
 ## 8. Cross-domain edges (hand off, don't reach in)
 - **ORDERS (you're the callee)**: at partner-accept `routes/order.js` builds `deliveryData`
@@ -286,7 +298,7 @@ Shift admin: `apis/admin/driver-shift-manager.ts`. `DELIVERY_STATUS` copy = `1..
 **Delivery-only:** `DeliveryListAnalytics.tsx` marks these rows with a `ידנית` badge and shows a
 `ביטול משלוח` button — `isDeliveryOnly && !CLOSED_DELIVERY_STATUSES.includes(status)` — which
 POSTs `delivery/order/status/update` with `status: -3`. That route clears `isPendingAssignment`
-and pushes the driver a cancellation (see CORE invariants 10–11).
+and pushes the driver a cancellation (see CORE invariants 12–13).
 This is where a human curates coverage — treat it as the source of truth UI for §1/§4.
 
 ### C3. shoofi-partner — STORE-OWNER (booking trigger + coverage check)

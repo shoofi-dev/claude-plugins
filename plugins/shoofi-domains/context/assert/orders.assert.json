@@ -27,7 +27,10 @@
         "test/integration/order-stock-combo.js",
         "services/notification/notification-service.js",
         "test/integration/push-timeout.js",
-        "test/integration/order-create-nonblocking-store-alert.js"
+        "test/integration/order-create-nonblocking-store-alert.js",
+        "routes/delivery/orders.js",
+        "services/monitoring/centralized-flow-monitor.js",
+        "test/integration/order-monitoring-auth.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -250,6 +253,21 @@
           "file": "utils/order-stock.js",
           "regex": "expandStockLines\\(oldItems, \\{ minQty: 0 \\}\\)",
           "desc": "doc CORE invariant 12: the amend delta compares two expansions with minQty 0 — it must not invent a unit"
+        },
+        {
+          "file": "routes/admin/order-monitoring.js",
+          "regex": "const MONITORING_ROLES = \\['master', 'admin', 'manager', 'senior', 'operator', 'viewer', 'editor'\\];\\s*const adminOnly = \\[auth\\.required, checkAdminRole\\(MONITORING_ROLES\\)\\];",
+          "desc": "every admin/order-monitoring route is gated to ANY admin role (auth.required alone passes customer tokens) - reference.md C4"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "status: DELIVERY_STATUS\\.DELIVERED,\\s*completedAt: new Date\\(\\),",
+          "desc": "driver complete stamps bookDelivery.completedAt and never writes orders.status - delivered = bookDelivery.completedAt (reference.md §2, C2)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "eventType: 'order_viewed',[\\s\\S]{0,600}?readyMinutes: updateobj\\.readyMinutes,[\\s\\S]{0,200}?previousStatus: order\\.status,",
+          "desc": "readyMinutes lives only in order_viewed metadata, and previousStatus is read from the post-update order (always the new status) - reference.md §2/§5 traps; if this changes, fix both notes"
         }
       ]
     },

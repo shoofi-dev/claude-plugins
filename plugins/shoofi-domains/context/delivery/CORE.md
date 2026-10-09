@@ -89,18 +89,23 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
    atomic `updateOne({isPendingAssignment:true})` (`matchedCount===0` = another container won).
    Never bypass either.
    **Delayed assignment is ON in production, and the window is 15 — not the code's 10.**
-   `DEFAULT_CONFIG` in `services/delivery/delayed-assignment.js:17-19` says
+   `DEFAULT_CONFIG` in `services/delivery/delayed-assignment.js` (`DEFAULT_CONFIG`) says
    `useDelayedAssignment: false, assignmentWindowMinutes: 10`; both are overridden by
    `delivery-company.delivery-config {type:'driver-assignment'}`, which holds
    `{useDelayedAssignment: true, assignmentWindowMinutes: 15}`. Read the DB document, never
    the constant. Consequence: the platform is *designed* to dispatch at `pickupTime − 15`
-   (`delayed-assignment.js:483-485`), so "this courier only got twelve minutes' notice" is
+   (`createPendingDelivery`, `assignDriverAt = pickupTimeDate − assignmentWindowMinutes`), so "this courier only got twelve minutes' notice" is
    normal operation rather than an anomaly — 559 of 4,957 completed deliveries in 1–17 Aug
    2026 reached their first courier under ten minutes before pickup. Any rule that measures
    notice-before-pickup from the other end (the late-delivery grace,
    `services/delivery/late-delivery.js`) is measuring the same quantity as
    `assignmentWindowMinutes` and moves as a step function of it: the lever for that
    population is the config value, not the report.
+   **Measuring assignment lag:** whenever ready-minutes < 15, `assignDriverAt` is already in
+   the past at the moment the booking is created, so `assignedAt − assignDriverAt` reports a
+   fake lag (≈5 min on a 10-minute order) that is pure window arithmetic. Measure
+   `assignedAt − max(assignDriverAt, created)`. All three are offset strings — parse to
+   instants; and an admin reassign (`routes/delivery/driver.js`) overwrites `assignedAt`.
 3. **Never write `customers.isActive` directly** — always `setDriverActiveStatus`
    (`services/delivery/driver-status-service.js`), which writes `driverStatusHistory` in
    lock-step and pushes a websocket update. Direct writes create phantom history.
@@ -109,7 +114,10 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
    `twinPickupSequence:1` side drives selection, the peer mirrors it, and `assignDriverAt` is
    aligned to the later side. Breaking any of it splits a twin.
 6. **Manual-admin routing:** companies with `isControlledByAdmin && manualAssignmentOnly` route
-   to a company **admin**, not a driver. Don't auto-assign them.
+   to a company **admin**, not a driver. Don't auto-assign them. Corollary for reports: a
+   company's admin login (`delivery-company.customers`, `role: "admin"`) **also takes jobs** —
+   one such account took ~1,164 in 30 days — so it is a fleet, not a courier. Any per-driver
+   table (lateness, load, pay) must flag `role === "admin"` rows rather than rank them.
    **`centralizedFlowMonitor.trackOrderFlowEvent` RETHROWS — always wrap it.** It logs and then
    `throw error` (`services/monitoring/centralized-flow-monitor.js:63-66`), so an `await`ed call
    with no local try/catch turns a monitoring failure into a 5xx on the dispatch route *after*
@@ -180,8 +188,23 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `order` are whole embedded documents, so a wished-for or misspelled field reads as
     `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
     runs — which looks identical to a correction that is simply rare.
-
-10. **`isPendingAssignment` is a queue-membership CLAIM TOKEN, not a status — and every exit
+    Same trap, live instances:
+    - **`readyForPickupAt` is partial.** `routes/order.js` writes `isReadyForPickup` +
+      `readyForPickupAt` (offset string) when the store presses ready **only if a driver is
+      already assigned** at that moment (`if (deliveryRecord && deliveryRecord.driver?._id)`,
+      ~`:5634-5652`); a booking still in the queue never gets it. The complete source is the
+      flow event above.
+    - **`company.storeName` and `driver.name` are never populated** on the embedded copies —
+      read `company.nameHE`/`nameAR` and `driver.fullName`. So the flow events'
+      `metadata.companyInfo.name` (`book-delivery.js`, reads `company.storeName`) is always
+      `undefined`, and `utils/crons/delivery-completion-delay-checker.js` reads
+      `order.driver?.name`, so its admin push always says "נהג: לא ידוע".
+    - **Driver arrival at the store has no field.** Only the optional driver tap
+      (`delivery_waiting_in_store` flow event, status `5`) or a reconstruction from
+      `delivery-company.driverLocationHistory` (30-day TTL on `expiresAt`) — first fix within
+      150 m of `bookDelivery.storeLocation` after dispatch. Pending: shoofi-server PR #285
+      (`lib/support-analytics/delay-analysis.js`, not merged) implements exactly that.
+12. **`isPendingAssignment` is a queue-membership CLAIM TOKEN, not a status — and every exit
     from the queue must burn it, not only cancel.** `processPendingAssignments`
     (`services/delivery/delayed-assignment.js`) dispatches on
     `{isPendingAssignment: true, assignDriverAt: {$lte: now}}` every 60s, so a booking that
@@ -206,11 +229,11 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `isAwaitingAssignment()` / `PENDING_ASSIGNMENT_EXCLUDED_STATUSES`, exported from
     `delayed-assignment.js`. Do **not** add anything to the atomic claim filter itself
     (invariant 2) while doing so.
-11. **Never assume a delivery has an order.** `deliveryOrder.order` is absent on every
+13. **Never assume a delivery has an order.** `deliveryOrder.order` is absent on every
     delivery-only booking, so anything keyed on `order.customerId`, `order.total` or
     `order.orderId` silently no-ops there. That is exactly how admin cancellation used to
     notify nobody while the driver was still driving to the store.
-12. **A new `scoringWeights` key must be defaulted in TWO places or it ships dead.** The live
+14. **A new `scoringWeights` key must be defaulted in TWO places or it ships dead.** The live
     `delivery-company.delivery-config {type:'driver-assignment'}` document holds exactly three
     weights — `{distanceToStore: 3, distanceToCustomer: 1, routeDeviation: 0.5}` — while
     `DEFAULT_CONFIG.scoringWeights` in `services/delivery/delayed-assignment.js` carries every
@@ -224,7 +247,7 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     comparison in `byConcurrencyTierThenScore` (`services/delivery/driver-load.js`) false and
     leaves the candidate order down to whatever `Array.prototype.sort` happened to do, which
     for two twin peers scored microseconds apart is a coin flip no decision log can reproduce.
-13. **`assignmentMetadata.estimatedArrivalAtStore` is scored, not a diagnostic — so
+15. **`assignmentMetadata.estimatedArrivalAtStore` is scored, not a diagnostic — so
     `assumedDriverSpeedKmh` is a dispatch lever.** The scored path's total is
     `distance + orderPenalty + customer + routeDeviation + sameStoreBonus + uncollectedPenalty
     + overduePenalty + pickupHeadroomPenalty` (`services/delivery/delayed-assignment.js`), and
