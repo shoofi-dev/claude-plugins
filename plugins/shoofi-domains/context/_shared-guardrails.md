@@ -109,6 +109,26 @@ especially closely. The zones (per `CLAUDE.md`):
 - A wrong DB selection leaks one store's data into another. Double-check any
   cross-DB read/write is intentional and justified.
 
+## 3a. An API permission change is a change to every app that calls the path
+Before adding or tightening `auth.required`, `checkAdminRole`, an entry in shoofi-server's
+`utils/restricted-admin-routes.js`, a role list, or anything that changes what a token must
+carry: grep **all four clients** (shoofi-app, shoofi-partner, shoofi-shoofir,
+shoofi-delivery-web) for the path **without** the `/api` prefix, plus its last segment, and
+list every caller and the token it sends in the PR's **Permission impact** section. Do it
+before writing the change and again before the PR is merged. "It's an admin screen's
+endpoint" is a guess until the grep says so.
+- **Only admin tokens carry `roles`.** Customer/partner/driver JWTs are `{phone, id}`
+  (`utils/auth-service.js`), so a role gate on a path a mobile app calls 403s every user of
+  that app.
+- **A 403 is silent in all four clients.** Each `http-interceptor` reacts only to 401, so the
+  screen renders empty with no error.
+- A path that has a mobile caller and still needs locking down gets a per-audience check
+  (master OR the token's own `id`), never a role-only gate.
+
+Incident: shoofi-server #281 (merged 2026-10-07) made `payments/{driver/summary,
+driver/details,admin/drivers/summary}` master-only as admin-screen endpoints; shoofir's
+payments screen calls all three, and every driver saw a blank screen until #289.
+
 ## 4. Never let a secondary feature break the primary flow
 Order creation/payment/delivery are primary. Secondary features (loyalty coins,
 world-cup points, influencer attribution, analytics, social) must be wrapped so a
@@ -147,6 +167,7 @@ failure is **swallowed and logged**, never thrown into the primary path.
    are close to empty), so you are usually *adding* the first coverage of a path rather
    than extending a suite. Prefer pure logic and route-level tests with faked infra —
    that's the pattern in `test/integration/`.
+3a. **Permission change?** The PR lists every client caller of each affected path (§3a).
 4. `npm run routes:check` **if you moved/added/renamed any route** (expect an
    empty diff unless the route change is intentional — then regenerate the baseline).
 5. `npm run docs:check` — the agent context docs must still match the code.
