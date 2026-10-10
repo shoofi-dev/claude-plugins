@@ -148,6 +148,18 @@ inventing coverage values. Price/ETA:
 `POST /api/delivery/company/price-by-location` (`geography.js`) resolves geometry→areas→
 `company.supportedAreas` → `{areaId, price, minOrder, eta}`.
 
+**`POST /api/delivery/available-drivers`** (`routes/delivery/driver.js` →
+`services/delivery/availability.js` `checkStoreDeliveryAvailability`, shared with the
+store-availability audit cron, which reads only `available`) returns
+`{available, isAreaSupported, isDeliveryPaused?, area?, companies?, distanceKm?, reason?}`:
+- no ACTIVE area at the dropoff → `isAreaSupported:false` + `isDeliveryPaused` (`true` when an
+  area exists but `isActive` is off — a second lookup with `ignoreAreaActive:true`; `false` when
+  none exists). Customer app: `helpers/delivery-availability.ts` `getDeliveryZoneState` →
+  `isDeliveryPaused` vs `isOutOfZone`.
+- area found, no company covers it → `isAreaSupported:false`, no `isDeliveryPaused`.
+- area + companies → `isAreaSupported:true`, `available` = any company has an eligible driver
+  ("no drivers now", not out of zone).
+
 **`expectedDeliveryAt = pickupTime + max(area.maxETA, 8 min + km/18 km/h)`** — the
 store→customer distance, with the admin's `maxETA` as a **floor**. One implementation,
 `services/delivery/delivery-promise.js:computeDeliveryPromise`, called by both writers
