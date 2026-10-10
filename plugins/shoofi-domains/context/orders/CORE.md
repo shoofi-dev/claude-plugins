@@ -178,6 +178,12 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       deal on the new items, then the delivery deal on the subtotal after it; never above the
       checkout grant; `promotionPricing.<kind>.basis` = `recomputed` | `kept-original` |
       `catalogue-gap`.
+      **A store edit never makes the customer pay more**: the amend passes
+      `previousItemsPrice` and the deals keep at least `granted − removedValue` (items first,
+      then delivery) — the store absorbs it, `protectedAmount` reports it (without this a lost
+      "10% over ₪200" charged MORE for less food, and a card hold refused the edit). The amend
+      also writes `promotions` into the `bookDelivery` snapshot (cash courier reimbursement)
+      and reconciles `promotionRedemptions` (removed deal → row deleted, reduced → new amount).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
