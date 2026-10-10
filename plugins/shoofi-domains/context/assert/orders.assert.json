@@ -30,7 +30,12 @@
         "test/integration/order-create-nonblocking-store-alert.js",
         "routes/delivery/orders.js",
         "services/monitoring/centralized-flow-monitor.js",
-        "test/integration/order-monitoring-auth.js"
+        "test/integration/order-monitoring-auth.js",
+        "routes/promotion.js",
+        "services/promotions/promotion-service.js",
+        "utils/promotion-discount.js",
+        "services/twin-order/twin-promotions.js",
+        "docs/promotions.md"
       ],
       "symbols": {
         "routes/order.js": [
@@ -60,12 +65,27 @@
           "calculateOrderPricing",
           "loadPricedProducts",
           "calculateComboExtrasPrice",
-          "COMBO_ISSUE"
+          "COMBO_ISSUE",
+          "repricePromotions"
         ],
         "routes/order-amend.js": [
           "repriceOrder",
           "applyItemChanges",
           "isComboLine"
+        ],
+        "services/promotions/promotion-service.js": [
+          "enforcePromotions",
+          "resolveDeliveryConflict",
+          "recordPromotionRedemptions",
+          "releasePromotionRedemptions",
+          "quotePromotions"
+        ],
+        "utils/promotion-discount.js": [
+          "evaluatePromotion",
+          "DELIVERY_MODES"
+        ],
+        "services/twin-order/twin-promotions.js": [
+          "enforceTwinSidePromotions"
         ]
       },
       "patterns": [

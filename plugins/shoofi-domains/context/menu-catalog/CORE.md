@@ -365,6 +365,15 @@ boundary and say so in the PR.
    `store.outOfStockExtras` (old name kept). Never route it through `POST /api/admin/product/update`
    (whole-document `$set`, last writer wins). A dismissed or accepted text is not re-raised.
 
+18. **PROMOTIONS ANNOTATE THE MENU; THEY NEVER CHANGE A PRICE** (`services/menu/promotions.js`).
+    `applyMenuPromotions` stamps `menuData.promotions[]` and `product.promotions[]` (the
+    "הנחה" badge) BEFORE the cache write, in both `GET /api/menu` and `POST /api/menu/refresh`
+    — omitting it from refresh wipes every running deal until the TTL lapses. A deal's value
+    depends on the whole cart, so `price`/`originalPrice` are untouched. Promotion writes
+    (`routes/promotion.js`) clear BOTH cache keys (invariant 2). Nothing fires at `endDate`: a
+    stale badge can sit up to 5 min, but every quote and order creation re-checks. Promotions
+    live in the STORE db (they reference that store's product/category ids).
+
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
 against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store DBs):
