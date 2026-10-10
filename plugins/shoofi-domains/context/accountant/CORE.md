@@ -262,6 +262,22 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     automatically (createdAt = now) without the lock — it can only collide with a report
     generated for a period that has not ended.
 
+11. **A store promotion is store-funded and needs no coupon branch** (`order.promotions`,
+    shoofi-server `docs/promotions.md`). Never look for it in `appliedCoupon`.
+    - **Items deal** — already netted into `orderPrice` with `originalOrderPrice` at list price,
+      i.e. it IS the store product discount: revenue uses the charged price, **commission the
+      list price**, the gap is reported as `productDiscounts`. Putting it in `appliedCoupon`
+      too would bill the store twice (lower revenue AND `campaigns`).
+    - **Delivery deal** — `shippingPrice` stays the full fee (courier pay, delivery tax
+      invoice). The store is billed it as a campaign (`totalAppliedCouponsSum`, row code
+      `מבצע`, `routes/payments/admin.js`). On a **CASH** order the courier collected that much
+      less at the door, so it is paid to them like a delivery coupon: `promotionDeliveryPortion`
+      in `lib/payments/calc.js` (inside `couponDeliveryPortion` / `couponDeliverySplit`, store
+      share = all of it) and the cash branches of `routes/payments/summaries.js` and
+      `routes/driver-reports.js` (`promotionDeliveryPayment`, added in a SEPARATE `$addFields`
+      stage). A delivery deal and a delivery coupon never both apply to one order.
+    - Shoofi funds nothing: no Shoofi share exists and the admin form has no field for one.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.

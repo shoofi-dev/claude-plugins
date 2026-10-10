@@ -146,6 +146,39 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       stripped with the other bookkeeping fields before `order.items` is written, so the
       persisted item shape never carries it.
 
+13. **A STORE PROMOTION IS THE STORE'S PRICE, NOT A COUPON** (`docs/promotions.md` in
+    shoofi-server). It lives on **`order.promotions = { items, delivery }`** — one deal of each
+    kind, each `{ promotionId, type, titleHE, titleAR, discountAmount, deliveryMode?,
+    eligibleItemIds, fundedBy: "store" }` — and **never in `appliedCoupon`** (the coupon slot is
+    the customer's coupon only). Order of pricing: items → **items deal** → coupon (minimum and %
+    measured on the price AFTER the deal) → coins; fee → **delivery deal**. Shape on the order:
+    the items deal is netted into `orderPrice`, `originalOrderPrice` stays the LIST price;
+    `shippingPrice` is **never lowered** — the delivery deal comes off `total` only.
+    - **Creation clamps, never rejects** (`enforcePromotions`, `routes/order.js`): every claimed
+      deal is re-derived from the catalogue-priced items; an over-claim is added back
+      (items → `orderPrice` AND `total`; delivery → `total`) and logged on
+      `promotionEntitlement`. A deal that ended, a used-up cap, a cart that no longer qualifies
+      or a deal in the wrong slot is dropped; a deleted promotion or a catalogue gap keeps the
+      client's number; the server never RAISES a claim. The delivery fee a deal may discount is
+      bounded by `resolveDeliveryTariffCeiling` (never 0).
+    - **The one conflict with a coupon**: a delivery deal and a delivery coupon
+      (`discountType: 'delivery'` or `type: 'free_delivery'`) never both apply — the larger
+      wins, a tie goes to the deal, and the dropped coupon is not sent so it is not spent
+      (`resolveDeliveryConflict`; the app picks first, creation re-checks).
+    - **Uses** are one row per (order, promotion) in `shoofi.promotionRedemptions` (unique,
+      idempotent), written at the four `couponUsages` write points with the same status gates
+      and released on cancel. NOT `couponUsages` — settlement and every coupon cap read that.
+    - **Twin orders**: each side carries ITS OWN store's deal, judged on its own items
+      (`services/twin-order/twin-promotions.js`, run per side in `/place` and
+      `/digital-place-pending` before coins); never split like the twin coupon. Only the
+      primary carries the fee, so only its store's delivery deal applies; the combination fee
+      is never discounted. Uses are recorded with the twin coupon usages (cash: the route; card:
+      `applyCaptureSuccess`) and released in `cascadeCancel`.
+    - **Amend re-runs the rules** (`repricePromotions` in `utils/order-pricing.js`): the items
+      deal on the new items, then the delivery deal on the subtotal after it; never above the
+      checkout grant; `promotionPricing.<kind>.basis` = `recomputed` | `kept-original` |
+      `catalogue-gap`.
+
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
 `shoofi-app/stores/cart/index.ts` and nothing about it reaches the server until submit, so
