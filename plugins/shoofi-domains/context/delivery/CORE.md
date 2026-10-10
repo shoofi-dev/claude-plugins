@@ -49,6 +49,14 @@ sets**, and the second one is wrong for anything dispatch-related. Note the asym
 scope documents above it — `cityAreas.isActive` and `parentCities.isActive` really are read as
 `{$ne: false}`, so absent means active *there*. Same field name, opposite default, one collection
 apart. Anything reasoning about whether an area was serving must use `isActive === true`.
+**Paused ≠ out of zone.** Staff pause delivery by switching areas off (the region "כבה" button
+→ `areas.isActive=false`), so the active-only lookup misses exactly as for "no area here".
+`checkStoreDeliveryAvailability` (`services/delivery/availability.js`, behind
+`POST /api/delivery/available-drivers`) then looks again with `ignoreAreaActive: true` and
+returns `isDeliveryPaused: true` (area exists, switched off) or `false` (no area). `isAreaSupported`
+stays `false` for a paused area on purpose — old app bundles keep their behaviour and no
+scheduled order opens into it. The customer app shows "delivery not available right now" for
+paused and "outside the delivery area" only for `isDeliveryPaused: false`.
 
 ## Delivery-only — a courier with no order behind it
 A store can book a driver for goods **Shoofi never sold**: owner picks a town, gives a phone
