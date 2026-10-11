@@ -75,7 +75,13 @@
           "scoreBreakdown"
         ],
         "services/delivery/driver-load.js": [
-          "byConcurrencyTierThenScore"
+          "byConcurrencyTierThenScore",
+          "getDriverCapacity",
+          "isDriverAssignable",
+          "driverHasCapacity",
+          "isWithinConcurrencyCap",
+          "DEFAULT_MAX_CONCURRENT_ORDERS",
+          "parseAdminQuotaInput"
         ],
         "services/delivery/book-delivery.js": [
           "originalBookId",
@@ -111,9 +117,22 @@
           "/api/delivery/delivery-only/book",
           "/api/delivery/delivery-only/list",
           "isDeliveryOnly"
+        ],
+        "routes/delivery/company.js": [
+          "/api/delivery/company/employee/:id/update-max-orders"
         ]
       },
       "patterns": [
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "String\\(driver\\?\\.role\\) === \"admin\" \\? Infinity : 0",
+          "desc": "a blank/0/unparseable maxOrdersByAdmin is capacity 0 — the courier is SWITCHED OFF, not uncapped — and only role 'admin' is exempt. 113 of 249 production driver records are in that state (2026-10-11), so any screen rendering a blank as '—' or '∞' misstates who is working (CORE invariant 16)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "const DEFAULT_MAX_CONCURRENT_ORDERS = 2",
+          "desc": "the platform cap of 2 is a SORT PREFERENCE (isWithinConcurrencyCap -> byConcurrencyTierThenScore), not a filter; maxOrdersByAdmin via driverHasCapacity is the only hard per-courier ceiling, which is how a courier comes to hold a 3rd"
+        },
         {
           "file": "consts/consts.js",
           "regex": "DELIVERY_STATUS",

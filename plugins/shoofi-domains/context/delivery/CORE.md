@@ -269,6 +269,34 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+16. **A blank `maxOrdersByAdmin` means the courier is SWITCHED OFF, not "no limit" — and
+    roughly half the fleet is in that state.** `getDriverCapacity`
+    (`services/delivery/driver-load.js`) returns **0** for a quota that is `null`,
+    `undefined`, `""`, `<= 0` or unparseable, and 0 fails `isDriverAssignable`, so the courier
+    is dropped before any load is counted for him. Measured 2026-10-11 on
+    `delivery-company.customers`: 113 of 249 driver records carry one (96 at `0`, 17 absent);
+    the positive values run 1–6, with 113 of the 136 set to `2`. Three consequences:
+    - **Any screen or report that renders a blank quota as "—", "∞" or "no limit" is lying**
+      about who is working. Such a courier is `isActive: true`, counts as idle, and receives
+      nothing. The admin dashboard's shared reader is `shoofi-delivery-web`
+      `src/utils/driver-quota.ts`; use it rather than re-deriving the rule.
+    - **The single exception is `role === "admin"`**, where blank returns `Infinity` —
+      manual-admin routing (invariant 6) dispatches to a company admin who has never had a cap
+      set, and treating blank as off for him would kill that routing mode. Never flag those
+      rows.
+    - **`maxOrdersByAdmin` is a HARD filter; the platform's `DEFAULT_MAX_CONCURRENT_ORDERS = 2`
+      is not.** The 2 only feeds `isWithinConcurrencyCap` → `byConcurrencyTierThenScore`, a
+      sort preference, so a courier whose own quota is 3 stays in the pool holding 2 and wins
+      once everyone under 2 is gone. "Why did he get a third" is answered by his own quota, not
+      the platform cap. And `1` means `1` — the `Math.max(capacity, 2)` floor was removed
+      2026-10-07, because "this courier takes one job at a time" is the control room's only
+      lever on a chronically late courier.
+    Writing it: `POST /api/delivery/company/employee/:id/update-max-orders`
+    (`routes/delivery/company.js`) is the one-field write, validated by
+    `parseAdminQuotaInput` in the same `driver-load.js`; `0` and blank both normalise to `null`
+    because they are one state. `POST /api/delivery/company/employee/update/:id` also accepts
+    the field but rebuilds the whole employee document and `$set`s `fullName`
+    unconditionally — never use it for a partial edit.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**

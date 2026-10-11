@@ -97,8 +97,13 @@ pickup zone (`area.cityId`) + dropoff geometry.
 **Driver eligibility** (`findAllMatchingDrivers`): company must match BOTH `supportedAreas`
 (areaId) AND `supportedCities` (cityId); `personalSupportedAreas` overrides. Then a
 store allow/block list (`storeAssignmentMode`/`assignedStoreAppNames`).
-**Load/selection**: counts active `bookDelivery` (status `1,2,3`) per driver, drops those
-at `maxOrdersByAdmin`, sorts ascending by load, **random tie-break**.
+**Load/selection** (`driver-load.js`): counts active `bookDelivery` per driver, then
+`isDriverAssignable` (capacity > 0) → `driverHasCapacity` (the one hard filter, against
+`maxOrdersByAdmin`) → `byConcurrencyTierThenScore`. ⚠️ A blank/0 quota is **switched off**,
+not uncapped, and ~113 of 249 drivers are — CORE invariant 16. The platform's
+`DEFAULT_MAX_CONCURRENT_ORDERS = 2` is only a sort preference (`isWithinConcurrencyCap`), so
+a courier may hold a 3rd when his own quota allows and everyone under 2 is gone. No random
+tie-break: the comparator is tier-then-score.
 **Manual-admin routing**: companies with `isControlledByAdmin && manualAssignmentOnly`
 route the order to a company **admin**, not a driver (`assignmentMethod:'manual-admin-routed'`).
 **Immediate vs delayed**: `book-delivery.js` picks delayed (`createPendingDelivery`,
@@ -240,7 +245,9 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   `distanceToStore: 0` — silently mis-ranking instead of erroring.
 - `customers` (drivers) — `role, isActive, isAvailable, isOnline, companyId(string),
   currentLocation, lastLocationUpdate, lastFixAt, locationMetadata,
-  personalSupportedAreas[areaId], maxOrdersByAdmin,
+  personalSupportedAreas[areaId], maxOrdersByAdmin (blank/0 = SWITCHED OFF, CORE
+  invariant 16; `maxOrdersUpdatedAt`/`maxOrdersUpdatedBy` record the last edit),
+  minPerHour, vehicleInfo,
   storeAssignmentMode, assignedStoreAppNames[]`. A `role: "admin"` row is the company's
   admin login and **also takes jobs** (~1,164 in 30 days on one account) — flag it in
   per-driver tables (CORE invariant 6).
