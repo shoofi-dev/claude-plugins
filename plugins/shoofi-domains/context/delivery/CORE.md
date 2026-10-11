@@ -50,6 +50,20 @@ scope documents above it — `cityAreas.isActive` and `parentCities.isActive` re
 `{$ne: false}`, so absent means active *there*. Same field name, opposite default, one collection
 apart. Anything reasoning about whether an area was serving must use `isActive === true`.
 
+**`areas.isActive` gates DISPATCH, never VISIBILITY — "who is on the road in this region" is
+unaffected by switching the region off.** `GET /api/delivery/company/employees?cityAreaId=…`
+(`routes/delivery/company.js`) resolves the region to its `cityIds`, then filters drivers by
+company `supportedCities` / `personalSupportedAreas` and counts each one's open deliveries
+(`bookDelivery` status `1|2|3|5`) — **no query in it mentions `areas.isActive`**. So a fully
+shut region still returns its full active-courier list with per-courier order counts, and any
+admin screen that hides that list when the region is off is hiding data it already has.
+(Exactly what `live-ops/components/ZoneBar.tsx` did until 2026-10-11.) The same asymmetry is
+why `POST /api/delivery/city-area/:id/bulk-toggle-areas` is safe to press mid-shift: it flips
+`isActive` on every `areas` row of the region's cities and nothing else — couriers stay
+connected and in-flight deliveries carry on. There is **no zone-level shut flag**; a region
+reads as shut because `GET /api/delivery/city-area/:id/disabled-areas` counted at least one
+`isActive: false` row, which one stale manually-disabled connection is enough to do.
+
 ## Delivery-only — a courier with no order behind it
 A store can book a driver for goods **Shoofi never sold**: owner picks a town, gives a phone
 and a ready-time, a courier goes. `services/delivery/delivery-only.js` +

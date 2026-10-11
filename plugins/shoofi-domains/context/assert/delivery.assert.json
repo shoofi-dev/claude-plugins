@@ -353,6 +353,16 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "routes/delivery/company.js",
+          "regex": "db\\.areas\\.find\\(\\{\\s*\\n?\\s*cityId: \\{ \\$in: cityIds \\},?\\s*\\n?\\s*\\}\\)",
+          "desc": "company/employees resolves a region's areas on cityId ALONE - no areas.isActive filter anywhere in the endpoint, so a region whose deliveries are switched off still returns its full active-courier list with per-courier activeOrderCount. areas.isActive gates dispatch, never visibility; an admin screen must not hide the courier list when a region is shut"
+        },
+        {
+          "file": "routes/delivery/geography.js",
+          "regex": "city-area/:id/bulk-toggle-areas",
+          "desc": "the only region-level deliveries on/off switch: it flips areas.isActive for every area whose cityId is in the region, and nothing else - no zone-level flag exists, drivers stay connected and in-flight deliveries carry on. 'Region is shut' is derived by counting areas with isActive:false (disabled-areas), so ONE stale manually-disabled connection makes a whole region read as shut"
         }
       ]
     },
@@ -420,7 +430,8 @@
       "files": [
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/views/admin/live-ops/components/ZoneBar.tsx"
       ],
       "patterns": [
         {
@@ -437,6 +448,11 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isDeliveryOnlySupport",
           "desc": "the platform-wide delivery-only switch lives in admin Settings"
+        },
+        {
+          "file": "src/views/admin/live-ops/components/ZoneBar.tsx",
+          "regex": "id=\\{countId\\}[\\s\\S]{0,1200}\\{closed \\?",
+          "desc": "the region chip's courier-list button is rendered in BOTH states - shut swaps the power button for 'הפעל' and nothing else. Re-nesting it under the `closed ? ... : ...` branch is the 2026-10-11 bug: it unmounts the only caller of openPopover({kind:'zone'}) and the popover's anchor, so switching deliveries off hides the courier list the agent is reading"
         }
       ]
     }
