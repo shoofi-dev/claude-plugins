@@ -38,6 +38,19 @@ has **BOTH** `supportedCities` (permission) **AND** `supportedAreas` (the wired 
 **fully replaces** company coverage.
 **ID trap:** `area.cityId` is a **string**, cities/`supportedCities` are **ObjectIds** — always
 normalize (`getId()` / `.toString()`).
+**⚠️ Two coverage resolvers answer "is this driver in this region", and they DISAGREE about
+`personalSupportedAreas`.** `GET /api/delivery/company/employees?cityAreaId=`
+(`routes/delivery/company.js`) treats a non-empty `personalSupportedAreas` as a **full override**:
+if none of his personal areas fall in the region it returns `false` without ever consulting his
+company. `getDriverCityAreas` (`services/driver-shift/driver-duty.js`) — what **shift booking, the
+activation guard and the deactivation cron** all resolve through — **unions** company areas with
+personal ones, and also honours a company's explicit `supportedCityAreas`, which the employees
+filter never reads at all. So a driver can be rostered on a shift, and be switched on for it, in a
+region that `?cityAreaId=` drops him from: **7 of the 40 drivers with `personalSupportedAreas` are
+in that state** (verified 2026-10-11; `אנואר עאסי` is one of them — the same driver
+`driver-duty.js`'s own header is about). Any screen that lists "drivers in this region" **and**
+reads the roster has to union the two answers rather than pick one, or the rostered driver is
+silently missing from the list.
 **`isActive` trap — an area is dispatchable only on a STRICT `true`.** `findBestAreaForLocation`
 builds `areaQuery.isActive = true` (`services/delivery/assignDriver.js`), and the coverage-alert
 and store-availability crons filter the same way. But **`POST /api/delivery/area/add` never sets
