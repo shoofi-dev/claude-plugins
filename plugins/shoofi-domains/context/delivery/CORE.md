@@ -277,9 +277,11 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `delivery-company.customers`: 113 of 249 driver records carry one (96 at `0`, 17 absent);
     the positive values run 1–6, with 113 of the 136 set to `2`. Three consequences:
     - **Any screen or report that renders a blank quota as "—", "∞" or "no limit" is lying**
-      about who is working. Such a courier is `isActive: true`, counts as idle, and receives
-      nothing. The admin dashboard's shared reader is `shoofi-delivery-web`
-      `src/utils/driver-quota.ts`; use it rather than re-deriving the rule.
+      about who can be dispatched. The admin dashboard's shared reader is
+      `shoofi-delivery-web` `src/utils/driver-quota.ts`; use it rather than re-deriving the
+      rule. ⚠️ Showing the state is right; **alarming on it is not** — the 113 are parked
+      deliberately, see "Known status" below for the confirmed verdict and for the one
+      combination that *is* worth flagging.
     - **The single exception is `role === "admin"`**, where blank returns `Infinity` —
       manual-admin routing (invariant 6) dispatches to a company admin who has never had a cap
       set, and treating blank as off for him would kill that routing mode. Never flag those
@@ -299,6 +301,22 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     unconditionally — never use it for a partial edit.
 
 ## Known status (human-confirmed — do NOT "fix")
+- **BY DESIGN (confirmed by מוהנד ראבי, 2026-10-11): the 113 couriers with a blank or `0`
+  `maxOrdersByAdmin` are parked ON PURPOSE** — *"מכוון להשאיר כך, זה נעשה במודע"*. Do **not**
+  propose a backfill, a migration, or a default. The quota is being used as a **second
+  off-switch beside `isActive`**, and the data agrees: measured 2026-10-11, **all 113 are
+  `isActive: false`**, and exactly **one** of them has any `book-delivery` row in the last
+  60 days (last on 2026-09-05). Of the 136 with a positive quota, 3 were active and 133 not.
+  So "113 of 249 couriers cannot be dispatched" is a **census, not a defect count** — reporting
+  it as a fault is wrong, and colouring it on a screen is an alarm on 45% of the fleet, which
+  is an alarm nobody reads.
+  **The reportable anomaly is the INTERSECTION: `isActive: true` AND no quota.** He is switched
+  on, counted in every "N פעילים" and "N פנויים", and dispatch will never offer him anything.
+  That set is **empty in production today**, which is precisely what makes it a usable signal —
+  it going non-zero is a real event. The admin dashboard encodes exactly this split in
+  `shoofi-delivery-web/src/utils/driver-quota.ts` (`isQuotaAnomaly`); reuse it rather than
+  re-deciding the threshold per screen. Invariant 16 still holds in full — a blank quota still
+  means capacity 0 — this entry only settles whether that state is a *problem*.
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
   `isDeliveryOnlySupport` field, so the gate returns `platform_disabled`/`store_disabled` for
   every store and the partner button is hidden platform-wide. The feature is built and merged;
