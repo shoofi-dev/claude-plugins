@@ -420,7 +420,9 @@
       "files": [
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/views/admin/drivers/DriverActivity.tsx",
+        "src/views/admin/live-ops/components/DriversSheet.tsx"
       ],
       "patterns": [
         {
@@ -437,6 +439,16 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isDeliveryOnlySupport",
           "desc": "the platform-wide delivery-only switch lives in admin Settings"
+        },
+        {
+          "file": "src/views/admin/drivers/DriverActivity.tsx",
+          "regex": "embedded",
+          "desc": "the courier board has an embedded mode; its route-only behaviours (<html> dark class, the cityAreaId query param, min-h-screen) sit behind it"
+        },
+        {
+          "file": "src/views/admin/live-ops/components/DriversSheet.tsx",
+          "regex": "initialCityAreaId",
+          "desc": "the live-ops sheet mounts the courier screen with the board's region and theme, instead of re-skinning its rows"
         }
       ]
     }

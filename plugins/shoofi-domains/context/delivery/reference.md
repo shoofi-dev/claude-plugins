@@ -299,6 +299,18 @@ Shift admin: `apis/admin/driver-shift-manager.ts`. `DELIVERY_STATUS` copy = `1..
 `ביטול משלוח` button — `isDeliveryOnly && !CLOSED_DELIVERY_STATUSES.includes(status)` — which
 POSTs `delivery/order/status/update` with `status: -3`. That route clears `isPendingAssignment`
 and pushes the driver a cancellation (see CORE invariants 12–13).
+**שינויים אצל השליחים (`views/admin/drivers/DriverActivity.tsx`) has TWO hosts.** Its own route
+`/admin/driver-activity`, reached from the issues rail, and a full-screen sheet over the live-ops
+board (`views/admin/live-ops/components/DriversSheet.tsx`) — the board is registered OUTSIDE the
+Admin layout, so the rail that normally leads there is not on that page. The screen is MOUNTED,
+never re-skinned, and exactly three of its behaviours are route-only, behind its `embedded` prop:
+the `dark` class written to `document.documentElement`, the `cityAreaId` query param
+(`useQueryParamState`), and `min-h-screen`. Embedded it also takes `initialCityAreaId` (the
+board's region) and `initialDark` (the board's theme), and `onClose` fires on the LAST Esc, after
+its own map drawer and its search box. Edit that screen and you are editing both hosts. The
+sheet's header badge is the rail's own `counts.attention` (`summary=true`): platform-wide, and
+NOT narrowed by any region filter.
+
 This is where a human curates coverage — treat it as the source of truth UI for §1/§4.
 
 ### C3. shoofi-partner — STORE-OWNER (booking trigger + coverage check)
