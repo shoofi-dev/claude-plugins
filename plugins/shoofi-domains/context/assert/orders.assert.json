@@ -6,6 +6,8 @@
       "files": [
         "routes/order.js",
         "routes/twin-order.js",
+        "utils/customer-details.js",
+        "test/integration/twin-order-customer-details.js",
         "routes/order-fraud-checks.js",
         "routes/order-origin-validator.js",
         "routes/admin/order-monitoring.js",
@@ -54,6 +56,11 @@
         "utils/customer-orders.js": [
           "getSuccessfulOrdersByCustomerIds"
         ],
+        "utils/customer-details.js": [
+          "resolveCustomerDetails",
+          "normalizeCustomerDetails",
+          "hasCustomerDetails"
+        ],
         "utils/order-pricing.js": [
           "calculateExtrasPrice",
           "calculateItemUnitPrice",
@@ -69,6 +76,26 @@
         ]
       },
       "patterns": [
+        {
+          "file": "utils/customer-details.js",
+          "regex": "customer\\?\\.fullName[\\s\\S]{0,200}?customer\\?\\.phone",
+          "desc": "customerDetails is built from customers.fullName + customers.phone and mapped to {name, phone} in exactly one place (CORE invariant 13)"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "customerDetails: normalizeCustomerDetails\\(customerDetails\\)",
+          "desc": "buildSkeletonOrder normalizes customerDetails - a plain `customerDetails || null` lets {name:'',phone:''} through, which is how tg_1791728191840_5cm6ga stored a blank customer on both legs (CORE invariant 13)"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*customerDetails: body\\.)",
+          "desc": "NO twin call site builds a leg from the request body - both /place and /digital-place-pending must use resolveCustomerDetails, because the customer app sends empty strings whenever its profile store has not loaded (CORE invariant 13)"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "customerPhone: customerDetails\\?\\.phone \\|\\| null",
+          "desc": "the twinOrderGroups doc's customerPhone comes from the resolved customer, not from the request body (CORE invariant 13)"
+        },
         {
           "file": "consts/consts.js",
           "regex": "ORDER_STATUS",

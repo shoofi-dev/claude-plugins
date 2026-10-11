@@ -145,6 +145,24 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       them); `comboSelections` ride along untouched and are never diffed; `comboIssues` is
       stripped with the other bookkeeping fields before `order.items` is written, so the
       persisted item shape never carries it.
+13. **`orders.customerDetails` is `{ name, phone }` — resolved SERVER-side, and the key is
+    never `fullName`.** The source field on the customer document IS `customers.fullName`
+    (`shoofi.customers` has no `name`), so the rename happens exactly once, in
+    `utils/customer-details.js` — `resolveCustomerDetails(shoofiDB, customerId, clientPayload)`,
+    document-first with the request body as a fallback only, never throwing and returning
+    `null` rather than empty strings. Every creation path uses it: `/api/order/create`
+    (`routes/order.js`) always did; `routes/twin-order.js` did NOT until 2026-10-11 and took
+    `body.<side>.customerDetails` verbatim, guarded by `|| null` — and `{name:"",phone:""}` is
+    **truthy**, so an unpopulated client profile store was persisted as a blank customer on
+    both legs (group tg_1791728191840_5cm6ga; the customer document held a good name and phone
+    throughout). An **empty `phone` is the fingerprint of a client-trusted write**: phone is
+    the login key and is populated on 100% of customer documents, so nothing that read one can
+    produce it. An empty `name` is NOT a bug — 10.5% of customers registered by phone+OTP have
+    no `fullName`. ⚠️ Reading `customerDetails?.fullName` parses, never throws and is
+    `undefined` forever: it put a null `fullName` on 103 `bookDelivery` rows via
+    `routes/delivery/admin.js` (write-once — nothing `$set`s it afterwards, so the courier's
+    card in shoofir is permanently nameless), and still reads as the literal fallback in
+    `routes/order.js` (drive-in arrival) and `utils/crons/future-order-reminder.js`.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
