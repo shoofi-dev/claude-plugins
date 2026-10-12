@@ -33,9 +33,15 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "services/delivery/availability.js"
       ],
       "symbols": {
+        "services/delivery/availability.js": [
+          "checkStoreDeliveryAvailability",
+          "isDeliveryPaused",
+          "ignoreAreaActive"
+        ],
         "services/delivery/assignDriver.js": [
           "findBestAreaForLocation",
           "personalSupportedAreas",
@@ -114,6 +120,16 @@
         ]
       },
       "patterns": [
+        {
+          "file": "services/delivery/availability.js",
+          "regex": "isDeliveryPaused:\\s*true,[\\s\\S]{0,900}?area:\\s*pausedArea",
+          "desc": "the paused branch must return the area. `area` carries the TARIFF, and the customer app's only fee expression is `availableDrivers?.area?.price || 0` - so dropping it does not read as 'delivery is off', it reads as 'delivery is free'. A SCHEDULED order is exempt from the no-drivers gate (shoofi-app hooks/checkout/use-checkout-validate.ts), so nothing else stops it: 15 orders were charged 0 for delivery between 2026-04-29 and 2026-10-12, all scheduled, all placed during the nightly region pause"
+        },
+        {
+          "file": "services/delivery/availability.js",
+          "regex": "isAreaSupported:\\s*false,\\s*\\n\\s*isDeliveryPaused:\\s*false",
+          "desc": "the no-area-at-all branch still returns NO area, because there is genuinely no tariff to quote. Any client reading this response must treat a missing area.price as 'no price', never as 0"
+        },
         {
           "file": "consts/consts.js",
           "regex": "DELIVERY_STATUS",

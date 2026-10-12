@@ -54,9 +54,32 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
 `checkStoreDeliveryAvailability` (`services/delivery/availability.js`, behind
 `POST /api/delivery/available-drivers`) then looks again with `ignoreAreaActive: true` and
 returns `isDeliveryPaused: true` (area exists, switched off) or `false` (no area). `isAreaSupported`
-stays `false` for a paused area on purpose — old app bundles keep their behaviour and no
-scheduled order opens into it. The customer app shows "delivery not available right now" for
-paused and "outside the delivery area" only for `isDeliveryPaused: false`.
+stays `false` for a paused area on purpose — old app bundles keep their behaviour. The customer
+app shows "delivery not available right now" for paused and "outside the delivery area" only for
+`isDeliveryPaused: false`.
+⚠️ **A scheduled order DOES open into a paused area, and `area` is what decides whether it is
+charged for delivery.** `validateAdress` (`shoofi-app/hooks/checkout/use-checkout-validate.ts`)
+exempts `orderTimingMode` `future`/`ramadan-iftar` from the no-drivers gate by design, and
+`getDeliveryZoneState` mirrors the exemption in `blocksCta` — so `isAreaSupported: false` stops
+an immediate order and nothing else. Meanwhile **every delivery-fee expression in the app is
+`availableDrivers?.area?.price || 0`** (eight sites in `screens/checkout/index.tsx`, plus
+`components/total-price/index.tsx`), so a response with **no `area` key does not read as "delivery
+is off" — it reads as "delivery is free"**, and the order is authorised and captured with no fee.
+Measured on `shoofi.apps-logs` (`order_completed`, `shipping_method: DELIVERY`): **15 orders
+charged ₪0 for delivery since 2026-04-29, every one of them scheduled — 4.6% of the 327 scheduled
+delivery orders, against 0 of 63,608 immediate ones.** Staff pause the regions nightly (roughly
+22:00→06:00; 203-217 areas at once, visible as open windows in
+`delivery-company.delivery-availability-events`), which is when they land. Fixed by returning
+`area` on the paused branch — the tariff exists the whole time, the area is only switched off
+*now*, and a customer booking for tomorrow morning is exactly when quoting it is right.
+`available` and `isAreaSupported` are unchanged, so nothing that gates on them allows more.
+**The remaining no-`area` branch (a location with no area at all) still has nothing to quote, so
+any client reading this response must treat a missing `area.price` as "no price", never as 0.**
+`isShippingPaid` is no help: it is set from the receipt method alone (`routes/order.js`), so
+these orders carry `isShippingPaid: true` with `shippingPrice: 0`, and the courier is still paid
+against the booking's own `area.price` — the shortfall is absorbed, not passed on.
+See also the client-quoted-fee entry below: `serverPricing.driftDetected` cannot see any of this,
+because `utils/order-pricing-shadow.js` takes `shippingPrice` as an **input**.
 
 ## Delivery-only — a courier with no order behind it
 A store can book a driver for goods **Shoofi never sold**: owner picks a town, gives a phone
