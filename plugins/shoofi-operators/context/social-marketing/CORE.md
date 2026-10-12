@@ -88,7 +88,14 @@ draft should assume a per-town account exists.
     `services/social-posts/meta-publisher.js` — the only module that talks to the Graph API.
   An `ad` is refused (it belongs in Ads Manager); Instagram and stories need a rendered image.
   A target that went out is never re-sent, and a send interrupted mid-way is marked failed
-  for a person to check rather than retried. None of this changes this operator's job: it
+  for a person to check rather than retried.
+  Results come back on **ביצועי פוסטים** (`/admin/social-analytics`, 2026-10-12): numbers read
+  from Meta every few hours, compared at the same age (24h / 7d after publishing), grouped by
+  what a draft can change (caption length, time of day, weekday, offer, coupon, format), and an
+  AI review whose every point cites the posts behind it. Reading the numbers needs two more
+  token permissions than posting: `read_insights` and `instagram_manage_insights`. When
+  drafting, the latest review there is evidence about the voice and the timing; groups marked
+  too small are anecdotes, not rules. None of this changes this operator's job: it
   still produces drafts and stops at the human gate.
 
 ### 3a. How the gate is actually enforced (fixed 2026-09-21)
