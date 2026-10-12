@@ -455,6 +455,40 @@
           "desc": "the platform-wide delivery-only switch lives in admin Settings"
         }
       ]
+    },
+    "shoofi-app": {
+      "files": [
+        "helpers/delivery-availability.ts",
+        "components/checkout/FutureOrderPicker.tsx",
+        "screens/checkout/index.tsx"
+      ],
+      "symbols": {
+        "helpers/delivery-availability.ts": [
+          "getDeliveryZoneState",
+          "isDeliveryPaused",
+          "isMissingDeliveryQuote",
+          "blocksSameDayDelivery",
+          "isSameDaySlotBlocked",
+          "isSameCalendarDay"
+        ]
+      },
+      "patterns": [
+        {
+          "file": "helpers/delivery-availability.ts",
+          "regex": "isMissingDeliveryQuote[\\s\\S]{0,400}?typeof availableDrivers\\?\\.area\\?\\.price !== \"number\"",
+          "desc": "a DELIVERY order with no quotable tariff must be refused, not priced at 0. Every fee expression in checkout is `availableDrivers?.area?.price || 0`, and a SCHEDULED order is exempt from the no-drivers gate, so this is the only thing standing between a missing quote and a free delivery"
+        },
+        {
+          "file": "helpers/delivery-availability.ts",
+          "regex": "isSameDayDeliveryBlocked[\\s\\S]{0,400}?!!isShipping[\\s\\S]{0,200}?isDeliveryPaused === true",
+          "desc": "product rule 2026-10-12: a paused region may be scheduled for a LATER DAY only. MUST stay scoped to isShipping - the picker is shared with takeaway/drive-in and a region pause says nothing about a pickup order"
+        },
+        {
+          "file": "components/checkout/FutureOrderPicker.tsx",
+          "regex": "disallowSameDay \\? 1 : 0",
+          "desc": "today is dropped in availableDays, NOT in the daysWithSlots filter below it: that loop stops at future_order_max_days, so filtering afterwards silently costs the customer a day"
+        }
+      ]
     }
   }
 }

@@ -67,9 +67,13 @@ an immediate order and nothing else. Meanwhile **every delivery-fee expression i
 is off" — it reads as "delivery is free"**, and the order is authorised and captured with no fee.
 Measured on `shoofi.apps-logs` (`order_completed`, `shipping_method: DELIVERY`): **15 orders
 charged ₪0 for delivery since 2026-04-29, every one of them scheduled — 4.6% of the 327 scheduled
-delivery orders, against 0 of 63,608 immediate ones.** Staff pause the regions nightly (roughly
-22:00→06:00; 203-217 areas at once, visible as open windows in
-`delivery-company.delivery-availability-events`), which is when they land. Fixed by returning
+delivery orders, against 0 of 63,608 immediate ones.** Staff pause the regions nightly — 203-217
+areas at once, **roughly 01:00→09:00 Israel time** (14,100 of 19,868 windows in 60 days start
+between 00:00 and 02:00 and end between 08:00 and 10:00, median 7h08) — and that is when they
+land. ⚠️ `delivery-availability-events.startedAt`/`endedAt` are **BSON Dates, i.e. UTC**, unlike
+nearly every other timestamp in this platform; read as local they say the pause starts before
+midnight, which does not match the affected orders (placed 03:01, 03:59, 06:17, 07:18, 08:15,
+08:45 local, while 00:xx and 01:xx orders priced correctly). Fixed by returning
 `area` on the paused branch — the tariff exists the whole time, the area is only switched off
 *now*, and a customer booking for tomorrow morning is exactly when quoting it is right.
 `available` and `isAreaSupported` are unchanged, so nothing that gates on them allows more.
@@ -80,6 +84,20 @@ these orders carry `isShippingPaid: true` with `shippingPrice: 0`, and the couri
 against the booking's own `area.price` — the shortfall is absorbed, not passed on.
 See also the client-quoted-fee entry below: `serverPricing.driftDetected` cannot see any of this,
 because `utils/order-pricing-shadow.js` takes `shippingPrice` as an **input**.
+**Product rule (2026-10-12): a paused area may be scheduled for a LATER DAY ONLY, never
+same-day.** Reopening happens in the morning, so booking for tomorrow is legitimate; promising a
+delivery later *today* out of a region that is dark right now is not. Enforced client-side in
+two places, because the picker and the CTA can disagree: `getDeliveryZoneState` returns
+`blocksSameDayDelivery` (→ `FutureOrderPicker`'s `disallowSameDay`, which starts its day loop one
+day later — in `availableDays`, **not** in the `daysWithSlots` filter, or the customer silently
+loses a day off `future_order_max_days`) and `isSameDaySlotBlocked` (a slot already in hand that
+is for today — restored from a checkout draft, which only checks `isAfter(now)`, or chosen
+seconds before the pause). ⚠️ Both are scoped to `isShipping`: the picker is shared with
+takeaway and drive-in, and a region pause says nothing about a pickup order. The
+Ramadan-iftar day list is a **separate generator** in the same component and needed its own
+`startDay` raise. Measured before shipping: of the 33 same-day scheduled delivery orders since
+the pause log starts, exactly **2** were placed into a paused area — and both are the ₪0 orders
+above, so the rule refuses what is broken and nothing else.
 
 ## Delivery-only — a courier with no order behind it
 A store can book a driver for goods **Shoofi never sold**: owner picks a town, gives a phone
