@@ -67,13 +67,18 @@ an immediate order and nothing else. Meanwhile **every delivery-fee expression i
 is off" — it reads as "delivery is free"**, and the order is authorised and captured with no fee.
 Measured on `shoofi.apps-logs` (`order_completed`, `shipping_method: DELIVERY`): **15 orders
 charged ₪0 for delivery since 2026-04-29, every one of them scheduled — 4.6% of the 327 scheduled
-delivery orders, against 0 of 63,608 immediate ones.** Staff pause the regions nightly — 203-217
-areas at once, **roughly 01:00→09:00 Israel time** (14,100 of 19,868 windows in 60 days start
-between 00:00 and 02:00 and end between 08:00 and 10:00, median 7h08) — and that is when they
-land. ⚠️ `delivery-availability-events.startedAt`/`endedAt` are **BSON Dates, i.e. UTC**, unlike
-nearly every other timestamp in this platform; read as local they say the pause starts before
-midnight, which does not match the affected orders (placed 03:01, 03:59, 06:17, 07:18, 08:15,
-08:45 local, while 00:xx and 01:xx orders priced correctly). Fixed by returning
+delivery orders, against 0 of 63,608 immediate ones.** Staff pause the regions nightly —
+**~23:50-01:50 → 09:00 Israel time**, the whole map at once — and that is when they land.
+⚠️ **Count pause EVENTS, not rows.** There are only two `city-areas` regions, of 99 and 118
+areas (= all 217), and one region-button click writes one row per area: 19,868 rows in 60 days
+are **211 events** when grouped on `correlationId`. 107 of the 211 start in the 01:00 hour, and
+8,113 area-rows end in the 09:00 hour. A multi-select bulk toggle
+(`DeliveryAreasList.tsx`, a `Promise.all` of per-area `/area/update` calls) writes
+`correlationId: null` on every row, so one human action there still reads as N outages.
+⚠️ `delivery-availability-events.startedAt`/`endedAt` are **BSON Dates, i.e. UTC**, unlike
+nearly every other timestamp in this platform; read as local they land three hours early and
+stop matching the affected orders (placed 03:01, 03:59, 06:17, 07:18, 08:15 and 08:45 local,
+while 00:xx and 01:xx orders priced correctly). Fixed by returning
 `area` on the paused branch — the tariff exists the whole time, the area is only switched off
 *now*, and a customer booking for tomorrow morning is exactly when quoting it is right.
 `available` and `isAreaSupported` are unchanged, so nothing that gates on them allows more.
@@ -97,7 +102,20 @@ takeaway and drive-in, and a region pause says nothing about a pickup order. The
 Ramadan-iftar day list is a **separate generator** in the same component and needed its own
 `startDay` raise. Measured before shipping: of the 33 same-day scheduled delivery orders since
 the pause log starts, exactly **2** were placed into a paused area — and both are the ₪0 orders
-above, so the rule refuses what is broken and nothing else.
+above. Over 60 days, **0** scheduled delivery orders were placed during a 09:00-21:00 pause
+(there are ~46 such events, median 18 min, longest 53), so the 46 daytime interventions cost
+nothing. **What it does cost is the pre-opening window**: a customer booking at 07:18 for today
+at 13:00 is refused although 13:00 is hours after the 09:00 reopen — 3 of 43 scheduled delivery
+orders in 60 days. Narrowing that to "no slot before the pause lifts" is impossible today:
+`areas`, `city-areas`, `parent-cities` and the event rows carry **no reopen time** (confirmed by
+field census), so the app can only say "not today", never "available from X".
+⚠️ **The gate under-covers, and the uncovered cases look identical to the customer.** Only
+`areas.isActive !== true` produces `isDeliveryPaused`. No company covering the area
+(**15 of 217 areas are in this state right now**, all `طيرة - كفر قاسم - *`), no eligible
+driver, and the global `isSendNotificationToDeliveryCompany: false` switch all answer **without**
+it — the first two as a plain `isAreaSupported` miss, the third as fully `available: true`. All
+of them still return a priced `area`, so a same-day scheduled order sails through with a correct
+fee and no courier behind it.
 
 ## Delivery-only — a courier with no order behind it
 A store can book a driver for goods **Shoofi never sold**: owner picks a town, gives a phone
