@@ -173,6 +173,31 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      `delivery`/`order_items` coupons. `full_discount` is the **only** coupon type with a
      stored 2×2 split (`getFullDiscountMatrix`); everything else must be re-derived from
      the order at read time — see `couponDeliverySplit` in `lib/payments/calc.js`.
+   - **An UNDER-allocated fixed split is accepted, and the gap is silently billed to
+     Shoofi.** `routes/coupon.js:1467` (create) / `:1707` (update) test
+     `storeDiscount + shoofiDiscount > value` — *exceed*, not *equal* — so a coupon saved
+     with `value: 120, storeDiscount: 100, shoofiDiscount: null` passes validation with ₪20
+     allocated to nobody. On redemption `computeFullDiscountBreakdown` pays the store's
+     configured share first and gives Shoofi the **residual**:
+     `shoofiItemsAmount = orderItemsAmount - storeItemsAmount`
+     (`services/coupons/coupon-usage.js:435`) — so the unallocated ₪20 becomes Shoofi's,
+     and that is what settlement reimburses (`admin.js:1270`, `shoofiItemsAmount`) and what
+     the partner's printed slip prints as *"شوفي ستدفع / שופי ישלם"*
+     (`shoofi-partner/utils/order-payment.ts:92-94`). Note the breakdown is internally
+     inconsistent here and **both halves are used**: `shoofiAmount` is 0 (the configured
+     share) while `shoofiItemsAmount` is 20 (the residual); `storeAmount + shoofiAmount`
+     does **not** equal `discountAmount` when the split under-allocates. Measured
+     2026-10-14: of every coupon with `storeDiscount > 0`, exactly one had
+     `storeDiscount + shoofiDiscount ≠ value` for a non-`delivery` type (`D9HRU7NZ`,
+     value 120 / store 100) — every other split coupon sums exactly. So a mismatch is a
+     data-entry slip, not a configuration idiom: check it before explaining a slip figure
+     as intentional. Measured from the other end the same day, **94 of 981 live
+     `full_discount` orders (9.6%) carry `storeAmount + shoofiAmount ≠ discountAmount`** —
+     but most are the BENIGN shape (`storeAmount 0, shoofiAmount 0`: the coupon declared
+     neither side, so the whole discount correctly falls to Shoofi under the
+     default-funder rule). The shape to look for is a store share **set but smaller than
+     the value**; that is the one that bills a store a number nobody chose and hands
+     Shoofi the rest.
    `campaigns` is an **outcome** feeding `totalOutcomes` → `totalForTransfer`, so this is
    live money. Do not "fix" the percentage base as a side effect of another change — it
    moves what stores are charged. **Ask.**

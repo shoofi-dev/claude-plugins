@@ -272,6 +272,16 @@
           "file": "routes/shoofi-admin.js",
           "regex": "rejectIfCompensationPeriodClosed\\(req,\\s*res,\\s*existingCompensation,\\s*null\\)",
           "desc": "CORE invariant 10: deleting a compensation is refused once a report covering its createdAt exists (add/edit/approve-item are locked by the same helper)"
+        },
+        {
+          "file": "services/coupons/coupon-usage.js",
+          "regex": "const shoofiItemsAmount = orderItemsAmount - storeItemsAmount",
+          "desc": "CORE invariant 7: Shoofi's full_discount items share is the RESIDUAL after the store's configured share, not the coupon's declared shoofiDiscount — so an under-allocated split (value > storeDiscount + shoofiDiscount) silently bills the gap to Shoofi"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "storeDisc \\+ shoofiDisc > couponValue",
+          "desc": "CORE invariant 7: the fixed-split guard tests EXCEED, not EQUAL, so a coupon saved with value 120 / storeDiscount 100 / shoofiDiscount null is accepted with 20 allocated to nobody"
         }
       ]
     }
