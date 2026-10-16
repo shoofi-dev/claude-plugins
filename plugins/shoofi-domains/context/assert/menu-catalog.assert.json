@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@6a87cf44 / 2026-10-03",
+  "lastVerified": "shoofi-server@faade7dc (feat/ai-helper) / 2026-10-16",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -57,7 +57,15 @@
         "services/catalog/menu-spellcheck.js",
         "utils/crons/menu-spellcheck-cron.js",
         "routes/admin/menu-spellcheck.js",
-        "docs/menu-spellcheck.md"
+        "docs/menu-spellcheck.md",
+        "routes/ai-helper.js",
+        "utils/extras-required.js",
+        "services/ordering-intelligence/avoid.js",
+        "services/ordering-intelligence/taste-profile.js",
+        "services/ordering-intelligence/ai-helper-service.js",
+        "services/ordering-intelligence/facts.js",
+        "docs/ai-helper.md",
+        "test/integration/ai-helper.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -137,7 +145,11 @@
         "services/ordering-intelligence/suggest-service.js": [
           "applyLiveMenu",
           "candidateQuery",
-          "suggestForCustomer"
+          "suggestForCustomer",
+          "modeClauses",
+          "loadProfile",
+          "filterByAvoid",
+          "hasRequiredOptions"
         ],
         "utils/crons/suggest-index-cron.js": [
           "startSuggestIndexCron",
@@ -211,6 +223,42 @@
         "utils/crons/menu-spellcheck-cron.js": [
           "startMenuSpellcheckJob",
           "runMenuSpellcheck"
+        ],
+        "services/ordering-intelligence/avoid.js": [
+          "filterByAvoid",
+          "conflictsWithAvoid",
+          "sanitizeAvoid",
+          "GUARANTEED_AVOID",
+          "AVOID_KEYS",
+          "isSeafoodType"
+        ],
+        "services/ordering-intelligence/suggest.js": [
+          "applyProfile",
+          "profileBias",
+          "rejectedFacts",
+          "addStatedCuisines",
+          "fromCartStoreFirst",
+          "drinkMode",
+          "sweetMode",
+          "crossSellMode"
+        ],
+        "utils/extras-required.js": [
+          "hasRequiredOptions"
+        ],
+        "services/ordering-intelligence/ai-helper-service.js": [
+          "getCuisines",
+          "rankCuisines",
+          "MAX_CUISINES",
+          "MIN_CUISINES"
+        ],
+        "services/ordering-intelligence/taste-profile.js": [
+          "getProfileDoc",
+          "deviceIdFromRequest",
+          "sanitizeAvoid"
+        ],
+        "routes/for-you.js": [
+          "sanitizeCart",
+          "deviceIdFromRequest"
         ]
       },
       "patterns": [
@@ -893,6 +941,251 @@
           "file": "services/catalog/menu-spellcheck.js",
           "regex": "combo\\.sections\\.\\$\\[s\\]",
           "desc": "doc reference §7e: combo sections are written by section id"
+        },
+        {
+          "file": "services/ordering-intelligence/avoid.js",
+          "regex": "const GUARANTEED_AVOID = \\[\"vegetarian\", \"no_seafood\"\\];",
+          "desc": "doc CORE invariant 18 / reference §7f: exactly these two avoid keys are guaranteed (label-backed); the app mirrors this list and stars the rest — promote a key here and in stores/ai-helper/index.ts together, after new label fields + a forced relabel"
+        },
+        {
+          "file": "services/ordering-intelligence/avoid.js",
+          "regex": "const AVOID_KEYS = \\[\"vegetarian\", \"vegan\", \"gluten_free\", \"lactose_free\", \"nut_allergy\", \"no_seafood\"\\];",
+          "desc": "doc reference §7f: the six avoid keys (sanitizeAvoid keeps only these, in this order)"
+        },
+        {
+          "file": "services/ordering-intelligence/avoid.js",
+          "regex": "vegetarian: \\(d\\) => d\\.vegetarian !== true,",
+          "desc": "doc CORE invariant 18: vegetarian keeps only a TRUSTED-label vegetarian === true — an unlabelled product is dropped"
+        },
+        {
+          "file": "services/ordering-intelligence/avoid.js",
+          "regex": "no_seafood: \\(d\\) =>\\s*d\\.protein == null \\|\\| d\\.protein === \"fish\" \\|\\| d\\.protein === \"seafood\" \\|\\| isSeafoodType\\(d\\.dishType\\) \\|\\| hasWord\\(d, SEAFOOD_WORDS\\),",
+          "desc": "doc CORE invariant 18 / reference §7f: no_seafood keeps only a labelled non-seafood protein (protein null = unlabelled = dropped), plus seafood dish types and name words"
+        },
+        {
+          "file": "services/ordering-intelligence/avoid.js",
+          "regex": "const SEAFOOD_TYPE_PATTERN = /fish\\|seafood\\|shrimp\\|sushi\\|salmon\\|tuna/;",
+          "desc": "doc reference §7f: any dish-type key naming fish or seafood counts as seafood"
+        },
+        {
+          "file": "services/ordering-intelligence/avoid.js",
+          "regex": "const GLUTEN_TYPES = new Set\\(\\[\"burger\", \"shawarma\", \"tortilla\", \"pizza\", \"falafel\", \"schnitzel\", \"pasta\", \"sandwich\", \"breakfast\"\\]\\);",
+          "desc": "doc reference §7f: the dish types gluten_free drops (best effort)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const docs = filterByAvoid\\(found, profile\\?\\.stated\\?\\.avoid\\);",
+          "desc": "doc CORE invariant 18: avoid filters the candidates right after the index read — before the rules AND before Claude"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const forClaude = applyProfile\\(docs, taste, profile\\);\\s*const ai = await aiChatTurn\\(\\{ shoofiDb, text, lang, history, docs: forClaude\\.docs, stores, closedStores, taste: forClaude\\.taste, customerId, now \\}\\)",
+          "desc": "doc CORE invariant 18 / reference §7f: Claude picks only from the avoid-filtered docs and gets the PROFILE-APPLIED taste, so rejected facts hold on the Claude path too"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "if \\(stated\\.length\\) or\\.push\\(\\{ dishType: \\{ \\$in: stated \\} \\}\\);",
+          "desc": "doc reference §2 / §7f: stated cuisines widen the index query (non-text modes)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "return \\[\\{ appName: cart\\.appName, \\$or: \\[\\{ course: \\{ \\$in: \\[\"drink\", \"side\", \"sauce\"\\] \\} \\}, \\{ dishType: \\{ \\$in: \\[\"drink\", \"side\"\\] \\} \\}\\] \\}\\];",
+          "desc": "doc CORE invariant 19 / reference §7f: cross_sell reads only the cart's store — drinks, sides, sauces"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "logger\\.warn\\(\"\\[for-you\\] taste profile read failed\"",
+          "desc": "doc CORE invariant 18: a failed profile read answers as if there were no profile"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "supportedCategoryIds: 1, extras: 1, soldByWeight: 1,",
+          "desc": "doc CORE invariant 11 / 19, reference §2: the live re-check projects extras + soldByWeight, only for hasRequiredOptions"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "hasRequiredOptions: hasRequiredOptions\\(row\\),",
+          "desc": "doc CORE invariant 19: every card that survives applyLiveMenu (rules and Claude paths) carries product.hasRequiredOptions"
+        },
+        {
+          "file": "utils/extras-required.js",
+          "regex": "if \\(product\\.soldByWeight === true\\) return true;",
+          "desc": "doc CORE invariant 19: a by-weight product always needs the product sheet"
+        },
+        {
+          "file": "utils/extras-required.js",
+          "regex": "e\\.isGroupHeader !== true && \\(e\\.type === \"single\" \\|\\| e\\.type === \"weight\"\\)",
+          "desc": "doc CORE invariant 19 / reference §4: any non-header single (default or not) or weight extra needs the sheet; `required` is never read"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "drink: drinkMode,\\n\\s*sweet: sweetMode,\\n\\s*cross_sell: crossSellMode,",
+          "desc": "doc CORE invariant 19 / reference §7: the MODES map includes the three cart modes (routes/for-you.js accepts only MODES keys)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const weighted = \\(d\\) => \\(d\\.qty30d \\|\\| 0\\) \\* \\(d\\._bias \\?\\? 1\\);",
+          "desc": "doc CORE invariant 18 / reference §7f: popularity sorts use qty30d x _bias, neutral (1) without a profile"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(!profile\\) return \\{ docs, taste \\};",
+          "desc": "doc CORE invariant 18: without a profile the docs and taste reach the modes untouched"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(doc\\.dishType && \\(stated\\.cuisines \\|\\| \\[\\]\\)\\.includes\\(doc\\.dishType\\)\\) bias \\*= 1\\.4;",
+          "desc": "doc reference §7f: a stated cuisine weighs x1.4"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(stated\\.spice === 0\\) bias \\*= 0\\.3;\\n\\s*else if \\(stated\\.spice >= 2\\) bias \\*= 1 \\+ 0\\.15 \\* stated\\.spice;",
+          "desc": "doc reference §7f: spice 0 sinks a spicy product (x0.3); 2 / 3 lift it (x1.3 / x1.45)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(stated\\.budget === 1\\) bias \\*= ratio <= 1 \\? 1\\.15 : ratio > 1\\.3 \\? 0\\.8 : 1;\\n\\s*if \\(stated\\.budget === 3\\) bias \\*= ratio >= 1 \\? 1\\.15 : ratio < 0\\.7 \\? 0\\.85 : 1;",
+          "desc": "doc reference §7f: budget against the dish type's median price among the candidates"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "code: \"you_like\", params: \\{ dishType: label \\}, confidence: 0",
+          "desc": "doc CORE invariant 18: a stated cuisine is shown as you_like — the customer's own claim, no order evidence"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "else if \\(stated > 0\\) replyCode = \"opener_stated\";",
+          "desc": "doc CORE invariant 18: a customer with no orders and a stated-cuisine card gets opener_stated"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(onboarded\\) return \\{ \\.\\.\\.result, replyCode: \"opener_onboarded\", replyParams: \\{\\} \\};",
+          "desc": "doc CORE invariant 18: onboarded: true makes the opener answer opener_onboarded"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const usualRejected = !!taste\\.rejected\\?\\.usualStores\\.has\\(doc\\.appName\\);",
+          "desc": "doc CORE invariant 18: a rejected usual:<appName> is never claimed at that store (ordered_before instead)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "!rejected\\.has\\(t\\.dishType\\)",
+          "desc": "doc CORE invariant 18: a rejected liked_type:<key> is never offered as a liked type"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(code === \"usual\" && arg\\) usualStores\\.add\\(arg\\);\\n\\s*if \\(code === \"liked_type\" && arg\\) types\\.add\\(arg\\);",
+          "desc": "doc reference §7f: only usual and liked_type rejections change ranking (meal_time / likes_spicy answers do not)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(!cart\\?\\.appName \\|\\| !storesByApp\\.has\\(cart\\.appName\\)\\) return \\{ replyCode: \"cross_sell\", replyParams: \\{\\}, cards: \\[\\] \\};",
+          "desc": "doc CORE invariant 19: cross_sell offers nothing when the cart's store is not open"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "!\\(d\\.appName === cart\\?\\.appName && inCart\\.has\\(String\\(d\\.productId\\)\\)\\)",
+          "desc": "doc CORE invariant 19: the cart modes never suggest what is already in the cart"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "createPicker\\(storesByApp, limit, cart\\?\\.appName \\? limit : RULES\\.MAX_PER_STORE\\)",
+          "desc": "doc CORE invariant 19: no per-store cap on the cart's store (other stores keep 2 each)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const isSweet = \\(d\\) => d\\.sweet === true \\|\\| \\(d\\.sweet == null && d\\.dishType === \"dessert\"\\) \\|\\| d\\.course === \"dessert\";",
+          "desc": "doc reference §7f: what sweet mode counts as sweet"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "replyCode: cards\\.length \\? \"drink_ideas\" : \"drink_unavailable\"",
+          "desc": "doc reference §7f: drink mode's reply codes (the app words them in for-you-copy.ts)"
+        },
+        {
+          "file": "services/ordering-intelligence/index-builder.js",
+          "regex": "await collection\\.createIndex\\(\\{ appName: 1, course: 1 \\}\\);",
+          "desc": "doc CORE invariant 19 / reference §2: the {appName, course} index serving the cart modes"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "\"isAiHelperEnabled\",\\n\\s*\"isAiHelperForAll\",\\n\\s*\"isAiHelperOnboardingEnabled\",\\n\\s*\"isChatOrderingEnabled\",",
+          "desc": "doc CORE invariant 18 / reference §7f: the four AI-helper flags are in SHOOFI_CONFIG_PUBLIC_FIELDS — drop one and the app never sees the switch"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "deviceId: customerId \\? null : deviceIdFromRequest\\(req\\),",
+          "desc": "doc reference §2 / §7: a visitor's profile is read by device-id only when there is no customer"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "cart\\.productIds\\.map\\(String\\)\\.slice\\(0, 50\\)",
+          "desc": "doc reference §7: sanitizeCart keeps at most 50 product ids"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "onboarded: onboarded === true,",
+          "desc": "doc reference §7: onboarded counts only when strictly true"
+        },
+        {
+          "file": "routes/ai-helper.js",
+          "regex": "router\\.get\\(\"/api/ai-helper/cuisines\", auth\\.optional",
+          "desc": "doc reference §7: the onboarding cuisines endpoint, no login needed"
+        },
+        {
+          "file": "routes/ai-helper.js",
+          "regex": "return res\\.status\\(200\\)\\.json\\(\\{ cuisines: \\[\\] \\}\\);",
+          "desc": "doc CORE invariant 19: a cuisines failure is an empty list, never an error the onboarding has to handle"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "const MAX_CUISINES = 9;",
+          "desc": "doc CORE invariant 19: at most 9 tiles"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "const MIN_CUISINES = 4;",
+          "desc": "doc CORE invariant 19 / reference §7f: a tier with fewer than 4 types widens to the next"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "const areaNames = \\[\\.\\.\\.openNames, \\.\\.\\.closed\\.map\\(\\(s\\) => s\\.appName\\)\\];",
+          "desc": "doc reference §7f: tier 2 = the area's open + closed stores"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "\\$group: \\{ _id: \\{ dishType: \"\\$dishType\", appName: \"\\$appName\" \\}, img: \\{ \\$first: \"\\$img\" \\}",
+          "desc": "doc reference §7f: tier 3 = the whole catalog, one row per dish type x store carrying its best seller's image"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "\\.filter\\(\\(t\\) => t\\.meal && byType\\.has\\(t\\.key\\)\\)",
+          "desc": "doc CORE invariant 19: only active MEAL types that occur in the rows"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "img: typeImages\\.get\\(t\\.key\\) \\|\\| e\\.best\\?\\.img \\|\\| null",
+          "desc": "doc CORE invariant 19: the type's own dishTaxonomy img wins, else the best seller's"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "\\.filter\\(\\(t\\) => t\\.img\\)",
+          "desc": "doc CORE invariant 19: a type with no image is left out"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "find\\(\\{ status: \"active\", img: \\{ \\$type: \"string\", \\$ne: \"\" \\} \\}",
+          "desc": "doc reference §2 / §7f: dishTaxonomy.img is read only for active types with a non-empty string"
+        },
+        {
+          "file": "routes/admin/dish-taxonomy.js",
+          "regex": "const \\{ label_ar, label_he, meal \\} = req\\.body \\|\\| \\{\\};",
+          "desc": "doc reference §2: the dish-type PATCH writes labels / meal / words only — NO img. If this line gains img, the 'no code writes dishTaxonomy.img' claims in CORE 19 and reference §2/§7f must go"
+        },
+        {
+          "file": "test/integration/ai-helper.js",
+          "regex": "profile ranking: with no profile the reply is exactly as before",
+          "desc": "doc CORE invariant 18: the test that pins 'no profile = no behaviour change'"
         }
       ]
     },
@@ -902,9 +1195,23 @@
         "screens/menu/components/GeneralCategoriesList.tsx",
         "__tests__/components/general-categories-open-product.test.tsx",
         "helpers/for-you-copy.ts",
-        "hooks/useVoiceInput.ts"
+        "hooks/useVoiceInput.ts",
+        "stores/ai-helper/index.ts",
+        "screens/ai-helper/OnboardingSteps.tsx",
+        "components/ai-helper/AiHelperFab.tsx",
+        "components/for-you/context-chips.ts",
+        "components/for-you/CartDock.tsx",
+        "helpers/ai-helper-copy.ts"
       ],
-      "symbols": {},
+      "symbols": {
+        "stores/ai-helper/index.ts": [
+          "GUARANTEED_AVOID",
+          "decideFabRoute"
+        ],
+        "components/for-you/context-chips.ts": [
+          "chipsFor"
+        ]
+      },
       "patterns": [
         {
           "file": "screens/menu/components/GeneralCategoriesList.tsx",
@@ -940,6 +1247,81 @@
           "file": "hooks/useVoiceInput.ts",
           "regex": "requireOptionalNativeModule\\(\"ExpoSpeechRecognition\"\\) \\? require\\(\"expo-speech-recognition\"\\)",
           "desc": "doc CORE invariant 11: the speech package is required ONLY after the native module is confirmed — a top-level import crashes every older binary that gets this JS by OTA"
+        },
+        {
+          "file": "stores/ai-helper/index.ts",
+          "regex": "export const GUARANTEED_AVOID: AvoidKey\\[\\] = \\[\"vegetarian\", \"no_seafood\"\\];",
+          "desc": "doc CORE invariant 18: the app's guaranteed list must equal the server's (avoid.js GUARANTEED_AVOID)"
+        },
+        {
+          "file": "screens/ai-helper/OnboardingSteps.tsx",
+          "regex": "GUARANTEED_AVOID\\.includes\\(k\\) \\? \"\" : \" \\*\"",
+          "desc": "doc CORE invariant 18 / reference §7f: every best-effort avoid chip is starred"
+        },
+        {
+          "file": "screens/ai-helper/OnboardingSteps.tsx",
+          "regex": "aiCopy\\(t, \"ai_helper_avoid_best_effort\"\\)",
+          "desc": "doc CORE invariant 18: the 'we can't guarantee' note is shown when a best-effort key is picked"
+        },
+        {
+          "file": "screens/ai-helper/OnboardingSteps.tsx",
+          "regex": "const cta = empty \\? \\{ key: \"ai_helper_next\", n: 0, enabled: true \\}",
+          "desc": "doc reference §7f: an empty cuisines list never traps the onboarding"
+        },
+        {
+          "file": "helpers/ai-helper-copy.ts",
+          "regex": "ai_helper_avoid_best_effort:",
+          "desc": "doc reference §7f: the best-effort note's copy key"
+        },
+        {
+          "file": "screens/explore.tsx",
+          "regex": "isAiHelperForAll \\|\\| !!userDetailsStore\\?\\.userDetails\\?\\.isShoofiEmployee",
+          "desc": "doc CORE invariant 18: the persona is gated to Shoofi employees until isAiHelperForAll"
+        },
+        {
+          "file": "screens/explore.tsx",
+          "regex": "chatSuggestEnabled && !aiHelperEnabled && !isMapMode",
+          "desc": "doc CORE invariant 11 / 18: the For-you home entry hides while the persona shows"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "fromOnboarding \\? \\{ mode: initialMode, onboarded: true \\} : \\{ mode: initialMode \\}",
+          "desc": "doc CORE invariant 18 / reference §8: the first opener after the onboarding sends onboarded: true"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "mode === \"drink\" \\|\\| mode === \"sweet\" \\? await cartForServer\\(\\) : undefined",
+          "desc": "doc CORE invariant 19 / reference §7f: only drink / sweet are sent with the cart (nothing sends cross_sell yet)"
+        },
+        {
+          "file": "components/for-you/context-chips.ts",
+          "regex": "\\{ kind: \"mode\", mode: \"drink\", key: \"for_you_chip_drink\" \\}",
+          "desc": "doc reference §7f: the cart chips (isChatOrderingEnabled) include a drink chip"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_reason_you_like",
+          "desc": "doc CORE invariant 18: the app words the you_like reason"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_reply_opener_onboarded",
+          "desc": "doc CORE invariant 18: the app words opener_onboarded"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_reply_cross_sell",
+          "desc": "doc reference §7f: the app has copy for the cross_sell reply"
+        },
+        {
+          "file": "components/ai-helper/AiHelperFab.tsx",
+          "regex": "isAiHelperOnboardingEnabled",
+          "desc": "doc reference §8: the persona opens the onboarding only with isAiHelperOnboardingEnabled"
+        },
+        {
+          "file": "stores/ai-helper/index.ts",
+          "regex": "/ai-helper/cuisines\\?lat=",
+          "desc": "doc reference §8: the onboarding reads its tiles from GET /api/ai-helper/cuisines"
         }
       ]
     },
@@ -950,7 +1332,8 @@
         "src/views/admin/ai-usage/AiUsage.tsx",
         "src/apis/admin/ai-usage.ts",
         "src/views/admin/stores/MenuSpellcheck.tsx",
-        "src/apis/admin/menu-spellcheck.ts"
+        "src/apis/admin/menu-spellcheck.ts",
+        "src/views/admin/settings/ShoofiSettings.tsx"
       ],
       "symbols": {},
       "patterns": [
@@ -968,6 +1351,11 @@
           "file": "src/apis/admin/menu-spellcheck.ts",
           "regex": "/admin/menu-spellcheck/accept",
           "desc": "doc reference §7: the admin screen accepts fixes through the spellcheck endpoint"
+        },
+        {
+          "file": "src/views/admin/settings/ShoofiSettings.tsx",
+          "regex": "isAiHelperEnabled: false,\\n\\s*isAiHelperForAll: false,\\n\\s*isAiHelperOnboardingEnabled: false,\\n\\s*isChatOrderingEnabled: false,",
+          "desc": "doc reference §7f / §8: the four AI-helper flags are toggled under Settings → Shoofi, default off"
         }
       ]
     }

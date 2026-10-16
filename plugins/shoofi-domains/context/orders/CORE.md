@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@a0e8bdb2 / 2026-09-23
+last-verified: shoofi-server@faade7dc (feat/ai-helper) / 2026-10-16
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -22,7 +22,10 @@ order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkou
 (shoofir), monitoring/twin-admin (delivery-web).
 
 **Not yours:** payment internals (`payments`), settlement/payouts (`accountant`), driver
-assignment & areas (`delivery`), auth (`customers`). Hand off in the PR.
+assignment & areas (`delivery`), auth (`customers`), the For-you chat / AI helper
+(suggestions `menu-catalog`, taste-profile ownership + login merge `customers`) — it only
+READS orders and the cart (reference §5, C1); the deferred in-chat checkout is yours (Known
+status). Hand off in the PR.
 
 ## ⚠️ HIGH-RISK — draft PR, flagged, never merge
 Order creation (`processCreditCardPayment`/`processHypTokenPayment`/`finalizeApplePayOrder`
@@ -36,7 +39,12 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    bucket `2,3,10,11,12`, cancelled `4,5,7,8,9`). Each client repo keeps its **own copy** in
    `consts/shared.ts` — a status change is a **multi-repo PR**. The driver endpoints
    never write `orders.status`: delivered = `bookDelivery.completedAt`, and
-   `readyMinutes` is not an order field (reference §2).
+   `readyMinutes` is not an order field (reference §2). So there is **no single
+   "delivered/completed" transition to hook** — completion is written on several paths
+   (partner/admin `order/update`, the `fix-stuck-orders` crons) and arrival only on
+   `bookDelivery`. A consumer that needs post-completion data reads lazily instead (the AI
+   helper's `inferred` taste cache), and the AI helper's `deliveredOrders` counts COMPLETED
+   statuses, not courier deliveries (reference §5).
 2. **Transition guards:** PENDING(`6`) only from FRAUD_REVIEW; store-accept rejects
    already-cancelled; `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
    not `order/update`.
@@ -249,6 +257,13 @@ Worked example: `services/exec-dashboard/engagement-metrics.js`.
 - **Awareness (not bugs):** coins-redeem-after-charge failure logs CRITICAL for manual
   reconciliation; HYP "verified=false but paid" is logged paid-but-stuck; background work in
   store-accept runs after the 200 response so failures never reach the client.
+- **DEFERRED (Sari, 2026-10-16) — do NOT build without a new decision:** the in-chat checkout
+  card in the For-you chat. Behind `isChatOrderingEnabled` the chat has a READ-ONLY cart dock
+  and context chips; "complete the order" opens the existing `cart` screen → normal checkout,
+  and the chat places no order (no order or payment API changed). Reasons: the charged total
+  is client-computed in `shoofi-app/screens/checkout/index.tsx` (`totalPrice` from
+  `TotalPriceCMP`, which the server charges — invariant 11); the post-charge reset and
+  navigation is `postChargeOrderActions` in the same file; and customer consent. Reference C1.
 
 ## Recipe — add a field to an order, end-to-end
 1. **Customer app** — add it where the cart payload is built (`stores/cart` `getCartData`).

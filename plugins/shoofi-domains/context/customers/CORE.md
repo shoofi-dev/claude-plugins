@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@561e3ca / 2026-07-28
+last-verified: shoofi-server@faade7dc (feat/ai-helper) / 2026-10-16
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -25,6 +25,11 @@ and the Google-Form registration sync (`services/school-registrations/`) — ref
 **School registrations never auto-create schools or classes, never guess a class section, and
 the sheet id (a public link to students' names and phones) never goes on a publicly readable
 doc** (`store{id:1}` / `/api/admin/school-settings`).
+Also yours: **who owns an AI-helper taste profile** (`shoofi.tasteProfiles`) and how it moves
+across login, logout and deletion — the owner/merge helpers in
+`services/ordering-intelligence/taste-profile.js`, `routes/ai-helper.js`, and the app hooks in
+`screens/verify-code` + `stores/auth` (invariant 9, reference §5a). What a profile *does* to
+suggestions is menu-catalog's (shoofi-server `docs/ai-helper.md`).
 
 ## The model — ONE auth, FOUR audiences, routed by `app-type`
 Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `app-type` header
@@ -118,6 +123,27 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    Anything that reports deletion must carry **both** fields end to end.
    (`GET /api/customer/:customerId` gained `deletedAt` in shoofi-server
    `fix/HIGH-RISK-churn-360-account-status`; add the matching assert once that merges.)
+9. **An AI-helper taste profile (`shoofi.tasteProfiles`) has ONE owner — a customer OR a
+   device — and only a customer-app token is a customer.** `ownerFromRequest`
+   (`services/ordering-intelligence/taste-profile.js`) takes `req.auth.id` only when `app-type`
+   is absent or `shoofi-shopping` — the same guard as `routes/for-you.js`, because
+   `auth.optional` also resolves partner and driver tokens and their ids are not customers'.
+   Anything else falls to the **`device-id` header**: the one the fraud checks, stories and
+   app-logs already read, now also the identity key of a *visitor* profile. It is a
+   client-generated string, so whoever sends it reads and writes that profile — **accepted
+   risk**: a visitor profile holds food preferences only, and nothing account-derived is ever
+   returned for a device owner. Never let a device id unlock anything account-shaped, and never
+   take the device id, `owner` or `inferred` from a request body (`PUT` whitelists `stated`,
+   `confirmed`, `onboardedAt`, `skippedAt`). One profile per owner: unique partial indexes on
+   `owner.customerId` and `owner.deviceId`.
+   - **Merge is an explicit client call after login, NOT part of OTP verification.**
+     `POST /api/ai-helper/merge` is `auth.required` (customer token only) and reads the device id
+     from the header; `validateAuthCode` knows nothing about it — keep it that way. The account's
+     non-empty `stated` wins field by field, `confirmed` is unioned, the earliest `onboardedAt`
+     is kept, and the **device profile is DELETED**, so the next person to log in on a shared
+     phone does not inherit it. Idempotent: no device profile → no-op.
+   - The customer app drops its cached copy on `logOut` and `deleteAccount`. The server does
+     **not** drop the account's profile on deletion — see Known status.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
@@ -136,9 +162,16 @@ All of these are **known and accepted for now**. They are scheduled work, not di
   registration, but the server routes on **`app-type`**, so the token lands correctly on
   `delivery-company.customers`. (Leftovers: an unused `db` variable in that handler, and a
   misleading header that *would* become a bug if the handler ever routed on `app-name`.)
+- **KNOWN — not yet handled (AI helper, recorded in shoofi-server `docs/ai-helper.md`,
+  2026-10-16):** `POST /api/customer/delete` does not delete the customer's
+  `shoofi.tasteProfiles` document — it outlives the deletion request, as the soft-deleted
+  customer doc itself does (invariant 8). Handling it means touching `routes/customer.js`, so
+  it is its own HIGH-RISK draft PR, not a drive-by.
 
 ## Recipe — touching an auth or identity path
 1. State **which of the four app-types** your change affects — they all share these endpoints.
+   A taste-profile change also names whether it touches the visitor (`device-id`) owner
+   (invariant 9).
 2. Confirm you haven't weakened stored-token equality, the impersonation master-gate, or
    `getCustomerAppName`'s central-DB behavior.
 3. Anything touching the JWT secret or token lifetime is a **planned migration with a
