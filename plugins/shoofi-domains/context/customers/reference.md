@@ -12,6 +12,10 @@
 Server: `routes/{auth,customer,user,customer-referrals,customer-campaigns,customer-feedback,
 shoofi-admin-users}.js`, `utils/{auth-service,admin-auth-service,app-name-helper}.js`,
 `controllers/customerAddressController.js`. Clients: login/OTP/profile in all 4 apps (§C).
+Also the **identity slice of the AI-helper taste profile** (§5a): owner resolution and merge in
+`services/ordering-intelligence/taste-profile.js` (`ownerFromRequest`, `deviceIdFromRequest`,
+`mergeDeviceIntoCustomer`) and `routes/ai-helper.js`. The rest of `ordering-intelligence/` —
+facts, avoid filtering, how a profile ranks suggestions — is menu-catalog's.
 **Not yours:** order history *content* (orders), coins/growth rewards (growth), driver
 coverage fields (delivery) — you own the identity record they hang off.
 
@@ -48,6 +52,9 @@ for **orders** (joined via `order.appName`).
    (`customer.token !== token` → reject, `auth.js`). So `logout` (which nulls `token`)
    genuinely invalidates a session. Impersonation tokens (`imp:true`) bypass this check.
 5. `auth.required` / `auth.optional` = `expressjwt`, `userProperty:"auth"` → handlers read `req.auth.id`.
+
+Nothing else rides on verification. The AI-helper taste-profile merge is a **separate client
+call after `updateUserToken`** (§5a) — `validateAuthCode` does not know it exists.
 
 ## 3. Admin auth (separate system)
 `utils/admin-auth-service.js` + `routes/shoofi-admin-users.js`: `shoofiAdminUsers` with
@@ -195,6 +202,10 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
   `personalSupportedAreas` (delivery-owned field).
 - **`shoofi.shoofiAdminUsers`** — `phoneNumber`, `password`(bcrypt), `roles[]`, `refreshToken`,
   `resetCode`+`resetCodeExpiry`, `isFirstLogin`.
+- **`shoofi.tasteProfiles`** (AI helper) — one doc per owner, `owner: {customerId}` **or**
+  `owner: {deviceId}`; `stated`, `confirmed`, server-only `inferred`,
+  `onboardedAt`/`skippedAt`/`createdAt`/`updatedAt`, `version: 1`. Not on the customer doc.
+  Owner rules, merge and lifecycle: §5a.
 - ⚠️ **`customers.orders[]` is a create-time snapshot with NO status** — never infer
   completion/revenue from it; join the store `orders` collection. Reuse
   `getSuccessfulOrdersByCustomerIds` (`utils/customer-orders.js`). See `docs/customer-orders-snapshot.md`.
@@ -237,6 +248,83 @@ one device ends that identity's sessions on **all** its stores and devices, and 
 token mirrored across the sibling docs above dies with it — the sweep is what keeps the
 mirror from outliving the logout.
 
+## 5a. AI-helper taste profile — owner, merge, lifecycle (`shoofi.tasteProfiles`)
+The customer app's floating persona **شوفي / שופי** runs a short taste onboarding and keeps
+the answers server-side (design: shoofi-server `docs/ai-helper.md`). This domain owns **whose**
+profile it is and how it moves across login, logout and deletion; what a profile does to
+suggestions is menu-catalog's.
+
+| Route (`routes/ai-helper.js`) | Auth | Owner / caller |
+|---|---|---|
+| `GET /api/ai-helper/profile` | `auth.optional` | customer token, else `device-id`; neither → `200 {profile: null, deliveredOrders: 0}` |
+| `PUT /api/ai-helper/profile` | `auth.optional` | same; neither → `400` |
+| `POST /api/ai-helper/merge` | `auth.required` | customer token only — no token `401`, partner/driver token `403` |
+| `GET /api/ai-helper/facts` | `auth.required` | customer token only (`403` otherwise) |
+| `GET /api/ai-helper/cuisines` | `auth.optional` | no owner — location only |
+
+**Owner resolution** (`ownerFromRequest`, `services/ordering-intelligence/taste-profile.js`):
+- **Customer** — `req.auth.id`, only when `app-type` is absent or `shoofi-shopping`, stored as
+  `String(req.auth.id)`. Same guard as `routes/for-you.js`: `auth.optional` resolves partner
+  (`storeUsers`) and driver (`delivery-company.customers`) tokens too, and their ids are not
+  customers', so such a token counts as no login — it falls to the device id, and `merge` /
+  `facts` answer `403`.
+- **Visitor** — `deviceIdFromRequest`: the `device-id` **header only**, trimmed, 8–200 chars,
+  else no owner. The customer app generates it once (`utils/http-interceptor`, AsyncStorage
+  `@storage_deviceId`, `device_<id>_<ts>_<rand>` — not a UUID) and sends it on every request;
+  nothing in the app clears it, logout included. The same header is already read by
+  `routes/order-fraud-checks.js` (after the body's `deviceId` / `unique_hash`), `routes/stories.js`
+  (the signed-out viewer key) and `routes/app-logs.js` (`user_visit_id`, orders CORE).
+- **Accepted risk** (shoofi-server `docs/ai-helper.md`): the device id is a client string, so
+  whoever sends it reads and writes that visitor profile. It is bounded by what a device owner
+  can get: food preferences only, nothing account-derived — `GET /profile` returns
+  `deliveredOrders: 0`, `facts` and `merge` need a customer token, and `publicProfile` returns
+  `owner: {kind: "customer" | "device"}` (never the customer id or the device id) and never
+  `inferred`.
+
+**Storage.** Unique partial indexes on `owner.customerId` and `owner.deviceId`
+(`partialFilterExpression: {$type: "string"}`), plus `updatedAt`; created lazily on first use
+per process (`ensureIndexes`). ⚠️ `owner.customerId` is the 24-hex **string** of
+`customers._id`, and every timestamp (`createdAt`, `updatedAt`, `onboardedAt`, `skippedAt`,
+`inferred.computedAt`) is a UTC ISO **string** (`toISOString()`), not a BSON Date — join with
+`String(_id)` and compare with ISO strings (cf. CORE invariant 5).
+
+**Writes** (`saveProfile`). `PUT` builds its update from `stated`, `confirmed`, `onboardedAt`,
+`skippedAt` only. `saveProfile` sanitises (`sanitizeStated`, `sanitizeConfirmed`), replaces
+`stated` whole when sent, sets `confirmed.<key>` per key, and writes `owner` only through
+`$setOnInsert` from the server-derived owner — `owner` and `inferred` are never read from the
+body (test: "a client cannot set owner or inferred"). `inferred` is written only by
+`refreshInferredIfStale`, for customer owners, lazily on `GET /profile` (details: the design doc).
+
+**Merge** (`mergeDeviceIntoCustomer`, behind `POST /api/ai-helper/merge`):
+- The device profile is found by the **header's** device id (`profiles.deviceIdFromRequest(req)`,
+  never the body). No device profile, or no header → `{merged: false, profile: <the account's>}`,
+  so a repeat call is a no-op (idempotent).
+- `stated`: the account's wins field by field when non-empty (`mergeStated`; `null` and `[]`
+  count as empty); no account profile yet → the device's.
+- `confirmed`: the union; on a shared key the account's answer wins.
+- `onboardedAt`: the earlier of the two; `skippedAt`: the account's if set, else the device's.
+- Upserts the customer's doc, **then deletes the device doc** — the shared-phone guarantee: the
+  next person to log in on that phone does not inherit it. The delete belongs to a successful
+  merge only; if the call fails, the device profile stays on the server under that device id.
+- **Not** inside `validateAuthCode`, and not on impersonation (below).
+
+**App** (shoofi-app `stores/ai-helper`, `aiHelperStore`). Keeps a copy in AsyncStorage
+`@storage_tasteProfile` for instant / offline routing.
+- **Login:** `screens/verify-code` calls `aiHelperStore.mergeAfterLogin()` straight after
+  `authStore.updateUserToken(...)` — **not awaited**, errors swallowed, so login never waits on
+  it or fails because of it. It posts only when the cached profile's `owner.kind` is `"device"`,
+  then refreshes from `GET /profile`. A failed merge is re-attempted only at a later login made
+  while the cached copy is a device profile.
+- **Impersonation:** `stores/auth/impersonation.ts` `consumeMasterLink` also calls
+  `updateUserToken` but does **not** merge (verify-code is the only `mergeAfterLogin` caller), so
+  a master operator's own visitor answers never land on the customer they open. Keep it so.
+- **Logout / delete:** `stores/auth` `logOut` and `deleteAccount` call `aiHelperStore.clear()`
+  (the in-memory profile and the cache key). `resetAppState` — the forced sign-out the
+  general-server-error dialog runs on a 401 — does **not**; there the account's copy stays cached
+  until the next `refresh()` replaces it with the device's profile (or null). The server keeps
+  the account's profile across logout: it belongs to the account.
+- **Deletion:** `POST /api/customer/delete` leaves the `tasteProfiles` doc in place — §7 item 10.
+
 ## 6. Referrals (`routes/customer-referrals.js`)
 8-char code (ambiguity-free alphabet) + TinyURL short link with `/r/:code` fallback. Config on
 `shoofi.store {id:1}.referralConfig` (reward amounts, `minFriendOrderAmount`, validity,
@@ -260,10 +348,14 @@ they differ only in `app-type`, default `app-name`, and post-login navigation.
 
 ### C1. shoofi-app (customer) — `app-type: shoofi-shopping`
 `screens/login` → `customer/create`; `screens/verify-code` (4 cells) → `customer/validateAuthCode`
-→ `authStore.updateUserToken`; new user → `screens/insert-customer-name` → `customer/update-name`.
+→ `authStore.updateUserToken` → fire-and-forget `aiHelperStore.mergeAfterLogin()` (§5a); new
+user → `screens/insert-customer-name` → `customer/update-name`.
 Token in AsyncStorage `@storage_userToken`, sent as `Authorization: Token`. Also sends a
-generated **`device-id`** (fraud). Stores: `stores/auth` (login/logout/deleteAccount),
-`stores/user-details` (`customer/details`), `stores/address`.
+generated **`device-id`** (`@storage_deviceId`, never cleared) — read by the fraud checks,
+stories and app-logs, and the owner key of a visitor's taste profile (§5a). Stores:
+`stores/auth` (login/logout/deleteAccount; `logOut` and `deleteAccount` also call
+`aiHelperStore.clear()`), `stores/user-details` (`customer/details`), `stores/address`,
+`stores/ai-helper` (the taste-profile copy, §5a).
 
 ### C2. shoofi-partner (store owner) — `app-type: shoofi-partner`
 **Same phone+OTP flow** (not admin creds). The partner-specific mechanism is
@@ -322,10 +414,17 @@ Do not "fix" them opportunistically; they are scheduled work, not bugs to discov
 9. **Dead/inherited (hands-off per §1c)** — the `AUTH_API`/`Authenticator` const block is
    imported in all three RN apps but **referenced 0 times** (legacy pre-`customer` surface);
    admin web has an unused `AdminTokens` interface; `routes/user.js` is legacy expressCart admin.
+10. **KNOWN — not yet handled (AI helper; recorded in shoofi-server `docs/ai-helper.md`,
+    2026-10-16):** `POST /api/customer/delete` soft-deletes the identity doc but leaves
+    `shoofi.tasteProfiles {"owner.customerId": <id>}` in place; only the app's cached copy goes
+    (`deleteAccount` → `aiHelperStore.clear()`). Since the customer `_id` survives deletion
+    (CORE invariant 8), a login after deletion finds the old profile again. Handling it touches
+    `routes/customer.js` — its own HIGH-RISK draft PR, not a drive-by.
 
 ## 8. Definition of done
 Inherit `_shared-guardrails.md` §7. For identity specifically: **never log OTPs/tokens/secrets**;
-state which app-types a change affects (all four branch off the same endpoints); confirm you
+state which app-types a change affects (all four branch off the same endpoints) — and, for the
+taste profile, whether it touches the visitor (`device-id`) owner (§5a); confirm you
 did not weaken stored-token equality, the impersonation master-gate, or `getCustomerAppName`'s
 central-DB behavior; and for anything touching the JWT secret or token lifetime, treat it as a
 **planned migration with a logout blast-radius**, not a code fix.

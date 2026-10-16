@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@a0e8bdb2 / 2026-09-23",
+  "lastVerified": "shoofi-server@faade7dc (feat/ai-helper) / 2026-10-16",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -268,6 +268,31 @@
           "file": "routes/order.js",
           "regex": "eventType: 'order_viewed',[\\s\\S]{0,600}?readyMinutes: updateobj\\.readyMinutes,[\\s\\S]{0,200}?previousStatus: order\\.status,",
           "desc": "readyMinutes lives only in order_viewed metadata, and previousStatus is read from the post-update order (always the new status) - reference.md §2/§5 traps; if this changes, fix both notes"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "const HISTORY_DAYS = 90;\\s*const MAX_ORDERS = 30;[\\s\\S]*?\\.slice\\(-MAX_ORDERS\\);[\\s\\S]*?status: \\{ \\$in: COMPLETED_STATUSES \\}",
+          "desc": "reference §5: the For-you / AI-helper history is the newest 30 customers.orders[] entries in 90 days, capped BEFORE the store-side COMPLETED_STATUSES filter - every taste fact and deliveredOrders count completed orders, never courier deliveries"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "projection: \\{\\s*created: 1,\\s*orderDate: 1,\\s*originalOrderDate: 1,\\s*\"order\\.items\\.item_id\": 1,\\s*\"order\\.items\\.qty\": 1,\\s*\"order\\.items\\.nameAR\": 1,\\s*\"order\\.items\\.nameHE\": 1,\\s*\"order\\.items\\.selectedExtras\": 1,",
+          "desc": "reference §5: the order fields the taste history reads - rename one of them and a taste fact silently disappears; change the list and the doc's list is wrong"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "orderMs: Date\\.parse\\(row\\.originalOrderDate \\|\\| row\\.orderDate \\|\\| row\\.created\\)",
+          "desc": "reference §5: facts meal_time buckets the DUE time frozen before any delay (CORE invariant 10's originalOrderDate), never the placed time"
+        },
+        {
+          "file": "services/ordering-intelligence/taste-profile.js",
+          "regex": "const INFERRED_TTL_MS = 60 \\* 60 \\* 1000;[\\s\\S]*?async function refreshInferredIfStale\\(",
+          "desc": "CORE invariant 1 / reference §5: the taste profile's `inferred` is a lazy cache refreshed on read after 1h, NOT an order-completion hook (there is no single completed transition)"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "deliveredOrders: taste\\.totalOrders",
+          "desc": "CORE invariant 1 / reference §5: deliveredOrders is taste.js's COMPLETED-order count, not bookDelivery deliveries"
         }
       ]
     },
@@ -325,6 +350,21 @@
           "file": "screens/cart/cart.tsx",
           "regex": "cart_checkout_blocked",
           "desc": "closed/busy-store bounces from the cart, previously unlogged (CORE: where an order that never happened lives)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "if \\(chip\\.kind === \"checkout\"\\) \\{[\\s\\S]{0,160}?navigate\\(\"cart\"\\)",
+          "desc": "CORE Known status (DEFERRED 2026-10-16) / reference C1: the chat's 'complete the order' hands off to the existing cart -> checkout"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*(?:submitOrder|SUBMIT_ORDER_API|use-checkout-submit))",
+          "desc": "CORE Known status: the For-you chat never submits an order - building the DEFERRED in-chat checkout card (client-computed total, postChargeOrderActions, consent) needs a new decision and this doc first"
+        },
+        {
+          "file": "components/for-you/CartDock.tsx",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*cartStore\\s*\\.\\s*(?:add|remove|[uU]pdate|reset|set|submit))",
+          "desc": "reference C1: the chat's cart dock only READS cartStore - a cart mutator here means the chat started editing the cart and the doc is wrong"
         }
       ]
     },

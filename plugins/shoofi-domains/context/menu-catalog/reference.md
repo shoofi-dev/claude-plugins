@@ -28,8 +28,15 @@ Primary files:
   `taxonomy.js`, `product-labeler.js`, `craving.js`, `routes/admin/dish-taxonomy.js`,
   `utils/crons/product-labels-cron.js`, `bin/label-products.js` (§2 `dishTaxonomy` /
   `productLabels` / `productLabelRuns`, §7, §7d)
+- The AI helper's effect on suggestions (§2 `tasteProfiles`, §7, §7f) — `avoid.js` (the `avoid`
+  filter), the profile hooks in `suggest.js` (`applyProfile`, `profileBias`, `rejectedFacts`, the
+  `drink` / `sweet` / `cross_sell` modes) and `suggest-service.js` (`loadProfile`, `modeClauses`,
+  `filterByAvoid`), `utils/extras-required.js` (`hasRequiredOptions`), and
+  `GET /api/ai-helper/cuisines` (`routes/ai-helper.js` → `ai-helper-service.js`). The profile's
+  owner and login merge (`taste-profile.js`, the other `/api/ai-helper/*` routes) are the
+  customers domain's; the history facts are `facts.js` — all in `docs/ai-helper.md`.
 - Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/explore-cache-invalidation.md`,
-  `docs/combo-deals.md`, `docs/for-you.md`
+  `docs/combo-deals.md`, `docs/for-you.md`, `docs/ai-helper.md`
 
 **You must NOT touch without explicit human review** (per `CLAUDE.md` guardrails):
 - Order creation / status transitions (`routes/order.js`), payments, auth.
@@ -166,7 +173,8 @@ One document per suggestible product of every food-service store (CORE invariant
 dishTypeSource (claude|admin|rules|null), course, sweet, spicy, vegetarian, light, protein,
 searchTermsNorm[], price, img|null, qty30d, orders30d, storeOrders30d, builtAt }`. Indexes
 (created by the builder, not by `DatabaseInitializationService`): `{ appName:1, productId:1 }`
-unique, `{ appName:1, dishType:1 }`, `{ appName:1, searchTermsNorm:1 }`. Written ONLY by `buildSuggestIndex`
+unique, `{ appName:1, dishType:1 }`, `{ appName:1, course:1 }` (the chat-ordering modes, §7f),
+`{ appName:1, searchTermsNorm:1 }`. Written ONLY by `buildSuggestIndex`
 (`services/ordering-intelligence/index-builder.js`): per store, `bulkWrite` of `replaceOne`
 upserts, then `deleteMany({ appName, builtAt: { $ne: builtAt } })`; at the end,
 `deleteMany({ appName: { $nin: kept } })`.
@@ -207,14 +215,18 @@ How each field is derived — read this before trusting one:
   including `$toInt` on `qty`.
 
 **Reading it:** `suggestForCustomer` (`suggest-service.js`) runs ONE `find` on it, scoped to the
-open stores' `appName`s and an `$or` of what the mode can use, ranks in memory, then
+open stores' `appName`s and an `$or` of what the mode can use (with a taste profile, also the
+stated cuisines' dish types; in a chat-ordering mode, its `modeClauses` — §7f), drops what the
+profile's `avoid` excludes (`filterByAvoid`), ranks in memory, then
 `applyLiveMenu` re-reads the winners from each store's `products` (projection `nameAR, nameHE,
-price, img[0], isHidden, isInStore, productType, supportedCategoryIds`) and, in parallel, the
+price, img[0], isHidden, isInStore, productType, supportedCategoryIds, extras, soldByWeight` — the
+last two only to compute `product.hasRequiredOptions`, §7f) and, in parallel, the
 store's `categories` with `{ isHidden: {$ne:true}, isSchoolProject: {$ne:true} }` (projection
 `discountPercent`). A row survives only if it exists, is not hidden, is not a combo, has at least
 one of its `supportedCategoryIds` among those visible categories, has `isInStore === true`, and a
 discounted `price > 0`. The card takes that discounted `price` (plus `originalPrice` /
-`discountPercent` when a discount applies) — CORE invariant 3 — and the live names and image.
+`discountPercent` when a discount applies) — CORE invariant 3 — the live names and image, and
+`hasRequiredOptions`.
 
 ### central `shoofi.dishTaxonomy` — the dish-type list as data (CORE invariant 12)
 `{ _id: key, key, label_ar, label_he, meal, words[], status: "active"|"proposed"|"rejected",
@@ -232,7 +244,9 @@ Production 2026-09-28 merged samboosek/sambousek, burekas/boureka, kubbeh/kibbeh
 `parseLabels(text, activeKeys, proposedTypes)` maps a pending proposal's key — found in either
 `dishType` or `proposedType` of a reply row — onto the stored proposal, so labels keep one key. Approve / reject / patch via the
 admin endpoints (§7); approve and patch force-reload the classifier on that instance, other
-instances pick it up within 10 min.
+instances pick it up within 10 min. An optional `img` (a CDN path) is read only by
+`GET /api/ai-helper/cuisines` as the type's own tile image (§7f); **no code writes it** — the
+`PATCH` takes `label_ar`, `label_he`, `meal` and `words` only — so it is absent unless set by hand.
 
 ### central `shoofi.productLabels` — Claude's per-product labels (CORE invariant 12)
 `{ appName, productId, nameAR, nameHE, contentHash, dishType, proposedType?, course, sweet, spicy,
@@ -250,6 +264,17 @@ the `contentHash` relabel rule: CORE invariant 12. Readers: `index-builder.js` (
 `{ startedAt, finishedAt, status: "running"|"done"|"failed", model, error?, stores, products,
 pending, labeled, applied, review, calls, errors, inputTokens, outputTokens, proposals }`. Dry runs
 write none. Read by `GET /api/admin/product-labels/runs` (the admin page's cost history).
+
+### central `shoofi.tasteProfiles` — the AI helper's taste profile (this domain only READS it)
+One document per owner (a customer, or a visitor's `device-id`): `{ owner, stated: { cuisines[],
+spice: 0-3|null, avoid[], mealTimes[], budget: 1-3|null }, confirmed: { [factKey]: boolean },
+inferred, onboardedAt, skippedAt, updatedAt, createdAt, version }`. Written by
+`PUT /api/ai-helper/profile` and the login merge (`taste-profile.js` — ownership and merge are the
+customers domain's, `docs/ai-helper.md`); `stated` is sanitised there (`avoid` through
+`sanitizeAvoid`, `cuisines` to `[a-z0-9_]` keys, not checked against the taxonomy). The
+suggestions read ONLY `stated` and `confirmed`, via `loadProfile` (`suggest-service.js`): by the
+customer id, else — only when there is no customer — by the `device-id` header; any error → no
+profile. What they do: CORE invariant 18, §7f.
 
 ## 3. Category → product hierarchy & ordering
 Two levels: `general-categories` → `categories` (linked by
@@ -352,7 +377,9 @@ each set in header `order`; keep it in lockstep with `validateWith` — and with
 this predicate leaves the add-to-cart button disabled forever. The partner app enforces
 nothing (`isValidForm={true}`), and order creation does not re-validate extras (see the recorded
 risk below). Making `required` real is a full-stack change: both editors → server passthrough →
-both validators → this doc.
+both validators → this doc — and the For-you quick-add flag `hasRequiredOptions`
+(`utils/extras-required.js`, §7f), which also ignores `required` and is a deliberate superset
+(defaulted singles, `weight` extras and `soldByWeight` count too).
 
 **Pricing has three copies that must stay in lockstep** — `shoofi-app/stores/extras/index.ts`,
 `shoofi-partner/stores/extras/index.ts`, and the server reference `utils/order-pricing.js`
@@ -469,7 +496,8 @@ the cache read.
 - Menu spellcheck (`routes/admin/menu-spellcheck.js`; `auth.required` + `checkAdminRole(["master","admin","manager"])`, POSTs in the audit route map): `GET /api/admin/menu-spellcheck/issues?status=open|accepted|dismissed|resolved|stale&appName=&lang=ar|he` → `{ issues (≤2000), truncated, counts, lastRun }`; `POST /api/admin/menu-spellcheck/run [{ appName }]` → `202 { started, runId }` / `409 locked` / `503 no-api-key`; `POST /api/admin/menu-spellcheck/accept { ids, fixes? }` → `{ accepted, stale, failed, outOfStockKept, rows[] }`; `POST /api/admin/menu-spellcheck/dismiss { ids }` → `{ dismissed }` (§7e)
 - `GET  /api/getTranslations`, `POST /api/translations/{update,add,delete}`
 - `POST /api/global-search` — central store name search
-- `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng} }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price }, dishType, reason, confidence }], personalized }` (`routes/for-you.js`, `auth.optional`). Only a customer `app-type` (`shoofi-shopping` or none) personalises. Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
+- `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng}, history?, lang?, cart?: { appName, productIds }, onboarded? }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price, originalPrice?, discountPercent?, hasRequiredOptions }, dishType, reason:{ code, params }, confidence }], personalized }` (`routes/for-you.js`, `auth.optional`). Modes `opener` (default), `usual`, `new`, `surprise`, `popular`, and the chat-ordering `drink`, `sweet`, `cross_sell` (§7f); reason codes `usual`, `ordered_before`, `liked_type`, `you_like`, `popular`, `match`. Only a customer `app-type` (`shoofi-shopping` or none) personalises; without a customer, a visitor's taste profile is read by the `device-id` header (CORE invariant 18). `cart` goes through `sanitizeCart` (a string `appName` ≤ 100 chars, ≤ 50 `productIds`); `onboarded` counts only when `=== true`. Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
+- `GET  /api/ai-helper/cuisines?lat=&lng=` — `{ cuisines: [{ key, label_ar, label_he, img, storeCount }] }` (`routes/ai-helper.js` → `ai-helper-service.js` `getCuisines`, `auth.optional`): the onboarding's cuisine tiles (§7f). `400` without a valid location; any other failure `200 { cuisines: [] }`. The other AI-helper routes — `GET`/`PUT /api/ai-helper/profile`, `POST /api/ai-helper/merge`, `GET /api/ai-helper/facts` — are the profile's side (`docs/ai-helper.md`; ownership and merge: customers domain).
 - Dish taxonomy / labels admin (`routes/admin/dish-taxonomy.js`; every route `auth.required` + `checkAdminRole(["master","admin","manager"])`):
   `GET /api/admin/dish-taxonomy` (seeds on first use), `POST /api/admin/dish-taxonomy/:key/approve` (→ active; its proposing labels get the type + `fromApprovedProposal`, `applied` at confidence ≥ 0.5 else `review`; admin labels untouched), `POST /api/admin/dish-taxonomy/:key/reject` (proposed only), `PATCH /api/admin/dish-taxonomy/:key`, `GET /api/admin/product-labels/review[?appName=]`, `POST /api/admin/product-labels/resolve { appName, productId, dishType }` (→ `status: "admin"`; `dishType` active or null), `GET /api/admin/product-labels/runs`, `POST /api/admin/product-labels/run [{ maxProducts, stores[] }]` — `startProductLabelsJob` (same `cron:product-labels` lock and locked index rebuild as the cron) answers as soon as it knows: `202 { started: true }` (running in the background), `409` a run already holds the lock, `503` no `ANTHROPIC_API_KEY`.
 
@@ -549,6 +577,123 @@ deep link `/admin/product/:appName/:categoryId/:productId`. Runs: `shoofi.menuSp
 Measured 2026-10-03 on 6 prod stores (~1.6k unique names): 19 calls, ≈ $0.03. Tests:
 `test/integration/menu-spellcheck.js`.
 
+## 7f. AI helper — what the taste profile does to suggestions, the cart modes, quick add, cuisines
+Design: `docs/ai-helper.md` (shoofi-server). The invariants are CORE 18–19; this is the detail.
+**Order inside `suggestForCustomer`:** open stores → customer taste and `loadProfile` in parallel →
+ONE index `find` (`candidateQuery`; non-text modes add `{ dishType: { $in: stated.cuisines } }`
+and `modeClauses(mode, cart, appNames)`) → `filterByAvoid` → Claude (`aiChatTurn`, typed text,
+when switched on) or `rankSuggestions` (which runs `applyProfile` first) → `applyLiveMenu`. The
+Claude path gets the `avoid` filter and nothing else from the profile.
+
+**`avoid`** (`avoid.js`; `sanitizeAvoid` keeps only `AVOID_KEYS`, in canonical order;
+`conflictsWithAvoid` / `filterByAvoid` are pure). A candidate is dropped when:
+
+| key | rule (on the index row) | guaranteed |
+|---|---|---|
+| `vegetarian` | `vegetarian !== true` — only a TRUSTED label sets it, so unlabelled (`null`) is dropped | yes |
+| `no_seafood` | `protein` null (unlabelled — no proof), fish or seafood; dish type `sushi` / `fish` or any key matching `fish\|seafood\|shrimp\|sushi\|salmon\|tuna`; a `SEAFOOD_WORDS` word in the name | yes |
+| `vegan` | the `vegetarian` rule, or protein cheese / egg, or dish type pizza / dessert, or a `DAIRY_WORDS` word | best effort |
+| `lactose_free` | protein cheese, dish type pizza, or a `DAIRY_WORDS` word | best effort |
+| `gluten_free` | dish type in `GLUTEN_TYPES` (burger, shawarma, tortilla, pizza, falafel, schnitzel, pasta, sandwich, breakfast) or a `GLUTEN_WORDS` word | best effort |
+| `nut_allergy` | a `NUT_WORDS` word | best effort |
+
+Name words (`hasWord`) match at a word START on the row's `nameNorm`, also with one glued prefix
+removed (Arabic وال / بال / لل / ال / و / ب / ل, Hebrew ו / ה / ב / ל / מ / ש / כ), so "דג" finds
+"דגים" and "فستق" finds "بالفستق"; multi-word entries ("פירות ים") match as a phrase. There is no
+allergen or dairy field on a product, a label or the Haat import. The app (`stores/ai-helper/index.ts`
+`GUARANTEED_AVOID`) stars the four best-effort chips and, once one is picked, shows
+`ai_helper_avoid_best_effort` ("we try, but can't guarantee — ask the store about allergies"),
+decided 2026-10-16. Promoting a key = label fields `vegan` / `containsDairy` / `containsGluten` /
+`containsNuts`, a forced full relabel (≈ $11, CORE invariant 12), the index build and
+`suggest-service.js` `PROJECTION` carrying them (the filter sees only projected index fields), and
+the key added to BOTH `GUARANTEED_AVOID` lists.
+
+**Weighting** — `applyProfile(docs, taste, profile)` sets `_bias = profileBias(doc, stated,
+medianPriceOf)` on every candidate (1 = neutral, factors multiply):
+
+| stated | factor |
+|---|---|
+| `cuisines` contains the row's dish type | ×1.4 |
+| `spice: 0`, row `spicy === true` | ×0.3 |
+| `spice: 2` / `3`, row `spicy === true` | ×1.3 / ×1.45 (`1 + 0.15 × spice`) |
+| `budget: 1` | price ≤ the median of its dish type among the candidates ×1.15; > 1.3× the median ×0.8 |
+| `budget: 3` | ≥ the median ×1.15; < 0.7× the median ×0.85 |
+
+`spice: 1` and `budget: 2` are neutral; medians are per dish type (untyped rows share one bucket)
+over the candidates' index `price`. `weighted(d) = qty30d × (_bias ?? 1)` replaces raw `qty30d` in
+`bestOfType`, `popularDocs`, `addFill`, `addStatedCuisines` and the cart modes; text mode multiplies
+its rank by `_bias`. `hasPopularEvidence` still reads raw `qty30d` — a bias never turns a product
+into "popular". `stated.mealTimes` is stored but no rule reads it.
+
+**`you_like` cards** (`addStatedCuisines`, from the opener — and so the `surprise` pool): per stated
+cuisine, the best-weighted row of that type with `qty30d > 0` not already shown, skipping a type a
+card already covers and any key that is not an active type (`dishTypeLabel` null);
+`reason: { code: "you_like", params: { dishType } }`, `confidence: 0`. A customer with < 3 orders gets
+up to 2 (after their one personal card) and, with 0 orders and at least one, `replyCode:
+"opener_stated"`; an experienced customer gets 1, after the liked types. `onboarded: true` in the
+body makes the opener answer `opener_onboarded` (the app fills `{{name}}` with `ai_helper_name`).
+
+**Rejected facts** (`rejectedFacts(profile.confirmed)`) — the keys are `facts.js`'s:
+`usual:<appName>`, `liked_type:<dishType>`, `meal_time:<meal>`, `likes_spicy`. Only `false` on the
+first two changes anything: `personalReason` answers `ordered_before` instead of `usual` at that
+store (the product is still offered), and `likedTypesToOffer` skips the type. A `true` answer
+boosts nothing. The Claude path gets the same: `suggest-service.js` runs `applyProfile` before
+`aiChatTurn`, so `cardForDoc` sees `taste.rejected`, and `ai-chat.js` `tasteSummary` drops
+rejected types from "Likes" and adds the stated cuisines ("Told us they like").
+
+**Without a profile** `applyProfile` returns docs and taste untouched (no `_bias`, `stated` or
+`rejected`), so every existing mode ranks and answers exactly as before — test "profile ranking:
+with no profile the reply is exactly as before".
+
+**Cart modes** (`cart: { appName, productIds }`; `fromCartStoreFirst` never offers a product of
+the cart's store that is in `productIds`; reason = the personal one, else `popular` with evidence,
+else `match`):
+
+| mode | index clause (`modeClauses`) | pick (`suggest.js`) | stores | replyCode |
+|---|---|---|---|---|
+| `drink` | `course: "drink"` or `dishType: "drink"` | `isDrink` | the cart's store first (no cap), then other open stores ≤ 2 each | `drink_ideas` / `drink_unavailable` |
+| `sweet` | `sweet: true`, `course: "dessert"` or `dishType: "dessert"` | `isSweet`: `sweet === true`, or `sweet` unknown + dish type dessert, or course dessert | same | `sweet_ideas` / `sweet_unavailable` |
+| `cross_sell` | only when the cart's store is open: that store's `course` drink / side / sauce or `dishType` drink / side | `isAddOn` | the cart's store ONLY; nothing when it is not open | `cross_sell`, also when empty |
+
+`course` is a Claude-label attribute (`null` without a trusted label), so sauces exist only as
+labels; the `{ appName: 1, course: 1 }` index serves these clauses. The app
+(`isChatOrderingEnabled`, `components/for-you/context-chips.ts` `chipsFor`): with items in the cart
+the chips are "complete the order" · a drink · something sweet · surprise, and `drink` / `sweet`
+are sent with the cart's store and product ids (`cartForServer` in `ForYouScreen.tsx`); **no chip
+sends `cross_sell` yet**. "Complete the order" and the cart dock (`CartDock.tsx`, reads `cartStore`
+only) open the normal `cart` screen; with an empty cart and an active order the chips are "where
+is my order?" and "order again" (`usual`). The chat writes no cart and places no order.
+
+**Quick add** — `product.hasRequiredOptions` (`utils/extras-required.js`), set by `applyLiveMenu`
+on every card of both paths: `true` when `soldByWeight === true` or any extra that is not
+`isGroupHeader` has `type` `single` or `weight`. `required` is never read (§4) and a single with a
+`defaultOptionId` still counts — "the product sheet has a choice to show", a superset of the app's
+add-to-cart block (`validateWith`, which a defaulted single never trips). A row with no `extras`
+array answers `false` unless it is `soldByWeight`. The app types the field (`stores/for-you`), but
+no screen reads it yet: a card tap still opens `menuScreen` at the product (§8).
+
+**Cuisines** — `getCuisines(appDb, lat, lng)` → `rankCuisines(types, rows, typeImages)`: the
+ACTIVE `meal` dish types (`loadActiveDishTypes`) that occur in the given index rows, ranked by
+distinct stores then summed `qty30d`, at most `MAX_CUISINES` (9), each
+`{ key, label_ar, label_he, img, storeCount }`. The rows widen until a tier yields at least
+`MIN_CUISINES` (4) types: (1) the area's OPEN stores (`getAreaStores`), (2) open + closed stores of
+the area (closed = not open now: closed, busy or coming soon), (3) the whole catalog — one
+`aggregate` over `suggestProductIndex` (`$match` meal types, `$sort` by `qty30d` descending,
+`$group` per dish type × store with that store's best seller's `img` and summed `qty30d`),
+returned whatever its size. So `storeCount` can
+count closed or far stores. Image: the type's `img` from `shoofi.dishTaxonomy` (active, non-empty
+string — no code writes it, §2), else the `img` of the best-selling row of that type in the tier
+used; a type with no image is left out. Central index only — no store DB, no menu cache; the
+whole-catalog tier is a deliberate platform-wide read that returns only type labels, image paths and
+counts. The app enables "next" on an empty list (`OnboardingSteps.tsx`) and asks for 2 picks
+otherwise.
+
+**Flags** — `isAiHelperEnabled`, `isAiHelperForAll` (off = Shoofi employees only),
+`isAiHelperOnboardingEnabled`, `isChatOrderingEnabled` on the central platform config document,
+public through `SHOOFI_CONFIG_PUBLIC_FIELDS` (`routes/store.js`), toggled under Settings → Shoofi
+(delivery-web `ShoofiSettings.tsx`). All default off; no server endpoint reads them. Tests:
+`test/integration/ai-helper.js`.
+
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":
   `POST /api/for-you/suggest` from `components/for-you/` + `screens/for-you/`, gated on the
@@ -563,8 +708,21 @@ Measured 2026-10-03 on 6 prod stores (~1.6k unique names): 19 calls, ≈ $0.03. 
   `generalCategories[].subCategories[].products` (and any direct `products`). Covered by
   `__tests__/components/general-categories-open-product.test.tsx`. Never navigate to the
   `meal` route for this — it is broken.
+  AI helper (§7f): the floating persona `components/ai-helper/AiHelperFab.tsx` on home
+  (`screens/explore.tsx`, `isAiHelperEnabled && (isAiHelperForAll || isShoofiEmployee)`, not in map
+  mode; it hides the For-you home entry). A tap opens the taste onboarding (`screens/ai-helper/`)
+  when `isAiHelperOnboardingEnabled` and `decideFabRoute` (`stores/ai-helper/index.ts`: not onboarded,
+  not skipped in the last 7 days) says so, else the chat. The onboarding's cuisine tiles come from
+  `GET /api/ai-helper/cuisines`, the avoid chips mirror `GUARANTEED_AVOID`, and the chat's first
+  opener after it sends `onboarded: true` (`fromOnboarding` route param). With
+  `isChatOrderingEnabled` the chat shows the cart dock and the cart chips (`components/for-you/`
+  `CartDock.tsx`, `context-chips.ts`) and sends `drink` / `sweet` with `cart`. Copy:
+  `helpers/ai-helper-copy.ts` (onboarding, `ai_helper_avoid_*`, `ai_helper_avoid_best_effort`) and
+  `helpers/for-you-copy.ts` (`for_you_reason_you_like`, `for_you_reply_opener_onboarded` /
+  `opener_stated` / `drink_*` / `sweet_*` / `cross_sell`); `SuggestionCard` counts `you_like` as a
+  personal tag.
 - **Partner app** (`shoofi-partner`): product write + ordering endpoints; sends `app-type: shoofi-partner` to see hidden products; listens for `product_updated`.
-- **Admin web** (`shoofi-delivery-web`/`shoofi-admin`): category CRUD, product ordering/migration, translations CRUD, stock screen (`update/quantity`), store config toggles (`isStockManagment`, `hasGeneralCategories`). "סוגי מנות (בשבילך)" at `/admin/dish-types` (`src/views/admin/dish-types/DishTypes.tsx`, API wrappers `src/apis/admin/dish-taxonomy.ts`): approve/reject/edit dish types, the "מוצרים לבדיקה" review list, run history with token counts, and a manual run. Platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled` / `isChatSuggestForAll` ("For You — Open To All Customers"; off = Shoofi employees only) under Settings → Shoofi.
+- **Admin web** (`shoofi-delivery-web`/`shoofi-admin`): category CRUD, product ordering/migration, translations CRUD, stock screen (`update/quantity`), store config toggles (`isStockManagment`, `hasGeneralCategories`). "סוגי מנות (בשבילך)" at `/admin/dish-types` (`src/views/admin/dish-types/DishTypes.tsx`, API wrappers `src/apis/admin/dish-taxonomy.ts`): approve/reject/edit dish types, the "מוצרים לבדיקה" review list, run history with token counts, and a manual run. Platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled` / `isChatSuggestForAll` ("For You — Open To All Customers"; off = Shoofi employees only) under Settings → Shoofi, and the AI helper's `isAiHelperEnabled` / `isAiHelperForAll` / `isAiHelperOnboardingEnabled` / `isChatOrderingEnabled` beside them (`src/views/admin/settings/ShoofiSettings.tsx`, §7f).
 
 ## 9. Known status (human-confirmed) — what's a bug vs. by-design
 Each item below was reviewed with the product owner. Respect these verdicts.
