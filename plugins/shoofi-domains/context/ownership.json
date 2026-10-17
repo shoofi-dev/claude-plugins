@@ -45,7 +45,9 @@
         "components/ai-helper/",
         "screens/ai-helper/",
         "stores/ai-helper/",
-        "helpers/ai-helper-copy.ts"
+        "helpers/ai-helper-copy.ts",
+        "hooks/useChatAddToCart.ts",
+        "helpers/chat-cart-line.ts"
       ],
       "shoofi-delivery-web": [
         "src/views/admin/dish-types/",
@@ -77,7 +79,8 @@
         "stores/cart/",
         "stores/orders/",
         "stores/twin-order/",
-        "consts/shared.ts"
+        "consts/shared.ts",
+        "hooks/useChatAddToCart.ts"
       ],
       "shoofi-partner": [
         "screens/admin/order",

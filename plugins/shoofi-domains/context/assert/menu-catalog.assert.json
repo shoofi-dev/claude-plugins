@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@faade7dc (feat/ai-helper) / 2026-10-16",
+  "lastVerified": "shoofi-server@5e4048a4 (feat/ai-helper) / 2026-10-17",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -149,7 +149,8 @@
           "modeClauses",
           "loadProfile",
           "filterByAvoid",
-          "hasRequiredOptions"
+          "hasRequiredOptions",
+          "replyAfterAvoid"
         ],
         "utils/crons/suggest-index-cron.js": [
           "startSuggestIndexCron",
@@ -1186,6 +1187,21 @@
           "file": "test/integration/ai-helper.js",
           "regex": "profile ranking: with no profile the reply is exactly as before",
           "desc": "doc CORE invariant 18: the test that pins 'no profile = no behaviour change'"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "if \\(!avoidEmptied \\|\\| ranked\\.replyCode === \"store_closed\"\\)",
+          "desc": "doc CORE invariant 18 / reference §7f: when avoid emptied the reply it says avoid_no_match — except a named closed store keeps store_closed"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "return \\{ replyCode: \"avoid_no_match\", replyParams: \\{\\} \\};",
+          "desc": "doc CORE invariant 18 / reference §7f: the reply code the app words as for_you_reply_avoid_no_match"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "discountPercent > 0\\n\\s*\\? Math\\.round\\(extrasPrice \\* \\(1 - discountPercent / 100\\)\\)\\n\\s*: extrasPrice;\\n\\s*\\n\\s*return \\{\\n\\s*price: basePrice \\+ discountedExtrasPrice,",
+          "desc": "doc CORE invariant 19 / reference §4, §7f: the server's line formula — one of the THREE copies (with shoofi-app screens/meal/index2.tsx and helpers/chat-cart-line.ts priceLine) that must stay in lockstep; shadow pricing compares against it"
         }
       ]
     },
@@ -1201,7 +1217,14 @@
         "components/ai-helper/AiHelperFab.tsx",
         "components/for-you/context-chips.ts",
         "components/for-you/CartDock.tsx",
-        "helpers/ai-helper-copy.ts"
+        "helpers/ai-helper-copy.ts",
+        "helpers/chat-cart-line.ts",
+        "hooks/useChatAddToCart.ts",
+        "components/for-you/ChatProductSheet.tsx",
+        "components/for-you/CrossSellPill.tsx",
+        "screens/meal/index2.tsx",
+        "__tests__/helpers/chat-cart-line.test.ts",
+        "__tests__/hooks/use-chat-add-to-cart.test.tsx"
       ],
       "symbols": {
         "stores/ai-helper/index.ts": [
@@ -1210,6 +1233,22 @@
         ],
         "components/for-you/context-chips.ts": [
           "chipsFor"
+        ],
+        "helpers/chat-cart-line.ts": [
+          "chatSheetSupport",
+          "prepareProduct",
+          "defaultSelections",
+          "selectionsValid",
+          "priceLine",
+          "buildCartLine",
+          "mandatoryChoicesAvailable",
+          "isOptionOutOfStock",
+          "maxQuantity"
+        ],
+        "hooks/useChatAddToCart.ts": [
+          "useChatAddToCart",
+          "findMenuProduct",
+          "addProductToCartForStore"
         ]
       },
       "patterns": [
@@ -1291,7 +1330,7 @@
         {
           "file": "screens/for-you/ForYouScreen.tsx",
           "regex": "mode === \"drink\" \\|\\| mode === \"sweet\" \\? await cartForServer\\(\\) : undefined",
-          "desc": "doc CORE invariant 19 / reference §7f: only drink / sweet are sent with the cart (nothing sends cross_sell yet)"
+          "desc": "doc CORE invariant 19 / reference §7f: only drink / sweet are sent with the cart"
         },
         {
           "file": "components/for-you/context-chips.ts",
@@ -1322,6 +1361,136 @@
           "file": "stores/ai-helper/index.ts",
           "regex": "/ai-helper/cuisines\\?lat=",
           "desc": "doc reference §8: the onboarding reads its tiles from GET /api/ai-helper/cuisines"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "if \\(isComboProduct\\(product\\)\\) return \\{ ok: false, reason: \"combo\" \\};\\n\\s*if \\(product\\.soldByWeight === true\\) return \\{ ok: false, reason: \"weight\" \\};",
+          "desc": "doc CORE invariant 19 / reference §7f: the chat sheet never takes a combo or a soldByWeight product — those open the store at the dish"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "if \\(Number\\(e\\.freeCount\\) > 0\\) return \\{ ok: false, reason: \"free_count\" \\};",
+          "desc": "doc CORE invariant 19 / reference §7f: a group header with freeCount > 0 opens the store (the sheet does not stamp isFree)"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "if \\(e\\.type === \"weight\" \\|\\| e\\.categoryId === \"weight\"\\) return \\{ ok: false, reason: \"weight\" \\};\\n\\s*if \\(e\\.type === \"pizza-topping\"\\) return \\{ ok: false, reason: \"pizza\" \\};\\n\\s*if \\(e\\.type === \"counter\"\\) return \\{ ok: false, reason: \"counter\" \\};\\n\\s*if \\(e\\.type !== \"single\" && e\\.type !== \"multi\"\\) return \\{ ok: false, reason: \"unsupported\" \\};",
+          "desc": "doc CORE invariant 19 / reference §7f: chatSheetSupport — chips ONLY for single + multi; weight (incl. legacy categoryId weight), pizza-topping, counter and any other type open the store"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "if \\(Array\\.isArray\\(data\\.extras\\)\\) data\\.extras = ensureOptionIds\\(data\\.extras\\);\\n\\s*data\\.basePrice = data\\.price;\\n\\s*data\\.baseOriginalPrice = data\\.originalPrice;",
+          "desc": "doc reference §7f: prepareProduct prepares the product as the menu screen does — deep copy, option ids, basePrice from the discounted menu price"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "const discounted = discountPercent > 0 \\? Math\\.round\\(extrasPrice \\* \\(1 - discountPercent / 100\\)\\) : extrasPrice;\\n\\s*return \\{\\n\\s*price: basePrice \\+ discounted,\\n\\s*\\.\\.\\.\\(baseOriginal \\? \\{ originalPrice: baseOriginal \\+ extrasPrice \\} : \\{\\}\\),",
+          "desc": "doc CORE invariant 19 / reference §4, §7f: priceLine mirrors screens/meal/index2.tsx and the server's utils/order-pricing.js — change one, change all three"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "if \\(!extrasStore\\.validateWith\\(prepared\\?\\.extras, selections\\)\\) return false;",
+          "desc": "doc reference §4 / §7f: the chat's add gate is the menu's validateWith (every non-header single answered)"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "const cap = Number\\(e\\.maxCount \\?\\? e\\.max\\);",
+          "desc": "doc reference §7f: selectionsValid adds the maxCount ?? max cap the menu's checkbox enforces (validateWith reads max only)"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "\\.filter\\(\\(e\\) => e && !e\\.isGroupHeader && e\\.type === \"single\"\\)\\n\\s*\\.every\\(\\(e\\) => Array\\.isArray\\(e\\.options\\) && e\\.options\\.some\\(\\(o: any\\) => !isOptionOutOfStock\\(o, outOfStockExtras\\)\\)\\);",
+          "desc": "doc reference §7f: a single with no options or every option out of stock makes the dish unavailable in the chat (the lint's SINGLE_WITHOUT_OPTIONS / REQUIRED_GROUP_ALL_OUT_OF_STOCK cases)"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "outOfStockExtras\\.includes\\(option\\.nameAR\\)",
+          "desc": "doc reference §7f: out-of-stock options are matched by nameAR, exactly, as the menu does (Known status)"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "if \\(storeData\\?\\.isStockManagment === true && typeof prepared\\?\\.quantity === \"number\"\\)",
+          "desc": "doc reference §7f: the quantity cap applies only to stock-managed stores (CORE invariant 4)"
+        },
+        {
+          "file": "screens/meal/index2.tsx",
+          "regex": "const discountedExtrasPrice = discountPercent > 0\\n\\s*\\? Math\\.round\\(extrasPrice \\* \\(1 - discountPercent / 100\\)\\)\\n\\s*: extrasPrice;",
+          "desc": "doc reference §4 / §7f: the menu product screen's line formula — the source helpers/chat-cart-line.ts priceLine mirrors"
+        },
+        {
+          "file": "screens/meal/index2.tsx",
+          "regex": "price: basePrice \\+ discountedExtrasPrice,\\n\\s*\\.\\.\\.\\(baseOriginal \\? \\{ originalPrice: baseOriginal \\+ extrasPrice \\} : \\{\\}\\),",
+          "desc": "doc reference §4 / §7f: the menu screen's unit price and original price — mirrored by priceLine"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "storeDataStore\\.getStoreDataFromServer\\(appName\\),\\n\\s*menuStore\\.getMenuFromServer\\(appName, false\\),",
+          "desc": "doc CORE invariant 19 / reference §7f: the chat loads the dish's store and menu with the FETCH-ONLY calls (explicit app-name, isSchoolProject=false)"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*\\b(?:getMenu|getStoreData|setStoreDBName)\\()",
+          "desc": "doc CORE invariant 19 / reference §7f: NEGATIVE pin — matches only while the hook calls none of getMenu( / getStoreData( / setStoreDBName( (they overwrite the browsed store other screens read); the lookbehind anchors it to the start of the file. If this fails, the hook started writing global store/menu state"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "if \\(card\\.product\\.hasRequiredOptions\\) setSheet\\(\\{ \\.\\.\\.CLOSED_SHEET, visible: true, card \\}\\);",
+          "desc": "doc CORE invariant 19: hasRequiredOptions is only a hint — it opens the sheet early; the full menu product decides"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "if \\(twinOrderStore\\?\\.isTwinModeActive \\|\\| twinCartStore\\.cartItems\\.length > 0\\) return fallback\\(card, \"twin\"\\);\\n\\s*if \\(cartStore\\.cartItems\\.length > 0 && \\(await cartStore\\.getIsSchoolProject\\(\\)\\)\\) return fallback\\(card, \"school\"\\);",
+          "desc": "doc CORE invariant 19 / reference §7f: twin orders and a school cart open the store instead of a chat add"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "if \\(storeData\\.isCheckAge && !\\(await AsyncStorage\\.getItem\\(\"@age_check_approved\"\\)\\)\\) return fallback\\(card, \"age_check\"\\);",
+          "desc": "doc CORE invariant 19 / reference §7f: an age-checked store opens the store (its age gate) instead"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "if \\(raw && !support\\.ok\\) return fallback\\(card, \\(support as any\\)\\.reason\\);",
+          "desc": "doc CORE invariant 19: whatever chatSheetSupport refuses opens the store at the dish"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "if \\(Object\\.keys\\(defaults\\)\\.length === 0 && selectionsValid\\(prepared, \\{\\}\\)\\)",
+          "desc": "doc CORE invariant 19 / reference §7f: straight into the cart only with no defaults and nothing to choose — a priced default is shown in the sheet, never added silently"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "for \\(const category of menu\\?\\.menu \\|\\| \\[\\]\\)",
+          "desc": "doc reference §7f: the product is found in menu.menu[].products — GET /api/menu's full category list, also for tile-grid stores"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "forYouStore\\.ask\\(location, \\{ mode: \"cross_sell\", cart: \\{ appName: storeData\\.appName, productIds \\} \\}, undefined, \\{\\n\\s*dropIfEmpty: true,",
+          "desc": "doc CORE invariant 19 / reference §7f: cross_sell is asked after a chat add (once per store per chat); an empty reply is dropped"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "await cartStore\\.addProductToCartForStore\\(line, storeData\\);",
+          "desc": "doc CORE invariant 19 / reference §7f: the line goes in through the store-explicit cart add (orders domain), never addProductToCart"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "opts\\.dropIfEmpty && reply\\.cards\\.length === 0",
+          "desc": "doc reference §7f: a cross-sell with nothing to offer shows nothing"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "const isCrossSell = orderingEnabled && item\\.replyCode === \"cross_sell\";",
+          "desc": "doc reference §7f / §8: cross_sell replies render as compact pills (CrossSellPill)"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_reply_avoid_no_match",
+          "desc": "doc reference §7f: the app words the avoid_no_match reply"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_reply_add_unavailable",
+          "desc": "doc reference §7f: the chat's own message when the dish cannot be added (sold out, stock 0, a mandatory choice with nothing left)"
         }
       ]
     },

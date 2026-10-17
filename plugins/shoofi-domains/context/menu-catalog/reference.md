@@ -32,7 +32,8 @@ Primary files:
   filter), the profile hooks in `suggest.js` (`applyProfile`, `profileBias`, `rejectedFacts`, the
   `drink` / `sweet` / `cross_sell` modes) and `suggest-service.js` (`loadProfile`, `modeClauses`,
   `filterByAvoid`), `utils/extras-required.js` (`hasRequiredOptions`), and
-  `GET /api/ai-helper/cuisines` (`routes/ai-helper.js` → `ai-helper-service.js`). The profile's
+  `GET /api/ai-helper/cuisines` (`routes/ai-helper.js` → `ai-helper-service.js`); in the app, the
+  chat's quick add `hooks/useChatAddToCart.ts` + `helpers/chat-cart-line.ts` (§7f). The profile's
   owner and login merge (`taste-profile.js`, the other `/api/ai-helper/*` routes) are the
   customers domain's; the history facts are `facts.js` — all in `docs/ai-helper.md`.
 - Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/explore-cache-invalidation.md`,
@@ -374,7 +375,9 @@ screen mirrors the same predicate in `shoofi-app/helpers/extras-groups.ts` (`isM
 unit-tested) to label groups "required / optional" and to list **mandatory groups first**,
 each set in header `order`; keep it in lockstep with `validateWith` — and with the lint, whose
 `SINGLE_WITHOUT_OPTIONS` / `REQUIRED_GROUP_ALL_OUT_OF_STOCK` are `critical` precisely because
-this predicate leaves the add-to-cart button disabled forever. The partner app enforces
+this predicate leaves the add-to-cart button disabled forever. `validateWith` has a second
+caller, the For-you chat's `selectionsValid` (`helpers/chat-cart-line.ts`, which adds the
+`maxCount ?? max` cap the menu's checkbox enforces — §7f). The partner app enforces
 nothing (`isValidForm={true}`), and order creation does not re-validate extras (see the recorded
 risk below). Making `required` real is a full-stack change: both editors → server passthrough →
 both validators → this doc — and the For-you quick-add flag `hasRequiredOptions`
@@ -383,7 +386,11 @@ both validators → this doc — and the For-you quick-add flag `hasRequiredOpti
 
 **Pricing has three copies that must stay in lockstep** — `shoofi-app/stores/extras/index.ts`,
 `shoofi-partner/stores/extras/index.ts`, and the server reference `utils/order-pricing.js`
-(`calculateExtrasPrice(extras, selections, { soldByWeight })`, orders domain). The weight
+(`calculateExtrasPrice(extras, selections, { soldByWeight })`, orders domain). The LINE formula
+on top of it (`base + (d > 0 ? Math.round(extras × (1 − d/100)) : extras)`) has two app copies
+besides the server's: the menu's product screen `screens/meal/index2.tsx` and the For-you chat's
+`helpers/chat-cart-line.ts` `priceLine` (§7f) — the menu screen was deliberately not refactored to
+share it, so the three change together. The weight
 extra prices as the **delta from `defaultValue`** (branch B) when the product is flagged or the
 weight is the only non-header extra; otherwise as an **add-on with the first step bundled**
 (branch A). Order creation charges the client total and shadow-compares it
@@ -581,9 +588,11 @@ Measured 2026-10-03 on 6 prod stores (~1.6k unique names): 19 calls, ≈ $0.03. 
 Design: `docs/ai-helper.md` (shoofi-server). The invariants are CORE 18–19; this is the detail.
 **Order inside `suggestForCustomer`:** open stores → customer taste and `loadProfile` in parallel →
 ONE index `find` (`candidateQuery`; non-text modes add `{ dishType: { $in: stated.cuisines } }`
-and `modeClauses(mode, cart, appNames)`) → `filterByAvoid` → Claude (`aiChatTurn`, typed text,
-when switched on) or `rankSuggestions` (which runs `applyProfile` first) → `applyLiveMenu`. The
-Claude path gets the `avoid` filter and nothing else from the profile.
+and `modeClauses(mode, cart, appNames)`) → `filterByAvoid` → Claude on
+`applyProfile(docs, taste, profile)` (`aiChatTurn`, typed text, when switched on) or
+`rankSuggestions` (which runs `applyProfile` itself) → `applyLiveMenu`; the rules path then goes
+through `replyAfterAvoid`. Both paths get the whole profile — Claude's shortlist ranks its text
+matches with `_bias`, `cardForDoc` sees `taste.rejected`, `tasteSummary` the stated cuisines.
 
 **`avoid`** (`avoid.js`; `sanitizeAvoid` keeps only `AVOID_KEYS`, in canonical order;
 `conflictsWithAvoid` / `filterByAvoid` are pure). A candidate is dropped when:
@@ -607,6 +616,11 @@ decided 2026-10-16. Promoting a key = label fields `vegan` / `containsDairy` / `
 `containsNuts`, a forced full relabel (≈ $11, CORE invariant 12), the index build and
 `suggest-service.js` `PROJECTION` carrying them (the filter sees only projected index fields), and
 the key added to BOTH `GUARANTEED_AVOID` lists.
+
+**`avoid_no_match`** — `replyAfterAvoid(ranked, cardCount, foundCount, keptCount)`: when `avoid`
+removed candidates (`kept < found`) and the rules path ends with no card, the reply becomes
+`replyCode: "avoid_no_match"` (app copy `for_you_reply_avoid_no_match`) instead of an opener over an
+empty row; a `store_closed` reply is kept. The Claude path returns before it.
 
 **Weighting** — `applyProfile(docs, taste, profile)` sets `_bias = profileBias(doc, stated,
 medianPriceOf)` on every candidate (1 = neutral, factors multiply):
@@ -659,18 +673,62 @@ else `match`):
 labels; the `{ appName: 1, course: 1 }` index serves these clauses. The app
 (`isChatOrderingEnabled`, `components/for-you/context-chips.ts` `chipsFor`): with items in the cart
 the chips are "complete the order" · a drink · something sweet · surprise, and `drink` / `sweet`
-are sent with the cart's store and product ids (`cartForServer` in `ForYouScreen.tsx`); **no chip
-sends `cross_sell` yet**. "Complete the order" and the cart dock (`CartDock.tsx`, reads `cartStore`
-only) open the normal `cart` screen; with an empty cart and an active order the chips are "where
-is my order?" and "order again" (`usual`). The chat writes no cart and places no order.
+are sent with the cart's store and product ids (`cartForServer` in `ForYouScreen.tsx`).
+`cross_sell` is asked by the quick add (below), once per store per chat, right after a dish goes
+in — with `dropIfEmpty`, so an empty reply shows nothing — and its cards render as compact
+`CrossSellPill`s (`isCrossSell` in `ForYouScreen.tsx`). "Complete the order" and the cart dock
+(`CartDock.tsx`, reads `cartStore`) open the normal `cart` screen; with an empty cart and an active
+order the chips are "where is my order?" and "order again" (`usual`). The chat places no order.
 
-**Quick add** — `product.hasRequiredOptions` (`utils/extras-required.js`), set by `applyLiveMenu`
-on every card of both paths: `true` when `soldByWeight === true` or any extra that is not
-`isGroupHeader` has `type` `single` or `weight`. `required` is never read (§4) and a single with a
-`defaultOptionId` still counts — "the product sheet has a choice to show", a superset of the app's
-add-to-cart block (`validateWith`, which a defaulted single never trips). A row with no `extras`
-array answers `false` unless it is `soldByWeight`. The app types the field (`stores/for-you`), but
-no screen reads it yet: a card tap still opens `menuScreen` at the product (§8).
+**`hasRequiredOptions`** (`utils/extras-required.js`), set by `applyLiveMenu` on every card of both
+paths: `true` when `soldByWeight === true` or any extra that is not `isGroupHeader` has `type`
+`single` or `weight`. `required` is never read (§4) and a single with a `defaultOptionId` still
+counts — "the product sheet has a choice to show", a superset of the app's add-to-cart block
+(`validateWith`, which a defaulted single never trips). A row with no `extras` array answers
+`false` unless it is `soldByWeight`. The app reads it as a HINT only: `true` opens the options
+sheet at once (loading) while the menu loads; the decision is made on the full menu product.
+
+**Quick add** (app only, no server change; `isChatOrderingEnabled`; built 2026-10-17) — the "+" on a
+card (a stepper once the dish is in the cart; "−" removes the dish's last line at zero) or on a
+cross-sell pill, through `hooks/useChatAddToCart.ts` `quickAdd`:
+- **Open the store instead** (the card tap, `openStoreAtProduct`; logged as
+   `for_you_quick_add_fallback` with the reason) for twin orders or a twin cart, a school cart, a
+   failed load, an age-checked store not yet approved (`isCheckAge`), extras that are not an
+   array, and whatever `chatSheetSupport` refuses: chips exist for `single` and `multi` ONLY, so a
+   combo, `soldByWeight`, a `weight` extra or a legacy `categoryId: "weight"` one (priced at menu
+   load), `pizza-topping`, `counter`, a group header with `freeCount > 0` (free toppings — the
+   pricer applies them to `pizza-topping` only, §4), or any other type goes to the store's own
+   product screen.
+- **Load** the dish's store and menu with the fetch-only calls —
+   `storeDataStore.getStoreDataFromServer(appName)` and `menuStore.getMenuFromServer(appName,
+   false)` (`app-name: <the dish's store>`, `isSchoolProject=false`; cached 2 min per store in the
+   hook). Never `getMenu` (it overwrites `menuStore.categories` / `generalCategories` /
+   `outOfStockExtras` — the BROWSED store's), `getStoreData` or `setStoreDBName`. The product is
+   found in `menu.menu[].products`, the full category list `GET /api/menu` returns for every store,
+   tile-grid ones included. It is the customer menu (cached, hidden products already excluded).
+- **Unavailable** — not found, `isInStore !== true`, `maxQuantity < 1` (stock cap only when
+   `isStockManagment`), or a mandatory single with no option left (`mandatoryChoicesAvailable`;
+   out-of-stock options matched by `nameAR` against the menu's `outOfStockExtras`, as the menu
+   does) — and the chat says `add_unavailable` (an app-side message, not a server reply).
+- **Build the line the menu would build** (`helpers/chat-cart-line.ts`): `prepareProduct` (deep
+   copy, `ensureOptionIds`, `basePrice` / `baseOriginalPrice` from the menu's already-discounted
+   price), `defaultSelections` (`resolveExtraDefaults`), `selectionsValid` (`validateWith` plus the
+   `maxCount ?? max` cap the menu's checkbox enforces), and `priceLine` — the formula of
+   `screens/meal/index2.tsx` and of the server's `utils/order-pricing.js`:
+   `price = basePrice + (d > 0 ? Math.round(extras × (1 − d/100)) : extras)`,
+   `originalPrice = baseOriginal + extras`, extras from `extrasStore.calculateExtrasPrice`. The menu
+   screen was deliberately not refactored to share it, so the three must change together.
+- **Straight in only when nothing is chosen for the customer**: no defaults and valid with no
+   selection. Otherwise `ChatProductSheet.tsx` opens with the defaults pre-selected (a priced
+   default is shown, never added silently); single replaces, multi toggles within its cap, an
+   out-of-stock option cannot be picked.
+- **Commit**: `cartStore.addProductToCartForStore(line, storeData)` stamps an empty cart with the
+   dish's store, never the browsed one (orders domain). A cart of another store is never mixed or
+   silently emptied — the chat asks (`store_conflict`: empty the cart and add / keep the cart).
+
+Reported verified on the simulator, 2026-10-17 (`docs/ai-helper.md`): the order placed after a chat
+add carried the chosen extras and the server's shadow pricing showed drift 0. Tests:
+`__tests__/helpers/chat-cart-line.test.ts`, `__tests__/hooks/use-chat-add-to-cart.test.tsx`.
 
 **Cuisines** — `getCuisines(appDb, lat, lng)` → `rankCuisines(types, rows, typeImages)`: the
 ACTIVE `meal` dish types (`loadActiveDishTypes`) that occur in the given index rows, ranked by
@@ -716,7 +774,10 @@ public through `SHOOFI_CONFIG_PUBLIC_FIELDS` (`routes/store.js`), toggled under 
   `GET /api/ai-helper/cuisines`, the avoid chips mirror `GUARANTEED_AVOID`, and the chat's first
   opener after it sends `onboarded: true` (`fromOnboarding` route param). With
   `isChatOrderingEnabled` the chat shows the cart dock and the cart chips (`components/for-you/`
-  `CartDock.tsx`, `context-chips.ts`) and sends `drink` / `sweet` with `cart`. Copy:
+  `CartDock.tsx`, `context-chips.ts`), sends `drink` / `sweet` with `cart`, and adds to the cart
+  itself: a "+" (a stepper once in the cart) on every `SuggestionCard` and `CrossSellPill`, the
+  options sheet `ChatProductSheet.tsx`, all through `hooks/useChatAddToCart.ts` +
+  `helpers/chat-cart-line.ts`, which then asks `cross_sell` (§7f). Copy:
   `helpers/ai-helper-copy.ts` (onboarding, `ai_helper_avoid_*`, `ai_helper_avoid_best_effort`) and
   `helpers/for-you-copy.ts` (`for_you_reason_you_like`, `for_you_reply_opener_onboarded` /
   `opener_stated` / `drink_*` / `sweet_*` / `cross_sell`); `SuggestionCard` counts `you_like` as a
