@@ -269,6 +269,45 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+16. **"Required couriers per hour" is `minDrivers`, it is ONE rounding, and the after-midnight
+    tail is sized from the NEXT weekday.** `ShiftService.computeCapacity`
+    (`services/driver-shift/shift-service.js`) is the whole number the admin's shifts grid
+    shows: `minDrivers = max(1, ceil(avgOrders × (1 + driverCalculationBuffer/100) /
+    ordersPerDriver))`. `maxDrivers = ceil(minDrivers × 1.2)` is a **booking ceiling only** —
+    `DriverShift.isFull()` gates `POST /shifts/book` on it and `minDrivers` gates nothing — so
+    a healthy full slot always shows more enrolled couriers than the requirement. The week
+    grid prints `booked/minDrivers` (`ShiftsCalendarGridView.tsx`), while `ShiftDetails.tsx`
+    and `ShiftEditModal.tsx` still print `booked/maxDrivers`: the same slot reads 20% bigger
+    in the drill-down. ⚠️ **Round once.** Rounding to a whole courier and *then* applying the
+    buffer to the rounded figure and rounding again made a configured 10% buffer cost 19.5%
+    (منطقة كفر قاسم, week of 2026-10-18: 779 driver-hours asked against a bare rate of 652)
+    and handed two couriers to every slot with `0 < avgOrders <= ordersPerDriver`, because
+    `ceil(1 × 1.1) === 2`. ⚠️ **`avgOrders` is never stored on the shift document**, so a
+    stored row cannot be re-derived — but `minDrivers` can be inverted when the buffer is
+    known, which is how to audit a generated week without re-running the sweep. It is measured
+    **order-side**, not from `bookDelivery`: `PeakHourDetectionService`
+    (`services/driver-shift/peak-hour-detection.js`) sweeps every live store whose
+    `supportedCities` meet the area's **pickup zones** (`cityAreas.cityIds`), counts that
+    store's own `orders` with `status ∈ {"2","3","10","11","12"}` and
+    `order.receipt_method === "DELIVERY"`, and divides by the dates the AREA traded on that
+    weekday — **one divisor for the whole day**, not per slot. `bookDelivery` is the
+    independent cross-check and agrees within a few percent; KQ achieves 2.6–3.4 trips per
+    courier-hour at peak, so `ordersPerDriver: 3` sits at the top of the real range. Because
+    of invariant 8, a slot before the day's `startHour` runs on the **next** calendar day and
+    is sized from that weekday's history (`crossesMidnight` → `isNextDay` on the generated
+    slot, `demandFor` per calendar weekday — one detection per distinct weekday, so a week
+    still costs 7 sweeps and not 14); sizing the whole business day from one weekday gave the
+    Saturday row's
+    `00:00` slot Friday-night volume (KQ: SAT hour 0 = 16.9 trips/hour vs SUN hour 0 = 8.8).
+    The stored `dayOfWeek`, the booking window and the permanent-driver lookup stay on the
+    **business** weekday — do not "make them consistent". Generation is on demand
+    (`POST /admin/shifts/generate`), never a cron, and the route loops `generateShifts` **once
+    per pickup zone** while each call re-measures the whole area, so one press of Generate
+    sweeps an 8-zone area 8 times; the result is idempotent, the cost is not. The measured
+    window is `now − lookbackMonths` then `.startOf('month')`, so its length depends on the
+    day of the month Generate was pressed — two runs with identical settings legitimately
+    differ. A `capacityOverridden: true` row was set by hand and regeneration will not touch
+    it.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**

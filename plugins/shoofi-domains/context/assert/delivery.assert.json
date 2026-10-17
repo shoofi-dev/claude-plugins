@@ -33,7 +33,10 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "services/driver-shift/peak-hour-detection.js",
+        "models/DriverShift.js",
+        "utils/shift-time.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -54,7 +57,9 @@
         "services/driver-shift/shift-service.js": [
           "getPermanentDriverSlotsForDay",
           "assignPermanentDriversToShifts",
-          "dayTimeSlots"
+          "dayTimeSlots",
+          "computeCapacity",
+          "demandFor"
         ],
         "utils/driver-active-hours.js": [
           "workingDayBounds",
@@ -111,6 +116,11 @@
           "/api/delivery/delivery-only/book",
           "/api/delivery/delivery-only/list",
           "isDeliveryOnly"
+        ],
+        "services/driver-shift/peak-hour-detection.js": [
+          "detectPeakHours",
+          "storeIsLive",
+          "storeIsInCities"
         ]
       },
       "patterns": [
@@ -242,7 +252,7 @@
         {
           "file": "services/driver-shift/shift-service.js",
           "regex": "endHour\\s*\\+=\\s*24",
-          "desc": "business day crosses midnight; every slot is stored under the STARTING date"
+          "desc": "the business day rolls past midnight"
         },
         {
           "file": "services/driver-shift/shift-service.js",
@@ -353,6 +363,41 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "Math\\.ceil\\(buffered / ordersPerDriver\\)",
+          "desc": "minDrivers rounds ONCE — driverCalculationBuffer is applied to the order VOLUME and the whole-courier rounding is the last step. Rounding twice (ceil the count, then ceil the buffered count) made a configured 10% buffer cost 19.5% across a real KQ week and handed two couriers to every slot with 0 < avgOrders <= ordersPerDriver, since ceil(1 * 1.1) === 2"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "slot\\.isNextDay \\? nextDayDemand : sameDayDemand",
+          "desc": "a slot before the business day startHour runs on the NEXT calendar day (invariant 8) and is sized from THAT weekday demand; the stored dayOfWeek, the booking window and the permanent-driver lookup deliberately stay on the business weekday"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "maxDrivers = Math\\.ceil\\(baseDrivers \\* 1\\.2\\)",
+          "desc": "maxDrivers is the BOOKING CEILING above the requirement, not a second demand estimate — DriverShift.isFull() gates booking on it and minDrivers gates nothing"
+        },
+        {
+          "file": "services/driver-shift/peak-hour-detection.js",
+          "regex": "\"order\\.receipt_method\": \"DELIVERY\"",
+          "desc": "avgOrders is measured ORDER-side from each live store own orders collection, delivery only — takeaway never counts towards a shift requirement"
+        },
+        {
+          "file": "services/driver-shift/peak-hour-detection.js",
+          "regex": "areaActiveDates",
+          "desc": "the divisor is the dates the AREA traded on that weekday — ONE number for the whole day, never recomputed per slot (per-slot divisors overstated the quiet hours)"
+        },
+        {
+          "file": "models/DriverShift.js",
+          "regex": "getBookedCount\\(\\) >= this\\.maxDrivers",
+          "desc": "isFull() — and therefore POST /shifts/book — gates on maxDrivers"
+        },
+        {
+          "file": "services/driver-shift/shift-service.js",
+          "regex": "const crossesMidnight = endHour <= startHour",
+          "desc": "the midnight roll is named once and both the slot list and the isNextDay tagging read it — two independent copies of this test is how the overnight tail got sized from the wrong weekday"
         }
       ]
     },
@@ -420,7 +465,8 @@
       "files": [
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/components/admin/ShiftsCalendarGridView.tsx"
       ],
       "patterns": [
         {
@@ -437,6 +483,11 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isDeliveryOnlySupport",
           "desc": "the platform-wide delivery-only switch lives in admin Settings"
+        },
+        {
+          "file": "src/components/admin/ShiftsCalendarGridView.tsx",
+          "regex": "getRequiredDrivers = \\(shift: DriverShift\\) => shift\\.minDrivers",
+          "desc": "the week grid prints booked/minDrivers (the requirement), not maxDrivers — ShiftDetails.tsx and ShiftEditModal.tsx still print booked/maxDrivers, so the same slot reads 20% bigger there"
         }
       ]
     }
