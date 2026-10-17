@@ -33,7 +33,8 @@ Primary files:
   `drink` / `sweet` / `cross_sell` modes) and `suggest-service.js` (`loadProfile`, `modeClauses`,
   `filterByAvoid`), `utils/extras-required.js` (`hasRequiredOptions`), and
   `GET /api/ai-helper/cuisines` (`routes/ai-helper.js` → `ai-helper-service.js`); in the app, the
-  chat's quick add `hooks/useChatAddToCart.ts` + `helpers/chat-cart-line.ts` (§7f). The profile's
+  chat's quick add `hooks/useChatAddToCart.ts` + `helpers/chat-cart-line.ts` (§7f) and the
+  minimized-chat bubble `components/for-you/{bubble-math.ts,ChatBubbleOverlay.tsx}` (§7g). The profile's
   owner and login merge (`taste-profile.js`, the other `/api/ai-helper/*` routes) are the
   customers domain's; the history facts are `facts.js` — all in `docs/ai-helper.md`.
 - Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/explore-cache-invalidation.md`,
@@ -750,7 +751,50 @@ otherwise.
 `isAiHelperOnboardingEnabled`, `isChatOrderingEnabled` on the central platform config document,
 public through `SHOOFI_CONFIG_PUBLIC_FIELDS` (`routes/store.js`), toggled under Settings → Shoofi
 (delivery-web `ShoofiSettings.tsx`). All default off; no server endpoint reads them. Tests:
-`test/integration/ai-helper.js`.
+`test/integration/ai-helper.js`. The chat-minimize pair comes right after them (§7g).
+
+## 7g. The minimized chat — a floating bubble (app only; CORE invariant 20)
+**Flags** `isChatMinimizeEnabled` + `isChatMinimizeForAll` (off = Shoofi employees only), gate
+`isChatMinimizeOn` in `components/for-you/bubble-math.ts`; in `SHOOFI_CONFIG_PUBLIC_FIELDS` after the
+four AI-helper flags (`test/integration/config-home-layout-flags.js` asserts all six are served),
+switches under Settings → Shoofi (`ShoofiSettings.tsx`), default off. No server change otherwise.
+
+**State** (`stores/for-you`, session-only, nothing persisted): `chatUi { mode: "full" | "minimized"
+| "closed", bubble: { side, y } | null, unread, peek }`, plus `draft`, `scrollOffset`, `closedToast`.
+A bot turn that lands while minimized adds to `unread` and sets `peek` (a 4 s peek from the bubble);
+`openFull()` clears both. `reset()` clears the conversation only (messages, busy, draft, scroll).
+
+**Lifecycle** (`ForYouScreen.tsx`). Flag OFF: `reset()` on mount and on unmount, as before. Flag
+ON: a chat with messages is RESTORED on open (`restoring`, unless it comes from the onboarding) —
+a home chip still asks its mode after what is there — and leaving it closes the window
+(`close()`) unless it was minimized; coming back into focus from a store makes it full again.
+
+**Minimize** — the chevron (`for-you-minimize`), a header swipe down (over 120 px, or over 40 px
+at over 600 px/s), Android back ONLY with items in the cart (`hardwareBackAction`; otherwise back
+as before), or a card tap (it still opens the store; with the flag the chat minimizes instead of
+closing). The chat draws its own shrink onto the bubble (380 ms) and leaves with no stack animation.
+
+**The bubble** (`ChatBubbleOverlay.tsx`, mounted once in `components/layout/app-container/index.tsx`
+with the focused leaf route name): 64 px, drags 1:1, snaps to a side (fling projected 0.18 s),
+clamped under the safe area and above the tab pills on `TAB_BAR_ROUTES`, remembers its spot, shows
+the cart count, laid out `direction: "ltr"` so positions stay physical under forced RTL. Hidden
+(`overlayVisible`) while the keyboard is open and on `BUBBLE_HIDDEN_ROUTES` — the chat, checkout,
+pick-time, credit cards, order-submitted, login, verify-code, insert-customer-name, the onboarding
+and the admin's product preview.
+
+**Expand** (tap): `openFull()`, then `StackActions.popTo("for-you", { restore: true })` when a chat
+is still in the root stack (e.g. under the store a card opened), else
+`navigate("for-you", { mode: "opener", restore: true })`; `MainStackNavigator` gives `for-you`
+`animation: "none"` when `params.restore` and the chat grows from the bubble (420 ms), with scroll
+offset and draft restored.
+
+**Close** — drop the bubble on the × (60 px target, 80 px magnet, haptic): `close()` changes
+`chatUi` only, a chat left under a store's menu is removed from the stack (so back does not land in
+it), and the `for_you_closed_toast` toast offers "رجّع" for 3.5 s (`undoClose()` → minimized again).
+**The cart is never touched**: the bubble reads `getProductsCount` and calls no cart mutator.
+`AiHelperFab` stays hidden while the bubble is out or the toast is up, then springs back.
+Tests: `__tests__/components/bubble-math.test.ts`, `__tests__/stores/for-you-chat-ui.test.ts`;
+Maestro `.maestro/chat-minimize/`.
 
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":
@@ -781,9 +825,11 @@ public through `SHOOFI_CONFIG_PUBLIC_FIELDS` (`routes/store.js`), toggled under 
   `helpers/ai-helper-copy.ts` (onboarding, `ai_helper_avoid_*`, `ai_helper_avoid_best_effort`) and
   `helpers/for-you-copy.ts` (`for_you_reason_you_like`, `for_you_reply_opener_onboarded` /
   `opener_stated` / `drink_*` / `sweet_*` / `cross_sell`); `SuggestionCard` counts `you_like` as a
-  personal tag.
+  personal tag. With `isChatMinimizeEnabled` (§7g) the chat minimizes into the floating
+  `ChatBubbleOverlay` (mounted in `components/layout/app-container/index.tsx`); a tap brings the same
+  conversation back.
 - **Partner app** (`shoofi-partner`): product write + ordering endpoints; sends `app-type: shoofi-partner` to see hidden products; listens for `product_updated`.
-- **Admin web** (`shoofi-delivery-web`/`shoofi-admin`): category CRUD, product ordering/migration, translations CRUD, stock screen (`update/quantity`), store config toggles (`isStockManagment`, `hasGeneralCategories`). "סוגי מנות (בשבילך)" at `/admin/dish-types` (`src/views/admin/dish-types/DishTypes.tsx`, API wrappers `src/apis/admin/dish-taxonomy.ts`): approve/reject/edit dish types, the "מוצרים לבדיקה" review list, run history with token counts, and a manual run. Platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled` / `isChatSuggestForAll` ("For You — Open To All Customers"; off = Shoofi employees only) under Settings → Shoofi, and the AI helper's `isAiHelperEnabled` / `isAiHelperForAll` / `isAiHelperOnboardingEnabled` / `isChatOrderingEnabled` beside them (`src/views/admin/settings/ShoofiSettings.tsx`, §7f).
+- **Admin web** (`shoofi-delivery-web`/`shoofi-admin`): category CRUD, product ordering/migration, translations CRUD, stock screen (`update/quantity`), store config toggles (`isStockManagment`, `hasGeneralCategories`). "סוגי מנות (בשבילך)" at `/admin/dish-types` (`src/views/admin/dish-types/DishTypes.tsx`, API wrappers `src/apis/admin/dish-taxonomy.ts`): approve/reject/edit dish types, the "מוצרים לבדיקה" review list, run history with token counts, and a manual run. Platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled` / `isChatSuggestForAll` ("For You — Open To All Customers"; off = Shoofi employees only) under Settings → Shoofi, and the AI helper's `isAiHelperEnabled` / `isAiHelperForAll` / `isAiHelperOnboardingEnabled` / `isChatOrderingEnabled` beside them (`src/views/admin/settings/ShoofiSettings.tsx`, §7f), then the chat's `isChatMinimizeEnabled` / `isChatMinimizeForAll` (§7g).
 
 ## 9. Known status (human-confirmed) — what's a bug vs. by-design
 Each item below was reviewed with the product owner. Respect these verdicts.

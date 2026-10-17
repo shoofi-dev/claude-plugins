@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@5e4048a4 (feat/ai-helper) / 2026-10-17",
+  "lastVerified": "shoofi-server@f893ec90 (feat/chat-minimize) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -65,7 +65,8 @@
         "services/ordering-intelligence/ai-helper-service.js",
         "services/ordering-intelligence/facts.js",
         "docs/ai-helper.md",
-        "test/integration/ai-helper.js"
+        "test/integration/ai-helper.js",
+        "test/integration/config-home-layout-flags.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -1202,6 +1203,16 @@
           "file": "utils/order-pricing.js",
           "regex": "discountPercent > 0\\n\\s*\\? Math\\.round\\(extrasPrice \\* \\(1 - discountPercent / 100\\)\\)\\n\\s*: extrasPrice;\\n\\s*\\n\\s*return \\{\\n\\s*price: basePrice \\+ discountedExtrasPrice,",
           "desc": "doc CORE invariant 19 / reference §4, §7f: the server's line formula — one of the THREE copies (with shoofi-app screens/meal/index2.tsx and helpers/chat-cart-line.ts priceLine) that must stay in lockstep; shadow pricing compares against it"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "\"isChatMinimizeEnabled\",\\n\\s*\"isChatMinimizeForAll\",",
+          "desc": "doc CORE invariant 20 / reference §7g: the two chat-minimize flags are in SHOOFI_CONFIG_PUBLIC_FIELDS — off the list, the admin switch saves and the app never sees it"
+        },
+        {
+          "file": "test/integration/config-home-layout-flags.js",
+          "regex": "\"isChatMinimizeEnabled\",\\n\\s*\"isChatMinimizeForAll\",",
+          "desc": "doc reference §7g: the flags test pins the six AI-helper / chat flags as served to the customer app"
         }
       ]
     },
@@ -1224,7 +1235,14 @@
         "components/for-you/CrossSellPill.tsx",
         "screens/meal/index2.tsx",
         "__tests__/helpers/chat-cart-line.test.ts",
-        "__tests__/hooks/use-chat-add-to-cart.test.tsx"
+        "__tests__/hooks/use-chat-add-to-cart.test.tsx",
+        "components/for-you/bubble-math.ts",
+        "components/for-you/ChatBubbleOverlay.tsx",
+        "components/layout/app-container/index.tsx",
+        "navigation/MainStackNavigator.tsx",
+        "__tests__/components/bubble-math.test.ts",
+        "__tests__/stores/for-you-chat-ui.test.ts",
+        ".maestro/chat-minimize/flow.yaml"
       ],
       "symbols": {
         "stores/ai-helper/index.ts": [
@@ -1249,6 +1267,22 @@
           "useChatAddToCart",
           "findMenuProduct",
           "addProductToCartForStore"
+        ],
+        "components/for-you/bubble-math.ts": [
+          "BUBBLE_HIDDEN_ROUTES",
+          "overlayVisible",
+          "hardwareBackAction",
+          "isChatMinimizeOn",
+          "snapBubble",
+          "isOverTarget"
+        ],
+        "stores/for-you/index.ts": [
+          "chatUi",
+          "openFull",
+          "minimize",
+          "undoClose",
+          "closedToast",
+          "onBotTurn"
         ]
       },
       "patterns": [
@@ -1491,6 +1525,111 @@
           "file": "helpers/for-you-copy.ts",
           "regex": "for_you_reply_add_unavailable",
           "desc": "doc reference §7f: the chat's own message when the dish cannot be added (sold out, stock 0, a mandatory choice with nothing left)"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "export const BUBBLE_HIDDEN_ROUTES = \\[\\n\\s*\"for-you\",\\n\\s*\"checkout-screen\",\\n\\s*\"pick-time-screen\",\\n\\s*\"credit-cards\",\\n\\s*\"add-credit-card\",\\n\\s*\"order-submitted\",\\n\\s*\"login\",\\n\\s*\"verify-code\",\\n\\s*\"insert-customer-name\",\\n\\s*\"ai-helper-onboarding\",\\n\\s*\"product-preview\",\\n\\];",
+          "desc": "doc CORE invariant 20 / reference §7g: the bubble never floats over the chat, checkout, payment, order-submitted, login or onboarding — matched by ROUTE NAME, so a new money / order / login screen must be added here"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "if \\(!input\\.enabled \\|\\| input\\.mode !== \"minimized\" \\|\\| input\\.keyboardOpen\\) return false;\\n\\s*return !BUBBLE_HIDDEN_ROUTES\\.includes\\(input\\.routeName \\|\\| \"\"\\);",
+          "desc": "doc CORE invariant 20: the bubble shows only with the flag on, the chat minimized, the keyboard closed, and not on a hidden route"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "return !!storeData\\?\\.isChatMinimizeEnabled && \\(!!storeData\\?\\.isChatMinimizeForAll \\|\\| !!isShoofiEmployee\\);",
+          "desc": "doc CORE invariant 20: the staged gate — employees until isChatMinimizeForAll"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "return input\\.enabled && input\\.cartCount > 0 \\? \"minimize\" : \"default\";",
+          "desc": "doc reference §7g: Android back minimizes only with items in the cart; otherwise back behaves as before"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "export const MAGNET_RADIUS = 80;",
+          "desc": "doc reference §7g: the x target catches the bubble within 80 px"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "close\\(\\) \\{\\n\\s*this\\.chatUi = \\{ \\.\\.\\.this\\.chatUi, mode: \"closed\", unread: 0, peek: null \\};\\n\\s*\\}",
+          "desc": "doc CORE invariant 20: close() changes the window state ONLY — never the messages, never the cart"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "reset\\(\\) \\{\\n\\s*this\\.messages = \\[\\];\\n\\s*this\\.busy = false;\\n\\s*this\\.draft = \"\";\\n\\s*this\\.scrollOffset = 0;\\n\\s*\\}",
+          "desc": "doc reference §7g: reset() clears the conversation only (window state is the caller's; the cart is never touched)"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "if \\(this\\.chatUi\\.mode !== \"minimized\"\\) return;\\n\\s*this\\.chatUi = \\{ \\.\\.\\.this\\.chatUi, unread: this\\.chatUi\\.unread \\+ 1, peek: \\{ messageId, at: Date\\.now\\(\\) \\} \\};",
+          "desc": "doc reference §7g: a bot turn that lands while minimized counts as unread and peeks from the bubble"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "return \\(\\) => \\{\\n\\s*if \\(!minimizeOn\\) \\{\\n\\s*forYouStore\\.reset\\(\\);\\n\\s*return;\\n\\s*\\}",
+          "desc": "doc CORE invariant 20: flag OFF keeps the old lifecycle — the chat resets on unmount, a fresh chat each time"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "if \\(forYouStore\\.chatUi\\.mode !== \"minimized\"\\) forYouStore\\.close\\(\\);",
+          "desc": "doc CORE invariant 20: flag ON, leaving the chat any way but minimize closes the WINDOW only — the conversation stays"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "const restoring = useRef\\(minimizeOn && forYouStore\\.messages\\.length > 0 && !fromOnboarding\\)\\.current;",
+          "desc": "doc CORE invariant 20 / reference §7g: flag ON continues the same conversation on reopen (until the app restarts); a new onboarding starts fresh"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "if \\(minimizeOn\\) forYouStore\\.minimize\\(\\);\\n\\s*openStoreAtProduct\\(card\\.store, card\\.product\\._id\\);",
+          "desc": "doc reference §7g: a card tap leaves for the store as before, and with the flag on the chat minimizes instead of closing"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "if \\(hardwareBackAction\\(\\{ enabled: minimizeOn, cartCount: cartStore\\.getProductsCount\\(\\) \\}\\) !== \"minimize\"\\) return false;",
+          "desc": "doc reference §7g: the Android back rule, applied in the chat"
+        },
+        {
+          "file": "components/for-you/ChatBubbleOverlay.tsx",
+          "regex": "if \\(chatInStack\\) navigationRef\\.dispatch\\(StackActions\\.popTo\\(\"for-you\", \\{ restore: true \\}\\)\\);\\n\\s*else \\(navigationRef as any\\)\\.navigate\\(\"for-you\", \\{ mode: \"opener\", restore: true \\}\\);",
+          "desc": "doc CORE invariant 20 / reference §7g: expand pops back to a chat still in the stack (never a second copy), else navigates with restore"
+        },
+        {
+          "file": "components/for-you/ChatBubbleOverlay.tsx",
+          "regex": "const routes = s\\.routes\\.filter\\(\\(r: any\\) => r\\.name !== \"for-you\"\\);",
+          "desc": "doc reference §7g: dropping the bubble also removes a chat left under a store's menu, so back does not land in it"
+        },
+        {
+          "file": "components/for-you/ChatBubbleOverlay.tsx",
+          "regex": "const visible = overlayVisible\\(\\{ enabled, mode: ui\\.mode, routeName, keyboardOpen \\}\\);",
+          "desc": "doc CORE invariant 20: the overlay's visibility is bubble-math's overlayVisible (hidden routes, keyboard)"
+        },
+        {
+          "file": "components/for-you/ChatBubbleOverlay.tsx",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*cartStore\\??\\.(?:resetCart|removeProduct|updateProductCount|addProductToCart\\w*|setCart\\w*)\\()",
+          "desc": "doc CORE invariant 20: NEGATIVE pin — matches only while the bubble calls no cart mutator (it reads getProductsCount only); the lookbehind anchors it to the start of the file. If this fails, closing / dismissing started touching the cart"
+        },
+        {
+          "file": "components/layout/app-container/index.tsx",
+          "regex": "<ChatBubbleOverlay routeName=\\{currentRouteName\\} />",
+          "desc": "doc reference §7g: the bubble is mounted once, above the navigator, fed the focused route name"
+        },
+        {
+          "file": "components/ai-helper/AiHelperFab.tsx",
+          "regex": "\\(forYouStore\\.chatUi\\.mode === \"minimized\" \\|\\| forYouStore\\.closedToast\\)",
+          "desc": "doc reference §7g: the persona hides while the bubble is out or its closed toast is up"
+        },
+        {
+          "file": "navigation/MainStackNavigator.tsx",
+          "regex": "const FOR_YOU_OPTIONS = \\(\\{ route \\}: any\\) => \\(route\\?\\.params\\?\\.restore \\? \\{ animation: \"none\" as const \\} : \\{\\}\\);",
+          "desc": "doc reference §7g: expanding from the bubble skips the stack animation (the chat draws its own growth)"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_closed_toast",
+          "desc": "doc reference §7g: the 'closed · undo' toast copy"
         }
       ]
     },
@@ -1525,6 +1664,11 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isAiHelperEnabled: false,\\n\\s*isAiHelperForAll: false,\\n\\s*isAiHelperOnboardingEnabled: false,\\n\\s*isChatOrderingEnabled: false,",
           "desc": "doc reference §7f / §8: the four AI-helper flags are toggled under Settings → Shoofi, default off"
+        },
+        {
+          "file": "src/views/admin/settings/ShoofiSettings.tsx",
+          "regex": "isChatMinimizeEnabled: false,\\n\\s*isChatMinimizeForAll: false,",
+          "desc": "doc reference §7g / §8: the two chat-minimize switches under Settings → Shoofi, default off"
         }
       ]
     }
