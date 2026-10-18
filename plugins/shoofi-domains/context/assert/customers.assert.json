@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@faade7dc (feat/ai-helper) / 2026-10-16",
+  "lastVerified": "shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -207,6 +207,21 @@
           "file": "services/ordering-intelligence/taste-profile.js",
           "regex": "async function mergeDeviceIntoCustomer\\([\\s\\S]{0,1500}await c\\.deleteOne\\(\\{ _id: device\\._id \\}\\);\\s*return \\{ merged: true",
           "desc": "a merge deletes the device profile before it reports merged:true, so the next person to log in on a shared phone does not inherit it - the bounded tail pins the delete to mergeDeviceIntoCustomer"
+        },
+        {
+          "file": "services/ordering-intelligence/taste-profile.js",
+          "regex": "\\{ \"owner\\.customerId\": \\{ \\$eq: String\\(owner\\.customerId\\), \\$type: \"string\" \\} \\}",
+          "desc": "doc CORE invariant 9: owner queries state $type string, or the partial unique indexes are never used (COLLSCAN on every suggestion)"
+        },
+        {
+          "file": "services/ordering-intelligence/access.js",
+          "regex": "const value = !!customer\\?\\.isShoofiEmployee;",
+          "desc": "doc CORE invariant 9: the server's employee gate reads isShoofiEmployee exactly as GET /api/customer/details hands it to the app (!!), so the two never disagree on who is in the pilot"
+        },
+        {
+          "file": "services/ordering-intelligence/taste-profile.js",
+          "regex": "async function deleteCustomerProfile\\(shoofiDb, customerId\\)",
+          "desc": "Known status: the account-delete removal exists and is tested; wiring it into POST /api/customer/delete is its own HIGH-RISK draft PR"
         }
       ]
     },

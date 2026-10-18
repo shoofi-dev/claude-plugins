@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@faade7dc (feat/ai-helper) / 2026-10-16
+last-verified: shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -135,15 +135,24 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    returned for a device owner. Never let a device id unlock anything account-shaped, and never
    take the device id, `owner` or `inferred` from a request body (`PUT` whitelists `stated`,
    `confirmed`, `onboardedAt`, `skippedAt`). One profile per owner: unique partial indexes on
-   `owner.customerId` and `owner.deviceId`.
+   `owner.customerId` and `owner.deviceId` — **partial on `$type: "string"`, so every owner query
+   states `$type: "string"` too** (`ownerFilter`); plain equality cannot use a partial index and
+   scanned the whole collection on every suggestion (IXSCAN pinned in `test/integration/ai-helper.js`).
+   - **The routes are gated on the server** (`services/ordering-intelligence/access.js`): For you
+     on for the caller (`isChatSuggestEnabled`, employees only until `isChatSuggestForAll`) and
+     `isAiHelperEnabled` (employees only until `isAiHelperForAll`). Off: reads answer empty,
+     `PUT /profile` and `POST /merge` answer 403 — no profile is created or merged. "Employee" is
+     `!!customer.isShoofiEmployee`, exactly as `GET /api/customer/details` hands it to the app.
    - **Merge is an explicit client call after login, NOT part of OTP verification.**
      `POST /api/ai-helper/merge` is `auth.required` (customer token only) and reads the device id
      from the header; `validateAuthCode` knows nothing about it — keep it that way. The account's
      non-empty `stated` wins field by field, `confirmed` is unioned, the earliest `onboardedAt`
      is kept, and the **device profile is DELETED**, so the next person to log in on a shared
      phone does not inherit it. Idempotent: no device profile → no-op.
-   - The customer app drops its cached copy on `logOut` and `deleteAccount`. The server does
-     **not** drop the account's profile on deletion — see Known status.
+   - The customer app drops its cached copy — and the For-you conversation, minimized bubble and
+     home picks (`forYouStore.resetForAccountChange()`) — on `logOut`, `deleteAccount` and a
+     forced sign-out (`resetAppState`). The server does **not** drop the account's profile on
+     deletion — see Known status.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
@@ -166,7 +175,10 @@ All of these are **known and accepted for now**. They are scheduled work, not di
   2026-10-16):** `POST /api/customer/delete` does not delete the customer's
   `shoofi.tasteProfiles` document — it outlives the deletion request, as the soft-deleted
   customer doc itself does (invariant 8). Handling it means touching `routes/customer.js`, so
-  it is its own HIGH-RISK draft PR, not a drive-by.
+  it is its own HIGH-RISK draft PR, not a drive-by. Since 2026-10-18 the deletes exist and are
+  tested — `deleteCustomerProfile` (`taste-profile.js`) and, for the For-you served audit
+  (`shoofi.forYouServed`, 30-day TTL), `deleteCustomerServed` (`served-log.js`); that draft PR
+  only wires them into the route.
 
 ## Recipe — touching an auth or identity path
 1. State **which of the four app-types** your change affects — they all share these endpoints.
