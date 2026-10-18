@@ -178,7 +178,9 @@ All of these are **known and accepted for now**. They are scheduled work, not di
   it is its own HIGH-RISK draft PR, not a drive-by. Since 2026-10-18 the deletes exist and are
   tested — `deleteCustomerProfile` (`taste-profile.js`) and, for the For-you served audit
   (`shoofi.forYouServed`, 30-day TTL), `deleteCustomerServed` (`served-log.js`); that draft PR
-  only wires them into the route.
+  only wires them into the route. The For-you quality collections need nothing there: the event
+  copy (`forYouEvents`) carries no customer id, the reviews (`forYouReviews`) only a one-way hash,
+  and golden cases none (menu-catalog CORE invariant 22).
 
 ## Recipe — touching an auth or identity path
 1. State **which of the four app-types** your change affects — they all share these endpoints.

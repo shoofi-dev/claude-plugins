@@ -539,6 +539,36 @@ boundary and say so in the PR.
      card opened (24 h) and adds `for_you_lines` / `for_you_suggestion_ids` to the
      `order_submit_success` analytics event. The order API, cart lines and `getCartData` are untouched.
 
+22. **FOR YOU QUALITY: THE REVIEWER PROPOSES, PEOPLE DECIDE** (`services/for-you-quality/`,
+   `routes/admin/for-you-quality.js`, `utils/crons/for-you-review-cron.js`; delivery-web
+   `views/admin/for-you-quality/`; `docs/for-you-quality.md`; reference §7h).
+   - **The funnel reads its own copy of the events.** `POST /api/app-logs/insert` copies the For-you /
+     AI-helper events and the checkout events into `shoofi.forYouEvents` — customer app only, 90-day
+     TTL, **no customer id** (the funnel counts phones by `device-id`), fire-and-forget. `apps-logs`
+     is indexed only by `{userId, created}`: never query it by date for this. **An insert never
+     waits for its indexes** (one shared build per db, retried on failure) — awaiting them dropped
+     the first burst of events after the collection was created; the served audit row follows the
+     same rule. The event names, `for_you_lines` and the onboarding question order
+     (`ONBOARDING_FLOWS` ↔ app `onboarding-logic.ts`) are a contract: rename one and a funnel step
+     silently reads zero — change `funnel.js` in the same PR.
+   - **The nightly reviewer only proposes.** 05:30 Israel, Redis-locked, reviews yesterday's
+     conversations (the app's `conversationId`; home-box loads, `surface: "home"`, are not
+     conversations). Free exact checks first — an avoid conflict and an ignored "not X" are
+     `critical`. Then a judge: Claude on the **paid API** (`MODELS.review`, `backend: "api"`, feature
+     `for-you-review`) under its own daily budget (`forYouReviewDailyBudgetUsd`, default $3; with
+     `forYouReviewMaxPerDay` and `forYouReviewSampleRate` — server-only fields on the platform config,
+     Settings → Shoofi). Without a key the checks still run (`judgeSkipped: "no-api-key"`).
+   - **A person's decision is never overwritten.** A re-run `$set`s only the machine's part (turns,
+     outcome, checks, severity, priority) — `status` is `$setOnInsert`, `human` is written only by a
+     decision — and the judge is not called (or paid) again for a conversation the same
+     `PROMPT_VERSION` judged with the same turns. Decisions (agree · disagree
+     with a verdict · fixed · dismiss · add_to_tests → `in_tests` + a `forYouGoldenCases` row) carry
+     the actor from the token. Calibration = how often the judge's verdict matched a person's.
+   - **No customer id in what outlives the audit:** `forYouReviews` (90 days) keeps the owner only as
+     a one-way hash, golden cases keep none — so account deletion does not need them.
+   - **Targets are code** (`targets.js`): changed in a reviewed PR; the funnel ones are first guesses
+     (2026-10-18), to be reset from pilot data. The API and the screen are `master|admin` only.
+
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
 against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store DBs):
