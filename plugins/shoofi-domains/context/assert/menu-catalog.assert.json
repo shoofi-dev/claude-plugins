@@ -2019,13 +2019,13 @@
         },
         {
           "file": "components/ai-helper/AiHelperFab.tsx",
-          "regex": "\\(forYouStore\\.chatUi\\.mode === \"minimized\" \\|\\| forYouStore\\.closedToast\\)",
-          "desc": "doc reference §7g: the persona hides while the bubble is out or its closed toast is up"
+          "regex": "\\(forYouStore\\.chatUi\\.mode === \"minimized\" \\|\\| forYouStore\\.chatUi\\.mode === \"full\" \\|\\| forYouStore\\.closedToast\\)",
+          "desc": "doc reference §7g: the persona hides while the chat is open (the genie lands on its spot), while the bubble is out or its closed toast is up"
         },
         {
           "file": "navigation/MainStackNavigator.tsx",
-          "regex": "const FOR_YOU_OPTIONS = \\(\\{ route \\}: any\\) => \\(route\\?\\.params\\?\\.restore \\? \\{ animation: \"none\" as const \\} : \\{\\}\\);",
-          "desc": "doc reference §7g: expanding from the bubble skips the stack animation (the chat draws its own growth)"
+          "regex": "const FOR_YOU_OPTIONS = \\(\\{ route \\}: any\\) =>\\n\\s*route\\?\\.params\\?\\.restore \\? \\{ animation: \"none\" as const, \\.\\.\\.CHAT_SEE_THROUGH_OPTIONS \\} : \\{\\};",
+          "desc": "doc reference §7g: expanding from the bubble skips the stack animation and is see-through (the chat draws its own genie)"
         },
         {
           "file": "helpers/for-you-copy.ts",
@@ -2181,6 +2181,76 @@
           "file": "screens/for-you/ForYouScreen.tsx",
           "regex": "frameRef\\.current\\?\\.measureInWindow",
           "desc": "doc reference §7g: the animation's frame is measured on an untransformed wrapper"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "export const GENIE_MS = 520;",
+          "desc": "doc reference §7g: the genie runs 520 ms both ways"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "let sx = key\\(1, 0\\.5, b / Math\\.max\\(W, 1\\)\\);\\n\\s*let sy = key\\(1, 0\\.92, b / Math\\.max\\(H, 1\\)\\);",
+          "desc": "doc reference §7g: the genie narrows first (0.5 wide, 0.92 tall at m 0.45), then drops to the bubble's 64 × 64"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "const r = t === 0 \\? 0 : Math\\.min\\(key\\(44, 90, 800\\), Math\\.min\\(W, H\\) / 2\\);",
+          "desc": "doc reference §7g: radius 44 → 90 → 800 clamped to half the box, square at rest"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "sx: seg\\(\\[0, 0\\.55, 0\\.75, 1\\], \\[0\\.6, 1\\.22, 0\\.9, 1\\]\\),\\n\\s*sy: seg\\(\\[0, 0\\.55, 0\\.75, 1\\], \\[0\\.6, 0\\.78, 1\\.12, 1\\]\\),",
+          "desc": "doc reference §7g: the bubble lands with a squash (1.22 × 0.78) and a stretch (0.9 × 1.12)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "const GENIE_EASE = Easing\\.bezier\\(0\\.6, 0, 0\\.3, 1\\);",
+          "desc": "doc reference §7g: the genie's curve"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "const GENIE_UNIFORM = false;",
+          "desc": "doc reference §7g: the Android uniform-scale fallback is OFF until a low-end Android is measured"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "m\\.value = Math\\.min\\(GENIE_DRAG_MAX, Math\\.max\\(0, e\\.translationY / \\(frame\\.value\\.h \\* 0\\.55\\)\\)\\);",
+          "desc": "doc reference §7g: the header drag drives only the narrowing (m ≤ 0.45)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "if \\(dy > 120 \\|\\| e\\.velocityY > 600\\) \\{",
+          "desc": "doc reference §7g: a header swipe minimizes past 120 px or at over 600 px/s"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "aimAtBubble\\(\\(\\) => \\{",
+          "desc": "doc reference §7g: the close measures the frame on the tap and starts in the measure's callback (a mount measure can land mid-push and aim at the mirror)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "shouldRasterizeIOS=\\{frozen\\}\\n\\s*renderToHardwareTextureAndroid=\\{frozen\\}",
+          "desc": "doc reference §7g: the chat is rasterized only while it genies"
+        },
+        {
+          "file": "components/for-you/ChatBubbleOverlay.tsx",
+          "regex": "withTiming\\(1, \\{ duration: LANDING_MS, easing: Easing\\.out\\(Easing\\.cubic\\) \\}\\)",
+          "desc": "doc reference §7g: the bubble's landing after the genie, 620 ms ease-out"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "export const GENIE_HANDOFF = 0\\.9;",
+          "desc": "doc reference §7g: closing, the chat is fully faded by m 0.9 and hands over to the bubble there"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "const o = opts\\.fadeOutBy \\? \\(t <= K \\? 1 : Math\\.max\\(0, 1 - \\(t - K\\) / \\(opts\\.fadeOutBy - K\\)\\)\\) : key\\(1, 1, 0\\.2\\);",
+          "desc": "doc reference §7g: opacity 1 → 1 → 0.2 (the open); the close fades to 0 by the hand-off"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "\\(\\) => closing\\.value === 1 && m\\.value >= GENIE_HANDOFF,",
+          "desc": "doc reference §7g: the close hands over to the bubble at GENIE_HANDOFF, not at the curve's end"
         }
       ]
     },
