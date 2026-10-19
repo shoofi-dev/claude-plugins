@@ -778,10 +778,57 @@ ON: a chat with messages is RESTORED on open (`restoring`, unless it comes from 
 a home chip still asks its mode after what is there — and leaving it closes the window
 (`close()`) unless it was minimized; coming back into focus from a store makes it full again.
 
-**Minimize** — the chevron (`for-you-minimize`), a header swipe down (over 120 px, or over 40 px
-at over 600 px/s), Android back ONLY with items in the cart (`hardwareBackAction`; otherwise back
-as before), or a card tap (it still opens the store; with the flag the chat minimizes instead of
-closing). The chat draws its own shrink onto the bubble (380 ms) and leaves with no stack animation.
+**Full screen** (every customer, not only the flag): `for-you` is in `hideHHeaderScreens`
+(`components/layout/header/header.tsx`), so no app header (address / coins) is drawn above the chat;
+its own header sits right under the status bar.
+
+**Minimize** — the header's ONE chevron (`for-you-minimize`, `components/for-you/ChatHeader.tsx`: at
+the PHYSICAL left end; on the right the 36 px persona, the name `ai_helper_name` and the subtitle
+`for_you_header_sub`, no divider; laid out `direction: "ltr"` so Arabic and Hebrew match; no grab
+handle, no ×; flag off: today's back arrow and title), a header swipe down (released past 120 px or at over 600 px/s), back
+or the edge swipe, or a card tap (it still opens the store; with the flag the chat minimizes instead
+of closing). Back and the edge swipe minimize a USED chat — a turn of the customer's own
+(`forYouStore.customerTurns`) or items in the cart — and just close an unused one (`leaveAction`).
+They arrive through a `beforeRemove` listener that acts only on the customer's own back
+(`isUserBack`: `GO_BACK` / `POP`) — a reset after an order, a replace or a navigate always goes
+through. The stack's swipe-back is off app-wide (`gestureEnabled: false`) and has no
+gesture-handler root above the navigator, so on iOS the chat draws its own edge swipe: a 14 pt
+strip on the PHYSICAL right edge (RTL's back edge), below the header, past 30 % of the width or a
+fling. The chat leaves with no stack animation after drawing its own transition into the bubble.
+
+**The "C · Genie" transition** (Sari, 2026-10-19 — replaces PROMPT.md §6 "Shrink" / "Expand"):
+keyframes in `components/for-you/genie.ts` (pure, `__tests__/components/genie.test.ts`). One value
+`m`, 0 = full screen, 1 = in the bubble: `m` 0 → 0.45 → 1 is scaleX 1 → 0.5 → 64/W, scaleY
+1 → 0.92 → 64/H, radius 44 → 90 → 800 clamped to half the box (square at rest), opacity
+1 → 1 → 0.2 — it narrows first, then drops in. 520 ms (`GENIE_MS`), `Easing.bezier(0.6, 0, 0.3, 1)`,
+UI thread only, the whole chat in one `Animated.View` (absolute fill, clipped), scaled about the
+bubble's centre by translation (`genieTranslate`). The open is the same curve backwards. The header
+drag drives only the narrowing (`m = clamp(dy / (H · 0.55), 0, 0.45)`) and, released, finishes in
+`520 · (1 − m)` ms or springs back. Closing, NO part of the chat stays on screen (Sari): the close
+fades it fully out by `m` 0.9 (`GENIE_HANDOFF`; the open keeps the 0.2) and hands over there — the
+chat hidden on the UI thread, then the store goes minimized and the screen pops — instead of
+waiting out the curve's slow last ~160 ms. The bubble then LANDS (`landingFrame`, in
+`ChatBubbleOverlay`): drops from 90 pt above, squash 1.22 × 0.78 at 55 %, stretch 0.9 × 1.12 at
+75 %, 620 ms ease-out, a light haptic at 340 ms; "رجّع" still pops it back the old way. While it
+moves the chat is a still picture: no scrolling, the persona's and the typing dots' loops paused
+(`still` / `paused`), the root rasterized only then. Reduce Motion: a 200 ms crossfade, no drop
+or bounce. `GENIE_UNIFORM` (one scale on both axes, Android only) is OFF — the low-end Android
+50 fps check that would decide it has not been run (`.maestro/genie/README.md`).
+During the bubble transitions (the `restore` expand route, and from the moment a minimize starts) the
+chat's card is see-through — `CHAT_SEE_THROUGH_OPTIONS` (`components/for-you/chat-layout.ts`:
+`transparentModal`, transparent card, no dim, the screen underneath kept attached and NOT
+parallax-shifted) — or it flashes white. The frame the genie scales about is measured on an
+UNTRANSFORMED wrapper (`measureInWindow` on the animated root returns the transformed rect), and
+measured again ON THE TAP: the mount's measure can land mid-push, with `x` off by up to a screen
+width, and the chat then aimed at the mirror of the bubble's spot (recorded; the pre-genie shrink
+had the same bug).
+With the flag, `chatBottomSpacing` (`components/for-you/chat-layout.ts`) sets the bottom: the input
+8 pt above the safe area, chips → input 8, dock → chips 8, no divider above the chips. With the
+flag the CHAT owns its bottom inset: `AppContainer` drops its bottom edge for `for-you`
+(`chatOwnsInset`) and the chat pads `inset + 8` itself (`parentAppliesInset: false`). An inset
+applied there resized home — drawn under the see-through chat — by ~34 pt while the chat was up,
+so home's floating footer rose on open and dropped on close (Sari, 2026-10-19). Flag off: the
+parent still applies it, today's values.
 
 **The bubble** (`ChatBubbleOverlay.tsx`, mounted once in `components/layout/app-container/index.tsx`
 with the focused leaf route name): 64 px, drags 1:1, snaps to a side (fling projected 0.18 s),
@@ -794,16 +841,18 @@ and the admin's product preview.
 **Expand** (tap): `openFull()`, then `StackActions.popTo("for-you", { restore: true })` when a chat
 is still in the root stack (e.g. under the store a card opened), else
 `navigate("for-you", { mode: "opener", restore: true })`; `MainStackNavigator` gives `for-you`
-`animation: "none"` when `params.restore` and the chat grows from the bubble (420 ms), with scroll
-offset and draft restored.
+`animation: "none"` plus `CHAT_SEE_THROUGH_OPTIONS` when `params.restore`, and the chat genies out of
+the bubble (520 ms) once its frame is measured — hidden until then — with scroll offset and draft
+restored. The bubble is gone from the tap's first frame (`openFull()` unmounts it).
 
 **Close** — drop the bubble on the × (60 px target, 80 px magnet, haptic): `close()` changes
 `chatUi` only, a chat left under a store's menu is removed from the stack (so back does not land in
 it), and the `for_you_closed_toast` toast offers "رجّع" for 3.5 s (`undoClose()` → minimized again).
 **The cart is never touched**: the bubble reads `getProductsCount` and calls no cart mutator.
-`AiHelperFab` stays hidden while the bubble is out or the toast is up, then springs back.
+`AiHelperFab` stays hidden while the chat is open (`chatUi.mode` "full" — the genie lands on its
+spot, which must be empty), while the bubble is out or the toast is up, then springs back.
 Tests: `__tests__/components/bubble-math.test.ts`, `__tests__/stores/for-you-chat-ui.test.ts`;
-Maestro `.maestro/chat-minimize/`.
+`__tests__/components/genie.test.ts`; Maestro `.maestro/chat-minimize/`, `.maestro/genie/`.
 
 ## 7h. For you quality — the funnel, the health numbers, the nightly reviewer (CORE invariant 22)
 Server `services/for-you-quality/` (`events.js`, `funnel.js`, `health.js`, `reviewer.js`,
