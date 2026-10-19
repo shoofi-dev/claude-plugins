@@ -169,6 +169,29 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   It relies on `COMPLETED_STATUSES` and on `created` being an Israel-offset ISO string (it reads
   the local date off the first 13 characters, falling back to moment-timezone otherwise).
 
+- **Per-customer history reader — For you / AI helper** (shoofi-server
+  `services/ordering-intelligence/taste.js` `loadCompletedOrders`, menu-catalog's code,
+  `docs/ai-helper.md`). It follows CORE invariant 5: `customers.orders[]` only says where to
+  look — its newest `MAX_ORDERS` = 30 entries whose `created` is inside `HISTORY_DAYS` = 90 —
+  and each store's `orders` keeps `status ∈ COMPLETED_STATUSES`. The cap is taken **before** the
+  status filter, so unpaid/cancelled snapshot rows use up slots. Projection: `created`,
+  `orderDate`, `originalOrderDate`, `order.items.{item_id, qty, nameAR, nameHE, selectedExtras}`
+  — rename one and a taste fact silently disappears. On top of it:
+  - `deliveredOrders` (`GET /api/ai-helper/profile`, `ai-helper-service.js`) = `totalOrders` =
+    **completed** orders in that window (per-instance 10-min cache) — **not** courier-delivered
+    (`bookDelivery.completedAt`). The app routes ≥ 2 (`HISTORY_MIN_ORDERS`,
+    `shoofi-app/stores/ai-helper`) to the history onboarding.
+  - `facts.js` `meal_time` buckets `orderMs = originalOrderDate || orderDate || created` by
+    **Israel** hour: the DUE time frozen before any delay (CORE invariant 10) — after a default
+    accept that is the tablet-clock ready time (§2), for `14`/`15` the requested time — never when
+    the order was placed. `likes_spicy` matches `selectedExtras` (`"id"` and legacy `["id"]`)
+    against the product's CURRENT extras.
+  - `inferred` on `shoofi.tasteProfiles` is a **lazy cache, not an order hook**:
+    `refreshInferredIfStale` (`taste-profile.js`) rewrites it on `GET /profile` when older than
+    `INFERRED_TTL_MS` (1 h), customers only; nothing reads it yet. There is no single
+    delivered/completed transition to hook (CORE invariant 1) — don't add one to a
+    status-transition path for it.
+
 ## 6. Idempotency & invariants — never break these
 1. **Stock**: `decrementOrderStock`/`restoreOrderStock` gated by the
    `stockDecremented && !stockRestored` pair (`order-stock.js`) + `store.isStockManagment`.
@@ -288,6 +311,11 @@ could break" section. Payments/invoicing files stay off-limits — hand off in t
 - **Awareness (not a bug):** HYP "verified=false but paid" → logged paid-but-stuck; no auto-recovery.
 - **Awareness:** background work in `/update/viewd` (delivery booking, external
   provider, twin coordination) runs after the 200 response — failures never reach the client.
+- **DEFERRED (Sari, 2026-10-16) — do not build without a new decision:** the For-you in-chat
+  **checkout** card. Adding to the cart from the chat is built (2026-10-17, CORE invariant 13);
+  ordering still hands off to the existing cart → checkout (C1). Reasons: the client-computed
+  total in `shoofi-app/screens/checkout/index.tsx`, `postChargeOrderActions` (same file), and
+  customer consent. See CORE Known status.
 
 # PART 2 — Client repos (full-stack view)
 You own orders across the clients too. Each subsection is where that repo drives
@@ -306,7 +334,10 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
   `produtsAdapter`) via `hooks/checkout/use-checkout-submit.ts` from
   `screens/checkout/index.tsx`. **Client computes the totals** (`total`, `orderPrice`,
   `shippingPrice`) and the server trusts them (matches the server doc's pricing note).
-  Initial status is `"0"` (CC) or `"6"` (digital success), decided client-side.
+  Initial status is `"0"` (CC) or `"6"` (digital success), decided client-side. **The target
+  store is the cart's stamp:** checkout passes `storeData: cartStoreData || storeDataStore.storeData`
+  and `submitOrder` sends `app-name: order.storeData?.appName` — so whatever stamps an empty
+  cart decides the store DB the order lands in (CORE invariant 13).
 - **Payment**: CC is charged **server-side inside `order/create`** (client passes
   `paymentData`; the client-side charge is deprecated). Apple/Google Pay use a ZCredit
   session + `order/save-apple-pay-session` → `update-apple-pay-order-session` →
@@ -324,6 +355,35 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
 - **Gotchas**: `order/create` is **multipart** (twin / Apple-Pay / HYP calls are JSON);
   the client `ORDER_STATUS` enum **omits `"0"` and `"13"`** (used only as literals) — keep
   in mind when reasoning about pending-payment/fraud states on the customer side.
+- **The For-you chat ADDS to the cart but never places an order** (`screens/for-you/ForYouScreen.tsx`,
+  menu-catalog's code; the cart side is CORE invariant 13). All behind `isChatOrderingEnabled`:
+  - **Read-only parts.** The cart dock (`components/for-you/CartDock.tsx` — reads `cartStore`,
+    writes nothing) and the context chips (`components/for-you/context-chips.ts`): with items in
+    the cart "complete the order" → `navigate("cart")` → normal checkout; with an active order
+    (the shared `ordersStore.activeOrders` list — the chat runs no poll) "where is my order?" →
+    the `active-orders` tab. The dock's ₪ is `cartStore.getProductsPrice()` (Σ line price × qty)
+    — **not** the order total: no delivery fee, coupon or coins (checkout's `TotalPriceCMP`).
+  - **Quick-add** (`hooks/useChatAddToCart.ts`, built 2026-10-17): the "+" on a `SuggestionCard`
+    or a `CrossSellPill` loads the store and its menu with the fetch-only
+    `getStoreDataFromServer` / `getMenuFromServer` (2-min per-store cache), builds the line as the
+    menu's product screen does (`helpers/chat-cart-line.ts` `buildCartLine`; choices in
+    `ChatProductSheet`, `single` / `multi` only) and calls `cartStore.addProductToCartForStore`.
+    Straight in only when there is nothing to choose and no default pre-chosen. A dish the store
+    no longer sells (not `isInStore`, stock 0, a mandatory choice all out of stock) is said in
+    the chat (`add_unavailable`) and nothing is added. Anything it cannot do exactly like the
+    menu opens the store at the dish instead (`openStoreAtProduct`, logged
+    `for_you_quick_add_fallback` + `reason`): a twin order or twin cart, a school cart, an
+    age-checked store not yet approved, combo / by-weight / pizza / counter / free-count /
+    unsupported extras, a failed load, a cart with no stored store.
+  - **Another store's cart:** the chat asks (`store_conflict`, replace / keep); "replace" re-reads
+    the cart, `resetCart()`s it if it is still another store's, then adds; "keep" changes
+    nothing. The stepper's "−" is `updateProductCount` / `removeProduct` on the dish's LAST line
+    (`removeProduct` clears the cart's store stamp when the cart empties).
+  - **Server traffic:** `/api/store` + `/api/menu` (fetch-only) and `/api/for-you/suggest` with
+    `cart: { appName, productIds }` (drink / sweet, and one `cross_sell` per store per chat after
+    the first add). No order API changed; server `docs/ai-helper.md` records a local end-to-end
+    check (the order landed in the dish's store with the chosen extras, shadow-pricing drift 0).
+    The in-chat checkout card stays DEFERRED (CORE Known status, §10).
 
 ## C2. shoofi-shoofir — the DRIVER app (React Native, MobX)
 Role: executes the **delivery leg**; drives `bookDelivery` status only — never the order's.

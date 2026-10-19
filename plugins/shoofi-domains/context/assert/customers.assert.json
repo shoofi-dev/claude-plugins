@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@561e3ca / 2026-07-28",
+  "lastVerified": "shoofi-server@faade7dc (feat/ai-helper) / 2026-10-16",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -24,7 +24,10 @@
         "services/school-registrations/sheet.js",
         "services/school-registrations/registrations.js",
         "routes/admin/school-registrations.js",
-        "utils/crons/school-registrations-sync-cron.js"
+        "utils/crons/school-registrations-sync-cron.js",
+        "routes/ai-helper.js",
+        "services/ordering-intelligence/taste-profile.js",
+        "docs/ai-helper.md"
       ],
       "symbols": {
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
@@ -65,6 +68,18 @@
           "toggleSchoolProjectActive",
           "deactivateCustomersWithoutStudents",
           "deactivateCustomersWithoutStudentsSafely"
+        ],
+        "services/ordering-intelligence/taste-profile.js": [
+          "tasteProfiles",
+          "ownerFromRequest",
+          "deviceIdFromRequest",
+          "mergeDeviceIntoCustomer",
+          "mergeStated",
+          "saveProfile",
+          "sanitizeStated",
+          "sanitizeConfirmed",
+          "publicProfile",
+          "partialFilterExpression"
         ]
       },
       "patterns": [
@@ -172,6 +187,26 @@
           "file": "routes/customer.js",
           "regex": "authCode: random4DigitsCode, token: null, isDeleted: false",
           "desc": "the OTP-REQUEST handler clears isDeleted before any code is verified, so isDeleted:false does not mean 'never asked to be deleted' - deletedAt is the durable marker"
+        },
+        {
+          "file": "services/ordering-intelligence/taste-profile.js",
+          "regex": "function ownerFromRequest\\(req\\) \\{[\\s\\S]{0,120}req\\.headers\\[\"app-type\"\\][\\s\\S]{0,80}isCustomerApp = !appType \\|\\| appType === \"shoofi-shopping\"[\\s\\S]{0,80}isCustomerApp && req\\.auth\\?\\.id",
+          "desc": "a taste profile's customer owner is a customer-app token only (app-type absent or shoofi-shopping) - a partner/driver token's req.auth.id is not a customer id and falls through to the device-id owner; same guard as routes/for-you.js"
+        },
+        {
+          "file": "routes/ai-helper.js",
+          "regex": "\"/api/ai-helper/merge\", auth\\.required[\\s\\S]{0,400}const deviceId = profiles\\.deviceIdFromRequest\\(req\\);",
+          "desc": "merge is login-only and takes the device id from the device-id header via deviceIdFromRequest, never from the body - the bounded tail pins it to the merge handler"
+        },
+        {
+          "file": "services/ordering-intelligence/taste-profile.js",
+          "regex": "function deviceIdFromRequest\\(req\\) \\{\\s*const raw = req\\.headers\\[\"device-id\"\\];",
+          "desc": "the visitor owner key is the device-id header - the same client string the fraud checks, stories and app-logs read; accepted risk because a visitor profile holds food preferences only"
+        },
+        {
+          "file": "services/ordering-intelligence/taste-profile.js",
+          "regex": "async function mergeDeviceIntoCustomer\\([\\s\\S]{0,1500}await c\\.deleteOne\\(\\{ _id: device\\._id \\}\\);\\s*return \\{ merged: true",
+          "desc": "a merge deletes the device profile before it reports merged:true, so the next person to log in on a shared phone does not inherit it - the bounded tail pins the delete to mergeDeviceIntoCustomer"
         }
       ]
     },

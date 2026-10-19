@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@6a87cf44 / 2026-10-03
+last-verified: shoofi-server@5e4048a4 (feat/ai-helper) / 2026-10-17
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -25,10 +25,17 @@ it — `services/ordering-intelligence/{taxonomy,product-labeler,craving}.js`,
 (admin web: `src/views/admin/dish-types/DishTypes.tsx`, `src/apis/admin/dish-taxonomy.ts`), and the
 monthly menu spellcheck — `utils/menu-spellcheck-text.js`, `services/catalog/menu-spellcheck.js`,
 `utils/crons/menu-spellcheck-cron.js`, `routes/admin/menu-spellcheck.js` (admin web:
-`src/views/admin/stores/MenuSpellcheck.tsx`, `src/apis/admin/menu-spellcheck.ts`).
+`src/views/admin/stores/MenuSpellcheck.tsx`, `src/apis/admin/menu-spellcheck.ts`), and what the
+AI helper's taste profile does to suggestions — `services/ordering-intelligence/avoid.js`, the
+profile hooks and chat-ordering modes in `suggest.js` / `suggest-service.js`,
+`utils/extras-required.js`, and `GET /api/ai-helper/cuisines` (`routes/ai-helper.js` →
+`ai-helper-service.js`) (app: `components/ai-helper/`, `screens/ai-helper/`, `stores/ai-helper/`,
+`components/for-you/`, and the chat's quick add `hooks/useChatAddToCart.ts` +
+`helpers/chat-cart-line.ts`). Who owns a profile and the login merge are the customers domain's;
+the cart the quick add writes into and the deferred in-chat checkout are the orders domain's.
 Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/sold-by-weight.md`,
 `docs/menu-import-issues.md` (the worklist — now also documents the `lint` phase),
-`docs/combo-deals.md`, `docs/for-you.md`, `docs/menu-spellcheck.md`.
+`docs/combo-deals.md`, `docs/for-you.md`, `docs/menu-spellcheck.md`, `docs/ai-helper.md`.
 Mostly **server-first**: catalog data is server-owned and clients render it — but if a task
 needs a client change (partner product screens, customer menu display), do it full-stack,
 one PR per repo.
@@ -196,8 +203,9 @@ boundary and say so in the PR.
      or priced `<= 0` ("not for sale", invariant 8). The card's `price` is
      `applyProductDiscount(row, buildCategoryDiscountMap(visibleCategories))` — the menu's number —
      with `originalPrice`/`discountPercent` when discounted; names and image are the live row's.
-     Any new `/api/menu` visibility rule must be mirrored here, or a suggestion opens a store
-     whose menu does not contain the product.
+     It also projects `extras` + `soldByWeight`, only to set `product.hasRequiredOptions`
+     (invariant 19). Any new `/api/menu` visibility rule must be mirrored here, or a suggestion
+     opens a store whose menu does not contain the product.
    - Nothing writes the menu cache; no cache key to clear. Catalog writes do not need to touch
      the index — the next build and the live re-check cover them.
    - **Three platform flags gate the client:** `isChatSuggestEnabled` (home entry + chat),
@@ -205,6 +213,7 @@ boundary and say so in the PR.
      central platform config document (app-name `shoofi`), exposed only because they are in
      `SHOOFI_CONFIG_PUBLIC_FIELDS` (`routes/store.js`). All default off. The app shows the home
      entry only when `isChatSuggestEnabled && (isChatSuggestForAll || customer.isShoofiEmployee)`
+     and the AI helper persona is not showing (invariant 18 — home keeps one way into the chat)
      (`screens/explore.tsx`, the same staged-rollout shape as `isTwinEnabledForAll` at checkout;
      `isShoofiEmployee` comes from `GET /api/customer/details`). The server endpoint itself does not
      read any of them — the gate is client-side.
@@ -364,6 +373,86 @@ boundary and say so in the PR.
    (invariant 2), and a renamed out-of-stock option's NEW `nameAR` **added** to
    `store.outOfStockExtras` (old name kept). Never route it through `POST /api/admin/product/update`
    (whole-document `$set`, last writer wins). A dismissed or accepted text is not re-raised.
+18. **A TASTE PROFILE FILTERS ONLY THROUGH `avoid`; EVERYTHING ELSE IN IT ONLY WEIGHTS — AND
+   WITHOUT ONE NOTHING CHANGES** (`avoid.js`, `suggest.js` `applyProfile`, `docs/ai-helper.md`;
+   detail reference §7f). `POST /api/for-you/suggest` reads the caller's `shoofi.tasteProfiles`
+   doc (customer token, else the `device-id` header) in `loadProfile`; a failed read is "no
+   profile", never a failed reply.
+   - **`avoid` runs on the candidates BEFORE both the rules and Claude**
+     (`filterByAvoid(found, …)` in `suggest-service.js`; `aiChatTurn` only picks from that list).
+     Only `GUARANTEED_AVOID = ["vegetarian", "no_seafood"]` are promises the data can keep:
+     `vegetarian` keeps a product only when its TRUSTED label says `vegetarian === true`
+     (unlabelled is dropped); `no_seafood` keeps a product only when its trusted label names a
+     protein that is not fish/seafood (unlabelled — `protein` null — is dropped too), and also drops
+     the sushi/fish dish types (and any type key naming fish or seafood) and seafood words in the
+     name. `vegan`, `lactose_free`, `gluten_free`,
+     `nut_allergy` are BEST EFFORT: there is no allergen or dairy data anywhere, so they drop only
+     what labels, dish types and names reveal, and the app stars them with a "we can't guarantee"
+     note (its own `GUARANTEED_AVOID` in `stores/ai-helper/index.ts` must equal the server's).
+     Never present a best-effort key as safe; promoting one needs new label fields and a forced
+     relabel (cost: invariant 12). When `avoid` removed candidates and the rules path is left
+     with no card, the reply is `avoid_no_match` (`replyAfterAvoid`), never an opener over an
+     empty row; a named closed store keeps `store_closed`.
+   - **Everything else is a ranking signal, never a filter.** `applyProfile` puts `_bias`
+     (`profileBias`: stated cuisine, spice, budget against the dish type's median price) on every
+     candidate, and every popularity sort uses `qty30d × _bias`. Stated cuisines also widen the
+     index query and add `you_like` cards (`params.dishType`; what the customer said needs no
+     order evidence) — with no orders the opener then answers `opener_stated`. `onboarded: true`
+     (the first opener after the onboarding) answers `opener_onboarded`.
+   - **A fact the customer rejected is never claimed again** (`rejectedFacts`):
+     `usual:<appName>: false` → that store's products say `ordered_before`, never `usual`;
+     `liked_type:<key>: false` → that type is never offered as a liked type. Both paths: the
+     Claude chat gets the PROFILE-APPLIED taste (`applyProfile` before `aiChatTurn` in
+     `suggest-service.js`), so `cardForDoc` never tags `usual` at a rejected store and
+     `tasteSummary` leaves rejected types out of "Likes" (and adds "Told us they like").
+   - **No profile = exactly the old ranking and reply codes.** `applyProfile` returns docs and
+     taste untouched (`_bias ?? 1`, no `stated`, no `rejected`) — pinned by the test "with no
+     profile the reply is exactly as before" (`test/integration/ai-helper.js`). Keep it green.
+   - Four more platform flags in `SHOOFI_CONFIG_PUBLIC_FIELDS`, all default off, no server
+     endpoint reads them (the gates are client-side): `isAiHelperEnabled`, `isAiHelperForAll`
+     (off = Shoofi employees only), `isAiHelperOnboardingEnabled`, `isChatOrderingEnabled`. The
+     persona shows on home when `isAiHelperEnabled && (isAiHelperForAll || isShoofiEmployee)`
+     (`screens/explore.tsx`), and while it shows the For-you home entry is hidden.
+19. **THE CHAT ADDS TO THE EXISTING CART EXACTLY AS THE MENU WOULD — OR IT OPENS THE STORE**
+   (`suggest.js`, `suggest-service.js`, `utils/extras-required.js`; app `hooks/useChatAddToCart.ts`,
+   `helpers/chat-cart-line.ts`; reference §7f).
+   - Modes `drink`, `sweet`, `cross_sell` take `cart: { appName, productIds }` and never suggest a
+     product already in it. `drink` / `sweet`: the cart's store first (no per-store cap there),
+     then other open stores at ≤ 2 each. `cross_sell`: drinks, sides and sauces from the cart's
+     store ONLY, and nothing when that store is not open. Their index clauses (`modeClauses`) are
+     served by `{ appName: 1, course: 1 }`, created by `ensureIndexes` in `index-builder.js`. The
+     app (`isChatOrderingEnabled`) sends `drink` / `sweet` from its cart chips and `cross_sell`
+     once per store per chat right after a chat add (an empty reply is dropped, `dropIfEmpty`);
+     its cards render as compact pills. The chat places no order — "complete the order" opens the
+     normal cart.
+   - **`product.hasRequiredOptions` is on every card**, rules and Claude paths alike
+     (`applyLiveMenu`, which projects `extras` + `soldByWeight` for it): `true` for
+     `soldByWeight === true` or any non-header `single` or `weight` extra. `required` is ignored
+     (a dead field, reference §4) and a `defaultOptionId` does not exempt a `single` — the flag
+     means "the product sheet has a choice to show", a superset of what blocks add-to-cart (Known
+     status). It is only a HINT: the app opens its options sheet at once when it is `true`; what
+     happens is decided on the full menu product (next bullet).
+   - **The quick add (the "+" on a card or a cross-sell pill) builds the line the menu would.**
+     `useChatAddToCart` loads the dish's store with the FETCH-ONLY `getStoreDataFromServer(appName)`
+     and `getMenuFromServer(appName, false)` (explicit `app-name`) — never `getMenu`, `getStoreData`
+     or `setStoreDBName`, which overwrite the browsed store other screens read — and finds the
+     product in `menu.menu[].products`. The chat's sheet has chips for `single` and `multi` ONLY
+     (`chatSheetSupport`): a combo, `soldByWeight`, a `weight` (or legacy `categoryId: "weight"`)
+     extra, `pizza-topping`, `counter`, a group header with `freeCount > 0`, any other type — and
+     twin orders, a school cart, an age-checked store, a failed load — open the store at the dish
+     instead. `priceLine` is `screens/meal/index2.tsx`'s formula and the server's
+     (`utils/order-pricing.js`): `price = base + (d > 0 ? Math.round(extras × (1 − d/100)) :
+     extras)` — change one, change all three. Straight into the cart only with no defaults and
+     nothing to choose; otherwise the sheet, defaults pre-selected, never added silently. The line
+     goes in through `cartStore.addProductToCartForStore` (orders domain), and a cart of another
+     store is never mixed or silently emptied — the chat asks.
+   - **`GET /api/ai-helper/cuisines?lat=&lng=`** — the onboarding's tiles, from the central index
+     only: ACTIVE `meal` dish types, most stores first, ≤ 9. Rows come from the area's OPEN
+     stores; with fewer than 4 types it widens to the area's closed stores too, then to the whole
+     catalog (one aggregation, best seller per type × store). Image = the type's `img` on its
+     `shoofi.dishTaxonomy` doc, else the best seller's in the tier used; no image = left out.
+     Nothing in the API writes `dishTaxonomy.img` yet. Bad location → 400; any other failure →
+     `200 { cuisines: [] }`.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
