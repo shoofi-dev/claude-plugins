@@ -213,6 +213,10 @@ apart — always establish which is meant:
    with `reason` ∈ {`store_closed`, `store_busy`, `store_custom_message`,
    `school_order_time_invalid`, `store_status_error`} (from `screens/cart/cart.tsx`). Before
    those events, a cart stopped by a closed/busy store left no trace at all.
+   The For-you funnel copies all of these checkout events (and `checkout_left`) into
+   `shoofi.forYouEvents` to explain a picked dish that was not ordered (menu-catalog CORE
+   invariant 22) — renaming one, or a `reason` / `step` / `error_code` value, changes its
+   "why" columns too.
 
 Checkout-screen events that explain the "reached checkout, didn't send" layer:
 - **`checkout_left`** — checkout lost focus (`reason`: `blur`|`unmount`) without a completed

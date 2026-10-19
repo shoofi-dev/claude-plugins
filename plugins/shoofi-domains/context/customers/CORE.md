@@ -155,7 +155,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
      deletes the account's profile and its For-you served-audit rows AFTER the reply
      (`deleteCustomerProfile`, `deleteCustomerServed`); a failure there is logged and never fails
      the delete. The customer document itself stays soft-deleted (invariant 8), so a customer who
-     logs in again starts with no taste profile.
+     logs in again starts with no taste profile. The For-you quality collections need nothing
+     there: the event copy (`forYouEvents`) carries no customer id, the reviews (`forYouReviews`)
+     only a one-way hash, and golden cases none (menu-catalog CORE invariant 22).
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:

@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@1870b2ff (feat/for-you-taste-redis-cache) / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -210,6 +210,18 @@ boundary and say so in the PR.
      opens a store whose menu does not contain the product.
    - Nothing writes the menu cache; no cache key to clear. Catalog writes do not need to touch
      the index — the next build and the live re-check cover them.
+   - **The customer's taste is cached 10 min and SHARED across instances** (`taste.js`
+     `getCustomerTaste`): Redis key `fy:taste:v<CACHE_VERSION>:<customerId>`, `PX` 10 min, via the
+     shared `utils/redis-lock` client, when `REDIS_URL || REDIS_HOST` and not `E2E_SANDBOX`. Redis is
+     only a shortcut — unconfigured, an error, a 150 ms timeout or an unreadable value falls back
+     to the per-process capped map (2000) for that call, and a failure skips Redis for 30 s; the
+     write is fire-and-forget. While Redis works it is the truth: a Redis miss recomputes, it never
+     falls through to a memory copy. The taste holds Maps, so it crosses Redis via
+     `serializeTaste`/`deserializeTaste` (exact round trip); **bump `CACHE_VERSION` when
+     `computeTaste`'s shape changes**. `invalidateCustomerTaste` drops both copies but is NOT wired
+     to any order transition — a completed order reaches For you within 10 min. The dry run
+     (`opts.dishTypes`) and the no-customer `EMPTY_TASTE` are never cached. Pinned by
+     `test/integration/for-you-taste-cache.js`.
    - **Three platform flags gate the client:** `isChatSuggestEnabled` (home entry + chat),
      `isChatVoiceEnabled` (mic) and `isChatSuggestForAll` (staged rollout) on the
      central platform config document (app-name `shoofi`), exposed only because they are in
@@ -450,11 +462,24 @@ boundary and say so in the PR.
      while it shows the For-you home entry is hidden. The server enforces the same rule on
      `routes/ai-helper.js` (`access.js`): switched off, reads answer empty and `PUT /profile` /
      `POST /merge` answer 403 — no profile is created or merged.
+   - **The onboarding saves only what the customer answered.** The budget (a sub-question on the
+     meal-times step) is never pre-selected and is saved only once tapped
+     (`AiHelperOnboardingScreen.tsx` `budgetChosen`); before 2026-10-19 the pre-selected «₪₪» was
+     saved whenever a meal time was picked and weighted the ranking. A first local profile starts
+     from `UNKNOWN_STATED`, never the screens' `EMPTY_STATED` defaults, so a skip stores no spice,
+     meal time or budget the customer never gave. `budget: null` is neutral, like `budget: 2`.
+   - **The persona's peek is seen, or not shown at all.** On a cold start the home mounts UNDER the
+     launch splash; the peek (once per session: no profile yet, or a meal window) and the persona's
+     `ai_helper_fab` / `ai_helper_peek` impressions wait for `helpers/splash-state.ts` (App.tsx marks
+     it when the splash's fade ends), then for home in front and the persona visible. Fired earlier,
+     the peek played unseen, used up the session's one peek and inflated the funnel's "seen"
+     (invariant 22).
 19. **THE CHAT ADDS TO THE EXISTING CART EXACTLY AS THE MENU WOULD — OR IT OPENS THE STORE**
    (`suggest.js`, `suggest-service.js`, `utils/extras-required.js`; app `hooks/useChatAddToCart.ts`,
    `helpers/chat-cart-line.ts`; reference §7f).
    - Modes `drink`, `sweet`, `cross_sell` take `cart: { appName, productIds }` and never suggest a
-     product already in it. With a cart, all three offer the cart's store ONLY (no per-store cap
+     product already in it; within one chat they prefer one not shown yet, never at the cost of an
+     empty reply (invariant 23). With a cart, all three offer the cart's store ONLY (no per-store cap
      there) — a drink "that goes with your order" from another store would ask to empty the cart on
      "+". Nothing there → `drink_unavailable_store` / `sweet_unavailable_store` with
      `replyParams.stores` (the reply names the store); without a cart, every open store at ≤ 2 each
@@ -513,6 +538,11 @@ boundary and say so in the PR.
      `pick-time-screen`, `credit-cards`, `add-credit-card`, `order-submitted`, `login`,
      `verify-code`, `insert-customer-name`, `ai-helper-onboarding`, `product-preview`. It matches
      ROUTE NAMES, so a new screen in those flows must be added to the list.
+   - **Back minimizes only what is worth coming back to, and never blocks the app's own
+     navigation.** Back and the edge swipe minimize a chat with a turn of the customer's own or
+     items in the cart, and close an unused one (`leaveAction`). The `beforeRemove` listener acts
+     ONLY on `GO_BACK` / `POP` (`isUserBack`): a reset after an order, a replace or a navigate must
+     always go through — catching those would strand the customer after checkout.
    - **Closing closes the window only.** Dropping the bubble on the × calls `forYouStore.close()`,
      which changes `chatUi` and nothing else: the conversation stays and the cart is never touched
      (the bubble only reads the cart count); a "رجّع" toast undoes it. Expanding pops back to a chat
@@ -530,7 +560,8 @@ boundary and say so in the PR.
    - **Every reply is served with a `suggestionId`** and leaves, without delaying the reply, one
      `[for-you] served` log line (path rules · ai · ai_fallback · off · error with the fallback
      reason, reply code, counts before/after avoid, cards dropped by the live and the last check,
-     `ms` per stage, Claude's model/tokens/cost) and one `shoofi.forYouServed` audit row (TTL 30
+     the `seen` ids applied and the `seenTopUp` cards (invariant 23), `ms` per stage, Claude's
+     model/tokens/cost) and one `shoofi.forYouServed` audit row (TTL 30
      days on `createdAt`; masked text, avoid keys, Claude's masked reply, and per card the labels that
      let it through). `deleteCustomerServed` removes a customer's rows (wiring it into account
      delete is customers-domain HIGH-RISK work — customers CORE Known status). Never log the raw
@@ -538,6 +569,65 @@ boundary and say so in the PR.
    - **Attribution stays on the phone:** the app notes dishes added from the chat or from a store a
      card opened (24 h) and adds `for_you_lines` / `for_you_suggestion_ids` to the
      `order_submit_success` analytics event. The order API, cart lines and `getCartData` are untouched.
+
+22. **FOR YOU QUALITY: THE REVIEWER PROPOSES, PEOPLE DECIDE** (`services/for-you-quality/`,
+   `routes/admin/for-you-quality.js`, `utils/crons/for-you-review-cron.js`; delivery-web
+   `views/admin/for-you-quality/`; `docs/for-you-quality.md`; reference §7h).
+   - **The funnel reads its own copy of the events.** `POST /api/app-logs/insert` copies the For-you /
+     AI-helper events and the checkout events into `shoofi.forYouEvents` — customer app only, 90-day
+     TTL, **no customer id** (the funnel counts phones by `device-id`), fire-and-forget. `apps-logs`
+     is indexed only by `{userId, created}`: never query it by date for this. **An insert never
+     waits for its indexes** (one shared build per db, retried on failure) — awaiting them dropped
+     the first burst of events after the collection was created; the served audit row follows the
+     same rule. The event names, `for_you_lines` and the onboarding question order
+     (`ONBOARDING_FLOWS` ↔ app `onboarding-logic.ts`) are a contract: rename one and a funnel step
+     silently reads zero — change `funnel.js` in the same PR.
+   - **The nightly reviewer only proposes.** 05:30 Israel, Redis-locked, reviews yesterday's
+     conversations (the app's `conversationId`; home-box loads, `surface: "home"`, are not
+     conversations). Free exact checks first — an avoid conflict and an ignored "not X" are
+     `critical`. Then a judge: Claude on the **paid API** (`MODELS.review`, `backend: "api"`, feature
+     `for-you-review`) under its own daily budget (`forYouReviewDailyBudgetUsd`, default $3; with
+     `forYouReviewMaxPerDay` and `forYouReviewSampleRate` — server-only fields on the platform config,
+     Settings → Shoofi). Without a key the checks still run (`judgeSkipped: "no-api-key"`).
+   - **A person's decision is never overwritten.** A re-run `$set`s only the machine's part (turns,
+     outcome, checks, severity, priority) — `status` is `$setOnInsert`, `human` is written only by a
+     decision — and the judge is not called (or paid) again for a conversation the same
+     `PROMPT_VERSION` judged with the same turns. Decisions (agree · disagree
+     with a verdict · fixed · dismiss · add_to_tests → `in_tests` + a `forYouGoldenCases` row) carry
+     the actor from the token. Calibration = how often the judge's verdict matched a person's.
+   - **No customer id in what outlives the audit:** `forYouReviews` (90 days) keeps the owner only as
+     a one-way hash, golden cases keep none — so account deletion does not need them.
+   - **Targets are code** (`targets.js`): changed in a reviewed PR; the funnel ones are first guesses
+     (2026-10-18), to be reset from pilot data. The API and the screen are `master|admin` only.
+
+23. **A QUICK REPLY PREFERS WHAT THE CHAT HAS NOT SHOWN — AND NEVER GOES EMPTY BECAUSE OF IT**
+   (`routes/for-you.js` `sanitizeSeen`, `suggest.js` `SEEN_MODES` / `modeCaps` / `topUpWithSeen`,
+   `suggest-service.js` `topUpSeen`; `docs/for-you.md`; reference §7). Found while recording the
+   marketing video: «فاجئني» re-served a dish the opener had just shown, and «الأكثر طلباً» repeated
+   both of the opener's dishes.
+   - **The contract:** `POST /api/for-you/suggest` takes `seen`, the card ids
+     (`"<appName>:<productId>"`, newest first) the conversation already showed. `sanitizeSeen` keeps
+     strings of ≤ 120 chars, deduplicated, the newest 40; anything else is ignored, never a 400.
+   - **Who uses it:** `popular`, `surprise`, `new`, `drink`, `sweet`, `cross_sell` — never `usual`
+     (repeats are its point), the opener (the first turn) or typed text (a dish matching what they
+     typed is relevant again; the Claude path is text-only, so it never sees `seen`).
+   - **How:** the same mode, every rule of it, runs on the unseen candidates — after `avoid`, with the
+     profile weights computed once over all of them — so evidence tags, caps and the cart's-store rule
+     hold by construction. That can change the answer, not only the order: `popular` with every
+     popular dish already shown answers its own fallback, `opener_ideas`, over the rest. The normal
+     reply rides along as `seenTopUp`.
+   - **The top-up is decided AFTER `applyLiveMenu` and `dropAtServe`:** when fewer than
+     `RULES.MIN_UNSEEN_CARDS` (2) unseen cards survive, the normal reply's other cards fill the reply
+     in their normal order, through the same two checks, within the mode's caps (2 per store; surprise
+     1 per store and 4 cards; with a cart the cart's store, uncapped). With nothing unseen left the
+     reply code is the normal one (`drink_ideas`, not `drink_unavailable_store`). Deciding before the
+     checks lets a sold-out unseen dish leave a one-card reply (test "top-up is decided AFTER the live
+     re-check", `test/integration/for-you-seen.js`). The `[for-you] served` line carries `seen` (ids
+     applied, 0 when the mode ignores them) and `seenTopUp` (cards the top-up added).
+   - **The app** (`stores/for-you` `SEEN_MODES`, `seenCardIds`) sends the ids of every card the
+     conversation showed, newest first, at most 40, for exactly these six modes; the list is the
+     chat's own messages, so `reset()` (closing the chat, logout) starts it empty. The two
+     `SEEN_MODES` lists — app and server — change together.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified

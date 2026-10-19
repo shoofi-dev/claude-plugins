@@ -504,7 +504,7 @@ the cache read.
 - Menu spellcheck (`routes/admin/menu-spellcheck.js`; `auth.required` + `checkAdminRole(["master","admin","manager"])`, POSTs in the audit route map): `GET /api/admin/menu-spellcheck/issues?status=open|accepted|dismissed|resolved|stale&appName=&lang=ar|he` → `{ issues (≤2000), truncated, counts, lastRun }`; `POST /api/admin/menu-spellcheck/run [{ appName }]` → `202 { started, runId }` / `409 locked` / `503 no-api-key`; `POST /api/admin/menu-spellcheck/accept { ids, fixes? }` → `{ accepted, stale, failed, outOfStockKept, rows[] }`; `POST /api/admin/menu-spellcheck/dismiss { ids }` → `{ dismissed }` (§7e)
 - `GET  /api/getTranslations`, `POST /api/translations/{update,add,delete}`
 - `POST /api/global-search` — central store name search
-- `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng}, history?, lang?, cart?: { appName, productIds }, onboarded? }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price, originalPrice?, discountPercent?, hasRequiredOptions }, dishType, reason:{ code, params }, confidence }], personalized }` (`routes/for-you.js`, `auth.optional`). Modes `opener` (default), `usual`, `new`, `surprise`, `popular`, and the chat-ordering `drink`, `sweet`, `cross_sell` (§7f); reason codes `usual`, `ordered_before`, `liked_type`, `you_like`, `popular`, `match`. Only a customer `app-type` (`shoofi-shopping` or none) personalises; without a customer, a visitor's taste profile is read by the `device-id` header (CORE invariant 18). `cart` goes through `sanitizeCart` (a string `appName` ≤ 100 chars, ≤ 50 `productIds`); `onboarded` counts only when `=== true`. Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
+- `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng}, history?, lang?, cart?: { appName, productIds }, onboarded?, conversationId?, surface?, seen?: string[] }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price, originalPrice?, discountPercent?, hasRequiredOptions }, dishType, reason:{ code, params }, confidence }], personalized, suggestionId }` (`routes/for-you.js`, `auth.optional`; `suggestionId` on every reply, CORE invariant 21). Modes `opener` (default), `usual`, `new`, `surprise`, `popular`, and the chat-ordering `drink`, `sweet`, `cross_sell` (§7f); reason codes `usual`, `ordered_before`, `liked_type`, `you_like`, `popular`, `match`. Only a customer `app-type` (`shoofi-shopping` or none) personalises; without a customer, a visitor's taste profile is read by the `device-id` header (CORE invariant 18). `cart` goes through `sanitizeCart` (a string `appName` ≤ 100 chars, ≤ 50 `productIds`); `onboarded` counts only when `=== true`. `seen` — the card `id`s this chat already showed, newest first — goes through `sanitizeSeen` (strings ≤ 120 chars, deduplicated, the newest 40; anything else ignored, never a 400): `popular`, `surprise`, `new`, `drink`, `sweet`, `cross_sell` then answer from the dishes not shown yet (the same mode on the unseen candidates) and are topped up with the normal reply's other cards only when fewer than 2 unseen cards survive `applyLiveMenu` + `dropAtServe`; `usual`, the opener and typed text ignore it (CORE invariant 23). Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
 - `GET  /api/ai-helper/cuisines?lat=&lng=` — `{ cuisines: [{ key, label_ar, label_he, img, storeCount }] }` (`routes/ai-helper.js` → `ai-helper-service.js` `getCuisines`, `auth.optional`): the onboarding's cuisine tiles (§7f). `400` without a valid location; any other failure `200 { cuisines: [] }`. The other AI-helper routes — `GET`/`PUT /api/ai-helper/profile`, `POST /api/ai-helper/merge`, `GET /api/ai-helper/facts` — are the profile's side (`docs/ai-helper.md`; ownership and merge: customers domain).
 - Dish taxonomy / labels admin (`routes/admin/dish-taxonomy.js`; every route `auth.required` + `checkAdminRole(["master","admin","manager"])`):
   `GET /api/admin/dish-taxonomy` (seeds on first use), `POST /api/admin/dish-taxonomy/:key/approve` (→ active; its proposing labels get the type + `fromApprovedProposal`, `applied` at confidence ≥ 0.5 else `review`; admin labels untouched), `POST /api/admin/dish-taxonomy/:key/reject` (proposed only), `PATCH /api/admin/dish-taxonomy/:key`, `GET /api/admin/product-labels/review[?appName=]`, `POST /api/admin/product-labels/resolve { appName, productId, dishType }` (→ `status: "admin"`; `dishType` active or null), `GET /api/admin/product-labels/runs`, `POST /api/admin/product-labels/run [{ maxProducts, stores[] }]` — `startProductLabelsJob` (same `cron:product-labels` lock and locked index rebuild as the cron) answers as soon as it knows: `202 { started: true }` (running in the background), `409` a run already holds the lock, `503` no `ANTHROPIC_API_KEY`.
@@ -535,6 +535,29 @@ empty. `node bin/build-suggest-index.js <envfile> [--customers=N]` is a read-onl
 prints coverage (stores, products, % with a dish type, stores with popularity evidence);
 `--write` rebuilds for real. One store failing is logged and the run continues; its old rows
 survive. Design, evidence rules and flags: `docs/for-you.md` (shoofi-server).
+
+**The customer-taste cache** (`services/ordering-intelligence/taste.js`, CORE invariant 11).
+`getCustomerTaste` (90 days, newest 30 completed orders) is cached 10 min (`CACHE_TTL_MS`):
+- **Redis first** when `REDIS_URL || REDIS_HOST` and not `E2E_SANDBOX` — `GET`/`SET … PX 600000`/`DEL`
+  on `fy:taste:v<CACHE_VERSION>:<customerId>` (`redisKeyOf`), through `utils/redis-lock`
+  `getRedisClient()` (one connection, shared with the locks and `chat-limits.js`). Each command
+  races `REDIS_TIMEOUT_MS` (150). A hit returns with no DB read; a miss (or an unreadable value —
+  `deserializeTaste` returns `null` for another version, bad JSON or a non-taste) recomputes and
+  re-writes in the background.
+- **Memory fallback** — the old capped per-process `Map` (`CACHE_MAX` 2000, oldest evicted): used
+  when Redis is not configured, or for a call where Redis errored / timed out; any Redis failure
+  (read, write or delete) also skips Redis for the next 30 s (`REDIS_BACKOFF_MS`). Every compute
+  writes memory, so an outage starts warm. Logs: `[for-you] taste cache <read|write|delete>
+  failed, using memory` at warn, error message only.
+- **Shape:** `serializeTaste` turns `products`, `stores`, `dishTypes` and each dish type's `stores`
+  into entry arrays (order kept) plus `v: CACHE_VERSION`; `deserializeTaste` rebuilds the Maps.
+  Consumers (`suggest.js`, `facts.js`, `ai-chat.js` `tasteSummary`, `ai-helper-service.js`,
+  `bin/build-suggest-index.js`) cannot tell a cached taste from a fresh one. Change the shape →
+  bump `CACHE_VERSION` (it is in the key AND the payload).
+- **Not cached:** no customer id (`EMPTY_TASTE`), the dry run's `opts.dishTypes`.
+- **`invalidateCustomerTaste(customerId)`** deletes the Redis key and this instance's memory entry,
+  never throws. Nothing calls it yet (wiring it to order completion would be an orders-domain
+  change); other instances' memory copies only answer while their Redis is failing.
 
 ## 7d. Weekly dish labelling — the cron and the script
 `utils/crons/product-labels-cron.js` — `SCHEDULE = "10 4 * * 0"` (Sunday 04:10 Asia/Jerusalem),
@@ -634,7 +657,8 @@ medianPriceOf)` on every candidate (1 = neutral, factors multiply):
 | `budget: 1` | price ≤ the median of its dish type among the candidates ×1.15; > 1.3× the median ×0.8 |
 | `budget: 3` | ≥ the median ×1.15; < 0.7× the median ×0.85 |
 
-`spice: 1` and `budget: 2` are neutral; medians are per dish type (untyped rows share one bucket)
+`spice: 1`, `budget: 2` and `budget: null` (not chosen — the app saves a budget only once it is
+tapped, CORE invariant 18) are neutral; medians are per dish type (untyped rows share one bucket)
 over the candidates' index `price`. `weighted(d) = qty30d × (_bias ?? 1)` replaces raw `qty30d` in
 `bestOfType`, `popularDocs`, `addFill`, `addStatedCuisines` and the cart modes; text mode multiplies
 its rank by `_bias`. `hasPopularEvidence` still reads raw `qty30d` — a bias never turns a product
@@ -722,10 +746,18 @@ cross-sell pill, through `hooks/useChatAddToCart.ts` `quickAdd`:
 - **Straight in only when nothing is chosen for the customer**: no defaults and valid with no
    selection. Otherwise `ChatProductSheet.tsx` opens with the defaults pre-selected (a priced
    default is shown, never added silently); single replaces, multi toggles within its cap, an
-   out-of-stock option cannot be picked.
+   out-of-stock option cannot be picked. Closing it — an add, a dismiss, a fallback — only HIDES it
+   (`hideSheet`); its content is cleared on the modal's `onModalHide` (`clearSheet`). Clearing both
+   at once flashed an empty sheet (spinner, no photo, "₪0") for the length of the slide-out.
 - **Commit**: `cartStore.addProductToCartForStore(line, storeData)` stamps an empty cart with the
    dish's store, never the browsed one (orders domain). A cart of another store is never mixed or
    silently emptied — the chat asks (`store_conflict`: empty the cart and add / keep the cart).
+
+**Arabic copy rule (app):** no punctuation straight after a final «ك» in `helpers/for-you-copy.ts` /
+`helpers/ai-helper-copy.ts`. MiddleEast (Nomad Type, the app's only typeface) draws that glyph with
+about 0.23 em of empty space on its left, so the mark looks detached («طلبك :»); measured with
+CoreText 2026-10-19. `__tests__/helpers/arabic-punctuation-copy.test.ts` guards it until the font
+itself is fixed (a licensed font — its designer's change, not ours).
 
 Reported verified on the simulator, 2026-10-17 (`docs/ai-helper.md`): the order placed after a chat
 add carried the chosen extras and the server's shadow pricing showed drift 0. Tests:
@@ -769,10 +801,57 @@ ON: a chat with messages is RESTORED on open (`restoring`, unless it comes from 
 a home chip still asks its mode after what is there — and leaving it closes the window
 (`close()`) unless it was minimized; coming back into focus from a store makes it full again.
 
-**Minimize** — the chevron (`for-you-minimize`), a header swipe down (over 120 px, or over 40 px
-at over 600 px/s), Android back ONLY with items in the cart (`hardwareBackAction`; otherwise back
-as before), or a card tap (it still opens the store; with the flag the chat minimizes instead of
-closing). The chat draws its own shrink onto the bubble (380 ms) and leaves with no stack animation.
+**Full screen** (every customer, not only the flag): `for-you` is in `hideHHeaderScreens`
+(`components/layout/header/header.tsx`), so no app header (address / coins) is drawn above the chat;
+its own header sits right under the status bar.
+
+**Minimize** — the header's ONE chevron (`for-you-minimize`, `components/for-you/ChatHeader.tsx`: at
+the PHYSICAL left end; on the right the 36 px persona, the name `ai_helper_name` and the subtitle
+`for_you_header_sub`, no divider; laid out `direction: "ltr"` so Arabic and Hebrew match; no grab
+handle, no ×; flag off: today's back arrow and title), a header swipe down (released past 120 px or at over 600 px/s), back
+or the edge swipe, or a card tap (it still opens the store; with the flag the chat minimizes instead
+of closing). Back and the edge swipe minimize a USED chat — a turn of the customer's own
+(`forYouStore.customerTurns`) or items in the cart — and just close an unused one (`leaveAction`).
+They arrive through a `beforeRemove` listener that acts only on the customer's own back
+(`isUserBack`: `GO_BACK` / `POP`) — a reset after an order, a replace or a navigate always goes
+through. The stack's swipe-back is off app-wide (`gestureEnabled: false`) and has no
+gesture-handler root above the navigator, so on iOS the chat draws its own edge swipe: a 14 pt
+strip on the PHYSICAL right edge (RTL's back edge), below the header, past 30 % of the width or a
+fling. The chat leaves with no stack animation after drawing its own transition into the bubble.
+
+**The "C · Genie" transition** (Sari, 2026-10-19 — replaces PROMPT.md §6 "Shrink" / "Expand"):
+keyframes in `components/for-you/genie.ts` (pure, `__tests__/components/genie.test.ts`). One value
+`m`, 0 = full screen, 1 = in the bubble: `m` 0 → 0.45 → 1 is scaleX 1 → 0.5 → 64/W, scaleY
+1 → 0.92 → 64/H, radius 44 → 90 → 800 clamped to half the box (square at rest), opacity
+1 → 1 → 0.2 — it narrows first, then drops in. 520 ms (`GENIE_MS`), `Easing.bezier(0.6, 0, 0.3, 1)`,
+UI thread only, the whole chat in one `Animated.View` (absolute fill, clipped), scaled about the
+bubble's centre by translation (`genieTranslate`). The open is the same curve backwards. The header
+drag drives only the narrowing (`m = clamp(dy / (H · 0.55), 0, 0.45)`) and, released, finishes in
+`520 · (1 − m)` ms or springs back. Closing, NO part of the chat stays on screen (Sari): the close
+fades it fully out by `m` 0.9 (`GENIE_HANDOFF`; the open keeps the 0.2) and hands over there — the
+chat hidden on the UI thread, then the store goes minimized and the screen pops — instead of
+waiting out the curve's slow last ~160 ms. The bubble then LANDS (`landingFrame`, in
+`ChatBubbleOverlay`): drops from 90 pt above, squash 1.22 × 0.78 at 55 %, stretch 0.9 × 1.12 at
+75 %, 620 ms ease-out, a light haptic at 340 ms; "رجّع" still pops it back the old way. While it
+moves the chat is a still picture: no scrolling, the persona's and the typing dots' loops paused
+(`still` / `paused`), the root rasterized only then. Reduce Motion: a 200 ms crossfade, no drop
+or bounce. `GENIE_UNIFORM` (one scale on both axes, Android only) is OFF — the low-end Android
+50 fps check that would decide it has not been run (`.maestro/genie/README.md`).
+During the bubble transitions (the `restore` expand route, and from the moment a minimize starts) the
+chat's card is see-through — `CHAT_SEE_THROUGH_OPTIONS` (`components/for-you/chat-layout.ts`:
+`transparentModal`, transparent card, no dim, the screen underneath kept attached and NOT
+parallax-shifted) — or it flashes white. The frame the genie scales about is measured on an
+UNTRANSFORMED wrapper (`measureInWindow` on the animated root returns the transformed rect), and
+measured again ON THE TAP: the mount's measure can land mid-push, with `x` off by up to a screen
+width, and the chat then aimed at the mirror of the bubble's spot (recorded; the pre-genie shrink
+had the same bug).
+With the flag, `chatBottomSpacing` (`components/for-you/chat-layout.ts`) sets the bottom: the input
+8 pt above the safe area, chips → input 8, dock → chips 8, no divider above the chips. With the
+flag the CHAT owns its bottom inset: `AppContainer` drops its bottom edge for `for-you`
+(`chatOwnsInset`) and the chat pads `inset + 8` itself (`parentAppliesInset: false`). An inset
+applied there resized home — drawn under the see-through chat — by ~34 pt while the chat was up,
+so home's floating footer rose on open and dropped on close (Sari, 2026-10-19). Flag off: the
+parent still applies it, today's values.
 
 **The bubble** (`ChatBubbleOverlay.tsx`, mounted once in `components/layout/app-container/index.tsx`
 with the focused leaf route name): 64 px, drags 1:1, snaps to a side (fling projected 0.18 s),
@@ -785,16 +864,70 @@ and the admin's product preview.
 **Expand** (tap): `openFull()`, then `StackActions.popTo("for-you", { restore: true })` when a chat
 is still in the root stack (e.g. under the store a card opened), else
 `navigate("for-you", { mode: "opener", restore: true })`; `MainStackNavigator` gives `for-you`
-`animation: "none"` when `params.restore` and the chat grows from the bubble (420 ms), with scroll
-offset and draft restored.
+`animation: "none"` plus `CHAT_SEE_THROUGH_OPTIONS` when `params.restore`, and the chat genies out of
+the bubble (520 ms) once its frame is measured — hidden until then — with scroll offset and draft
+restored. The bubble is gone from the tap's first frame (`openFull()` unmounts it).
 
 **Close** — drop the bubble on the × (60 px target, 80 px magnet, haptic): `close()` changes
 `chatUi` only, a chat left under a store's menu is removed from the stack (so back does not land in
 it), and the `for_you_closed_toast` toast offers "رجّع" for 3.5 s (`undoClose()` → minimized again).
 **The cart is never touched**: the bubble reads `getProductsCount` and calls no cart mutator.
-`AiHelperFab` stays hidden while the bubble is out or the toast is up, then springs back.
+`AiHelperFab` stays hidden while the chat is open (`chatUi.mode` "full" — the genie lands on its
+spot, which must be empty), while the bubble is out or the toast is up, then springs back.
 Tests: `__tests__/components/bubble-math.test.ts`, `__tests__/stores/for-you-chat-ui.test.ts`;
-Maestro `.maestro/chat-minimize/`.
+`__tests__/components/genie.test.ts`; Maestro `.maestro/chat-minimize/`, `.maestro/genie/`.
+
+## 7h. For you quality — the funnel, the health numbers, the nightly reviewer (CORE invariant 22)
+Server `services/for-you-quality/` (`events.js`, `funnel.js`, `health.js`, `reviewer.js`,
+`targets.js`), `routes/admin/for-you-quality.js`, `utils/crons/for-you-review-cron.js`; tests
+`test/integration/for-you-quality.js`; full write-up `docs/for-you-quality.md`. Admin screen
+**איכות For you** (delivery-web `views/admin/for-you-quality/`, `master|admin`).
+
+**What the app sends.** `/api/for-you/suggest` takes `conversationId` (`[A-Za-z0-9_-]{6,64}`, born
+with a chat's first turn — `ask()` on an empty chat, which is how every chat starts and what
+`reset()` and logout leave behind; `reset()` itself is pinned in §7g and unchanged) and `surface`
+(`home` | `chat`); both land in the `forYouServed` row with the reply time, Claude's shortlist
+names, and per card its name, store, `spicy` and `sweet`. An app without them still works: its
+home loads are then reviewed as conversations, grouped by owner with a 30-minute gap.
+
+**Central collections** (all `shoofi`):
+- `forYouEvents` — the app events the funnel reads, copied by `app-logs/insert` (customer
+  app only; 90-day TTL on `created`; no `userId`). Copied: `button_clicked` / `impression`
+  whose id starts `for_you_` or `ai_helper_`; `page_viewed` `for_you`, `ai_helper_onboarding`,
+  and `ProductAddToCart` with `source: "for_you_chat"`; every `cart_checkout_pressed`,
+  `cart_checkout_blocked`, `checkout_validation_failed`, `order_submit_error`,
+  `order_submit_success`, `checkout_left`.
+- `forYouReviews` — one per conversation per Israel day: masked turns and cards, outcome
+  (tapped / added / ordered via `suggestionId` and `for_you_suggestion_ids`), `checks`,
+  `severity`, `priority` (queue order: critical 0, judged bad 1, partial 2, flagged unjudged 3,
+  flagged judged good 4, rest 5), `judge`, `status` (open · agreed · disagreed · fixed · dismissed
+  · in_tests), `human`; `owner: { kind, hash }`. 90-day TTL on `createdAt`.
+- `forYouReviewRuns` — one per run: counts, cost, `budgetHit`, `judgeSkipped`, `alreadyJudged`.
+- `forYouGoldenCases` — "add to tests": masked turns, dish names, avoid keys, the person's note as
+  the expectation; no customer id, no TTL. Nothing runs them automatically yet.
+
+**The funnel** — one phone (`user_visit_id`) per Israel day: seen → opened → chat_opened →
+engaged → picked → ordered (`order_submit_success.for_you_lines > 0`), each with its conversion,
+target and the reasons of the ones who stopped; plus the home shortcut, personalization
+(offered / started / finished / skipped / quit, where they quit, median time) and chat cart →
+order. **Health** — from `forYouServed` + `aiUsage`: path mix, fallback reasons, empty /
+unavailable / fallback rates, p50/p95 by path, avoid conflicts replayed on the stored labels,
+spend for `for-you-chat` and `for-you-review`.
+
+**The reviewer** — `30 5 * * *` Asia/Jerusalem under `ENABLE_CRONS` (lock `cron:for-you-review`),
+or `POST /api/admin/for-you-quality/review/run { day? }` (202, or 409 when locked — always 409
+without Redis). Checks: `avoid_conflict` and `ignored_negation` (critical); `error_reply`,
+`empty_reply`, `slow` (rules 3 s / Claude 6 s), `ai_timeout|ai_api_error|ai_parse|ai_filtered`,
+`rephrased_no_pick`, `no_engagement` (warn). The judge reads critical → typed → flagged → a sample,
+at most `forYouReviewMaxPerDay` (300), until today's `for-you-review` spend reaches
+`forYouReviewDailyBudgetUsd` ($3; ≈ $0.006 per conversation on Sonnet 5). It answers `{ verdict,
+score, issues[code], explanation, fix{type} }` in Hebrew; unknown codes are dropped.
+
+**Admin API** (`auth.required` + `checkAdminRole(["master","admin"])`): `GET
+/api/admin/for-you-quality/funnel?from=&to=`, `GET …/health?from=&to=` (Israel days, ≤ 31),
+`GET …/reviews?day=&severity=&status=&verdict=&limit=&skip=` (+ `bySeverity`, `byVerdict`,
+`calibration`, `lastRun`), `GET …/reviews/:id`, `POST …/reviews/:id/decision { action, verdict?,
+note? }`, `POST …/review/run`.
 
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":

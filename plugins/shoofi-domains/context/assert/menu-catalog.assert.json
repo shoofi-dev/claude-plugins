@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@1870b2ff (feat/for-you-taste-redis-cache) / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -69,8 +69,20 @@
         "test/integration/config-home-layout-flags.js",
         "services/ordering-intelligence/access.js",
         "services/ordering-intelligence/chat-limits.js",
+        "services/ordering-intelligence/taste.js",
+        "test/integration/for-you-taste-cache.js",
         "services/ordering-intelligence/served-log.js",
-        "test/integration/for-you-pilot-guards.js"
+        "test/integration/for-you-pilot-guards.js",
+        "services/for-you-quality/events.js",
+        "services/for-you-quality/funnel.js",
+        "services/for-you-quality/health.js",
+        "services/for-you-quality/reviewer.js",
+        "services/for-you-quality/targets.js",
+        "routes/admin/for-you-quality.js",
+        "utils/crons/for-you-review-cron.js",
+        "docs/for-you-quality.md",
+        "test/integration/for-you-quality.js",
+        "test/integration/for-you-seen.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -156,7 +168,8 @@
           "filterByAvoid",
           "hasRequiredOptions",
           "replyAfterAvoid",
-          "dropAtServe"
+          "dropAtServe",
+          "topUpSeen"
         ],
         "utils/crons/suggest-index-cron.js": [
           "startSuggestIndexCron",
@@ -253,7 +266,11 @@
           "fromCartStoreFirst",
           "drinkMode",
           "sweetMode",
-          "crossSellMode"
+          "crossSellMode",
+          "SEEN_MODES",
+          "appliesSeen",
+          "modeCaps",
+          "topUpWithSeen"
         ],
         "utils/extras-required.js": [
           "hasRequiredOptions"
@@ -271,7 +288,8 @@
         ],
         "routes/for-you.js": [
           "sanitizeCart",
-          "deviceIdFromRequest"
+          "deviceIdFromRequest",
+          "sanitizeSeen"
         ],
         "services/ordering-intelligence/access.js": [
           "resolveAccess",
@@ -293,6 +311,29 @@
         "services/ai/complete.js": [
           "apiTimeoutMs",
           "apiMaxRetries"
+        ],
+        "services/for-you-quality/reviewer.js": [
+          "runReview",
+          "decide",
+          "calibration",
+          "priorityOf",
+          "ownerOf",
+          "PROMPT_VERSION"
+        ],
+        "services/for-you-quality/funnel.js": [
+          "computeFunnel",
+          "ONBOARDING_FLOWS"
+        ],
+        "services/for-you-quality/events.js": [
+          "isForYouEvent",
+          "mirrorForYouEvent"
+        ],
+        "services/ordering-intelligence/taste.js": [
+          "getCustomerTaste",
+          "serializeTaste",
+          "deserializeTaste",
+          "invalidateCustomerTaste",
+          "redisKeyOf"
         ]
       },
       "patterns": [
@@ -1317,6 +1358,36 @@
           "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — the per-customer cap"
         },
         {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "const CACHE_TTL_MS = 10 \\* 60 \\* 1000;\\s*const CACHE_MAX = 2000;\\s*const CACHE_VERSION = \\d+;\\s*const REDIS_TIMEOUT_MS = 150;\\s*const REDIS_BACKOFF_MS = 30 \\* 1000;",
+          "desc": "doc CORE invariant 11 / reference §7c: the taste cache is 10 min, memory capped at 2000, Redis given 150 ms and skipped 30 s after a failure"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "const redisKeyOf = \\(customerId\\) => `fy:taste:v\\$\\{CACHE_VERSION\\}:\\$\\{customerId\\}`;",
+          "desc": "doc CORE invariant 11 / reference §7c: the shared key carries the shape version, so a shape change never reads an old value"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "const redisConfigured = \\(\\) => !process\\.env\\.E2E_SANDBOX && Boolean\\(process\\.env\\.REDIS_URL \\|\\| process\\.env\\.REDIS_HOST\\);",
+          "desc": "doc CORE invariant 11 / reference §7c: Redis only when configured and never in the E2E sandbox (same gate as chat-limits.js)"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "redis\\.set\\(redisKeyOf\\(customerId\\), payload, \\\"PX\\\", CACHE_TTL_MS\\)\\)\\.catch\\(",
+          "desc": "doc CORE invariant 11 / reference §7c: the Redis write expires with the TTL and is fire-and-forget"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "if \\(fromRedis\\.taste\\) return fromRedis\\.taste;\\s*shared = fromRedis\\.ok;[\\s\\S]*?if \\(!shared\\) \\{\\s*const cached = cacheGet\\(cacheKey, now\\);",
+          "desc": "doc CORE invariant 11: while Redis answers it is the truth - a Redis miss recomputes, memory is read only when Redis is absent or failed"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "if \\(!opts\\.dishTypes\\) \\{\\s*cacheSet\\(cacheKey, taste, now\\);\\s*if \\(shared\\) redisSetTaste\\(cacheKey, taste\\);",
+          "desc": "doc CORE invariant 11 / reference §7c: the dry run's supplied dish types are never cached, in memory or Redis"
+        },
+        {
           "file": "services/ordering-intelligence/ai-chat.js",
           "regex": "\\{ \\$group: \\{ _id: null, usd: \\{ \\$sum: BUDGET_COST \\} \\} \\},",
           "desc": "doc CORE invariant 16: the budget counts an unpriced call at UNPRICED_BUDGET_PRICE, never $0"
@@ -1380,6 +1451,201 @@
           "file": "services/ordering-intelligence/served-log.js",
           "regex": "logger\\.info\\(\"\\[for-you\\] served\", servedEvent\\(\\{ suggestionId, input, result, trace \\}\\)\\);",
           "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — one log line per reply"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "const RETENTION_DAYS = 90;",
+          "desc": "doc CORE invariant 22: For you quality — the event copy is kept 90 days"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "const \\{ _id, userId, \\.\\.\\.doc \\} = logDoc;",
+          "desc": "doc CORE invariant 22: For you quality — the event copy carries no customer id"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "^    ensureIndexes\\(shoofiDb\\);$",
+          "desc": "doc CORE invariant 22: For you quality — an event copy never waits for its indexes"
+        },
+        {
+          "file": "services/ordering-intelligence/served-log.js",
+          "regex": "^  ensureIndexesOnce\\(shoofiDb\\);$",
+          "desc": "doc CORE invariant 22: For you quality — the served audit row never waits for its indexes"
+        },
+        {
+          "file": "routes/app-logs.js",
+          "regex": "if \\(appType === 'shoofi-shopping'\\) forYouEvents\\.mirrorForYouEvent\\(shoofiDb, logDoc\\);",
+          "desc": "doc CORE invariant 22: For you quality — the copy is made for the customer app only, fire-and-forget"
+        },
+        {
+          "file": "services/for-you-quality/funnel.js",
+          "regex": "if \\(Number\\(p\\.for_you_lines\\) > 0\\) j\\.ordered = true;",
+          "desc": "doc CORE invariant 22: For you quality — ordered means an order whose success event carries For-you lines"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "const FEATURE = \"for-you-review\";",
+          "desc": "doc CORE invariant 22: For you quality — the judge has its own usage feature and budget"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "backend: \"api\",",
+          "desc": "doc CORE invariant 22: For you quality — the judge runs on the paid API"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "if \\(avoidConflicts\\(row\\) > 0\\) out\\.push\\(\\{ code: \"avoid_conflict\", severity: \"critical\", turn \\}\\);",
+          "desc": "doc CORE invariant 22: For you quality — an avoid conflict is critical"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "if \\(ignored\\) out\\.push\\(\\{ code: \"ignored_negation\", severity: \"critical\", turn \\}\\);",
+          "desc": "doc CORE invariant 22: For you quality — an ignored \"not X\" is critical"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "\\$setOnInsert: \\{ createdAt: now, status: \"open\", judge: null \\}",
+          "desc": "doc CORE invariant 22: For you quality — a re-run never overwrites a person's decision"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "prev\\.promptVersion === PROMPT_VERSION && prev\\.turns === it\\.conversation\\.rows\\.length",
+          "desc": "doc CORE invariant 22: For you quality — a conversation already judged by this prompt version is not paid for twice"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "hash: crypto\\.createHash\\(\"sha256\"\\)\\.update\\(raw\\)\\.digest\\(\"hex\"\\)\\.slice\\(0, 16\\),",
+          "desc": "doc CORE invariant 22: For you quality — a review keeps a one-way hash of its owner, never the customer id"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "add_to_tests: review\\.status === \"open\" \\? \"in_tests\" : review\\.status",
+          "desc": "doc CORE invariant 22: For you quality — add to tests is its own outcome"
+        },
+        {
+          "file": "routes/admin/for-you-quality.js",
+          "regex": "const ADMIN = \\[auth\\.required, checkAdminRole\\(\\[\"master\", \"admin\"\\]\\)\\];",
+          "desc": "doc CORE invariant 22: For you quality — the API is master/admin only"
+        },
+        {
+          "file": "utils/crons/for-you-review-cron.js",
+          "regex": "const SCHEDULE = \"30 5 \\* \\* \\*\";",
+          "desc": "doc CORE invariant 22: For you quality — the review runs nightly at 05:30 Israel time"
+        },
+        {
+          "file": "services/ai/complete.js",
+          "regex": "^  review: \"claude-",
+          "desc": "doc CORE invariant 22: For you quality — the judge has its own model key"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "const MAX_SEEN = 40;\\nconst MAX_SEEN_ID_LENGTH = 120;",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — seen keeps at most 40 ids of at most 120 characters"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "if \\(!Array\\.isArray\\(seen\\)\\) return \\[\\];",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — anything but an array is ignored, never a 400"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "if \\(typeof id === \"string\" && id\\.length > 0 && id\\.length <= MAX_SEEN_ID_LENGTH\\) ids\\.add\\(id\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — only strings of 1-120 characters, each kept once"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "if \\(ids\\.size >= MAX_SEEN\\) break;",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the first 40 sent are kept — the newest, as the list is newest first"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "seen: sanitizeSeen\\(seen\\),",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the service only ever gets the sanitised list"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const SEEN_MODES = new Set\\(\\[\"popular\", \"surprise\", \"new\", \"drink\", \"sweet\", \"cross_sell\"\\]\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — exactly these six modes; never usual or the opener"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const appliesSeen = \\(mode, text\\) => !\\(text && text\\.trim\\(\\)\\) && SEEN_MODES\\.has\\(mode\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — typed text never applies seen (a match is relevant again)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "MIN_UNSEEN_CARDS: 2,",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — fewer than 2 unseen cards and the seen ones top the reply up"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const unseen = input\\.docs\\.filter\\(\\(d\\) => !seenIds\\.has\\(keyOf\\(d\\.appName, d\\.productId\\)\\)\\);\\n\\s*const fresh = MODES\\[effectiveMode\\]\\(\\{ \\.\\.\\.input, docs: unseen \\}\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the same mode, every rule of it, on the unseen candidates, cut from the profile-weighted docs so the weights do not shift"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(mode === \"surprise\"\\) return \\{ perStore: 1, limit: Math\\.min\\(limit, SURPRISE_MAX\\) \\};",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — a surprise top-up stays one per store and 4 cards"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "return \\{ perStore: RULES\\.MAX_PER_STORE, limit \\};",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — other top-ups keep 2 per store"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(ids\\.has\\(c\\.id\\) \\|\\| n >= perStore\\) continue;",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the top-up never breaks the per-store cap"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const cards = dropAtServe\\(live, docsByKey, avoid, craving, trace\\)\\.slice\\(0, limit\\);\\n\\s*const served = await topUpSeen\\(ranked, cards, \\{ limit, dbFor, docsByKey, avoid, craving, trace \\}\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the top-up is decided on the cards that passed the live re-check and the last check"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "if \\(!normal \\|\\| cards\\.length >= RULES\\.MIN_UNSEEN_CARDS\\) return \\{ reply: ranked, cards \\};",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — only when fewer than 2 unseen cards survived"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const live = await applyLiveMenu\\(rest, dbFor\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the top-up's cards go through the live re-check"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const kept = dropAtServe\\(live, docsByKey, avoid, craving, lastCheck\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — and through the last check"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "return \\{ reply: cards\\.length \\? ranked : normal, cards: merged \\};",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — nothing unseen survived: the normal reply's code (drink_ideas, not drink_unavailable_store)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "trace\\.seen = appliesSeen\\(mode, text\\) \\? \\(seen \\|\\| \\[\\]\\)\\.length : 0;",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the served line counts the ids applied, 0 when the mode ignores them"
+        },
+        {
+          "file": "services/ordering-intelligence/served-log.js",
+          "regex": "seen: trace\\.seen \\?\\? 0,\\n\\s*seenTopUp: trace\\.seenTopUp \\?\\? 0,",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the [for-you] served line carries seen and seenTopUp"
+        },
+        {
+          "file": "test/integration/for-you-seen.js",
+          "regex": "popular after the opener: none of the opener's dishes come back while enough others exist",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the test of the bug as recorded"
+        },
+        {
+          "file": "test/integration/for-you-seen.js",
+          "regex": "top-up is decided AFTER the live re-check: a sold-out unseen dish never leaves a one-card reply",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the test that pins the decision after the checks"
+        },
+        {
+          "file": "test/integration/for-you-seen.js",
+          "regex": "top-up: nothing unseen left — the reply is the normal one, never empty",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the test that pins never empty because of seen"
         }
       ]
     },
@@ -1412,7 +1678,12 @@
         ".maestro/chat-minimize/flow.yaml",
         "helpers/for-you-access.ts",
         "helpers/for-you-attribution.ts",
-        ".maestro/pilot-readiness/README.md"
+        ".maestro/pilot-readiness/README.md",
+        "helpers/splash-state.ts",
+        "__tests__/helpers/arabic-punctuation-copy.test.ts",
+        "__tests__/helpers/splash-state.test.ts",
+        "components/for-you/ChatHeader.tsx",
+        "components/for-you/chat-layout.ts"
       ],
       "symbols": {
         "stores/ai-helper/index.ts": [
@@ -1441,10 +1712,11 @@
         "components/for-you/bubble-math.ts": [
           "BUBBLE_HIDDEN_ROUTES",
           "overlayVisible",
-          "hardwareBackAction",
           "isChatMinimizeOn",
           "snapBubble",
-          "isOverTarget"
+          "isOverTarget",
+          "leaveAction",
+          "isUserBack"
         ],
         "stores/for-you/index.ts": [
           "chatUi",
@@ -1452,7 +1724,8 @@
           "minimize",
           "undoClose",
           "closedToast",
-          "onBotTurn"
+          "onBotTurn",
+          "customerTurns"
         ],
         "helpers/for-you-access.ts": [
           "forYouAccess"
@@ -1720,11 +1993,6 @@
         },
         {
           "file": "components/for-you/bubble-math.ts",
-          "regex": "return input\\.enabled && input\\.cartCount > 0 \\? \"minimize\" : \"default\";",
-          "desc": "doc reference §7g: Android back minimizes only with items in the cart; otherwise back behaves as before"
-        },
-        {
-          "file": "components/for-you/bubble-math.ts",
           "regex": "export const MAGNET_RADIUS = 80;",
           "desc": "doc reference §7g: the x target catches the bubble within 80 px"
         },
@@ -1764,11 +2032,6 @@
           "desc": "doc reference §7g: a card tap leaves for the store as before, and with the flag on the chat minimizes instead of closing"
         },
         {
-          "file": "screens/for-you/ForYouScreen.tsx",
-          "regex": "if \\(hardwareBackAction\\(\\{ enabled: minimizeOn, cartCount: cartStore\\.getProductsCount\\(\\) \\}\\) !== \"minimize\"\\) return false;",
-          "desc": "doc reference §7g: the Android back rule, applied in the chat"
-        },
-        {
           "file": "components/for-you/ChatBubbleOverlay.tsx",
           "regex": "if \\(chatInStack\\) navigationRef\\.dispatch\\(StackActions\\.popTo\\(\"for-you\", \\{ restore: true \\}\\)\\);\\n\\s*else \\(navigationRef as any\\)\\.navigate\\(\"for-you\", \\{ mode: \"opener\", restore: true \\}\\);",
           "desc": "doc CORE invariant 20 / reference §7g: expand pops back to a chat still in the stack (never a second copy), else navigates with restore"
@@ -1795,13 +2058,13 @@
         },
         {
           "file": "components/ai-helper/AiHelperFab.tsx",
-          "regex": "\\(forYouStore\\.chatUi\\.mode === \"minimized\" \\|\\| forYouStore\\.closedToast\\)",
-          "desc": "doc reference §7g: the persona hides while the bubble is out or its closed toast is up"
+          "regex": "\\(forYouStore\\.chatUi\\.mode === \"minimized\" \\|\\| forYouStore\\.chatUi\\.mode === \"full\" \\|\\| forYouStore\\.closedToast\\)",
+          "desc": "doc reference §7g: the persona hides while the chat is open (the genie lands on its spot), while the bubble is out or its closed toast is up"
         },
         {
           "file": "navigation/MainStackNavigator.tsx",
-          "regex": "const FOR_YOU_OPTIONS = \\(\\{ route \\}: any\\) => \\(route\\?\\.params\\?\\.restore \\? \\{ animation: \"none\" as const \\} : \\{\\}\\);",
-          "desc": "doc reference §7g: expanding from the bubble skips the stack animation (the chat draws its own growth)"
+          "regex": "const FOR_YOU_OPTIONS = \\(\\{ route \\}: any\\) =>\\n\\s*route\\?\\.params\\?\\.restore \\? \\{ animation: \"none\" as const, \\.\\.\\.CHAT_SEE_THROUGH_OPTIONS \\} : \\{\\};",
+          "desc": "doc reference §7g: expanding from the bubble skips the stack animation and is see-through (the chat draws its own genie)"
         },
         {
           "file": "helpers/for-you-copy.ts",
@@ -1847,6 +2110,191 @@
           "file": "components/for-you/context-chips.ts",
           "regex": "if \\(lastReplyCode && NOTHING_OPEN\\.has\\(lastReplyCode\\)\\) return \\[BROWSE\\];",
           "desc": "doc CORE invariant 18: a reply with nothing to show always offers a next step"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "if \\(this\\.messages\\.length === 0\\) this\\.conversationId = newConversationId\\(\\);",
+          "desc": "reference §7h: a conversation id is born with the chat's first turn, so starting over gets a new one"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "fetchSuggestions\\(location, \\{ mode: \"opener\", surface: \"home\" \\}\\)",
+          "desc": "reference §7h: the home box's load says it is the home box"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "export const SEEN_MODES: ForYouMode\\[\\] = \\[\"popular\", \"surprise\", \"new\", \"drink\", \"sweet\", \"cross_sell\"\\];",
+          "desc": "doc CORE invariant 23: the app sends seen for exactly the server's six modes"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "const seen = !input\\.text && input\\.mode && SEEN_MODES\\.includes\\(input\\.mode\\) \\? this\\.seenCardIds\\(\\) : \\[\\];",
+          "desc": "doc CORE invariant 23: never for typed text, only for the seen modes"
+        },
+        {
+          "file": "screens/ai-helper/AiHelperOnboardingScreen.tsx",
+          "regex": "budget: budgetChosen\\.current \\? budget : null,",
+          "desc": "doc CORE invariant 18: the budget is saved only once tapped"
+        },
+        {
+          "file": "stores/ai-helper/index.ts",
+          "regex": "stated: \\{ \\.\\.\\.UNKNOWN_STATED \\},",
+          "desc": "doc CORE invariant 18: a first local profile starts from unknown, not the UI defaults"
+        },
+        {
+          "file": "stores/ai-helper/index.ts",
+          "regex": "export const EMPTY_STATED: TasteStated = \\{ cuisines: \\[\\], spice: 1, avoid: \\[\\], mealTimes: \\[\"dinner\"\\], budget: null \\};",
+          "desc": "doc CORE invariant 18: the budget is never pre-selected"
+        },
+        {
+          "file": "components/ai-helper/AiHelperFab.tsx",
+          "regex": "const stop = splashState\\.whenGone\\(\\(\\) => \\{",
+          "desc": "doc CORE invariant 18: the peek and the persona's impressions wait for the splash to be gone"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "splashState\\.markGone\\(\\);",
+          "desc": "doc CORE invariant 18: App.tsx marks the splash gone when its fade ends"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "const clearSheet = useCallback\\(\\(\\) => setSheet\\(\\(s\\) => \\(s\\.visible \\? s : CLOSED_SHEET\\)\\), \\[\\]\\);",
+          "desc": "doc reference §7f: the sheet's content is cleared only after it has hidden"
+        },
+        {
+          "file": "components/for-you/ChatProductSheet.tsx",
+          "regex": "onModalHide=\\{onHidden\\}",
+          "desc": "doc reference §7f: cleared on the modal's onModalHide"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "return input\\.enabled && \\(input\\.customerTurns > 0 \\|\\| input\\.cartCount > 0\\) \\? \"minimize\" : \"default\";",
+          "desc": "doc reference §7g / doc CORE invariant 20: back and the edge swipe minimize a used chat; an unused one closes"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "export const isUserBack = \\(actionType\\?: string \\| null\\) => actionType === \"GO_BACK\" \\|\\| actionType === \"POP\";",
+          "desc": "doc CORE invariant 20: only the customer's own back is a leave — never a reset after an order"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "return navigation\\.addListener\\(\"beforeRemove\"",
+          "desc": "doc reference §7g: back arrives through beforeRemove"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "if \\(minimizing\\.current \\|\\| !isUserBack\\(type\\)\\) return;",
+          "desc": "doc CORE invariant 20: the listener lets every non-back action through"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "\\.enabled\\(minimizeOn && Platform\\.OS === \"ios\"\\)",
+          "desc": "doc reference §7g: the chat's own iOS edge swipe, flag ON only"
+        },
+        {
+          "file": "components/layout/header/header.tsx",
+          "regex": "^  \"for-you\",$",
+          "desc": "doc reference §7g: the chat is full screen — no app header above it"
+        },
+        {
+          "file": "components/for-you/ChatHeader.tsx",
+          "regex": "direction: \"ltr\",",
+          "desc": "doc reference §7g: the minimize header is laid out physically — the chevron at the left end in every language"
+        },
+        {
+          "file": "components/for-you/chat-layout.ts",
+          "regex": "inputPaddingBottom: keyboardHeight \\|\\| parentAppliesInset \\? 8 : insetsBottom \\+ 8,",
+          "desc": "doc reference §7g: the input 8 pt above the safe area, whoever applies the inset"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "parentAppliesInset: !minimizeOn,",
+          "desc": "doc reference §7g: with minimize on the chat owns its bottom inset (home under the see-through chat must not resize)"
+        },
+        {
+          "file": "components/for-you/chat-layout.ts",
+          "regex": "presentation: \"transparentModal\" as const,",
+          "desc": "doc reference §7g: the chat's card is see-through during the bubble transitions (no white flash, no parallax)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "frameRef\\.current\\?\\.measureInWindow",
+          "desc": "doc reference §7g: the animation's frame is measured on an untransformed wrapper"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "export const GENIE_MS = 520;",
+          "desc": "doc reference §7g: the genie runs 520 ms both ways"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "let sx = key\\(1, 0\\.5, b / Math\\.max\\(W, 1\\)\\);\\n\\s*let sy = key\\(1, 0\\.92, b / Math\\.max\\(H, 1\\)\\);",
+          "desc": "doc reference §7g: the genie narrows first (0.5 wide, 0.92 tall at m 0.45), then drops to the bubble's 64 × 64"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "const r = t === 0 \\? 0 : Math\\.min\\(key\\(44, 90, 800\\), Math\\.min\\(W, H\\) / 2\\);",
+          "desc": "doc reference §7g: radius 44 → 90 → 800 clamped to half the box, square at rest"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "sx: seg\\(\\[0, 0\\.55, 0\\.75, 1\\], \\[0\\.6, 1\\.22, 0\\.9, 1\\]\\),\\n\\s*sy: seg\\(\\[0, 0\\.55, 0\\.75, 1\\], \\[0\\.6, 0\\.78, 1\\.12, 1\\]\\),",
+          "desc": "doc reference §7g: the bubble lands with a squash (1.22 × 0.78) and a stretch (0.9 × 1.12)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "const GENIE_EASE = Easing\\.bezier\\(0\\.6, 0, 0\\.3, 1\\);",
+          "desc": "doc reference §7g: the genie's curve"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "const GENIE_UNIFORM = false;",
+          "desc": "doc reference §7g: the Android uniform-scale fallback is OFF until a low-end Android is measured"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "m\\.value = Math\\.min\\(GENIE_DRAG_MAX, Math\\.max\\(0, e\\.translationY / \\(frame\\.value\\.h \\* 0\\.55\\)\\)\\);",
+          "desc": "doc reference §7g: the header drag drives only the narrowing (m ≤ 0.45)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "if \\(dy > 120 \\|\\| e\\.velocityY > 600\\) \\{",
+          "desc": "doc reference §7g: a header swipe minimizes past 120 px or at over 600 px/s"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "aimAtBubble\\(\\(\\) => \\{",
+          "desc": "doc reference §7g: the close measures the frame on the tap and starts in the measure's callback (a mount measure can land mid-push and aim at the mirror)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "shouldRasterizeIOS=\\{frozen\\}\\n\\s*renderToHardwareTextureAndroid=\\{frozen\\}",
+          "desc": "doc reference §7g: the chat is rasterized only while it genies"
+        },
+        {
+          "file": "components/for-you/ChatBubbleOverlay.tsx",
+          "regex": "withTiming\\(1, \\{ duration: LANDING_MS, easing: Easing\\.out\\(Easing\\.cubic\\) \\}\\)",
+          "desc": "doc reference §7g: the bubble's landing after the genie, 620 ms ease-out"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "export const GENIE_HANDOFF = 0\\.9;",
+          "desc": "doc reference §7g: closing, the chat is fully faded by m 0.9 and hands over to the bubble there"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "const o = opts\\.fadeOutBy \\? \\(t <= K \\? 1 : Math\\.max\\(0, 1 - \\(t - K\\) / \\(opts\\.fadeOutBy - K\\)\\)\\) : key\\(1, 1, 0\\.2\\);",
+          "desc": "doc reference §7g: opacity 1 → 1 → 0.2 (the open); the close fades to 0 by the hand-off"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "\\(\\) => closing\\.value === 1 && m\\.value >= GENIE_HANDOFF,",
+          "desc": "doc reference §7g: the close hands over to the bubble at GENIE_HANDOFF, not at the curve's end"
+        },
+        {
+          "file": "components/layout/app-container/index.tsx",
+          "regex": "FLOATING_TAB_BAR_SCREENS\\.indexOf\\(currentRouteName\\) > -1 \\|\\| chatOwnsInset",
+          "desc": "doc reference §7g: AppContainer drops its bottom edge for the chat with minimize on — else home's footer jumps on open / close"
         }
       ]
     },
@@ -1858,7 +2306,9 @@
         "src/apis/admin/ai-usage.ts",
         "src/views/admin/stores/MenuSpellcheck.tsx",
         "src/apis/admin/menu-spellcheck.ts",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/views/admin/for-you-quality/ForYouQuality.tsx",
+        "src/apis/admin/for-you-quality.ts"
       ],
       "symbols": {},
       "patterns": [
@@ -1886,6 +2336,16 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isChatMinimizeEnabled: false,\\n\\s*isChatMinimizeForAll: false,",
           "desc": "doc reference §7g / §8: the two chat-minimize switches under Settings → Shoofi, default off"
+        },
+        {
+          "file": "src/components/Sidebar/Sidebar.tsx",
+          "regex": "path: \"/admin/for-you-quality\".*roles: \\[\"master\", \"admin\"\\]",
+          "desc": "doc CORE invariant 22: For you quality — the screen is master/admin only, matching the server"
+        },
+        {
+          "file": "src/views/admin/settings/ShoofiSettings.tsx",
+          "regex": "forYouReviewDailyBudgetUsd",
+          "desc": "doc CORE invariant 22: For you quality — the reviewer's daily budget is set in Settings → Shoofi"
         }
       ]
     }
