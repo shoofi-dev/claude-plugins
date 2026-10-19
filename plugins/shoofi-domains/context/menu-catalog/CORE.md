@@ -526,6 +526,11 @@ boundary and say so in the PR.
      `pick-time-screen`, `credit-cards`, `add-credit-card`, `order-submitted`, `login`,
      `verify-code`, `insert-customer-name`, `ai-helper-onboarding`, `product-preview`. It matches
      ROUTE NAMES, so a new screen in those flows must be added to the list.
+   - **Back minimizes only what is worth coming back to, and never blocks the app's own
+     navigation.** Back and the edge swipe minimize a chat with a turn of the customer's own or
+     items in the cart, and close an unused one (`leaveAction`). The `beforeRemove` listener acts
+     ONLY on `GO_BACK` / `POP` (`isUserBack`): a reset after an order, a replace or a navigate must
+     always go through — catching those would strand the customer after checkout.
    - **Closing closes the window only.** Dropping the bubble on the × calls `forYouStore.close()`,
      which changes `chatUi` and nothing else: the conversation stays and the cart is never touched
      (the bubble only reads the cart count); a "رجّع" toast undoes it. Expanding pops back to a chat

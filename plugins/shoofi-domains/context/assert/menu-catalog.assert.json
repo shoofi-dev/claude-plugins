@@ -1671,10 +1671,11 @@
         "components/for-you/bubble-math.ts": [
           "BUBBLE_HIDDEN_ROUTES",
           "overlayVisible",
-          "hardwareBackAction",
           "isChatMinimizeOn",
           "snapBubble",
-          "isOverTarget"
+          "isOverTarget",
+          "leaveAction",
+          "isUserBack"
         ],
         "stores/for-you/index.ts": [
           "chatUi",
@@ -1682,7 +1683,8 @@
           "minimize",
           "undoClose",
           "closedToast",
-          "onBotTurn"
+          "onBotTurn",
+          "customerTurns"
         ],
         "helpers/for-you-access.ts": [
           "forYouAccess"
@@ -1950,11 +1952,6 @@
         },
         {
           "file": "components/for-you/bubble-math.ts",
-          "regex": "return input\\.enabled && input\\.cartCount > 0 \\? \"minimize\" : \"default\";",
-          "desc": "doc reference §7g: Android back minimizes only with items in the cart; otherwise back behaves as before"
-        },
-        {
-          "file": "components/for-you/bubble-math.ts",
           "regex": "export const MAGNET_RADIUS = 80;",
           "desc": "doc reference §7g: the x target catches the bubble within 80 px"
         },
@@ -1992,11 +1989,6 @@
           "file": "screens/for-you/ForYouScreen.tsx",
           "regex": "if \\(minimizeOn\\) forYouStore\\.minimize\\(\\);\\n\\s*openStoreAtProduct\\(card\\.store, card\\.product\\._id\\);",
           "desc": "doc reference §7g: a card tap leaves for the store as before, and with the flag on the chat minimizes instead of closing"
-        },
-        {
-          "file": "screens/for-you/ForYouScreen.tsx",
-          "regex": "if \\(hardwareBackAction\\(\\{ enabled: minimizeOn, cartCount: cartStore\\.getProductsCount\\(\\) \\}\\) !== \"minimize\"\\) return false;",
-          "desc": "doc reference §7g: the Android back rule, applied in the chat"
         },
         {
           "file": "components/for-you/ChatBubbleOverlay.tsx",
@@ -2132,6 +2124,41 @@
           "file": "components/for-you/ChatProductSheet.tsx",
           "regex": "onModalHide=\\{onHidden\\}",
           "desc": "doc reference §7f: cleared on the modal's onModalHide"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "return input\\.enabled && \\(input\\.customerTurns > 0 \\|\\| input\\.cartCount > 0\\) \\? \"minimize\" : \"default\";",
+          "desc": "doc reference §7g / doc CORE invariant 20: back and the edge swipe minimize a used chat; an unused one closes"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "export const isUserBack = \\(actionType\\?: string \\| null\\) => actionType === \"GO_BACK\" \\|\\| actionType === \"POP\";",
+          "desc": "doc CORE invariant 20: only the customer's own back is a leave — never a reset after an order"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "return navigation\\.addListener\\(\"beforeRemove\"",
+          "desc": "doc reference §7g: back arrives through beforeRemove"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "if \\(minimizing\\.current \\|\\| !isUserBack\\(type\\)\\) return;",
+          "desc": "doc CORE invariant 20: the listener lets every non-back action through"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "\\.enabled\\(minimizeOn && Platform\\.OS === \"ios\"\\)",
+          "desc": "doc reference §7g: the chat's own iOS edge swipe, flag ON only"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "\\{ paddingBottom: minimizeOn \\? Math\\.max\\(0, keyboardHeight - insets\\.bottom\\) : keyboardHeight \\}",
+          "desc": "doc reference §7g: the keyboard lift subtracts the bottom inset AppContainer already adds"
+        },
+        {
+          "file": "components/layout/header/header.tsx",
+          "regex": "^  \"for-you\",$",
+          "desc": "doc reference §7g: the chat is full screen — no app header above it"
         }
       ]
     },
