@@ -536,6 +536,29 @@ prints coverage (stores, products, % with a dish type, stores with popularity ev
 `--write` rebuilds for real. One store failing is logged and the run continues; its old rows
 survive. Design, evidence rules and flags: `docs/for-you.md` (shoofi-server).
 
+**The customer-taste cache** (`services/ordering-intelligence/taste.js`, CORE invariant 11).
+`getCustomerTaste` (90 days, newest 30 completed orders) is cached 10 min (`CACHE_TTL_MS`):
+- **Redis first** when `REDIS_URL || REDIS_HOST` and not `E2E_SANDBOX` — `GET`/`SET … PX 600000`/`DEL`
+  on `fy:taste:v<CACHE_VERSION>:<customerId>` (`redisKeyOf`), through `utils/redis-lock`
+  `getRedisClient()` (one connection, shared with the locks and `chat-limits.js`). Each command
+  races `REDIS_TIMEOUT_MS` (150). A hit returns with no DB read; a miss (or an unreadable value —
+  `deserializeTaste` returns `null` for another version, bad JSON or a non-taste) recomputes and
+  re-writes in the background.
+- **Memory fallback** — the old capped per-process `Map` (`CACHE_MAX` 2000, oldest evicted): used
+  when Redis is not configured, or for a call where Redis errored / timed out; any Redis failure
+  (read, write or delete) also skips Redis for the next 30 s (`REDIS_BACKOFF_MS`). Every compute
+  writes memory, so an outage starts warm. Logs: `[for-you] taste cache <read|write|delete>
+  failed, using memory` at warn, error message only.
+- **Shape:** `serializeTaste` turns `products`, `stores`, `dishTypes` and each dish type's `stores`
+  into entry arrays (order kept) plus `v: CACHE_VERSION`; `deserializeTaste` rebuilds the Maps.
+  Consumers (`suggest.js`, `facts.js`, `ai-chat.js` `tasteSummary`, `ai-helper-service.js`,
+  `bin/build-suggest-index.js`) cannot tell a cached taste from a fresh one. Change the shape →
+  bump `CACHE_VERSION` (it is in the key AND the payload).
+- **Not cached:** no customer id (`EMPTY_TASTE`), the dry run's `opts.dishTypes`.
+- **`invalidateCustomerTaste(customerId)`** deletes the Redis key and this instance's memory entry,
+  never throws. Nothing calls it yet (wiring it to order completion would be an orders-domain
+  change); other instances' memory copies only answer while their Redis is failing.
+
 ## 7d. Weekly dish labelling — the cron and the script
 `utils/crons/product-labels-cron.js` — `SCHEDULE = "10 4 * * 0"` (Sunday 04:10 Asia/Jerusalem),
 registered in `app.js` with the other crons (`ENABLE_CRONS`), Redis lock `cron:product-labels`
