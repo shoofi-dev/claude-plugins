@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@69c1f656 (fix/for-you-recording-issues) / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -454,7 +454,8 @@ boundary and say so in the PR.
    (`suggest.js`, `suggest-service.js`, `utils/extras-required.js`; app `hooks/useChatAddToCart.ts`,
    `helpers/chat-cart-line.ts`; reference §7f).
    - Modes `drink`, `sweet`, `cross_sell` take `cart: { appName, productIds }` and never suggest a
-     product already in it. With a cart, all three offer the cart's store ONLY (no per-store cap
+     product already in it; within one chat they prefer one not shown yet, never at the cost of an
+     empty reply (invariant 23). With a cart, all three offer the cart's store ONLY (no per-store cap
      there) — a drink "that goes with your order" from another store would ask to empty the cart on
      "+". Nothing there → `drink_unavailable_store` / `sweet_unavailable_store` with
      `replyParams.stores` (the reply names the store); without a cart, every open store at ≤ 2 each
@@ -530,7 +531,8 @@ boundary and say so in the PR.
    - **Every reply is served with a `suggestionId`** and leaves, without delaying the reply, one
      `[for-you] served` log line (path rules · ai · ai_fallback · off · error with the fallback
      reason, reply code, counts before/after avoid, cards dropped by the live and the last check,
-     `ms` per stage, Claude's model/tokens/cost) and one `shoofi.forYouServed` audit row (TTL 30
+     the `seen` ids applied and the `seenTopUp` cards (invariant 23), `ms` per stage, Claude's
+     model/tokens/cost) and one `shoofi.forYouServed` audit row (TTL 30
      days on `createdAt`; masked text, avoid keys, Claude's masked reply, and per card the labels that
      let it through). `deleteCustomerServed` removes a customer's rows (wiring it into account
      delete is customers-domain HIGH-RISK work — customers CORE Known status). Never log the raw
@@ -568,6 +570,31 @@ boundary and say so in the PR.
      a one-way hash, golden cases keep none — so account deletion does not need them.
    - **Targets are code** (`targets.js`): changed in a reviewed PR; the funnel ones are first guesses
      (2026-10-18), to be reset from pilot data. The API and the screen are `master|admin` only.
+
+23. **A QUICK REPLY PREFERS WHAT THE CHAT HAS NOT SHOWN — AND NEVER GOES EMPTY BECAUSE OF IT**
+   (`routes/for-you.js` `sanitizeSeen`, `suggest.js` `SEEN_MODES` / `modeCaps` / `topUpWithSeen`,
+   `suggest-service.js` `topUpSeen`; `docs/for-you.md`; reference §7). Found while recording the
+   marketing video: «فاجئني» re-served a dish the opener had just shown, and «الأكثر طلباً» repeated
+   both of the opener's dishes.
+   - **The contract:** `POST /api/for-you/suggest` takes `seen`, the card ids
+     (`"<appName>:<productId>"`, newest first) the conversation already showed. `sanitizeSeen` keeps
+     strings of ≤ 120 chars, deduplicated, the newest 40; anything else is ignored, never a 400.
+   - **Who uses it:** `popular`, `surprise`, `new`, `drink`, `sweet`, `cross_sell` — never `usual`
+     (repeats are its point), the opener (the first turn) or typed text (a dish matching what they
+     typed is relevant again; the Claude path is text-only, so it never sees `seen`).
+   - **How:** the same mode, every rule of it, runs on the unseen candidates — after `avoid`, with the
+     profile weights computed once over all of them — so evidence tags, caps and the cart's-store rule
+     hold by construction. That can change the answer, not only the order: `popular` with every
+     popular dish already shown answers its own fallback, `opener_ideas`, over the rest. The normal
+     reply rides along as `seenTopUp`.
+   - **The top-up is decided AFTER `applyLiveMenu` and `dropAtServe`:** when fewer than
+     `RULES.MIN_UNSEEN_CARDS` (2) unseen cards survive, the normal reply's other cards fill the reply
+     in their normal order, through the same two checks, within the mode's caps (2 per store; surprise
+     1 per store and 4 cards; with a cart the cart's store, uncapped). With nothing unseen left the
+     reply code is the normal one (`drink_ideas`, not `drink_unavailable_store`). Deciding before the
+     checks lets a sold-out unseen dish leave a one-card reply (test "top-up is decided AFTER the live
+     re-check", `test/integration/for-you-seen.js`). The `[for-you] served` line carries `seen` (ids
+     applied, 0 when the mode ignores them) and `seenTopUp` (cards the top-up added).
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
