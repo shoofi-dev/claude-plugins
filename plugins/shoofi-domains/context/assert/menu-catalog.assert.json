@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@f893ec90 (feat/chat-minimize) / 2026-10-18",
+  "lastVerified": "shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -66,7 +66,11 @@
         "services/ordering-intelligence/facts.js",
         "docs/ai-helper.md",
         "test/integration/ai-helper.js",
-        "test/integration/config-home-layout-flags.js"
+        "test/integration/config-home-layout-flags.js",
+        "services/ordering-intelligence/access.js",
+        "services/ordering-intelligence/chat-limits.js",
+        "services/ordering-intelligence/served-log.js",
+        "test/integration/for-you-pilot-guards.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -151,7 +155,8 @@
           "loadProfile",
           "filterByAvoid",
           "hasRequiredOptions",
-          "replyAfterAvoid"
+          "replyAfterAvoid",
+          "dropAtServe"
         ],
         "utils/crons/suggest-index-cron.js": [
           "startSuggestIndexCron",
@@ -177,7 +182,11 @@
           "parseCraving",
           "satisfies",
           "cravingQuery",
-          "cravingLabel"
+          "cravingLabel",
+          "isExcluded",
+          "hasExclusions",
+          "exclusionLine",
+          "ALLERGEN_WORDS"
         ],
         "utils/crons/product-labels-cron.js": [
           "startProductLabelsCron",
@@ -196,7 +205,9 @@
           "aiChatTurn",
           "buildShortlist",
           "parseChatReply",
-          "loadChatAiConfig"
+          "loadChatAiConfig",
+          "safeReply",
+          "BUDGET_COST"
         ],
         "services/ai/usage-log.js": [
           "recordUsage",
@@ -261,6 +272,27 @@
         "routes/for-you.js": [
           "sanitizeCart",
           "deviceIdFromRequest"
+        ],
+        "services/ordering-intelligence/access.js": [
+          "resolveAccess",
+          "accessFor"
+        ],
+        "services/ordering-intelligence/chat-limits.js": [
+          "takeChatAiTurn"
+        ],
+        "services/ordering-intelligence/served-log.js": [
+          "newSuggestionId",
+          "servedEvent",
+          "servedRow",
+          "recordServed",
+          "deleteCustomerServed"
+        ],
+        "services/ai/pricing.js": [
+          "UNPRICED_BUDGET_PRICE"
+        ],
+        "services/ai/complete.js": [
+          "apiTimeoutMs",
+          "apiMaxRetries"
         ]
       },
       "patterns": [
@@ -1213,6 +1245,141 @@
           "file": "test/integration/config-home-layout-flags.js",
           "regex": "\"isChatMinimizeEnabled\",\\n\\s*\"isChatMinimizeForAll\",",
           "desc": "doc reference §7g: the flags test pins the six AI-helper / chat flags as served to the customer app"
+        },
+        {
+          "file": "services/ordering-intelligence/craving.js",
+          "regex": "if \\(isExcluded\\(doc, craving\\)\\) return false;",
+          "desc": "doc CORE invariant 13: 'not X' is an exclusion, never a filter for X — satisfies rejects excluded products"
+        },
+        {
+          "file": "services/ordering-intelligence/craving.js",
+          "regex": "if \\(ex\\.avoidKeys\\.length && conflictsWithAvoid\\(doc, ex\\.avoidKeys\\)\\) return true;",
+          "desc": "doc CORE invariant 13: 'not X' is an exclusion, never a filter for X — an allergen-group word uses the avoid word lists"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const skip = \\(d\\) => isExcluded\\(d, craving\\);",
+          "desc": "doc CORE invariant 13: 'not X' is an exclusion, never a filter for X — the popular/fill fallbacks skip what they said no to"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "return \\{ replyCode: \"without_results\", replyParams: \\{ without: ex\\.words\\.join\\(\", \"\\) \\}, cards: picker\\.cards \\};",
+          "desc": "doc CORE invariant 13: 'not X' is an exclusion, never a filter for X — a name-based exclusion says it is best effort"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "if \\(!customerId\\) return fallback\\(\"not_eligible\"\\);",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — logged-in customers only"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "const turn = await takeTurn\\(customerId, now\\);",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — the per-customer cap is taken before the call"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "const TIMEOUT_MS = 6000;",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — 6 s"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "apiTimeoutMs: TIMEOUT_MS,",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — the SDK aborts the request, not a Promise.race"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "apiMaxRetries: 0,",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — no retries while a person waits"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "const model = MODELS\\.chat;",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it / invariant 16 — the chat's own model key"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "if \\(!safeReply\\(parsed\\.reply, \\{ lang: language, shortlist \\}\\)\\) return fallback\\(\"filtered\"",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — the output filter (prompt-injection guard) sends a rejected reply to the rules"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "const HISTORY_MAX_CHARS = 600;",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — the history cap"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "if \\(isExcluded\\(doc, craving\\)\\) return;",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it / invariant 13 — never an excluded product on Claude's list"
+        },
+        {
+          "file": "services/ordering-intelligence/chat-limits.js",
+          "regex": "const LIMITS = \\{ perHour: 20, perDay: 60 \\};",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — the per-customer cap"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "\\{ \\$group: \\{ _id: null, usd: \\{ \\$sum: BUDGET_COST \\} \\} \\},",
+          "desc": "doc CORE invariant 16: the budget counts an unpriced call at UNPRICED_BUDGET_PRICE, never $0"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const cards = dropAtServe\\(live, docsByKey, avoid, craving, trace\\)\\.slice\\(0, limit\\);",
+          "desc": "doc CORE invariant 18: the last check at serve time, on both paths"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(!storesByApp\\.has\\(cart\\.appName\\)\\) return picker\\.cards;",
+          "desc": "doc CORE invariant 19: with a cart, drink/sweet come from the cart's store ONLY"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "return nothingAtCartStore\\(\"drink_unavailable\", input\\);",
+          "desc": "doc CORE invariant 19: with a cart, drink/sweet come from the cart's store ONLY — the reply names the store"
+        },
+        {
+          "file": "services/ordering-intelligence/access.js",
+          "regex": "const chat = !!config\\?\\.isChatSuggestEnabled && \\(!!config\\?\\.isChatSuggestForAll \\|\\| !!employee\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — the master switch"
+        },
+        {
+          "file": "services/ordering-intelligence/access.js",
+          "regex": "const aiHelper = chat && !!config\\?\\.isAiHelperEnabled && \\(!!config\\?\\.isAiHelperForAll \\|\\| !!employee\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — the AI helper lives inside the chat"
+        },
+        {
+          "file": "services/ordering-intelligence/access.js",
+          "regex": "return \\{ chat: false, aiHelper: false \\};",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — a gate that cannot read its switches stays shut"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "const \\{ chat \\} = await access\\.resolveAccess\\(shoofiDb, customerId\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — checked before any work"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "return res\\.status\\(200\\)\\.json\\(\\{ \\.\\.\\.result, suggestionId \\}\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — every reply carries its suggestionId"
+        },
+        {
+          "file": "routes/ai-helper.js",
+          "regex": "if \\(!\\(await helperOn\\(req\\)\\)\\) return res\\.status\\(403\\)\\.json\\(OFF\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged / invariant 18 — switched off, no profile is created or merged"
+        },
+        {
+          "file": "services/ordering-intelligence/served-log.js",
+          "regex": "const RETENTION_DAYS = 30;",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — the served audit is kept 30 days"
+        },
+        {
+          "file": "services/ordering-intelligence/served-log.js",
+          "regex": "await c\\.createIndex\\(\\{ createdAt: 1 \\}, \\{ expireAfterSeconds: RETENTION_DAYS \\* 24 \\* 60 \\* 60 \\}\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — by a TTL index"
+        },
+        {
+          "file": "services/ordering-intelligence/served-log.js",
+          "regex": "logger\\.info\\(\"\\[for-you\\] served\", servedEvent\\(\\{ suggestionId, input, result, trace \\}\\)\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — one log line per reply"
         }
       ]
     },
@@ -1242,7 +1409,10 @@
         "navigation/MainStackNavigator.tsx",
         "__tests__/components/bubble-math.test.ts",
         "__tests__/stores/for-you-chat-ui.test.ts",
-        ".maestro/chat-minimize/flow.yaml"
+        ".maestro/chat-minimize/flow.yaml",
+        "helpers/for-you-access.ts",
+        "helpers/for-you-attribution.ts",
+        ".maestro/pilot-readiness/README.md"
       ],
       "symbols": {
         "stores/ai-helper/index.ts": [
@@ -1283,6 +1453,13 @@
           "undoClose",
           "closedToast",
           "onBotTurn"
+        ],
+        "helpers/for-you-access.ts": [
+          "forYouAccess"
+        ],
+        "helpers/for-you-attribution.ts": [
+          "noteForYouLine",
+          "forYouOrderProps"
         ]
       },
       "patterns": [
@@ -1630,6 +1807,46 @@
           "file": "helpers/for-you-copy.ts",
           "regex": "for_you_closed_toast",
           "desc": "doc reference §7g: the 'closed · undo' toast copy"
+        },
+        {
+          "file": "helpers/for-you-access.ts",
+          "regex": "const chat = !!d\\.isChatSuggestEnabled && \\(!!d\\.isChatSuggestForAll \\|\\| staff\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — the app reads the switches as the server does"
+        },
+        {
+          "file": "screens/explore.tsx",
+          "regex": "const aiHelperEnabled =\n    chatSuggestEnabled &&",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged / invariant 18 — the persona needs For you on"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "if \\(!forYouAccess\\(storeData, isShoofiEmployee\\)\\.chat\\) return false;",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged / invariant 20 — the bubble needs For you on"
+        },
+        {
+          "file": "stores/auth/index.ts",
+          "regex": "forYouStore\\.resetForAccountChange\\(\\);",
+          "desc": "doc CORE invariant 20: logout, delete and a forced sign-out clear the For-you conversation"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "silent: true,",
+          "desc": "doc CORE invariant 21 / docs/for-you.md: a For-you request never opens the app-wide error dialog"
+        },
+        {
+          "file": "utils/http-interceptor/index.ts",
+          "regex": "if \\(error\\?\\.config\\?\\.silent\\) \\{",
+          "desc": "the interceptor's opt-in silent flag (For you only; every other request unchanged)"
+        },
+        {
+          "file": "components/for-you/SuggestionCard.tsx",
+          "regex": "zIndex: 3,\n    elevation: 3,",
+          "desc": "the reason tag sits above custom-fast-image-v4's layers (zIndex 1-2) — without it the 'why' is never visible"
+        },
+        {
+          "file": "components/for-you/context-chips.ts",
+          "regex": "if \\(lastReplyCode && NOTHING_OPEN\\.has\\(lastReplyCode\\)\\) return \\[BROWSE\\];",
+          "desc": "doc CORE invariant 18: a reply with nothing to show always offers a next step"
         }
       ]
     },

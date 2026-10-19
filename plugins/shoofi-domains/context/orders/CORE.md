@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@5e4048a4 (feat/ai-helper) / 2026-10-17
+last-verified: shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -202,8 +202,13 @@ apart — always establish which is meant:
    {`ProductAddToCart`, `Cart`} and no `order_submit_success`. Add-to-cart uses
    `trackPageView`, not `trackEvent`, so it is a `page_viewed` row and easy to miss.
    A For-you chat add logs the same `ProductAddToCart` page view (its `storeDBName` is the
-   dish's store, plus `source: "for_you_chat"`) and also `button_clicked`
-   `button_id: "for_you_quick_add"` (fallbacks `for_you_quick_add_fallback` + `reason`).
+   dish's store, plus `source: "for_you_chat"` and the reply's `suggestionId`) and also
+   `button_clicked` `button_id: "for_you_quick_add"` (fallbacks `for_you_quick_add_fallback` +
+   `reason`). An order that holds For-you dishes says so on its `order_submit_success` event:
+   `for_you_lines` + `for_you_suggestion_ids` (`shoofi-app helpers/for-you-attribution.ts` —
+   noted on the phone for 24 h when a dish is added from the chat or from a store a card opened,
+   cleared once counted). Analytics only: the order payload, cart lines and `getCartData` are
+   untouched; a failure there adds nothing to the event and never blocks the submit.
    The cart's continue button logs `cart_checkout_pressed`, and `cart_checkout_blocked`
    with `reason` ∈ {`store_closed`, `store_busy`, `store_custom_message`,
    `school_order_time_invalid`, `store_status_error`} (from `screens/cart/cart.tsx`). Before

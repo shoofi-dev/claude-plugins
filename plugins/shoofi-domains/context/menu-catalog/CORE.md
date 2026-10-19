@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@f893ec90 (feat/chat-minimize) / 2026-10-18
+last-verified: shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -17,6 +17,7 @@ Server: `routes/menu.js`, `routes/product.js`, `routes/category.js`, the catalog
 worklist writer + nightly run), `routes/admin/catalog-lint.js`, `utils/crons/catalog-lint-cron.js`,
 the combo-deals trio `utils/combo-validation.js`, `services/menu/combo-snapshots.js`,
 `utils/client-features.js`, and the "For you" suggestions — `services/ordering-intelligence/`
+(incl. the server gate `access.js`, the Claude cap `chat-limits.js` and the served log `served-log.js`)
 (the catalog-facing parts are `index-builder.js`, `dish-types.js` and the live re-check in
 `suggest-service.js`; ranking/taste/open-stores ride along), `routes/for-you.js`,
 `utils/crons/suggest-index-cron.js`, `bin/build-suggest-index.js`, and the dish labelling behind
@@ -321,6 +322,16 @@ boundary and say so in the PR.
    with `replyParams.craving` (the label pair) and popular/fill cards — never the closest spelling
    of a different food. The app renders it as `for_you_reply_craving_unavailable`
    (`shoofi-app/helpers/for-you-copy.ts`).
+   **"NOT X" IS AN EXCLUSION, NEVER A FILTER FOR X.** A negator ("مش", "بدون", "بلا", "من غير",
+   "ما بدي", "בלי", "ללא", "לא", "without", "not", "no"; two-word ones read as one) turns what
+   follows — up to an ender ("مع", "بس", "من", "עם", "אבל", "with", "but", "from") — into
+   `craving.exclude`: attributes and proteins by label, a dish word's dish type, an allergen-group
+   word through the avoid word lists (`ALLERGEN_WORDS` → `conflictsWithAvoid`, so "بدون مكسرات"
+   drops "كنافة بالفستق"), and any other word by the product NAME. `satisfies` rejects
+   `isExcluded` products, and `textMode` passes the same `skip` to the popular/fill fallbacks:
+   what they said no to is in no card. A name-based exclusion replies `without_results` with
+   `replyParams.without` ("ideas without X in their names — with an allergy, ask the store").
+   Found when "مش حار" / "בלי חריף" returned a SPICY filter and "بدون مكسرات" searched FOR nuts.
 
 14. **A STORE NAMED IN A CRAVING NARROWS; A NEAR-SPELLING IS A LAST RESORT** (`store-mention.js`,
    `suggest.js` text mode). `detectStoreMentions(craving.rest, openStores)` finds open stores the
@@ -341,22 +352,37 @@ boundary and say so in the PR.
    the Claude chat is told "named X, which is CLOSED now" — found when GCP was closed at 09:48 and
    its name fell into the dish search.
 15. **CLAUDE IN THE CHAT IS OPT-IN, CAPPED, AND PICKS ONLY FROM OUR SHORTLIST** (`ai-chat.js`).
-   Only typed messages, and only while `isChatAiEnabled` is true on the platform config doc
-   (server-read; not in `SHOOFI_CONFIG_PUBLIC_FIELDS`). Off, over `chatAiDailyBudgetUsd` (default 5,
-   Israel day, summed from `aiUsage` rows with feature `for-you-chat`, cached 1 min), a 12 s timeout,
-   an API error or an unreadable reply → `aiChatTurn` returns null and the rules answer unchanged.
-   Claude sees a shortlist (≤ 40: `scoreText` matches, then the customer's own dishes, then popular —
-   open stores only), what the rules understood (craving attributes, named store, dish types, and
-   whether anything matched), a taste summary and ≤ 6 history turns; it returns
-   `{reply, pick:["p<n>"]}` and ids outside the list are dropped. Cards keep our reasons and pass
-   `applyLiveMenu`. Reply `replyCode: "ai_reply"` with `replyParams.text`, `ai: true`. Chips never call it.
+   Only typed messages, only from a LOGGED-IN customer, and only while `isChatAiEnabled` is true on
+   the platform config doc (server-read; not in `SHOOFI_CONFIG_PUBLIC_FIELDS`). Off, a visitor
+   (`not_eligible`), over `chatAiDailyBudgetUsd` (default 5, Israel day, summed from `aiUsage` rows
+   with feature `for-you-chat`, cached 1 min), over the customer's own cap (`chat-limits.js`: 20 an
+   hour, 60 a day; Redis when configured, else per-instance memory — `rate_limited`), a 6 s timeout,
+   an API error, an unreadable reply or a reply `safeReply` rejects → `aiChatTurn` returns null, the
+   rules answer unchanged, and `trace.reason` says why (invariant 21). The call uses `MODELS.chat`
+   with `apiTimeoutMs: 6000` and `apiMaxRetries: 0`: the SDK ABORTS the request (a `Promise.race`
+   only stops waiting — the request went on, was billed and logged as a success). Claude sees a
+   shortlist (≤ 40: `scoreText` matches, then the customer's own dishes, then popular — open stores
+   only, and never an `isExcluded` product), what the rules understood (craving attributes,
+   exclusions, named store, dish types, and whether anything matched), a taste summary and history
+   turns capped at 600 characters in all (newest kept); it returns `{reply, pick:["p<n>"]}` and ids
+   outside the list are dropped. The prompt forbids any "free of X / safe for an allergy" claim and
+   asks for Palestinian colloquial Arabic / gender-neutral Hebrew; `safeReply` drops a reply with a
+   link, ₪/%, a coupon or discount word, a free-of claim, digits not in a listed dish's own name, or
+   the wrong script — it is shown verbatim, so this is the prompt-injection guard. Cards keep our
+   reasons and pass `applyLiveMenu`. Reply `replyCode: "ai_reply"` with `replyParams.text`,
+   `ai: true`. Chips never call it.
 16. **EVERY CLAUDE CALL IS LOGGED AND PRICED** (`services/ai/usage-log.js`, `pricing.js`).
    `complete.js` writes one `shoofi.aiUsage` row per call — `feature` (the caller's `label`), model,
    backend, tokens, `costUsd` at list prices when it ran (bridge = 0), ms, ok/error, `meta` — for
    every AI feature, not only For you. Fire-and-forget (a failed write never fails the call); TTL 180
    days; the sink is registered at boot (`app.js`) and by `bin/label-products.js`. Admin
    "שימוש ב-Claude" (`GET /api/admin/ai-usage`, admin roles) reads it. When a price changes, change
-   `PRICES` in `pricing.js`.
+   `PRICES` in `pricing.js`. **Every model named in `MODELS` needs a price row** (a test in
+   `test/integration/for-you-ai-chat.js` fails otherwise): an unpriced call logs `costUsd: null`, and
+   the chat's budget counts such a row at `UNPRICED_BUDGET_PRICE` (twice the dearest known price) —
+   never as $0, or a model upgrade would switch the cap off. Features with their own budget or
+   quality gate have their own `MODELS` key (`chat`, `labels`); moving `best` must not move them.
+   The chat's message is stored with digits masked.
 17. **SPELLCHECK PROPOSES; A NAME CHANGES ONLY ON A PERSON'S ACCEPT, AND ONLY IF UNCHANGED**
    (`services/catalog/menu-spellcheck.js`, `docs/menu-spellcheck.md`). A monthly cron
    (`15 3 1 * *`, lock `cron:menu-spellcheck`, shared with the admin "run now") asks Claude
@@ -393,7 +419,14 @@ boundary and say so in the PR.
      Never present a best-effort key as safe; promoting one needs new label fields and a forced
      relabel (cost: invariant 12). When `avoid` removed candidates and the rules path is left
      with no card, the reply is `avoid_no_match` (`replyAfterAvoid`), never an opener over an
-     empty row; a named closed store keeps `store_closed`.
+     empty row; a named closed store keeps `store_closed`. Nothing the app SAYS about avoid is
+     absolute ("we'll try to avoid it"); the chat shows the active filter line and, after
+     `avoid_no_match`, an "edit my taste" step (app `components/for-you/context-chips.ts`).
+   - **The last check, at serve time** (`dropAtServe` in `suggest-service.js`): every card that
+     survived `applyLiveMenu`, on both paths, is checked again against `avoid` and the message's
+     exclusions using the index labels with the dish's LIVE name — a dish renamed "… shrimp" since
+     the index was built never reaches a no-seafood customer. A catch is logged (`card dropped at
+     serve time`): it means an earlier filter missed it.
    - **Everything else is a ranking signal, never a filter.** `applyProfile` puts `_bias`
      (`profileBias`: stated cuisine, spice, budget against the dish type's median price) on every
      candidate, and every popularity sort uses `qty30d × _bias`. Stated cuisines also widen the
@@ -409,18 +442,24 @@ boundary and say so in the PR.
    - **No profile = exactly the old ranking and reply codes.** `applyProfile` returns docs and
      taste untouched (`_bias ?? 1`, no `stated`, no `rejected`) — pinned by the test "with no
      profile the reply is exactly as before" (`test/integration/ai-helper.js`). Keep it green.
-   - Four more platform flags in `SHOOFI_CONFIG_PUBLIC_FIELDS`, all default off, no server
-     endpoint reads them (the gates are client-side): `isAiHelperEnabled`, `isAiHelperForAll`
-     (off = Shoofi employees only), `isAiHelperOnboardingEnabled`, `isChatOrderingEnabled`. The
-     persona shows on home when `isAiHelperEnabled && (isAiHelperForAll || isShoofiEmployee)`
-     (`screens/explore.tsx`), and while it shows the For-you home entry is hidden.
+   - Four more platform flags in `SHOOFI_CONFIG_PUBLIC_FIELDS`, all default off:
+     `isAiHelperEnabled`, `isAiHelperForAll` (off = Shoofi employees only),
+     `isAiHelperOnboardingEnabled`, `isChatOrderingEnabled`. All sit UNDER the For-you master
+     switch (invariant 21). The persona shows on home when For you is on for the customer AND
+     `isAiHelperEnabled && (isAiHelperForAll || isShoofiEmployee)` (`screens/explore.tsx`), and
+     while it shows the For-you home entry is hidden. The server enforces the same rule on
+     `routes/ai-helper.js` (`access.js`): switched off, reads answer empty and `PUT /profile` /
+     `POST /merge` answer 403 — no profile is created or merged.
 19. **THE CHAT ADDS TO THE EXISTING CART EXACTLY AS THE MENU WOULD — OR IT OPENS THE STORE**
    (`suggest.js`, `suggest-service.js`, `utils/extras-required.js`; app `hooks/useChatAddToCart.ts`,
    `helpers/chat-cart-line.ts`; reference §7f).
    - Modes `drink`, `sweet`, `cross_sell` take `cart: { appName, productIds }` and never suggest a
-     product already in it. `drink` / `sweet`: the cart's store first (no per-store cap there),
-     then other open stores at ≤ 2 each. `cross_sell`: drinks, sides and sauces from the cart's
-     store ONLY, and nothing when that store is not open. Their index clauses (`modeClauses`) are
+     product already in it. With a cart, all three offer the cart's store ONLY (no per-store cap
+     there) — a drink "that goes with your order" from another store would ask to empty the cart on
+     "+". Nothing there → `drink_unavailable_store` / `sweet_unavailable_store` with
+     `replyParams.stores` (the reply names the store); without a cart, every open store at ≤ 2 each
+     and `drink_unavailable` / `sweet_unavailable`. `cross_sell`: drinks, sides and sauces, and
+     nothing when that store is not open. Their index clauses (`modeClauses`) are
      served by `{ appName: 1, course: 1 }`, created by `ensureIndexes` in `index-builder.js`. The
      app (`isChatOrderingEnabled`) sends `drink` / `sweet` from its cart chips and `cross_sell`
      once per store per chat right after a chat add (an empty reply is dropped, `dropIfEmpty`);
@@ -457,10 +496,14 @@ boundary and say so in the PR.
 20. **THE CHAT CAN MINIMIZE INTO A FLOATING BUBBLE — FLAG OFF IS EXACTLY THE OLD CHAT, AND CLOSING
    NEVER TOUCHES THE CART** (app only: `components/for-you/bubble-math.ts`, `ChatBubbleOverlay.tsx`,
    `stores/for-you`, `screens/for-you/ForYouScreen.tsx`; reference §7g).
-   - **Gate:** `isChatMinimizeEnabled && (isChatMinimizeForAll || isShoofiEmployee)`
-     (`isChatMinimizeOn`). Both flags are in `SHOOFI_CONFIG_PUBLIC_FIELDS` (`routes/store.js`, right
-     after the four AI-helper flags; pinned by `test/integration/config-home-layout-flags.js`), default
-     off, and no server endpoint reads them.
+   - **Gate:** For you on for the customer (invariant 21) AND
+     `isChatMinimizeEnabled && (isChatMinimizeForAll || isShoofiEmployee)` (`isChatMinimizeOn`). Both
+     flags are in `SHOOFI_CONFIG_PUBLIC_FIELDS` (`routes/store.js`, right after the four AI-helper
+     flags; pinned by `test/integration/config-home-layout-flags.js`), default off, and no server
+     endpoint reads them.
+   - **Another person on the phone gets nothing of it:** logout, account delete and a forced
+     sign-out call `forYouStore.resetForAccountChange()` (`stores/auth`) — conversation, bubble and
+     home picks all go ("your usual" cards are personal).
    - **Flag OFF = the old lifecycle, unchanged:** no chevron, no header swipe, no bubble, and the chat
      `reset()`s on mount and on unmount — a fresh conversation every time. Flag ON: the conversation
      (messages, draft, scroll) lives in `forYouStore` and continues across minimize, close and reopen
@@ -475,6 +518,26 @@ boundary and say so in the PR.
      (the bubble only reads the cart count); a "رجّع" toast undoes it. Expanding pops back to a chat
      still in the stack (`StackActions.popTo("for-you")`) — never a second copy — else navigates with
      `{ restore: true }`.
+21. **FOR YOU IS GATED ON THE SERVER, AND EVERY REPLY IS LOGGED** (`services/ordering-intelligence/
+   access.js`, `served-log.js`, `routes/for-you.js`; app `helpers/for-you-access.ts`,
+   `helpers/for-you-attribution.ts`; `docs/for-you.md`).
+   - **One rule, both sides:** `chat = isChatSuggestEnabled && (isChatSuggestForAll || employee)` is
+     the MASTER switch; the AI helper, its onboarding, ordering in the chat and the bubble all need
+     it. "Employee" is `!!customer.isShoofiEmployee`, read the way `routes/customer.js` gives it to the
+     app, so the two never disagree on who is in the pilot. `POST /api/for-you/suggest` checks it
+     before any work and answers the usual `200 unavailable` when it says no — no index read, no
+     Claude call. A gate that cannot read its switches stays shut.
+   - **Every reply is served with a `suggestionId`** and leaves, without delaying the reply, one
+     `[for-you] served` log line (path rules · ai · ai_fallback · off · error with the fallback
+     reason, reply code, counts before/after avoid, cards dropped by the live and the last check,
+     `ms` per stage, Claude's model/tokens/cost) and one `shoofi.forYouServed` audit row (TTL 30
+     days on `createdAt`; masked text, avoid keys, Claude's masked reply, and per card the labels that
+     let it through). `deleteCustomerServed` removes a customer's rows (wiring it into account
+     delete is customers-domain HIGH-RISK work — customers CORE Known status). Never log the raw
+     device id or unmasked text.
+   - **Attribution stays on the phone:** the app notes dishes added from the chat or from a store a
+     card opened (24 h) and adds `for_you_lines` / `for_you_suggestion_ids` to the
+     `order_submit_success` analytics event. The order API, cart lines and `getCartData` are untouched.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified

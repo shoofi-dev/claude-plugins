@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@5e4048a4 (feat/ai-helper) / 2026-10-17",
+  "lastVerified": "shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -303,7 +303,8 @@
         "screens/checkout/index.tsx",
         "components/checkout/FutureOrderPicker.tsx",
         "hooks/checkout/use-checkout-validate.ts",
-        "screens/cart/cart.tsx"
+        "screens/cart/cart.tsx",
+        "helpers/for-you-attribution.ts"
       ],
       "patterns": [
         {
@@ -390,6 +391,11 @@
           "file": "hooks/useChatAddToCart.ts",
           "regex": "(?<![\\s\\S])(?=[\\s\\S]*cartStore\\.addProductToCartForStore\\()(?![\\s\\S]*(?:\\.addProductToCart\\s*\\(|\\.addProductListToCart\\s*\\(|\\.resetCartForNewStore\\s*\\(|submitOrder|SUBMIT_ORDER_API|use-checkout-submit))",
           "desc": "CORE invariant 13 + Known status: the chat's only way into the cart is addProductToCartForStore (never addProductToCart / addProductListToCart / resetCartForNewStore, which stamp the browsed store), and it never submits an order - the in-chat checkout card is DEFERRED"
+        },
+        {
+          "file": "hooks/checkout/use-checkout-submit.ts",
+          "regex": "\\.\\.\\.forYouOrderProps\\(order\\?\\.products\\),",
+          "desc": "doc CORE (abandonment layers): order_submit_success carries the For-you lines — analytics only, the order payload untouched"
         }
       ]
     },
