@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@5e4048a4 (feat/ai-helper) / 2026-10-17
+last-verified: shoofi-server@f893ec90 (feat/chat-minimize) / 2026-10-18
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -30,9 +30,10 @@ AI helper's taste profile does to suggestions — `services/ordering-intelligenc
 profile hooks and chat-ordering modes in `suggest.js` / `suggest-service.js`,
 `utils/extras-required.js`, and `GET /api/ai-helper/cuisines` (`routes/ai-helper.js` →
 `ai-helper-service.js`) (app: `components/ai-helper/`, `screens/ai-helper/`, `stores/ai-helper/`,
-`components/for-you/`, and the chat's quick add `hooks/useChatAddToCart.ts` +
-`helpers/chat-cart-line.ts`). Who owns a profile and the login merge are the customers domain's;
-the cart the quick add writes into and the deferred in-chat checkout are the orders domain's.
+`components/for-you/` — incl. the minimized-chat bubble — and the chat's quick add
+`hooks/useChatAddToCart.ts` + `helpers/chat-cart-line.ts`). Who owns a profile and the login
+merge are the customers domain's; the cart the quick add writes into and the deferred in-chat
+checkout are the orders domain's.
 Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/sold-by-weight.md`,
 `docs/menu-import-issues.md` (the worklist — now also documents the `lint` phase),
 `docs/combo-deals.md`, `docs/for-you.md`, `docs/menu-spellcheck.md`, `docs/ai-helper.md`.
@@ -453,6 +454,27 @@ boundary and say so in the PR.
      `shoofi.dishTaxonomy` doc, else the best seller's in the tier used; no image = left out.
      Nothing in the API writes `dishTaxonomy.img` yet. Bad location → 400; any other failure →
      `200 { cuisines: [] }`.
+20. **THE CHAT CAN MINIMIZE INTO A FLOATING BUBBLE — FLAG OFF IS EXACTLY THE OLD CHAT, AND CLOSING
+   NEVER TOUCHES THE CART** (app only: `components/for-you/bubble-math.ts`, `ChatBubbleOverlay.tsx`,
+   `stores/for-you`, `screens/for-you/ForYouScreen.tsx`; reference §7g).
+   - **Gate:** `isChatMinimizeEnabled && (isChatMinimizeForAll || isShoofiEmployee)`
+     (`isChatMinimizeOn`). Both flags are in `SHOOFI_CONFIG_PUBLIC_FIELDS` (`routes/store.js`, right
+     after the four AI-helper flags; pinned by `test/integration/config-home-layout-flags.js`), default
+     off, and no server endpoint reads them.
+   - **Flag OFF = the old lifecycle, unchanged:** no chevron, no header swipe, no bubble, and the chat
+     `reset()`s on mount and on unmount — a fresh conversation every time. Flag ON: the conversation
+     (messages, draft, scroll) lives in `forYouStore` and continues across minimize, close and reopen
+     until the app restarts (memory only, nothing persisted); a new onboarding starts fresh.
+   - **Never over money, order or identity screens.** `overlayVisible` hides the bubble while the
+     keyboard is open and on every route in `BUBBLE_HIDDEN_ROUTES`: `for-you`, `checkout-screen`,
+     `pick-time-screen`, `credit-cards`, `add-credit-card`, `order-submitted`, `login`,
+     `verify-code`, `insert-customer-name`, `ai-helper-onboarding`, `product-preview`. It matches
+     ROUTE NAMES, so a new screen in those flows must be added to the list.
+   - **Closing closes the window only.** Dropping the bubble on the × calls `forYouStore.close()`,
+     which changes `chatUi` and nothing else: the conversation stays and the cart is never touched
+     (the bubble only reads the cart count); a "رجّع" toast undoes it. Expanding pops back to a chat
+     still in the stack (`StackActions.popTo("for-you")`) — never a second copy — else navigates with
+     `{ restore: true }`.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
