@@ -293,6 +293,16 @@
           "file": "services/ordering-intelligence/ai-helper-service.js",
           "regex": "deliveredOrders: taste\\.totalOrders",
           "desc": "CORE invariant 1 / reference §5: deliveredOrders is taste.js's COMPLETED-order count, not bookDelivery deliveries"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "const CHECKOUT_EVENTS = new Set\\(\\[",
+          "desc": "doc §Where an order that never happened lives: the For-you funnel copies the checkout events (menu-catalog CORE invariant 22)"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "^  \"checkout_left\",$",
+          "desc": "doc §Where an order that never happened lives: checkout_left is among the copied checkout events"
         }
       ]
     },

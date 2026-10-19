@@ -504,7 +504,7 @@ the cache read.
 - Menu spellcheck (`routes/admin/menu-spellcheck.js`; `auth.required` + `checkAdminRole(["master","admin","manager"])`, POSTs in the audit route map): `GET /api/admin/menu-spellcheck/issues?status=open|accepted|dismissed|resolved|stale&appName=&lang=ar|he` → `{ issues (≤2000), truncated, counts, lastRun }`; `POST /api/admin/menu-spellcheck/run [{ appName }]` → `202 { started, runId }` / `409 locked` / `503 no-api-key`; `POST /api/admin/menu-spellcheck/accept { ids, fixes? }` → `{ accepted, stale, failed, outOfStockKept, rows[] }`; `POST /api/admin/menu-spellcheck/dismiss { ids }` → `{ dismissed }` (§7e)
 - `GET  /api/getTranslations`, `POST /api/translations/{update,add,delete}`
 - `POST /api/global-search` — central store name search
-- `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng}, history?, lang?, cart?: { appName, productIds }, onboarded? }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price, originalPrice?, discountPercent?, hasRequiredOptions }, dishType, reason:{ code, params }, confidence }], personalized }` (`routes/for-you.js`, `auth.optional`). Modes `opener` (default), `usual`, `new`, `surprise`, `popular`, and the chat-ordering `drink`, `sweet`, `cross_sell` (§7f); reason codes `usual`, `ordered_before`, `liked_type`, `you_like`, `popular`, `match`. Only a customer `app-type` (`shoofi-shopping` or none) personalises; without a customer, a visitor's taste profile is read by the `device-id` header (CORE invariant 18). `cart` goes through `sanitizeCart` (a string `appName` ≤ 100 chars, ≤ 50 `productIds`); `onboarded` counts only when `=== true`. Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
+- `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng}, history?, lang?, cart?: { appName, productIds }, onboarded?, conversationId?, surface? }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price, originalPrice?, discountPercent?, hasRequiredOptions }, dishType, reason:{ code, params }, confidence }], personalized }` (`routes/for-you.js`, `auth.optional`). Modes `opener` (default), `usual`, `new`, `surprise`, `popular`, and the chat-ordering `drink`, `sweet`, `cross_sell` (§7f); reason codes `usual`, `ordered_before`, `liked_type`, `you_like`, `popular`, `match`. Only a customer `app-type` (`shoofi-shopping` or none) personalises; without a customer, a visitor's taste profile is read by the `device-id` header (CORE invariant 18). `cart` goes through `sanitizeCart` (a string `appName` ≤ 100 chars, ≤ 50 `productIds`); `onboarded` counts only when `=== true`. Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
 - `GET  /api/ai-helper/cuisines?lat=&lng=` — `{ cuisines: [{ key, label_ar, label_he, img, storeCount }] }` (`routes/ai-helper.js` → `ai-helper-service.js` `getCuisines`, `auth.optional`): the onboarding's cuisine tiles (§7f). `400` without a valid location; any other failure `200 { cuisines: [] }`. The other AI-helper routes — `GET`/`PUT /api/ai-helper/profile`, `POST /api/ai-helper/merge`, `GET /api/ai-helper/facts` — are the profile's side (`docs/ai-helper.md`; ownership and merge: customers domain).
 - Dish taxonomy / labels admin (`routes/admin/dish-taxonomy.js`; every route `auth.required` + `checkAdminRole(["master","admin","manager"])`):
   `GET /api/admin/dish-taxonomy` (seeds on first use), `POST /api/admin/dish-taxonomy/:key/approve` (→ active; its proposing labels get the type + `fromApprovedProposal`, `applied` at confidence ≥ 0.5 else `review`; admin labels untouched), `POST /api/admin/dish-taxonomy/:key/reject` (proposed only), `PATCH /api/admin/dish-taxonomy/:key`, `GET /api/admin/product-labels/review[?appName=]`, `POST /api/admin/product-labels/resolve { appName, productId, dishType }` (→ `status: "admin"`; `dishType` active or null), `GET /api/admin/product-labels/runs`, `POST /api/admin/product-labels/run [{ maxProducts, stores[] }]` — `startProductLabelsJob` (same `cron:product-labels` lock and locked index rebuild as the cron) answers as soon as it knows: `202 { started: true }` (running in the background), `409` a run already holds the lock, `503` no `ANTHROPIC_API_KEY`.
@@ -795,6 +795,58 @@ it), and the `for_you_closed_toast` toast offers "رجّع" for 3.5 s (`undoClos
 `AiHelperFab` stays hidden while the bubble is out or the toast is up, then springs back.
 Tests: `__tests__/components/bubble-math.test.ts`, `__tests__/stores/for-you-chat-ui.test.ts`;
 Maestro `.maestro/chat-minimize/`.
+
+## 7h. For you quality — the funnel, the health numbers, the nightly reviewer (CORE invariant 22)
+Server `services/for-you-quality/` (`events.js`, `funnel.js`, `health.js`, `reviewer.js`,
+`targets.js`), `routes/admin/for-you-quality.js`, `utils/crons/for-you-review-cron.js`; tests
+`test/integration/for-you-quality.js`; full write-up `docs/for-you-quality.md`. Admin screen
+**איכות For you** (delivery-web `views/admin/for-you-quality/`, `master|admin`).
+
+**What the app sends.** `/api/for-you/suggest` takes `conversationId` (`[A-Za-z0-9_-]{6,64}`, born
+with a chat's first turn — `ask()` on an empty chat, which is how every chat starts and what
+`reset()` and logout leave behind; `reset()` itself is pinned in §7g and unchanged) and `surface`
+(`home` | `chat`); both land in the `forYouServed` row with the reply time, Claude's shortlist
+names, and per card its name, store, `spicy` and `sweet`. An app without them still works: its
+home loads are then reviewed as conversations, grouped by owner with a 30-minute gap.
+
+**Central collections** (all `shoofi`):
+- `forYouEvents` — the app events the funnel reads, copied by `app-logs/insert` (customer
+  app only; 90-day TTL on `created`; no `userId`). Copied: `button_clicked` / `impression`
+  whose id starts `for_you_` or `ai_helper_`; `page_viewed` `for_you`, `ai_helper_onboarding`,
+  and `ProductAddToCart` with `source: "for_you_chat"`; every `cart_checkout_pressed`,
+  `cart_checkout_blocked`, `checkout_validation_failed`, `order_submit_error`,
+  `order_submit_success`, `checkout_left`.
+- `forYouReviews` — one per conversation per Israel day: masked turns and cards, outcome
+  (tapped / added / ordered via `suggestionId` and `for_you_suggestion_ids`), `checks`,
+  `severity`, `priority` (queue order: critical 0, judged bad 1, partial 2, flagged unjudged 3,
+  flagged judged good 4, rest 5), `judge`, `status` (open · agreed · disagreed · fixed · dismissed
+  · in_tests), `human`; `owner: { kind, hash }`. 90-day TTL on `createdAt`.
+- `forYouReviewRuns` — one per run: counts, cost, `budgetHit`, `judgeSkipped`, `alreadyJudged`.
+- `forYouGoldenCases` — "add to tests": masked turns, dish names, avoid keys, the person's note as
+  the expectation; no customer id, no TTL. Nothing runs them automatically yet.
+
+**The funnel** — one phone (`user_visit_id`) per Israel day: seen → opened → chat_opened →
+engaged → picked → ordered (`order_submit_success.for_you_lines > 0`), each with its conversion,
+target and the reasons of the ones who stopped; plus the home shortcut, personalization
+(offered / started / finished / skipped / quit, where they quit, median time) and chat cart →
+order. **Health** — from `forYouServed` + `aiUsage`: path mix, fallback reasons, empty /
+unavailable / fallback rates, p50/p95 by path, avoid conflicts replayed on the stored labels,
+spend for `for-you-chat` and `for-you-review`.
+
+**The reviewer** — `30 5 * * *` Asia/Jerusalem under `ENABLE_CRONS` (lock `cron:for-you-review`),
+or `POST /api/admin/for-you-quality/review/run { day? }` (202, or 409 when locked — always 409
+without Redis). Checks: `avoid_conflict` and `ignored_negation` (critical); `error_reply`,
+`empty_reply`, `slow` (rules 3 s / Claude 6 s), `ai_timeout|ai_api_error|ai_parse|ai_filtered`,
+`rephrased_no_pick`, `no_engagement` (warn). The judge reads critical → typed → flagged → a sample,
+at most `forYouReviewMaxPerDay` (300), until today's `for-you-review` spend reaches
+`forYouReviewDailyBudgetUsd` ($3; ≈ $0.006 per conversation on Sonnet 5). It answers `{ verdict,
+score, issues[code], explanation, fix{type} }` in Hebrew; unknown codes are dropped.
+
+**Admin API** (`auth.required` + `checkAdminRole(["master","admin"])`): `GET
+/api/admin/for-you-quality/funnel?from=&to=`, `GET …/health?from=&to=` (Israel days, ≤ 31),
+`GET …/reviews?day=&severity=&status=&verdict=&limit=&skip=` (+ `bySeverity`, `byVerdict`,
+`calibration`, `lastRun`), `GET …/reviews/:id`, `POST …/reviews/:id/decision { action, verdict?,
+note? }`, `POST …/review/run`.
 
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":

@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@bd27b5c1 (feat/for-you-quality) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -70,7 +70,16 @@
         "services/ordering-intelligence/access.js",
         "services/ordering-intelligence/chat-limits.js",
         "services/ordering-intelligence/served-log.js",
-        "test/integration/for-you-pilot-guards.js"
+        "test/integration/for-you-pilot-guards.js",
+        "services/for-you-quality/events.js",
+        "services/for-you-quality/funnel.js",
+        "services/for-you-quality/health.js",
+        "services/for-you-quality/reviewer.js",
+        "services/for-you-quality/targets.js",
+        "routes/admin/for-you-quality.js",
+        "utils/crons/for-you-review-cron.js",
+        "docs/for-you-quality.md",
+        "test/integration/for-you-quality.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -293,6 +302,22 @@
         "services/ai/complete.js": [
           "apiTimeoutMs",
           "apiMaxRetries"
+        ],
+        "services/for-you-quality/reviewer.js": [
+          "runReview",
+          "decide",
+          "calibration",
+          "priorityOf",
+          "ownerOf",
+          "PROMPT_VERSION"
+        ],
+        "services/for-you-quality/funnel.js": [
+          "computeFunnel",
+          "ONBOARDING_FLOWS"
+        ],
+        "services/for-you-quality/events.js": [
+          "isForYouEvent",
+          "mirrorForYouEvent"
         ]
       },
       "patterns": [
@@ -1380,6 +1405,91 @@
           "file": "services/ordering-intelligence/served-log.js",
           "regex": "logger\\.info\\(\"\\[for-you\\] served\", servedEvent\\(\\{ suggestionId, input, result, trace \\}\\)\\);",
           "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — one log line per reply"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "const RETENTION_DAYS = 90;",
+          "desc": "doc CORE invariant 22: For you quality — the event copy is kept 90 days"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "const \\{ _id, userId, \\.\\.\\.doc \\} = logDoc;",
+          "desc": "doc CORE invariant 22: For you quality — the event copy carries no customer id"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "^    ensureIndexes\\(shoofiDb\\);$",
+          "desc": "doc CORE invariant 22: For you quality — an event copy never waits for its indexes"
+        },
+        {
+          "file": "services/ordering-intelligence/served-log.js",
+          "regex": "^  ensureIndexesOnce\\(shoofiDb\\);$",
+          "desc": "doc CORE invariant 22: For you quality — the served audit row never waits for its indexes"
+        },
+        {
+          "file": "routes/app-logs.js",
+          "regex": "if \\(appType === 'shoofi-shopping'\\) forYouEvents\\.mirrorForYouEvent\\(shoofiDb, logDoc\\);",
+          "desc": "doc CORE invariant 22: For you quality — the copy is made for the customer app only, fire-and-forget"
+        },
+        {
+          "file": "services/for-you-quality/funnel.js",
+          "regex": "if \\(Number\\(p\\.for_you_lines\\) > 0\\) j\\.ordered = true;",
+          "desc": "doc CORE invariant 22: For you quality — ordered means an order whose success event carries For-you lines"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "const FEATURE = \"for-you-review\";",
+          "desc": "doc CORE invariant 22: For you quality — the judge has its own usage feature and budget"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "backend: \"api\",",
+          "desc": "doc CORE invariant 22: For you quality — the judge runs on the paid API"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "if \\(avoidConflicts\\(row\\) > 0\\) out\\.push\\(\\{ code: \"avoid_conflict\", severity: \"critical\", turn \\}\\);",
+          "desc": "doc CORE invariant 22: For you quality — an avoid conflict is critical"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "if \\(ignored\\) out\\.push\\(\\{ code: \"ignored_negation\", severity: \"critical\", turn \\}\\);",
+          "desc": "doc CORE invariant 22: For you quality — an ignored \"not X\" is critical"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "\\$setOnInsert: \\{ createdAt: now, status: \"open\", judge: null \\}",
+          "desc": "doc CORE invariant 22: For you quality — a re-run never overwrites a person's decision"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "prev\\.promptVersion === PROMPT_VERSION && prev\\.turns === it\\.conversation\\.rows\\.length",
+          "desc": "doc CORE invariant 22: For you quality — a conversation already judged by this prompt version is not paid for twice"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "hash: crypto\\.createHash\\(\"sha256\"\\)\\.update\\(raw\\)\\.digest\\(\"hex\"\\)\\.slice\\(0, 16\\),",
+          "desc": "doc CORE invariant 22: For you quality — a review keeps a one-way hash of its owner, never the customer id"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "add_to_tests: review\\.status === \"open\" \\? \"in_tests\" : review\\.status",
+          "desc": "doc CORE invariant 22: For you quality — add to tests is its own outcome"
+        },
+        {
+          "file": "routes/admin/for-you-quality.js",
+          "regex": "const ADMIN = \\[auth\\.required, checkAdminRole\\(\\[\"master\", \"admin\"\\]\\)\\];",
+          "desc": "doc CORE invariant 22: For you quality — the API is master/admin only"
+        },
+        {
+          "file": "utils/crons/for-you-review-cron.js",
+          "regex": "const SCHEDULE = \"30 5 \\* \\* \\*\";",
+          "desc": "doc CORE invariant 22: For you quality — the review runs nightly at 05:30 Israel time"
+        },
+        {
+          "file": "services/ai/complete.js",
+          "regex": "^  review: \"claude-",
+          "desc": "doc CORE invariant 22: For you quality — the judge has its own model key"
         }
       ]
     },
@@ -1847,6 +1957,16 @@
           "file": "components/for-you/context-chips.ts",
           "regex": "if \\(lastReplyCode && NOTHING_OPEN\\.has\\(lastReplyCode\\)\\) return \\[BROWSE\\];",
           "desc": "doc CORE invariant 18: a reply with nothing to show always offers a next step"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "if \\(this\\.messages\\.length === 0\\) this\\.conversationId = newConversationId\\(\\);",
+          "desc": "reference §7h: a conversation id is born with the chat's first turn, so starting over gets a new one"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "fetchSuggestions\\(location, \\{ mode: \"opener\", surface: \"home\" \\}\\)",
+          "desc": "reference §7h: the home box's load says it is the home box"
         }
       ]
     },
@@ -1858,7 +1978,9 @@
         "src/apis/admin/ai-usage.ts",
         "src/views/admin/stores/MenuSpellcheck.tsx",
         "src/apis/admin/menu-spellcheck.ts",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/views/admin/for-you-quality/ForYouQuality.tsx",
+        "src/apis/admin/for-you-quality.ts"
       ],
       "symbols": {},
       "patterns": [
@@ -1886,6 +2008,16 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isChatMinimizeEnabled: false,\\n\\s*isChatMinimizeForAll: false,",
           "desc": "doc reference §7g / §8: the two chat-minimize switches under Settings → Shoofi, default off"
+        },
+        {
+          "file": "src/components/Sidebar/Sidebar.tsx",
+          "regex": "path: \"/admin/for-you-quality\".*roles: \\[\"master\", \"admin\"\\]",
+          "desc": "doc CORE invariant 22: For you quality — the screen is master/admin only, matching the server"
+        },
+        {
+          "file": "src/views/admin/settings/ShoofiSettings.tsx",
+          "regex": "forYouReviewDailyBudgetUsd",
+          "desc": "doc CORE invariant 22: For you quality — the reviewer's daily budget is set in Settings → Shoofi"
         }
       ]
     }
