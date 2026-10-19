@@ -823,8 +823,12 @@ measured again ON THE TAP: the mount's measure can land mid-push, with `x` off b
 width, and the chat then aimed at the mirror of the bubble's spot (recorded; the pre-genie shrink
 had the same bug).
 With the flag, `chatBottomSpacing` (`components/for-you/chat-layout.ts`) sets the bottom: the input
-8 pt above the safe area (AppContainer already adds the bottom inset to non-tab screens; the
-keyboard lift subtracts it), chips → input 8, dock → chips 8, no divider above the chips.
+8 pt above the safe area, chips → input 8, dock → chips 8, no divider above the chips. With the
+flag the CHAT owns its bottom inset: `AppContainer` drops its bottom edge for `for-you`
+(`chatOwnsInset`) and the chat pads `inset + 8` itself (`parentAppliesInset: false`). An inset
+applied there resized home — drawn under the see-through chat — by ~34 pt while the chat was up,
+so home's floating footer rose on open and dropped on close (Sari, 2026-10-19). Flag off: the
+parent still applies it, today's values.
 
 **The bubble** (`ChatBubbleOverlay.tsx`, mounted once in `components/layout/app-container/index.tsx`
 with the focused leaf route name): 64 px, drags 1:1, snaps to a side (fling projected 0.18 s),

@@ -2164,13 +2164,13 @@
         },
         {
           "file": "components/for-you/chat-layout.ts",
-          "regex": "inputPaddingBottom: keyboardHeight \\|\\| parentAppliesInset \\? 8 : insetsBottom,",
-          "desc": "doc reference §7g: the input 8 pt above the safe area the parent already applies"
+          "regex": "inputPaddingBottom: keyboardHeight \\|\\| parentAppliesInset \\? 8 : insetsBottom \\+ 8,",
+          "desc": "doc reference §7g: the input 8 pt above the safe area, whoever applies the inset"
         },
         {
           "file": "screens/for-you/ForYouScreen.tsx",
-          "regex": "parentAppliesInset: true,",
-          "desc": "doc reference §7g: the chat is a stack screen — AppContainer keeps its bottom safe area"
+          "regex": "parentAppliesInset: !minimizeOn,",
+          "desc": "doc reference §7g: with minimize on the chat owns its bottom inset (home under the see-through chat must not resize)"
         },
         {
           "file": "components/for-you/chat-layout.ts",
@@ -2251,6 +2251,11 @@
           "file": "screens/for-you/ForYouScreen.tsx",
           "regex": "\\(\\) => closing\\.value === 1 && m\\.value >= GENIE_HANDOFF,",
           "desc": "doc reference §7g: the close hands over to the bubble at GENIE_HANDOFF, not at the curve's end"
+        },
+        {
+          "file": "components/layout/app-container/index.tsx",
+          "regex": "FLOATING_TAB_BAR_SCREENS\\.indexOf\\(currentRouteName\\) > -1 \\|\\| chatOwnsInset",
+          "desc": "doc reference §7g: AppContainer drops its bottom edge for the chat with minimize on — else home's footer jumps on open / close"
         }
       ]
     },
