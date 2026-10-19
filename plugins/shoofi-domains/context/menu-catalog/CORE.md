@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@69c1f656 (fix/for-you-recording-issues) / 2026-10-19
+last-verified: shoofi-server@1870b2ff (feat/for-you-taste-redis-cache) / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -210,6 +210,18 @@ boundary and say so in the PR.
      opens a store whose menu does not contain the product.
    - Nothing writes the menu cache; no cache key to clear. Catalog writes do not need to touch
      the index — the next build and the live re-check cover them.
+   - **The customer's taste is cached 10 min and SHARED across instances** (`taste.js`
+     `getCustomerTaste`): Redis key `fy:taste:v<CACHE_VERSION>:<customerId>`, `PX` 10 min, via the
+     shared `utils/redis-lock` client, when `REDIS_URL || REDIS_HOST` and not `E2E_SANDBOX`. Redis is
+     only a shortcut — unconfigured, an error, a 150 ms timeout or an unreadable value falls back
+     to the per-process capped map (2000) for that call, and a failure skips Redis for 30 s; the
+     write is fire-and-forget. While Redis works it is the truth: a Redis miss recomputes, it never
+     falls through to a memory copy. The taste holds Maps, so it crosses Redis via
+     `serializeTaste`/`deserializeTaste` (exact round trip); **bump `CACHE_VERSION` when
+     `computeTaste`'s shape changes**. `invalidateCustomerTaste` drops both copies but is NOT wired
+     to any order transition — a completed order reaches For you within 10 min. The dry run
+     (`opts.dishTypes`) and the no-customer `EMPTY_TASTE` are never cached. Pinned by
+     `test/integration/for-you-taste-cache.js`.
    - **Three platform flags gate the client:** `isChatSuggestEnabled` (home entry + chat),
      `isChatVoiceEnabled` (mic) and `isChatSuggestForAll` (staged rollout) on the
      central platform config document (app-name `shoofi`), exposed only because they are in

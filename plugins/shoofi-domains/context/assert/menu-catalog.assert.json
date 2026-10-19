@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@69c1f656 (fix/for-you-recording-issues) / 2026-10-19",
+  "lastVerified": "shoofi-server@1870b2ff (feat/for-you-taste-redis-cache) / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -69,6 +69,8 @@
         "test/integration/config-home-layout-flags.js",
         "services/ordering-intelligence/access.js",
         "services/ordering-intelligence/chat-limits.js",
+        "services/ordering-intelligence/taste.js",
+        "test/integration/for-you-taste-cache.js",
         "services/ordering-intelligence/served-log.js",
         "test/integration/for-you-pilot-guards.js",
         "services/for-you-quality/events.js",
@@ -325,6 +327,13 @@
         "services/for-you-quality/events.js": [
           "isForYouEvent",
           "mirrorForYouEvent"
+        ],
+        "services/ordering-intelligence/taste.js": [
+          "getCustomerTaste",
+          "serializeTaste",
+          "deserializeTaste",
+          "invalidateCustomerTaste",
+          "redisKeyOf"
         ]
       },
       "patterns": [
@@ -1347,6 +1356,36 @@
           "file": "services/ordering-intelligence/chat-limits.js",
           "regex": "const LIMITS = \\{ perHour: 20, perDay: 60 \\};",
           "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — the per-customer cap"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "const CACHE_TTL_MS = 10 \\* 60 \\* 1000;\\s*const CACHE_MAX = 2000;\\s*const CACHE_VERSION = \\d+;\\s*const REDIS_TIMEOUT_MS = 150;\\s*const REDIS_BACKOFF_MS = 30 \\* 1000;",
+          "desc": "doc CORE invariant 11 / reference §7c: the taste cache is 10 min, memory capped at 2000, Redis given 150 ms and skipped 30 s after a failure"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "const redisKeyOf = \\(customerId\\) => `fy:taste:v\\$\\{CACHE_VERSION\\}:\\$\\{customerId\\}`;",
+          "desc": "doc CORE invariant 11 / reference §7c: the shared key carries the shape version, so a shape change never reads an old value"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "const redisConfigured = \\(\\) => !process\\.env\\.E2E_SANDBOX && Boolean\\(process\\.env\\.REDIS_URL \\|\\| process\\.env\\.REDIS_HOST\\);",
+          "desc": "doc CORE invariant 11 / reference §7c: Redis only when configured and never in the E2E sandbox (same gate as chat-limits.js)"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "redis\\.set\\(redisKeyOf\\(customerId\\), payload, \\\"PX\\\", CACHE_TTL_MS\\)\\)\\.catch\\(",
+          "desc": "doc CORE invariant 11 / reference §7c: the Redis write expires with the TTL and is fire-and-forget"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "if \\(fromRedis\\.taste\\) return fromRedis\\.taste;\\s*shared = fromRedis\\.ok;[\\s\\S]*?if \\(!shared\\) \\{\\s*const cached = cacheGet\\(cacheKey, now\\);",
+          "desc": "doc CORE invariant 11: while Redis answers it is the truth - a Redis miss recomputes, memory is read only when Redis is absent or failed"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "if \\(!opts\\.dishTypes\\) \\{\\s*cacheSet\\(cacheKey, taste, now\\);\\s*if \\(shared\\) redisSetTaste\\(cacheKey, taste\\);",
+          "desc": "doc CORE invariant 11 / reference §7c: the dry run's supplied dish types are never cached, in memory or Redis"
         },
         {
           "file": "services/ordering-intelligence/ai-chat.js",
