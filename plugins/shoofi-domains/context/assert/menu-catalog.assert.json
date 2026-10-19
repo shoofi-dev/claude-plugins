@@ -2171,6 +2171,16 @@
           "file": "screens/for-you/ForYouScreen.tsx",
           "regex": "parentAppliesInset: true,",
           "desc": "doc reference §7g: the chat is a stack screen — AppContainer keeps its bottom safe area"
+        },
+        {
+          "file": "components/for-you/chat-layout.ts",
+          "regex": "presentation: \"transparentModal\" as const,",
+          "desc": "doc reference §7g: the chat's card is see-through during the bubble transitions (no white flash, no parallax)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "frameRef\\.current\\?\\.measureInWindow",
+          "desc": "doc reference §7g: the animation's frame is measured on an untransformed wrapper"
         }
       ]
     },

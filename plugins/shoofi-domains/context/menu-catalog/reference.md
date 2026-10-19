@@ -795,6 +795,11 @@ through. The stack's swipe-back is off app-wide (`gestureEnabled: false`) and ha
 gesture-handler root above the navigator, so on iOS the chat draws its own edge swipe: a 14 pt
 strip on the PHYSICAL right edge (RTL's back edge), below the header, past 30 % of the width or a
 fling. The chat draws its own shrink onto the bubble (380 ms) and leaves with no stack animation.
+During the bubble transitions (the `restore` expand route, and from the moment a minimize starts) the
+chat's card is see-through — `CHAT_SEE_THROUGH_OPTIONS` (`components/for-you/chat-layout.ts`:
+`transparentModal`, transparent card, no dim, the screen underneath kept attached and NOT
+parallax-shifted) — or it flashes white; and the frame it animates from is measured on an
+UNTRANSFORMED wrapper (`measureInWindow` on the animated root returns the transformed rect).
 With the flag, `chatBottomSpacing` (`components/for-you/chat-layout.ts`) sets the bottom: the input
 8 pt above the safe area (AppContainer already adds the bottom inset to non-tab screens; the
 keyboard lift subtracts it), chips → input 8, dock → chips 8, no divider above the chips.
