@@ -782,8 +782,9 @@ a home chip still asks its mode after what is there — and leaving it closes th
 (`components/layout/header/header.tsx`), so no app header (address / coins) is drawn above the chat;
 its own header sits right under the status bar.
 
-**Minimize** — the header's ONE chevron (`for-you-minimize`, where the back arrow is with the flag
-off; no grab handle, no ×), a header swipe down (over 120 px, or over 40 px at over 600 px/s), back
+**Minimize** — the header's ONE chevron (`for-you-minimize`, `components/for-you/ChatHeader.tsx`: at
+the PHYSICAL left end, the title and a 40 px persona on the right, laid out `direction: "ltr"` so
+Arabic and Hebrew match; no grab handle, no ×; flag off: today's back arrow), a header swipe down (over 120 px, or over 40 px at over 600 px/s), back
 or the edge swipe, or a card tap (it still opens the store; with the flag the chat minimizes instead
 of closing). Back and the edge swipe minimize a USED chat — a turn of the customer's own
 (`forYouStore.customerTurns`) or items in the cart — and just close an unused one (`leaveAction`).
@@ -793,8 +794,9 @@ through. The stack's swipe-back is off app-wide (`gestureEnabled: false`) and ha
 gesture-handler root above the navigator, so on iOS the chat draws its own edge swipe: a 14 pt
 strip on the PHYSICAL right edge (RTL's back edge), below the header, past 30 % of the width or a
 fling. The chat draws its own shrink onto the bubble (380 ms) and leaves with no stack animation.
-With the flag, the input bar sits 8 pt above the safe area (AppContainer already adds the bottom
-inset to non-tab screens) and the keyboard lift subtracts that inset.
+With the flag, `chatBottomSpacing` (`components/for-you/chat-layout.ts`) sets the bottom: the input
+8 pt above the safe area (AppContainer already adds the bottom inset to non-tab screens; the
+keyboard lift subtracts it), chips → input 8, dock → chips 8, no divider above the chips.
 
 **The bubble** (`ChatBubbleOverlay.tsx`, mounted once in `components/layout/app-container/index.tsx`
 with the focused leaf route name): 64 px, drags 1:1, snaps to a side (fling projected 0.18 s),

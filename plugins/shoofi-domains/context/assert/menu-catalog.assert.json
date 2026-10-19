@@ -1642,7 +1642,9 @@
         ".maestro/pilot-readiness/README.md",
         "helpers/splash-state.ts",
         "__tests__/helpers/arabic-punctuation-copy.test.ts",
-        "__tests__/helpers/splash-state.test.ts"
+        "__tests__/helpers/splash-state.test.ts",
+        "components/for-you/ChatHeader.tsx",
+        "components/for-you/chat-layout.ts"
       ],
       "symbols": {
         "stores/ai-helper/index.ts": [
@@ -2151,14 +2153,24 @@
           "desc": "doc reference §7g: the chat's own iOS edge swipe, flag ON only"
         },
         {
-          "file": "screens/for-you/ForYouScreen.tsx",
-          "regex": "\\{ paddingBottom: minimizeOn \\? Math\\.max\\(0, keyboardHeight - insets\\.bottom\\) : keyboardHeight \\}",
-          "desc": "doc reference §7g: the keyboard lift subtracts the bottom inset AppContainer already adds"
-        },
-        {
           "file": "components/layout/header/header.tsx",
           "regex": "^  \"for-you\",$",
           "desc": "doc reference §7g: the chat is full screen — no app header above it"
+        },
+        {
+          "file": "components/for-you/ChatHeader.tsx",
+          "regex": "direction: \"ltr\",",
+          "desc": "doc reference §7g: the minimize header is laid out physically — the chevron at the left end in every language"
+        },
+        {
+          "file": "components/for-you/chat-layout.ts",
+          "regex": "inputPaddingBottom: keyboardHeight \\|\\| parentAppliesInset \\? 8 : insetsBottom,",
+          "desc": "doc reference §7g: the input 8 pt above the safe area the parent already applies"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "parentAppliesInset: true,",
+          "desc": "doc reference §7g: the chat is a stack screen — AppContainer keeps its bottom safe area"
         }
       ]
     },
