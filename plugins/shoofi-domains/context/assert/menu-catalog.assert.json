@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@bd27b5c1 (feat/for-you-quality) / 2026-10-18",
+  "lastVerified": "shoofi-server@69c1f656 (fix/for-you-recording-issues) / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -79,7 +79,8 @@
         "routes/admin/for-you-quality.js",
         "utils/crons/for-you-review-cron.js",
         "docs/for-you-quality.md",
-        "test/integration/for-you-quality.js"
+        "test/integration/for-you-quality.js",
+        "test/integration/for-you-seen.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -165,7 +166,8 @@
           "filterByAvoid",
           "hasRequiredOptions",
           "replyAfterAvoid",
-          "dropAtServe"
+          "dropAtServe",
+          "topUpSeen"
         ],
         "utils/crons/suggest-index-cron.js": [
           "startSuggestIndexCron",
@@ -262,7 +264,11 @@
           "fromCartStoreFirst",
           "drinkMode",
           "sweetMode",
-          "crossSellMode"
+          "crossSellMode",
+          "SEEN_MODES",
+          "appliesSeen",
+          "modeCaps",
+          "topUpWithSeen"
         ],
         "utils/extras-required.js": [
           "hasRequiredOptions"
@@ -280,7 +286,8 @@
         ],
         "routes/for-you.js": [
           "sanitizeCart",
-          "deviceIdFromRequest"
+          "deviceIdFromRequest",
+          "sanitizeSeen"
         ],
         "services/ordering-intelligence/access.js": [
           "resolveAccess",
@@ -1490,6 +1497,116 @@
           "file": "services/ai/complete.js",
           "regex": "^  review: \"claude-",
           "desc": "doc CORE invariant 22: For you quality — the judge has its own model key"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "const MAX_SEEN = 40;\\nconst MAX_SEEN_ID_LENGTH = 120;",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — seen keeps at most 40 ids of at most 120 characters"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "if \\(!Array\\.isArray\\(seen\\)\\) return \\[\\];",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — anything but an array is ignored, never a 400"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "if \\(typeof id === \"string\" && id\\.length > 0 && id\\.length <= MAX_SEEN_ID_LENGTH\\) ids\\.add\\(id\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — only strings of 1-120 characters, each kept once"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "if \\(ids\\.size >= MAX_SEEN\\) break;",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the first 40 sent are kept — the newest, as the list is newest first"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "seen: sanitizeSeen\\(seen\\),",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the service only ever gets the sanitised list"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const SEEN_MODES = new Set\\(\\[\"popular\", \"surprise\", \"new\", \"drink\", \"sweet\", \"cross_sell\"\\]\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — exactly these six modes; never usual or the opener"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const appliesSeen = \\(mode, text\\) => !\\(text && text\\.trim\\(\\)\\) && SEEN_MODES\\.has\\(mode\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — typed text never applies seen (a match is relevant again)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "MIN_UNSEEN_CARDS: 2,",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — fewer than 2 unseen cards and the seen ones top the reply up"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const unseen = input\\.docs\\.filter\\(\\(d\\) => !seenIds\\.has\\(keyOf\\(d\\.appName, d\\.productId\\)\\)\\);\\n\\s*const fresh = MODES\\[effectiveMode\\]\\(\\{ \\.\\.\\.input, docs: unseen \\}\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the same mode, every rule of it, on the unseen candidates, cut from the profile-weighted docs so the weights do not shift"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(mode === \"surprise\"\\) return \\{ perStore: 1, limit: Math\\.min\\(limit, SURPRISE_MAX\\) \\};",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — a surprise top-up stays one per store and 4 cards"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "return \\{ perStore: RULES\\.MAX_PER_STORE, limit \\};",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — other top-ups keep 2 per store"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(ids\\.has\\(c\\.id\\) \\|\\| n >= perStore\\) continue;",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the top-up never breaks the per-store cap"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const cards = dropAtServe\\(live, docsByKey, avoid, craving, trace\\)\\.slice\\(0, limit\\);\\n\\s*const served = await topUpSeen\\(ranked, cards, \\{ limit, dbFor, docsByKey, avoid, craving, trace \\}\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the top-up is decided on the cards that passed the live re-check and the last check"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "if \\(!normal \\|\\| cards\\.length >= RULES\\.MIN_UNSEEN_CARDS\\) return \\{ reply: ranked, cards \\};",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — only when fewer than 2 unseen cards survived"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const live = await applyLiveMenu\\(rest, dbFor\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the top-up's cards go through the live re-check"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const kept = dropAtServe\\(live, docsByKey, avoid, craving, lastCheck\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — and through the last check"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "return \\{ reply: cards\\.length \\? ranked : normal, cards: merged \\};",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — nothing unseen survived: the normal reply's code (drink_ideas, not drink_unavailable_store)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "trace\\.seen = appliesSeen\\(mode, text\\) \\? \\(seen \\|\\| \\[\\]\\)\\.length : 0;",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the served line counts the ids applied, 0 when the mode ignores them"
+        },
+        {
+          "file": "services/ordering-intelligence/served-log.js",
+          "regex": "seen: trace\\.seen \\?\\? 0,\\n\\s*seenTopUp: trace\\.seenTopUp \\?\\? 0,",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the [for-you] served line carries seen and seenTopUp"
+        },
+        {
+          "file": "test/integration/for-you-seen.js",
+          "regex": "popular after the opener: none of the opener's dishes come back while enough others exist",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the test of the bug as recorded"
+        },
+        {
+          "file": "test/integration/for-you-seen.js",
+          "regex": "top-up is decided AFTER the live re-check: a sold-out unseen dish never leaves a one-card reply",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the test that pins the decision after the checks"
+        },
+        {
+          "file": "test/integration/for-you-seen.js",
+          "regex": "top-up: nothing unseen left — the reply is the normal one, never empty",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the test that pins never empty because of seen"
         }
       ]
     },
@@ -1522,7 +1639,10 @@
         ".maestro/chat-minimize/flow.yaml",
         "helpers/for-you-access.ts",
         "helpers/for-you-attribution.ts",
-        ".maestro/pilot-readiness/README.md"
+        ".maestro/pilot-readiness/README.md",
+        "helpers/splash-state.ts",
+        "__tests__/helpers/arabic-punctuation-copy.test.ts",
+        "__tests__/helpers/splash-state.test.ts"
       ],
       "symbols": {
         "stores/ai-helper/index.ts": [
@@ -1967,6 +2087,51 @@
           "file": "stores/for-you/index.ts",
           "regex": "fetchSuggestions\\(location, \\{ mode: \"opener\", surface: \"home\" \\}\\)",
           "desc": "reference §7h: the home box's load says it is the home box"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "export const SEEN_MODES: ForYouMode\\[\\] = \\[\"popular\", \"surprise\", \"new\", \"drink\", \"sweet\", \"cross_sell\"\\];",
+          "desc": "doc CORE invariant 23: the app sends seen for exactly the server's six modes"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "const seen = !input\\.text && input\\.mode && SEEN_MODES\\.includes\\(input\\.mode\\) \\? this\\.seenCardIds\\(\\) : \\[\\];",
+          "desc": "doc CORE invariant 23: never for typed text, only for the seen modes"
+        },
+        {
+          "file": "screens/ai-helper/AiHelperOnboardingScreen.tsx",
+          "regex": "budget: budgetChosen\\.current \\? budget : null,",
+          "desc": "doc CORE invariant 18: the budget is saved only once tapped"
+        },
+        {
+          "file": "stores/ai-helper/index.ts",
+          "regex": "stated: \\{ \\.\\.\\.UNKNOWN_STATED \\},",
+          "desc": "doc CORE invariant 18: a first local profile starts from unknown, not the UI defaults"
+        },
+        {
+          "file": "stores/ai-helper/index.ts",
+          "regex": "export const EMPTY_STATED: TasteStated = \\{ cuisines: \\[\\], spice: 1, avoid: \\[\\], mealTimes: \\[\"dinner\"\\], budget: null \\};",
+          "desc": "doc CORE invariant 18: the budget is never pre-selected"
+        },
+        {
+          "file": "components/ai-helper/AiHelperFab.tsx",
+          "regex": "const stop = splashState\\.whenGone\\(\\(\\) => \\{",
+          "desc": "doc CORE invariant 18: the peek and the persona's impressions wait for the splash to be gone"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "splashState\\.markGone\\(\\);",
+          "desc": "doc CORE invariant 18: App.tsx marks the splash gone when its fade ends"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "const clearSheet = useCallback\\(\\(\\) => setSheet\\(\\(s\\) => \\(s\\.visible \\? s : CLOSED_SHEET\\)\\), \\[\\]\\);",
+          "desc": "doc reference §7f: the sheet's content is cleared only after it has hidden"
+        },
+        {
+          "file": "components/for-you/ChatProductSheet.tsx",
+          "regex": "onModalHide=\\{onHidden\\}",
+          "desc": "doc reference §7f: cleared on the modal's onModalHide"
         }
       ]
     },

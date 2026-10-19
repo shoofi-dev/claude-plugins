@@ -504,7 +504,7 @@ the cache read.
 - Menu spellcheck (`routes/admin/menu-spellcheck.js`; `auth.required` + `checkAdminRole(["master","admin","manager"])`, POSTs in the audit route map): `GET /api/admin/menu-spellcheck/issues?status=open|accepted|dismissed|resolved|stale&appName=&lang=ar|he` → `{ issues (≤2000), truncated, counts, lastRun }`; `POST /api/admin/menu-spellcheck/run [{ appName }]` → `202 { started, runId }` / `409 locked` / `503 no-api-key`; `POST /api/admin/menu-spellcheck/accept { ids, fixes? }` → `{ accepted, stale, failed, outOfStockKept, rows[] }`; `POST /api/admin/menu-spellcheck/dismiss { ids }` → `{ dismissed }` (§7e)
 - `GET  /api/getTranslations`, `POST /api/translations/{update,add,delete}`
 - `POST /api/global-search` — central store name search
-- `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng}, history?, lang?, cart?: { appName, productIds }, onboarded?, conversationId?, surface? }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price, originalPrice?, discountPercent?, hasRequiredOptions }, dishType, reason:{ code, params }, confidence }], personalized }` (`routes/for-you.js`, `auth.optional`). Modes `opener` (default), `usual`, `new`, `surprise`, `popular`, and the chat-ordering `drink`, `sweet`, `cross_sell` (§7f); reason codes `usual`, `ordered_before`, `liked_type`, `you_like`, `popular`, `match`. Only a customer `app-type` (`shoofi-shopping` or none) personalises; without a customer, a visitor's taste profile is read by the `device-id` header (CORE invariant 18). `cart` goes through `sanitizeCart` (a string `appName` ≤ 100 chars, ≤ 50 `productIds`); `onboarded` counts only when `=== true`. Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
+- `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng}, history?, lang?, cart?: { appName, productIds }, onboarded?, conversationId?, surface?, seen?: string[] }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price, originalPrice?, discountPercent?, hasRequiredOptions }, dishType, reason:{ code, params }, confidence }], personalized, suggestionId }` (`routes/for-you.js`, `auth.optional`; `suggestionId` on every reply, CORE invariant 21). Modes `opener` (default), `usual`, `new`, `surprise`, `popular`, and the chat-ordering `drink`, `sweet`, `cross_sell` (§7f); reason codes `usual`, `ordered_before`, `liked_type`, `you_like`, `popular`, `match`. Only a customer `app-type` (`shoofi-shopping` or none) personalises; without a customer, a visitor's taste profile is read by the `device-id` header (CORE invariant 18). `cart` goes through `sanitizeCart` (a string `appName` ≤ 100 chars, ≤ 50 `productIds`); `onboarded` counts only when `=== true`. `seen` — the card `id`s this chat already showed, newest first — goes through `sanitizeSeen` (strings ≤ 120 chars, deduplicated, the newest 40; anything else ignored, never a 400): `popular`, `surprise`, `new`, `drink`, `sweet`, `cross_sell` then answer from the dishes not shown yet (the same mode on the unseen candidates) and are topped up with the normal reply's other cards only when fewer than 2 unseen cards survive `applyLiveMenu` + `dropAtServe`; `usual`, the opener and typed text ignore it (CORE invariant 23). Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
 - `GET  /api/ai-helper/cuisines?lat=&lng=` — `{ cuisines: [{ key, label_ar, label_he, img, storeCount }] }` (`routes/ai-helper.js` → `ai-helper-service.js` `getCuisines`, `auth.optional`): the onboarding's cuisine tiles (§7f). `400` without a valid location; any other failure `200 { cuisines: [] }`. The other AI-helper routes — `GET`/`PUT /api/ai-helper/profile`, `POST /api/ai-helper/merge`, `GET /api/ai-helper/facts` — are the profile's side (`docs/ai-helper.md`; ownership and merge: customers domain).
 - Dish taxonomy / labels admin (`routes/admin/dish-taxonomy.js`; every route `auth.required` + `checkAdminRole(["master","admin","manager"])`):
   `GET /api/admin/dish-taxonomy` (seeds on first use), `POST /api/admin/dish-taxonomy/:key/approve` (→ active; its proposing labels get the type + `fromApprovedProposal`, `applied` at confidence ≥ 0.5 else `review`; admin labels untouched), `POST /api/admin/dish-taxonomy/:key/reject` (proposed only), `PATCH /api/admin/dish-taxonomy/:key`, `GET /api/admin/product-labels/review[?appName=]`, `POST /api/admin/product-labels/resolve { appName, productId, dishType }` (→ `status: "admin"`; `dishType` active or null), `GET /api/admin/product-labels/runs`, `POST /api/admin/product-labels/run [{ maxProducts, stores[] }]` — `startProductLabelsJob` (same `cron:product-labels` lock and locked index rebuild as the cron) answers as soon as it knows: `202 { started: true }` (running in the background), `409` a run already holds the lock, `503` no `ANTHROPIC_API_KEY`.
@@ -634,7 +634,8 @@ medianPriceOf)` on every candidate (1 = neutral, factors multiply):
 | `budget: 1` | price ≤ the median of its dish type among the candidates ×1.15; > 1.3× the median ×0.8 |
 | `budget: 3` | ≥ the median ×1.15; < 0.7× the median ×0.85 |
 
-`spice: 1` and `budget: 2` are neutral; medians are per dish type (untyped rows share one bucket)
+`spice: 1`, `budget: 2` and `budget: null` (not chosen — the app saves a budget only once it is
+tapped, CORE invariant 18) are neutral; medians are per dish type (untyped rows share one bucket)
 over the candidates' index `price`. `weighted(d) = qty30d × (_bias ?? 1)` replaces raw `qty30d` in
 `bestOfType`, `popularDocs`, `addFill`, `addStatedCuisines` and the cart modes; text mode multiplies
 its rank by `_bias`. `hasPopularEvidence` still reads raw `qty30d` — a bias never turns a product
@@ -722,10 +723,18 @@ cross-sell pill, through `hooks/useChatAddToCart.ts` `quickAdd`:
 - **Straight in only when nothing is chosen for the customer**: no defaults and valid with no
    selection. Otherwise `ChatProductSheet.tsx` opens with the defaults pre-selected (a priced
    default is shown, never added silently); single replaces, multi toggles within its cap, an
-   out-of-stock option cannot be picked.
+   out-of-stock option cannot be picked. Closing it — an add, a dismiss, a fallback — only HIDES it
+   (`hideSheet`); its content is cleared on the modal's `onModalHide` (`clearSheet`). Clearing both
+   at once flashed an empty sheet (spinner, no photo, "₪0") for the length of the slide-out.
 - **Commit**: `cartStore.addProductToCartForStore(line, storeData)` stamps an empty cart with the
    dish's store, never the browsed one (orders domain). A cart of another store is never mixed or
    silently emptied — the chat asks (`store_conflict`: empty the cart and add / keep the cart).
+
+**Arabic copy rule (app):** no punctuation straight after a final «ك» in `helpers/for-you-copy.ts` /
+`helpers/ai-helper-copy.ts`. MiddleEast (Nomad Type, the app's only typeface) draws that glyph with
+about 0.23 em of empty space on its left, so the mark looks detached («طلبك :»); measured with
+CoreText 2026-10-19. `__tests__/helpers/arabic-punctuation-copy.test.ts` guards it until the font
+itself is fixed (a licensed font — its designer's change, not ours).
 
 Reported verified on the simulator, 2026-10-17 (`docs/ai-helper.md`): the order placed after a chat
 add carried the chosen extras and the server's shadow pricing showed drift 0. Tests:
