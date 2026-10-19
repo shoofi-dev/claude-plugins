@@ -450,6 +450,18 @@ boundary and say so in the PR.
      while it shows the For-you home entry is hidden. The server enforces the same rule on
      `routes/ai-helper.js` (`access.js`): switched off, reads answer empty and `PUT /profile` /
      `POST /merge` answer 403 — no profile is created or merged.
+   - **The onboarding saves only what the customer answered.** The budget (a sub-question on the
+     meal-times step) is never pre-selected and is saved only once tapped
+     (`AiHelperOnboardingScreen.tsx` `budgetChosen`); before 2026-10-19 the pre-selected «₪₪» was
+     saved whenever a meal time was picked and weighted the ranking. A first local profile starts
+     from `UNKNOWN_STATED`, never the screens' `EMPTY_STATED` defaults, so a skip stores no spice,
+     meal time or budget the customer never gave. `budget: null` is neutral, like `budget: 2`.
+   - **The persona's peek is seen, or not shown at all.** On a cold start the home mounts UNDER the
+     launch splash; the peek (once per session: no profile yet, or a meal window) and the persona's
+     `ai_helper_fab` / `ai_helper_peek` impressions wait for `helpers/splash-state.ts` (App.tsx marks
+     it when the splash's fade ends), then for home in front and the persona visible. Fired earlier,
+     the peek played unseen, used up the session's one peek and inflated the funnel's "seen"
+     (invariant 22).
 19. **THE CHAT ADDS TO THE EXISTING CART EXACTLY AS THE MENU WOULD — OR IT OPENS THE STORE**
    (`suggest.js`, `suggest-service.js`, `utils/extras-required.js`; app `hooks/useChatAddToCart.ts`,
    `helpers/chat-cart-line.ts`; reference §7f).
@@ -595,6 +607,10 @@ boundary and say so in the PR.
      checks lets a sold-out unseen dish leave a one-card reply (test "top-up is decided AFTER the live
      re-check", `test/integration/for-you-seen.js`). The `[for-you] served` line carries `seen` (ids
      applied, 0 when the mode ignores them) and `seenTopUp` (cards the top-up added).
+   - **The app** (`stores/for-you` `SEEN_MODES`, `seenCardIds`) sends the ids of every card the
+     conversation showed, newest first, at most 40, for exactly these six modes; the list is the
+     chat's own messages, so `reset()` (closing the chat, logout) starts it empty. The two
+     `SEEN_MODES` lists — app and server — change together.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified

@@ -1639,7 +1639,10 @@
         ".maestro/chat-minimize/flow.yaml",
         "helpers/for-you-access.ts",
         "helpers/for-you-attribution.ts",
-        ".maestro/pilot-readiness/README.md"
+        ".maestro/pilot-readiness/README.md",
+        "helpers/splash-state.ts",
+        "__tests__/helpers/arabic-punctuation-copy.test.ts",
+        "__tests__/helpers/splash-state.test.ts"
       ],
       "symbols": {
         "stores/ai-helper/index.ts": [
@@ -2084,6 +2087,51 @@
           "file": "stores/for-you/index.ts",
           "regex": "fetchSuggestions\\(location, \\{ mode: \"opener\", surface: \"home\" \\}\\)",
           "desc": "reference §7h: the home box's load says it is the home box"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "export const SEEN_MODES: ForYouMode\\[\\] = \\[\"popular\", \"surprise\", \"new\", \"drink\", \"sweet\", \"cross_sell\"\\];",
+          "desc": "doc CORE invariant 23: the app sends seen for exactly the server's six modes"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "const seen = !input\\.text && input\\.mode && SEEN_MODES\\.includes\\(input\\.mode\\) \\? this\\.seenCardIds\\(\\) : \\[\\];",
+          "desc": "doc CORE invariant 23: never for typed text, only for the seen modes"
+        },
+        {
+          "file": "screens/ai-helper/AiHelperOnboardingScreen.tsx",
+          "regex": "budget: budgetChosen\\.current \\? budget : null,",
+          "desc": "doc CORE invariant 18: the budget is saved only once tapped"
+        },
+        {
+          "file": "stores/ai-helper/index.ts",
+          "regex": "stated: \\{ \\.\\.\\.UNKNOWN_STATED \\},",
+          "desc": "doc CORE invariant 18: a first local profile starts from unknown, not the UI defaults"
+        },
+        {
+          "file": "stores/ai-helper/index.ts",
+          "regex": "export const EMPTY_STATED: TasteStated = \\{ cuisines: \\[\\], spice: 1, avoid: \\[\\], mealTimes: \\[\"dinner\"\\], budget: null \\};",
+          "desc": "doc CORE invariant 18: the budget is never pre-selected"
+        },
+        {
+          "file": "components/ai-helper/AiHelperFab.tsx",
+          "regex": "const stop = splashState\\.whenGone\\(\\(\\) => \\{",
+          "desc": "doc CORE invariant 18: the peek and the persona's impressions wait for the splash to be gone"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "splashState\\.markGone\\(\\);",
+          "desc": "doc CORE invariant 18: App.tsx marks the splash gone when its fade ends"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "const clearSheet = useCallback\\(\\(\\) => setSheet\\(\\(s\\) => \\(s\\.visible \\? s : CLOSED_SHEET\\)\\), \\[\\]\\);",
+          "desc": "doc reference §7f: the sheet's content is cleared only after it has hidden"
+        },
+        {
+          "file": "components/for-you/ChatProductSheet.tsx",
+          "regex": "onModalHide=\\{onHidden\\}",
+          "desc": "doc reference §7f: cleared on the modal's onModalHide"
         }
       ]
     },

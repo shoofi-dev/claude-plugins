@@ -634,7 +634,8 @@ medianPriceOf)` on every candidate (1 = neutral, factors multiply):
 | `budget: 1` | price ≤ the median of its dish type among the candidates ×1.15; > 1.3× the median ×0.8 |
 | `budget: 3` | ≥ the median ×1.15; < 0.7× the median ×0.85 |
 
-`spice: 1` and `budget: 2` are neutral; medians are per dish type (untyped rows share one bucket)
+`spice: 1`, `budget: 2` and `budget: null` (not chosen — the app saves a budget only once it is
+tapped, CORE invariant 18) are neutral; medians are per dish type (untyped rows share one bucket)
 over the candidates' index `price`. `weighted(d) = qty30d × (_bias ?? 1)` replaces raw `qty30d` in
 `bestOfType`, `popularDocs`, `addFill`, `addStatedCuisines` and the cart modes; text mode multiplies
 its rank by `_bias`. `hasPopularEvidence` still reads raw `qty30d` — a bias never turns a product
@@ -722,10 +723,18 @@ cross-sell pill, through `hooks/useChatAddToCart.ts` `quickAdd`:
 - **Straight in only when nothing is chosen for the customer**: no defaults and valid with no
    selection. Otherwise `ChatProductSheet.tsx` opens with the defaults pre-selected (a priced
    default is shown, never added silently); single replaces, multi toggles within its cap, an
-   out-of-stock option cannot be picked.
+   out-of-stock option cannot be picked. Closing it — an add, a dismiss, a fallback — only HIDES it
+   (`hideSheet`); its content is cleared on the modal's `onModalHide` (`clearSheet`). Clearing both
+   at once flashed an empty sheet (spinner, no photo, "₪0") for the length of the slide-out.
 - **Commit**: `cartStore.addProductToCartForStore(line, storeData)` stamps an empty cart with the
    dish's store, never the browsed one (orders domain). A cart of another store is never mixed or
    silently emptied — the chat asks (`store_conflict`: empty the cart and add / keep the cart).
+
+**Arabic copy rule (app):** no punctuation straight after a final «ك» in `helpers/for-you-copy.ts` /
+`helpers/ai-helper-copy.ts`. MiddleEast (Nomad Type, the app's only typeface) draws that glyph with
+about 0.23 em of empty space on its left, so the mark looks detached («طلبك :»); measured with
+CoreText 2026-10-19. `__tests__/helpers/arabic-punctuation-copy.test.ts` guards it until the font
+itself is fixed (a licensed font — its designer's change, not ours).
 
 Reported verified on the simulator, 2026-10-17 (`docs/ai-helper.md`): the order placed after a chat
 add carried the chosen extras and the server's shadow pricing showed drift 0. Tests:
