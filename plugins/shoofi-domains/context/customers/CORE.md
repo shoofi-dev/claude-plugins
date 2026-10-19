@@ -151,8 +151,13 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
      phone does not inherit it. Idempotent: no device profile → no-op.
    - The customer app drops its cached copy — and the For-you conversation, minimized bubble and
      home picks (`forYouStore.resetForAccountChange()`) — on `logOut`, `deleteAccount` and a
-     forced sign-out (`resetAppState`). The server does **not** drop the account's profile on
-     deletion — see Known status.
+     forced sign-out (`resetAppState`). `POST /api/customer/delete` (customer-app branch only)
+     deletes the account's profile and its For-you served-audit rows AFTER the reply
+     (`deleteCustomerProfile`, `deleteCustomerServed`); a failure there is logged and never fails
+     the delete. The customer document itself stays soft-deleted (invariant 8), so a customer who
+     logs in again starts with no taste profile. The For-you quality collections need nothing
+     there: the event copy (`forYouEvents`) carries no customer id, the reviews (`forYouReviews`)
+     only a one-way hash, and golden cases none (menu-catalog CORE invariant 22).
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
@@ -171,16 +176,6 @@ All of these are **known and accepted for now**. They are scheduled work, not di
   registration, but the server routes on **`app-type`**, so the token lands correctly on
   `delivery-company.customers`. (Leftovers: an unused `db` variable in that handler, and a
   misleading header that *would* become a bug if the handler ever routed on `app-name`.)
-- **KNOWN — not yet handled (AI helper, recorded in shoofi-server `docs/ai-helper.md`,
-  2026-10-16):** `POST /api/customer/delete` does not delete the customer's
-  `shoofi.tasteProfiles` document — it outlives the deletion request, as the soft-deleted
-  customer doc itself does (invariant 8). Handling it means touching `routes/customer.js`, so
-  it is its own HIGH-RISK draft PR, not a drive-by. Since 2026-10-18 the deletes exist and are
-  tested — `deleteCustomerProfile` (`taste-profile.js`) and, for the For-you served audit
-  (`shoofi.forYouServed`, 30-day TTL), `deleteCustomerServed` (`served-log.js`); that draft PR
-  only wires them into the route. The For-you quality collections need nothing there: the event
-  copy (`forYouEvents`) carries no customer id, the reviews (`forYouReviews`) only a one-way hash,
-  and golden cases none (menu-catalog CORE invariant 22).
 
 ## Recipe — touching an auth or identity path
 1. State **which of the four app-types** your change affects — they all share these endpoints.
