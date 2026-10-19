@@ -783,8 +783,9 @@ a home chip still asks its mode after what is there — and leaving it closes th
 its own header sits right under the status bar.
 
 **Minimize** — the header's ONE chevron (`for-you-minimize`, `components/for-you/ChatHeader.tsx`: at
-the PHYSICAL left end, the title and a 40 px persona on the right, laid out `direction: "ltr"` so
-Arabic and Hebrew match; no grab handle, no ×; flag off: today's back arrow), a header swipe down (over 120 px, or over 40 px at over 600 px/s), back
+the PHYSICAL left end; on the right the 36 px persona, the name `ai_helper_name` and the subtitle
+`for_you_header_sub`, no divider; laid out `direction: "ltr"` so Arabic and Hebrew match; no grab
+handle, no ×; flag off: today's back arrow and title), a header swipe down (over 120 px, or over 40 px at over 600 px/s), back
 or the edge swipe, or a card tap (it still opens the store; with the flag the chat minimizes instead
 of closing). Back and the edge swipe minimize a USED chat — a turn of the customer's own
 (`forYouStore.customerTurns`) or items in the cart — and just close an unused one (`leaveAction`).
