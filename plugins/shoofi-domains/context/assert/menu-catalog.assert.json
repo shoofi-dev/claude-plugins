@@ -11,6 +11,7 @@
         "routes/translations.js",
         "routes/global-search.js",
         "utils/menu-cache.js",
+        "utils/general-category-order.js",
         "utils/order-stock.js",
         "services/database/DatabaseInitializationService.js",
         "utils/create-indexes.js",
@@ -334,6 +335,10 @@
           "deserializeTaste",
           "invalidateCustomerTaste",
           "redisKeyOf"
+        ],
+        "utils/general-category-order.js": [
+          "sortGeneralCategories",
+          "compareGeneralCategories"
         ]
       },
       "patterns": [
@@ -406,6 +411,41 @@
           "file": "routes/menu.js",
           "regex": "store.hasGeneralCategories",
           "desc": "doc reference §2: the menu reads this flag from the PER-STORE store doc, while the admin form writes central shoofi.stores. If this line changes, re-check the two-document drift note."
+        },
+        {
+          "file": "utils/general-category-order.js",
+          "regex": "Number\\.isFinite\\(n\\) \\? n : Infinity",
+          "desc": "doc CORE invariant 6: a general-category tile with a missing/invalid `order` sorts LAST (Mongo's {order:1} would put it first)"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "sortGeneralCategories\\(await db\\.collection\\('general-categories'\\)\\.find",
+          "desc": "doc CORE invariant 6: GET /api/menu (and /menu/refresh) serve general-category tiles sorted, never in natural order — the app renders the array as-is"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "sortGeneralCategories\\(await mockDb\\.collection\\('general-categories'\\)",
+          "desc": "doc CORE invariant 6: GET /api/menu/mock sorts tiles with the same comparator"
+        },
+        {
+          "file": "routes/category.js",
+          "regex": "sortGeneralCategories\\(await db\\.generalCategories\\.find\\(\\)",
+          "desc": "doc CORE invariant 6: the admin tile list (general/all/by-store) uses the menu's comparator, so admin and app agree"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "clearMenuCachesAfterReorder\\(appName, \"store-category/update-order\"\\)",
+          "desc": "doc CORE invariants 2 + 6: the store-category reorder clears both menu cache keys"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "clearMenuCachesAfterReorder\\(appName, \"category/general/update-order\"\\)",
+          "desc": "doc CORE invariants 2 + 6: the general-category reorder clears both menu cache keys"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "menuCache\\.clearStore\\(appName\\);\\n\\s*await menuCache\\.clearStore\\(`\\$\\{appName\\}_schoolProject`\\);\\n\\s*\\} catch \\(err\\) \\{\\n\\s*logger\\.warn\\(\"menu cache clear after reorder failed\"",
+          "desc": "doc reference §3: clearMenuCachesAfterReorder clears BOTH keys and swallows+logs a failure — the reorder is already saved"
         },
         {
           "file": "utils/catalog-lint.js",

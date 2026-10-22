@@ -107,6 +107,9 @@ strings), `discountPercent` (**drives menu discounting**), `isSchoolProject`,
 `nameAR`, `nameHE`, `img`, `order`, `isSchoolProject`, `isHidden`. Enriched at
 read with `subCategories` (the matching `categories`) — only when
 `store.hasGeneralCategories` is true.
+Served sorted by `order` via `sortGeneralCategories` (`utils/general-category-order.js`) — missing
+`order` last, ties by string `_id`; never in natural order (CORE invariant 6). `POST
+/api/category/general/add` sets no `order`, so a new tile appears last until someone drags it.
 
 ### `extras` — declared in `DatabaseInitializationService.js`, **unused**: nothing in the server reads or writes it. Every option lives embedded in its product's `extras` array (§4); delivery-web's `ExtraGroup` is editor-side only.
 ### `store` (singleton `{id:1}`) — per-store config
@@ -283,9 +286,14 @@ Two levels: `general-categories` → `categories` (linked by
 `category.supportedGeneralCategoryIds`) → `products` (linked by
 `product.supportedCategoryIds`, many-to-many). **Ordering:** categories by
 `order`; products by `categoryOrders[categoryId]`, falling back to legacy `order`.
+General-category tiles by `order` too (missing last — `sortGeneralCategories`).
 Reorder endpoints: `product.js` (`update/order`, `order-per-category`,
 `bulk-reorder`, `reset-order`, `migrate-orders`) and `store.js`
-(`store-category/update-order`, `category/general/update-order`).
+(`store-category/update-order`, `category/general/update-order`). Both `store.js`
+reorder routes write `{order}` per item with one `bulkWrite` on the `app-name` DB and then
+clear both menu cache keys (`clearMenuCachesAfterReorder`; a failed clear is logged, never
+fails the save). Admin callers: delivery-web `StoreCategoriesList.tsx` /
+`GeneralCategoriesList.tsx` drag-and-drop, which renumbers every item 0..n-1.
 
 ## 4. Product options / extras / pricing
 A product's `extras` is an **array** of extras (stored verbatim from `JSON.parse(req.body.extras)`;
