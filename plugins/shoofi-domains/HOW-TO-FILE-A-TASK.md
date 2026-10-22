@@ -12,7 +12,11 @@ automatic.
 3. That agent loads its context doc, does the work, runs the checks.
 4. It opens a **pull request and stops. It never merges.**
 5. A human reviews and merges. **That review is the only gate**, so nothing reaches
-   production unseen.
+   production unseen. The human merges either on GitHub or from the admin's
+   **"מיזוג PRs"** screen (owners only). That screen merges a feature's PRs across
+   repos together once CI is green. A PR whose title or branch says HIGH-RISK, or a
+   draft, needs its branch name typed before it merges. If the screen had to resolve a
+   merge conflict, it pauses until the owner has read the resolution.
 
 ## Write the outcome, not the implementation
 
@@ -61,7 +65,8 @@ HIGH-RISK**, with extra tests and a "what could break" section — read those cl
 
 ## What the agents will not do
 
-- **Merge anything.** Ever.
+- **Merge anything.** Ever. The "מיזוג PRs" screen does not change this. It merges
+  only when an owner presses it.
 - **Touch payments/auth internals** without an explicit decision from a human.
 - **Delete legacy code.** It's known and deliberately parked.
 - **Guess past a real ambiguity** — they'll ask instead.
