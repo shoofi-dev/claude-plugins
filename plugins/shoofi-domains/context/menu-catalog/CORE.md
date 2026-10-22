@@ -13,6 +13,7 @@ Products, categories, menu assembly, options/extras, availability & stock, catal
 Server: `routes/menu.js`, `routes/product.js`, `routes/category.js`, the catalog slice of
 `routes/store.js`, `routes/translations.js`, `routes/global-search.js`, `utils/menu-cache.js`,
 `utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`,
+`utils/general-category-order.js` (tile order),
 `utils/catalog-lint.js` (the extras lint rules), `services/catalog/catalog-lint.js` (the
 worklist writer + nightly run), `routes/admin/catalog-lint.js`, `utils/crons/catalog-lint-cron.js`,
 the combo-deals trio `utils/combo-validation.js`, `services/menu/combo-snapshots.js`,
@@ -63,6 +64,15 @@ boundary and say so in the PR.
 5. **`supportedCategoryIds` are STRINGS**, compared via `{$toString:'$_id'}`. Don't switch to
    ObjectId comparison without a data migration.
 6. **Product ordering** comes from `categoryOrders[categoryId]`, falling back to legacy `order`.
+   **General-category tiles** (`<appName>.general-categories`, `hasGeneralCategories` stores) are
+   served by `order` through ONE comparator, `sortGeneralCategories` (`utils/general-category-order.js`):
+   numeric `order` ascending, a missing/invalid `order` **last**, ties by string `_id`. `GET /api/menu`,
+   `POST /api/menu/refresh`, `GET /api/menu/mock` and the admin list
+   (`GET /api/category/general/all/by-store`) all use it, so admin and app agree. Never return
+   this collection unsorted: natural (insertion) order is what the app renders, which is how
+   super-abu-shaqra's "ملحمه" was saved first (order 0) and served 27th of 28 (2026-10-22).
+   Both reorder routes (`POST /api/store-category/update-order`,
+   `POST /api/category/general/update-order`) clear both cache keys (invariant 2).
 7. **By-weight price invariant:** a by-weight product stores its weight as an extra of
    `type:"weight"` (`{min,max,step,defaultValue,price,unit?}`, `price` = price of ONE step) and
    must satisfy `product.price === extra.price * (defaultValue / step)` to the agora. Which
