@@ -76,13 +76,32 @@ What that means for the PR you open:
   contains `HIGH-RISK`, or a PR is a draft. A money or identity change therefore
   carries `HIGH-RISK` in its branch name or title, not only in the body.
   The body alone is invisible to that check.
-- **Grouping comes from your cross-links.** Give every PR of one change the **same
-  branch name** in each repo, and link the others as `shoofi-dev/<repo>#N` or by full
-  URL. Then the set merges together and in a safe order: server first, the clients
-  next, claude-plugins after them, and shoofi-bridge last. A docs PR that names
-  its code PR only in prose ("links to follow") lands in a group of its own.
+- **Grouping comes from your cross-links, in both directions.** Give every PR of one
+  change the **same branch name** in each repo, or link the PRs **both ways** as
+  `shoofi-dev/<repo>#N` or by full URL: each PR names the others, and they name it
+  back. Edit the earlier PR's body once the later one exists. A one-way mention
+  joins nothing, on purpose; across a month of history, "found while building #X"
+  lines chained unrelated features together. A linked set merges together and in a
+  safe order: server first, the clients next, claude-plugins after them, and
+  shoofi-bridge last. A docs PR whose code PR doesn't link back, or that names it
+  only in prose ("links to follow"), lands in a group of its own.
 - **Stacked PRs are handled.** A child whose base is another PR's head is retargeted
   to `main` before that head branch is deleted.
+
+### Your PR becomes a release note
+The admin's **"הערות שחרור"** screen (`/admin/ai-merge/releases`) lists every PR
+merged into `main` in the org, from the screen or from GitHub. It groups them the
+same way the merge screen does and gives each feature one line.
+- That line is written from your **title** and the start of your **body**, and the
+  category (feature / bug / improvement / infra / docs) also reads the conventional
+  prefix (`feat`, `fix`, `docs`, `chore|ci|refactor|build|test`). So write the title
+  for the team, not for git: what changed, for whom. Put the "What" paragraph first.
+- **Released means merged into `main`.** A PR merged into another branch (a stack
+  merged in the wrong order) is stored but never listed as released.
+- shoofi-app, shoofi-partner and shoofi-shoofir changes are listed as **waiting for
+  an app update**. A merge does not put them on phones; that takes an `eas update`
+  or a store build. Never write "released" or "live" in an app PR on the strength
+  of a merge.
 
 ### When you are consulted to resolve a merge conflict
 The merge job may start a session on an **existing** PR branch whose merge with
