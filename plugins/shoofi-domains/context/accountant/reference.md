@@ -35,10 +35,18 @@ before touching any settlement math.
 ## 2. Store settlement reports — `routes/payments/admin-reports.js`
 **Generate**: `POST /api/payments/admin/reports/generate`  — per store (or all
 `business_visible` stores). Pre-generate **guards** (all skip on failure):
-1. exact-duplicate (same store+day-range) ; 2. **overlap vs NON-sent reports** ( —
-⚠️ a *sent* report does NOT block an overlapping new one, §10); 3. **orders-closed** ( —
+1. exact-duplicate (same store+day-range) ; 2. **overlap vs reports of ANY status**
+(`checkOverlappingReports` — a sent report blocks too; CORE invariant 5); 3. **orders-closed** ( —
 no store `orders` in `{"1","6"}` in range; reads the store-DB `orders` collection, which HAS
-status — the snapshot rule is respected); 4. compensations approved .
+status — the snapshot rule is respected); 4. **compensations approved**
+(`validateCompensationsApproved`): no item still pending (status not 1/2) that moves the
+store's money (`payingParty` or `compensationFor` = `business`), over the report's own
+compensation window with BSON `Date` bounds. Before 2026-10 it compared Date fields to strings
+and never fired (CORE invariant 5).
+It also returns `pendingCompensations` (`[{compensationId, orderNumber, items}]`): the
+failure is pushed to the generate response, stored on the `store-report-failures` row and
+returned by `GET /reports/failed-stores`, and the admin (GenerateReports / ReportsList
+failed-stores view) links each one to `/admin/compensations?orderNumber=…`.
 Then `generateStoreReportData`  → insert `storeReports` `status:'draft'` → HTML→PDF→Spaces.
 
 **The money-critical totals** (`admin-reports.js`) — memorize:
@@ -51,10 +59,27 @@ totalOutcomes   = totalCommission + vat + oneTimeFees + monthlyFees + campaigns
                   - couponsFromShoofi - compensationsFromShoofi
 totalForTransfer = creditCardRevenue + driveInCreditCard - totalOutcomes   ← the MASAV/bank figure
 totalForInvoice  = creditCardRevenue + driveInCreditCard                    ← tax-invoice gross
-balance          = totalForTransfer   (÷1.18 if businessType === 'exempt')
+balance          = totalForTransfer   (no VAT adjustment for any businessType — CORE invariant 1)
 ```
 Revenue comes from an internal self-call to **`stores-export-new`** (§4, the real engine).
-Commission base = **pre-discount** price so coupons can't erode Shoofi's cut. `vat = totalCommission * 0.18`.
+Commission base = the FINAL items price charged (CORE invariant 3). `vat = calculateVAT(totalCommission)` (`utils/vat.js`).
+
+**Windows** (`services/compensations/report-window.js`, CORE invariant 10): orders, coins,
+coupons and delivery-only fees use `storeReportBounds` → `[start, end]` business-day bounds
+(offset strings). Compensations use `storeCompensationWindow` → `[start, endExclusive)` Dates,
+where `endExclusive` is the next day's business-day start — passed to the two
+`GET /api/shoofiAdmin/compensations` self-calls (`payers=['business']`,
+`recipients=['business']`) with `endExclusive=true`, and stored on the report as
+`reportData.compensationWindow`. Carry-over compensations
+(`appNameBackfill.pendingReportCarryover`) are deliberately NOT date-filtered.
+
+**Compensation lock** (`checkCompensationLock`, called from `rejectIfCompensationPeriodClosed`
+in `routes/shoofi-admin.js` on add / `edit/:id` + `PUT :id` / `approve-item` / `DELETE :id`):
+409 `compensation_period_closed` when a money-moving change (`affectedParties`) hits a
+compensation whose `createdAt` is inside an existing store report's window (by `appName`) or
+driver report's window (by `deliveryCompanyId` = `item.deliveryCompany._id`). Delete +
+regenerate the report to reopen. The admin web (`CompensationManagement.tsx`,
+`CompensationModal.tsx`) shows generic error toasts and does not yet surface the 409 message.
 
 **Lifecycle**: `draft →(approve)→ approved →(send: WhatsApp monthly_report to billingContacts)→
 sent`; `send-invoice`; `create-invoice` (§5); status toggles `reportSent/invoiceSent/
@@ -71,6 +96,15 @@ invoiceReceived/transferPerformed`. Carry-over comps marked collected only on **
 - **`effectiveDeliveryFee(delivery)`** (`calc.js`) = courier earning = `order.shippingPrice`;
   twin **single-mode primary** adds `combinationFeeBase` once (one driver, both pickups); split/secondary = base only.
 - **`couponDeliveryPortion`**  peels coupon-covered delivery out of cash/CC buckets.
+- **`shoofiCouponCredit({shoofiDiscount, couponType, orderPrice, appliedAmount})`** (`calc.js`)
+  = the per-order `couponsFromShoofi` credit for a customer-specific `order_items` coupon:
+  `min(nominal, applied)`, nominal = `shoofiDiscount` (percentage → `/100 * orderPrice`),
+  applied = **`appliedCouponAmount(appliedCoupon)`** (`discountAmount ?? coupon.discountAmount`);
+  applied missing → nominal (legacy). `stores-export-new` pushes the row as
+  `{amount, itemsAmount: amount, deliveryAmount: 0}`. An empty `shoofiDiscount` on a
+  customer-specific coupon falls back to `coupon.value` — deliberately, so a store-paid
+  `COMP-*` compensation coupon is credited back against its one-time
+  `compensationsToCustomers` charge (CORE invariant 7).
 - **`getDateRange`**  — business-day boundaries via `store.openHours` (March-2026 transition fix).
 - **Cost-bearers:** store bears commission+VAT+fees+its coupon share+store-paid comps; Shoofi
   bears customer coupons (reimburses store), Shoofi comps, driver min-guarantee, drive-in cut;
@@ -80,7 +114,7 @@ invoiceReceived/transferPerformed`. Carry-over comps marked collected only on **
 Read-only aggregations: `admin.js` `/overview`, `/partners` (flat 15%), `/drivers`, `/analytics`.
 **`POST /stores-export-new` (`admin.js`) is the real revenue source** feeding store reports:
 per store, over `orders` with `status ∈ {"2","3","10","11","12"}` (completed) in range —
-commission base `originalOrderPrice||orderPrice` (pre-discount), revenue by method **minus coins**
+commission base = the charged `orderPrice` (CORE invariant 3 — not pre-discount since 2026-08-04), revenue by method **minus coins**
 (`orderPrice - coinsValue`), coupon split from per-source `couponUsages` docs. `summaries.js`
 serves partner/driver self-service views via `calc.js`.
 
@@ -94,6 +128,26 @@ PAYER×recipient (the report fields are recipient-filtered), F1–F3 per company
 the contract dropdown label. Each figure carries the stored report's value for the SAME range with a
 delta (`compareWithStoredReport`; no report = null, never 0). Cached 5 min per range, Redis-locked,
 202 while another process computes. See shoofi-server `docs/financial-overview.md`.
+
+*Store population (2026-09) — by DATA, not by today's visibility.* Candidates are every non-mock
+store (`getAllNonMockStores` in `services/exec-dashboard/store-registry.js`; `isMockStore` is the
+only test-store convention, there is no deletion flag). Live stores (visible, not coming-soon) are
+always run through the engine; a non-live store is run only if `probeNonLiveStores` (compute.js)
+finds an order of ANY status, a compensation by `order.storeData.appName`, a pending carry-over, a
+delivery-only booking, or an overlapping stored report in a window **2 days wider** than the range
+each side (the engine snaps to business-day boundaries, so the probe must over-select). A store is
+kept when `metrics.storeHasData` says its live report is not all zeros: any non-zero ACTIVITY field
+(`STORE_ACTIVITY_FIELDS`: orders, revenue by method, drive-in, coins, product discounts, Shoofi
+coupons, campaigns, compensations both ways + carry-over, delivery-only fees, commission) keeps any
+store; CONTRACT charges (`monthlyCharges`/`oneTimeCharges`) keep only a live store — the monthly
+generator bills them to live stores and never to hidden ones (08/2026: ~16 closed hidden stores
+still carry an open ₪118 monthly row). Derived totals (`totalOutcomes`, `totalForTransfer`, …) are
+never consulted. A store with an EXACT-range stored report is always kept; a store whose engine
+throws is always kept (flagged). Why: filtering on `business_visible` dropped el-patron, qashtuta,
+royal-asado and crunchy-toost (₪4,111.92 owed, sent August reports) once they were hidden.
+`missingReports` lists kept stores with no stored report OVERLAPPING the range
+(`metrics.storedReportCoverage`: `exact` | `wider` (multi-month, e.g. abuissa-grills / the-x
+01.07–31.08) | `partial` | `none` — any overlap counts as present; only `exact` is diffed).
 
 ## 5. Store ↔ Shoofi tax invoices — `routes/hyp.js` / `utils/{hyp,greeninvoice,invoice-provider}.js`
 Provider = `amazonconfigs {app:"invoiceProvider"}.active` (`greeninvoice` default | `hyp`).
@@ -136,24 +190,75 @@ summary(5)/closing(9); amounts → agorot (`Math.round(amount*100)`); Hebrew nam
 `accounting.bankAccount` (via the Excel). **There is no automated report→MASAV linkage in code** —
 a human bridges it. Payout amount = store `balance` / driver `netTotal`.
 
+## 7b. Hashavshevet export (movein.dat) — `services/accountant-export/`, `utils/hashavshevet-movein.js`
+`GET /api/payments/admin/accountant/movein?month=YYYY-MM&tab=stores|drivers[&docs=k1,k2]` (route in
+`routes/payments/admin-reports.js`; button "הורד DAT" on the admin "חשבוניות שופי לרואה חשבון"
+screen, `views/admin/invoices/AccountantInvoices.tsx`). The accountant's journal-import file for the
+documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` + what was left out).
+- **Byte format** (`utils/hashavshevet-movein.js`), reverse-engineered from the accountant's own
+  export and byte-tested against an excerpt of it (`test/fixtures/movein-example-excerpt.dat`):
+  Windows-1255, Hebrew in **logical** order, CRLF; line 1 = 180 × `0`; one 178-char record per
+  document, records separated by an **empty line**; all fields right-aligned. Offsets: ref [0,8),
+  date DDMMYY [8,14), value date [14,25), `"  $"` [25,28), name (first 22 chars) [28,50), debit
+  accts [50,58)+[58,66), credit accts [66,74)+[74,82), debit amts [82,94)+[94,106), credit amts
+  [106,118)+[118,130) (2 decimals; zero = bare `0`), spaces to 178.
+- **Month = the DOCUMENT date** (end of the report end date's month, as `create-invoice` dates it),
+  not the reports list's date-range overlap — a multi-month report is exported once.
+- **Amounts are EZcount's, not ours** (`ezcountInclusiveTotals`): per item line net =
+  round(price/1.18, 4), VAT = round(net×0.18, 4); document net and VAT = those sums rounded to 2;
+  gross = net + VAT. `storeInvoiceTotals` rebuilds the line prices `create-invoice` sends
+  (`settlementInvoiceLinePrices` — a mirror; keep it in step) and, when they don't add up to
+  `totalOutcomes`, uses the one-line rule on the total. Reproduced **259/259** system-issued
+  May–June 2026 invoices exactly. `round2(totalOutcomes)` is wrong by an agora on ~1 in 6.
+- **Stores tab** (`STORE_INVOICE_ACCOUNTS`, proven by the example): invoice = debit the store's
+  `accounting.accountantFileNumber` gross / credit **50001** net + **40002** VAT; ref `"9"+docNumber`
+  (`hypInvoiceDocNumber`). Credit note mirrored, ref `"12"+docNumber` (prefix seen only on manual
+  credit notes). History entries reversed by a credit note export both documents; cancelled
+  without one, or GreenInvoice (no doc number) → listed as `excluded`.
+- **No מספר תיק = skipped, not fatal** (owner decision 2026-09-29): a document whose store/company
+  has no usable file number (1–8 chars, no whitespace) is left out of the file and listed in
+  `skipped` with its document keys; the UI shows it as a note. Because a movein import is not
+  idempotent, the note warns not to re-import the whole month and offers "הורד רק את המסמכים שחסרו",
+  which re-requests with `docs=<those keys>` (keys: `type:docNumber` for stores — one HYP sequence;
+  `type:companyId:docNumber` for companies — per-company numbering; max 500).
+  Every document skipped → **422 `nothing-exportable`** (no header-only file). A document that can't
+  be written exactly whatever the accountant does (bad document number, non-positive amount) still
+  → **422 `blocked`**, whole file refused.
+- **Drivers tab**: "חשבונית חברה" / "חשבונית פיצויים" are issued BY each company from its own HYP
+  account (`create-company-invoice` → `createInvoiceOnBehalf`, customer = Shoofi), for money Shoofi
+  pays out (`earningsByCreditCard`; compensations/bonuses/top-up); numbered per company. They are the
+  counterpart of the stores tab's "חשבונית חנות", not of Shoofi's invoices, and the accountant's
+  file contains neither kind (verified 2026-09-28). They are Shoofi's **purchase** side; the expense /
+  input-VAT accounts and ref prefix are unknown → `DRIVER_INVOICE_ACCOUNTS` all `null` →
+  **422 `missing-config`** until the accountant supplies them. The purchase layout (debit expense
+  net + input VAT, credit company gross) is the credit-note layout and is unverified.
+- **It is not the full HYP ledger.** Documents issued by hand in HYP (receipts, manual invoices,
+  manual credit notes) and any HYP document whose number never reached our DB are absent — the
+  accountant's May–June file had 26 such records out of 285.
+
 ## 8. Data model
-- **`shoofi.storeReports`** — `{storeId, appName, dateRange, reportType, status(draft|approved|sent),
+- **`shoofi.storeReports`** (collection `store-reports`) — `{storeId, appName, dateRange, reportType, status(draft|approved|sent),
   reportData{creditCardRevenue, cashRevenue, coins*, driveIn*, couponsFromShoofi,
   compensationsFromShoofi, totalIncomes, commission, coinsCommission, vatOnCommission, oneTime/
   monthlyCharges, campaigns, compensationsTo*, carryover*, driveInShoofi, totalOutcomes,
-  totalForTransfer, totalForInvoice, balance, commissionPercent, businessType}, reportSent,
+  totalForTransfer, totalForInvoice, balance, commissionPercent, businessType,
+  compensationWindow{start, endExclusive} (2026-10+; absent on older reports)}, reportSent,
   invoiceSent, invoiceReceived, transferPerformed, pdfUrl, greenInvoice*, hyp*Invoice*}`.
-- **`shoofi.driverReports`** — `{deliveryCompanyId, dateRange, reportData{totalDeliveries,
+- **`shoofi.driverReports`** (collection `driver-reports`) — `{deliveryCompanyId (string), dateRange, reportData{totalDeliveries,
   totalDriverPayment, earningsBy*, totalBonuses, totalCompensations, totalDriverCharges,
   totalMinGuaranteeTopUp, netTotal, driverPayments[]}, status, transferPerformed, pdfUrl}`.
 - **`delivery-company.driverDailyHours`** — `{driverId, date, activeMinutes, inShiftMinutes,
   inWorkingHoursMinutes, …}` (nightly cron; live fallback from `driverStatusHistory`+`driverShifts`).
 - **`shoofi.compensations`** — `{order, items:[{status(0|1|2), compensationFor('business'|'customer'|
   'driver'|'shoofi'), payingParty('shoofi'|'business'|'driver'), approvedAmount, driver, deliveryCompany}],
-  appNameBackfill{pendingReportCarryover}}`. `payingParty !== compensationFor` is enforced on add/edit
+  appNameBackfill{pendingReportCarryover}, createdAt (BSON Date — the settlement clock)}`. Attributed to the
+  report whose window contains `createdAt` (CORE invariant 10), locked once that report exists.
+  `payingParty !== compensationFor` is enforced on add/edit
   (`services/compensations/validate-parties.js`). `compensationFor:'shoofi'` = the store (or driver) owes
   Shoofi — store report outcome `compensationsToShoofi`, driver report `totalDriverCharges`; no coupon.
-- **Store `accounting`** (store's own DB): `bankAccount{bank,branch,accountNumber,companyId,
+- **Store `accounting`** (store's own DB): `accountantFileNumber` (the accountant's מספר תיק = the
+  Hashavshevet customer account the movein export debits; also on `delivery-company.store`),
+  `bankAccount{bank,branch,accountNumber,companyId,
   businessType('exempt'|'licensed')}`, `billingContacts[]`, `contract{commissionTiers[],
   coinsCommissionPercent, monthlyPayments[], onetimePayments[]}`, `store.hyp{ua_uuid,api_key,access_token,status}`.
 - **`shoofi.amazonconfigs`** — `{app:"greeninvoice"|"hyp"|"invoiceProvider"|"amazon"}` (provider creds/switch; never print).
@@ -164,15 +269,18 @@ a human bridges it. Payout amount = store `balance` / driver `netTotal`.
 ## 9. Client — shoofi-delivery-web (admin) is the accountant's cockpit
 The reports/settlement/payout UI lives in the **admin** app: `views/admin/DriverPayments.tsx`,
 `DriverBonuses.tsx`, `CompensationManagement.tsx`, `driver-reports/`, `financial-overview/` (the live
-26-metric screen, 4 tabs: summary / stores / companies / delivery fees), plus store-report screens
+26-metric screen, tabs: summary / Shoofi expenses / stores / companies / delivery fees; the summary
+opens with "חנויות עם נתונים בלי דוח" (`MissingReports.tsx`, fed by `missingReports`), and hidden /
+coming-soon stores carry a red `VisibilityBadge`), plus store-report screens
 and `generate-stores-summaries.tsx`; `app-type: shoofi-admin`. This is where a human generates,
 approves, sends reports, and exports the MASAV Excel. (Full-stack: server computes, admin drives.)
 
 ## 10. ⚠️ Known risks / flagged for verdict (money-critical — do NOT silently "fix")
-1. **Overlap guard ignores `sent` reports**  — a `sent` report does NOT block a new
-   overlapping report → a **double-billing window**. Bug, or intended (allow re-issue)?
-2. **`DELETE report` status guard is commented out**  — a sent/invoiced report can be
-   deleted, **orphaning an issued tax invoice**. Almost certainly should be re-enabled — confirm.
+1. ~~**Overlap guard ignores `sent` reports**~~ — FIXED: `checkOverlappingReports` checks every
+   status (CORE Known status). Kept for history.
+2. **`DELETE report` accepts any status** — decided INTENTIONAL 2026-08-03 (CORE Known status):
+   a wrong sent report must be regenerable; an issued tax invoice is only warned about. Deleting
+   a report also reopens its compensations to edits (CORE invariant 10).
 3. **`reset-invoice`**  unsets invoice fields, re-enabling `create-invoice` → **double-invoice
    risk** if misused. Intended re-issue path? Guard it?
 4. **Hardcoded IDs** — GreenInvoice `businessId = '9058c694-…'`  and `itemId`/`catalogNum`
@@ -182,6 +290,17 @@ approves, sends reports, and exports the MASAV Excel. (Full-stack: server comput
    divergence is a payout risk. Worth a single source of truth?
 6. **No automated report→MASAV linkage** — payout amounts are re-keyed into an Excel by hand
    (`masav.js`), an error-prone gap. Leave manual, or is closing it desired later?
+
+7. **`create-invoice` does not itemize `carryoverToCustomers` / `carryoverToDrivers`** (`routes/hyp.js`)
+   although both are inside `totalOutcomes`, the invoiced amount — so on such invoices the item lines
+   do not add up to the document total and EZcount's `auto_balance` covers the gap. Seen on 31 of the
+   259 May–June 2026 invoices (e.g. 10473: lines 2181.48, invoiced 2214.48, carryoverToDrivers 33).
+   Found 2026-09-27; `routes/hyp.js` is do-not-touch — needs a decision.
+8. **Duplicate HYP settlement invoices never recorded in our DB.** The accountant's May–June 2026
+   export holds 19 invoices (10562–10582, dated 30/06/26, batch of 2026-07-07) with the same store
+   and amount as the invoice our DB records for that store's June report (e.g. brixta 10576 and
+   10580, both ₪545.04). Our DB knows only the later one. Unless cancelled at HYP, those stores were
+   invoiced twice for June. Found 2026-09-27 — needs a human to check HYP and decide.
 
 ## 11. Definition of done
 Inherit `_shared-guardrails.md` §7. For accountant specifically: for ANY change to a payout or

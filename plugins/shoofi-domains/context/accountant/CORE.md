@@ -18,8 +18,11 @@ invoices, and bank payouts. Distinct from `payments` (money IN).
 ## Scope
 Server: `routes/payments/{admin-reports,admin,summaries}.js`, `routes/driver-reports.js`,
 `routes/admin/masav.js`, `routes/hyp.js` (EZcount invoicing), `lib/payments/calc.js`,
-`utils/{vat,greeninvoice,invoice-provider}.js`, `services/financial-overview/` (the live overview —
-it RUNS the two report engines over any range; never re-derive money there). Client: the
+`utils/{vat,greeninvoice,invoice-provider}.js`, `services/compensations/report-window.js` (which
+report a compensation belongs to + the post-report lock, invariant 10), `services/financial-overview/` (the live overview —
+it RUNS the two report engines over any range; never re-derive money there), and the accountant's
+Hashavshevet export `services/accountant-export/` + `utils/hashavshevet-movein.js` (reference §7b —
+its amounts are EZcount's per-line rounding, never `round2(totalOutcomes)`). Client: the
 reports/payout screens and `views/admin/financial-overview/` in `shoofi-delivery-web`.
 **🔒 CLAUDE.md do-not-touch overlap:** `routes/hyp.js`, `utils/hyp.js`,
 `utils/invoice-provider.js`, `lib/payments/`. You depend on `routes/order.js` for order
@@ -114,6 +117,15 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    wrong, and the fix is delete + regenerate. But delete **must release the carry-over
    compensations** that `/send` consumed (`appNameBackfill.pendingReportCarryover` back to
    `true`), or the regenerated report silently drops those amounts.
+   **The compensations-approved guard (`validateCompensationsApproved`) must query with BSON
+   `Date` bounds** — `compensations.createdAt` is a Date, and until 2026-10 the guard passed
+   `moment().format()` strings, which never match a Date, so it found 0 compensations and
+   **never blocked a single report** (Sep 2026: 0 by string vs 156 by Date). It now uses the
+   report's own compensation window (invariant 10), the same store key as the report fetch
+   (`order.storeData.appName`), and counts only pending items that move the store's money
+   (`payingParty` or `compensationFor` is `business`). The driver report's guard
+   (`validateDriverCompensationsApproved`) already used Dates; it counts only
+   `compensationFor: 'driver'` items, not driver-PAID ones.
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
 7. **A store's coupon cost (`reportData.campaigns`) is the coupon's NOMINAL
@@ -148,8 +160,8 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    - **`storeDiscount` carries two different units and no field says which.**
      Shekels normally; percentage points when `type === 'percentage'`. There is no
      validation bounding it to 0-100 in that case — `lib/schemas/newCoupon.json` sets
-     only `minimum: 0`, and `routes/coupon.js:1364` bounds the split only for
-     `fixed_amount`. **`splitType: 'percentage'` is the exception:** those coupons
+     only `minimum: 0`, and `routes/coupon.js:1462` (create) / `:1702` (update) bound the
+     split only for `fixed_amount`. **`splitType: 'percentage'` is the exception:** those coupons
      resolve the share into shekels before the order is written
      (`routes/coupon.js:48-74`, `:345`), so `storeDiscount` on the applied snapshot is
      already an amount. Any reader dividing by 100 must exclude them or it bills ₪0.14
@@ -168,6 +180,29 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
 
+   **The other direction — `couponsFromShoofi` (Shoofi credits the store) — is the APPLIED
+   amount, capped by Shoofi's share** (owner decision 2026-10). For a customer-specific
+   `order_items` coupon, `stores-export-new` credits
+   `min(nominal, applied)` via `shoofiCouponCredit` (`lib/payments/calc.js`), where
+   `nominal = shoofiDiscount` (or `(shoofiDiscount/100) * orderPrice` for `type:
+   'percentage'`) and `applied = appliedCoupon.discountAmount ?? appliedCoupon.coupon.discountAmount`
+   (`appliedCouponAmount`). `applied` missing (legacy orders) → the nominal, unchanged.
+   Before this, every redemption was credited the nominal value, so a **partial-use**
+   coupon paid out its full value at every store it touched (IMGOJRNG: ₪200 credited for a
+   ₪49 use AND ₪200 for a ₪151 use; 27 rows / ₪1,775.5 Mar-Oct 2026). The pushed
+   `shoofiCouponsData` row carries `itemsAmount = credited, deliveryAmount = 0` so the PDF
+   columns reconcile with `amount`. Note the asymmetry with `campaigns` above, which is
+   still the nominal — that is a separate, undecided question; do not "align" them.
+   **The `coupon.value` fallback is CORRECT, do not remove it:** a customer-specific coupon
+   with an empty `shoofiDiscount` is treated as Shoofi-credited at `coupon.value`, even when
+   it has `storeDiscount` set. That is how a **store-paid compensation** balances: the store
+   is charged ONCE as `compensationsToCustomers` in the month the compensation is approved,
+   and each redemption of the resulting `COMP-*` coupon is credited back via
+   `couponsFromShoofi`, offsetting the food it handed over — net, the store bears the
+   compensation exactly once. (With the old nominal credit, a ₪200 COMP coupon spent ₪90
+   at the store refunded it ₪200: its real cost fell to ₪90.) Guarded in
+   `test/integration/settlement-guards.js`.
+
 8. **Compensation parties.** `compensationFor ∈ {customer, business, driver, shoofi}`,
    `payingParty ∈ {shoofi, business, driver}`, and **payer ≠ recipient** — enforced server-side
    on add and edit by `services/compensations/validate-parties.js`. `business → business` would
@@ -181,9 +216,60 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    a term added to `totalOutcomes` and not to that list shows up as a non-zero
    `billingReconciliationDelta`, which is the point of the list.
 
+9. **The live overview's store population is by DATA, never by today's `business_visible`.**
+   `services/financial-overview/compute.js` enumerates every non-mock store
+   (`getAllNonMockStores`) and keeps those whose live report is not all zeros
+   (`storeHasData` in `services/financial-overview/metrics.js`). The range is usually in the
+   past, and a store hidden after it traded is still owed for that period — filtering on
+   visibility silently shrank the liability total (08/2026: four hidden stores, ₪4,111.92 on
+   sent reports, gone from the screen). Contract charges alone keep only a LIVE store (the
+   generator never bills a hidden one); derived totals never decide inclusion. Do not
+   "optimise" back to `getLiveStores` — narrow the non-live PROBE instead, and only towards
+   over-selection. Details: reference §4.
+
+10. **A compensation belongs to the report whose period contains its `createdAt` — never the
+    month it was approved in — and the windows tile with no overlap and no gap.**
+    `services/compensations/report-window.js` is the one place this is decided; the store
+    report fetch, the generate guard (invariant 5) and the post-report lock all call it.
+    - **Store:** `storeCompensationWindow` = `[report start, next day's start)` — the start is
+      the report's business-day start (`storeReportBounds`, extracted verbatim from
+      `generateStoreReportData`: snapped openHours + the openHours transition-month rule); the
+      **exclusive** end is that same function's start for the day after `endDate`, so
+      September ends at the exact instant October begins. The report passes these as exact
+      instants with `endExclusive=true` to `GET /api/shoofiAdmin/compensations`; without that
+      flag (the admin screen's date filter) a plain `endDate` is still stretched to 23:59:59.999.
+      Before 2026-10 the report's end was stretched too, so everything created on the 1st of
+      the next month after the store opened was billed in BOTH months (snooshy, ₪17, Oct 1
+      22:36 IL). Orders keep their own `[start, end]` window — unchanged.
+    - **Driver:** Israel calendar days, inclusive (`routes/driver-reports.js`) — already tiled;
+      mirrored by `driverCompensationWindow` for the lock only. A compensation touching both a
+      store and a driver can therefore land in different months on the two reports in the
+      first hours of the 1st; each report is still exactly-once.
+    - **The lock:** once a store or driver report (any status) covers a compensation's
+      `createdAt`, a change that moves money on it is refused **409**
+      (`code: 'compensation_period_closed'`, Hebrew message) by add / edit / approve-item /
+      delete in `routes/shoofi-admin.js` (`checkCompensationLock`). "Moves money" =
+      `affectedParties`: an item whose report footprint (status 1 + approvedAmount +
+      parties + company/driver) changes, a NEW item (even pending — it could never be
+      approved into any report), or deleting an approved item. Text edits and declining a
+      never-approved item stay open. Without the lock the change reached no report at all
+      (vapego-taibe, ₪2000 driver→business, edited 2026-09-19 after the August report — the
+      store was never credited). **The way out is delete + regenerate** (a deleted report no
+      longer locks) or a new compensation, which lands in the current period.
+      New reports store their exact window in `reportData.compensationWindow`; for older
+      reports the lock recomputes it from the store's CURRENT openHours.
+    Not covered: `services/payments/cancel-compensation.js` inserts compensations
+    automatically (createdAt = now) without the lock — it can only collide with a report
+    generated for a period that has not ended.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
+- **FIXED 2026-10, keep it that way:** `couponsFromShoofi` credits the discount APPLIED on
+  the order (capped by Shoofi's share), not the coupon's nominal value per redemption — see
+  invariant 7. **INTENTIONAL, do NOT "fix":** the customer-specific `coupon.value` fallback
+  that credits a store-paid `COMP-*` compensation coupon (it offsets the one-time
+  `compensationsToCustomers` charge).
 - **INTENTIONAL, do NOT "restore":** delete accepts **any** report status (2026-08-03). The
   old "only draft reports can be deleted" guard was removed on purpose so a wrong report that
   already went out to a store/driver can be regenerated. Deleting a report that carries an
