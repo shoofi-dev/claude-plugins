@@ -17,6 +17,10 @@ automatic.
    repos together once CI is green. A PR whose title or branch says HIGH-RISK, or a
    draft, needs its branch name typed before it merges. If the screen had to resolve a
    merge conflict, it pauses until the owner has read the resolution.
+6. Once merged into `main`, the work appears on the admin's **"הערות שחרור"** screen
+   (admin, master, manager), one line per feature. App changes there are marked as
+   waiting for an app update: a merge doesn't put them on phones until an
+   `eas update` or a store build ships.
 
 ## Write the outcome, not the implementation
 
