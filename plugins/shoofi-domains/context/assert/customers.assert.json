@@ -169,6 +169,11 @@
           "desc": "the authenticated user is req.auth, never req.user - nothing in the codebase assigns req.user"
         },
         {
+          "file": "routes/auth.js",
+          "regex": "authorization\\.split\\(\" \"\\)\\[0\\] === \"Token\"",
+          "desc": "on the customer/partner/driver branch getTokenFromHeaders only returns a token for the literal 'Token ' prefix - a Bearer header falls through and returns undefined, so a valid JWT gets a bare 401"
+        },
+        {
           "file": "routes/customer.js",
           "regex": "created: new Date\\(\\)",
           "desc": "customers.created is a real BSON Date - a string bound will never match it"
@@ -227,6 +232,16 @@
           "file": "routes/customer.js",
           "regex": "res\\.status\\(200\\)\\.json\\(\\{ data: \"deleted success\" \\}\\);[\\s\\S]{0,400}if \\(collection === \"customers\" && customerDB === req\\.app\\.db\\[\"shoofi\"\\]\\)[\\s\\S]{0,300}deleteCustomerProfile\\(shoofiDb, String\\(id\\)\\)[\\s\\S]{0,200}deleteCustomerServed\\(shoofiDb, String\\(id\\)\\)",
           "desc": "doc CORE invariant 9: POST /api/customer/delete removes the customer's taste profile and For-you served audit AFTER the reply, customer-app branch only, never failing the delete"
+        }
+      ]
+    },
+    "shoofi-app": {
+      "files": ["utils/http-interceptor/index.ts"],
+      "patterns": [
+        {
+          "file": "utils/http-interceptor/index.ts",
+          "regex": "\"Token \" \\+ token",
+          "desc": "the customer app sends the 'Token ' prefix - the server's customer branch returns undefined for anything else"
         }
       ]
     },
