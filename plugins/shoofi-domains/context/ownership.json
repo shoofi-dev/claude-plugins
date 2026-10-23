@@ -27,7 +27,9 @@
         "routes/admin/dish-taxonomy.js",
         "routes/admin/ai-usage.js",
         "services/ai/usage-log.js",
-        "services/ai/pricing.js"
+        "services/ai/pricing.js",
+        "routes/ai-helper.js",
+        "utils/extras-required.js"
       ],
       "shoofi-partner": [
         "screens/admin/product",
@@ -39,7 +41,13 @@
         "screens/for-you",
         "stores/for-you/",
         "helpers/for-you-copy.ts",
-        "hooks/useOpenStoreAtProduct.ts"
+        "hooks/useOpenStoreAtProduct.ts",
+        "components/ai-helper/",
+        "screens/ai-helper/",
+        "stores/ai-helper/",
+        "helpers/ai-helper-copy.ts",
+        "hooks/useChatAddToCart.ts",
+        "helpers/chat-cart-line.ts"
       ],
       "shoofi-delivery-web": [
         "src/views/admin/dish-types/",
@@ -71,7 +79,8 @@
         "stores/cart/",
         "stores/orders/",
         "stores/twin-order/",
-        "consts/shared.ts"
+        "consts/shared.ts",
+        "hooks/useChatAddToCart.ts"
       ],
       "shoofi-partner": [
         "screens/admin/order",
@@ -177,7 +186,9 @@
         "utils/auth-service.js",
         "utils/admin-auth-service.js",
         "utils/app-name-helper.js",
-        "controllers/customerAddressController.js"
+        "controllers/customerAddressController.js",
+        "routes/ai-helper.js",
+        "services/ordering-intelligence/taste-profile.js"
       ],
       "shoofi-app": [
         "screens/login",
@@ -187,7 +198,8 @@
         "screens/addresses",
         "stores/auth/",
         "stores/user-details/",
-        "stores/address/"
+        "stores/address/",
+        "stores/ai-helper/"
       ],
       "shoofi-partner": [
         "screens/login",

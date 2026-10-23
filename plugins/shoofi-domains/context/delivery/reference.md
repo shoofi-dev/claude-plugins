@@ -97,7 +97,14 @@ pickup zone (`area.cityId`) + dropoff geometry.
 **Driver eligibility** (`findAllMatchingDrivers`): company must match BOTH `supportedAreas`
 (areaId) AND `supportedCities` (cityId); `personalSupportedAreas` overrides. Then a
 store allow/block list (`storeAssignmentMode`/`assignedStoreAppNames`).
-**Load/selection**: counts active `bookDelivery` (status `1,2,3`) per driver, drops those
+**Load/selection**: counts active `bookDelivery` (**`ACTIVE_ORDER_STATUSES = ["1","2","3","5"]`**,
+the canonical list, `services/delivery/driver-load.js:23` — **import it, never retype it**;
+`"5"` WAITING_IN_STORE is the driver standing in the restaurant, which is in flight, and
+every hand-written `["1","2","3"]` drops him. Values are **strings**; `driver._id` is an
+**ObjectId** and is absent on the 0.27% of rows not yet assigned. Three competing spellings
+are live today: the canonical one, `["2","3","5"]` at `routes/delivery/driver.js:997,:1133`
+(the location broadcast and the live map), and the inline `["1","2","3","5"]` literal at
+`routes/delivery/company.js:324`) per driver, drops those
 at `maxOrdersByAdmin`, sorts ascending by load, **random tie-break**.
 **Manual-admin routing**: companies with `isControlledByAdmin && manualAssignmentOnly`
 route the order to a company **admin**, not a driver (`assignmentMethod:'manual-admin-routed'`).
@@ -216,6 +223,54 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
   `services/delivery/driver-status-service.js:setDriverActiveStatus` (it writes
   `driverStatusHistory` in lock-step + WS-pushes `driver_status_updated`). Direct writes create phantom history.
 - **`isActive` (on shift/enabled) ≠ `isAvailable` ≠ `isOnline`** — three separate flags.
+- **`driver-status-history` is the availability audit trail** (code `db.driverStatusHistory`,
+  collection **hyphenated**). 27,891 rows on 2026-09-25 and **all** of them are `isActive`
+  changes — `{timestamp(offset STRING), driverId(ObjectId), driverName, companyId(string),
+  changes:{isActive:{old,new}}, oldValues, newValues, changedFields:['isActive'], updateType,
+  updatedBySource, updatedByName, updatedById, userAgent, ipAddress}`. The driver document
+  has **no** toggle timestamp (see CORE invariant 3), so this is the only source of "when".
+  Sort "latest per driver" on `_id`, not `timestamp` (offset string, DST-unsafe). Join it as
+  a LEFT join: drivers are hard-deleted (`routes/delivery/company.js`, `driver.js`) and 26 of
+  the 231 driver ids in the history have no `customers` document left — the row's own
+  `driverName` is the fallback. Existing readers:
+  `GET /api/driver-shift-manager/admin/driver-status-history` (per-driver, per-month
+  forensics → `DriverActiveHours.tsx`) and
+  `GET /api/driver-shift-manager/admin/driver-availability-changes`
+  (`services/delivery/driver-availability-feed.js` → the admin's driver-activity board).
+- ⚠️ **Most of what the `isActive` stream looks like is normal operation. Measure before
+  you build an alert on it** (`driver-status-history`, 30 days to 2026-09-27: **1,660
+  switch-offs, 49 drivers**):
+  - **44% is the system, not a person.** `cron` 731 · `driver_app` 712 · `shoofi_support`
+    216 · `admin_web` 1. The hourly `driver-shift` cron switches off everyone whose slot
+    ended, so switch-offs peak at 23:00 (228), 01:00 (179) and 00:00 (165). Any "who did
+    this" feed that does not separate the sources is half cron rows a human must learn to
+    scroll past.
+  - **24% is flapping.** 391 switch-offs are the same driver back on inside **two minutes**;
+    661 inside ten. Rendered raw, one person contradicts himself twice a minute.
+  - **59% of switch-offs happen while the driver still holds an accepted, unfinished
+    delivery — and that is not an incident.** 982 of 1,660, ~33/day. It produced **0
+    orphaned deliveries** and **0 reassignments** in the whole window; median time from the
+    flip to that delivery completing is 6–15 min. `isActive:false` does not stop a driver
+    completing what he holds, and the cron switches drivers off exactly as they finish their
+    last run. The narrow version (uncollected, and then >20 min to finish) is still 13.7%
+    and still dominated by the cron. **Do not build a "went offline holding a delivery"
+    alert** — a naive definition manufactures a red row for something that is working, the
+    same trap as tuning the assignment penalty. There is also no orphaned-delivery detector
+    anywhere, and `setDriverActiveStatus` does not block, warn, reassign or notify on
+    deactivation; the only precedent is `routes/delivery/driver.js:227` refusing to DELETE a
+    driver who holds active orders.
+  - Checked and also not worth a row: dispatch handing work to an off driver happens **9
+    times in 30 days**, all 1–2 min after the flip (a push already in flight).
+- **Phone numbers:** `customers.phone` is a local `0XXXXXXXXX` — **240 of 244 drivers are
+  exactly `05` + 8 digits**. The four that are not are two junk values (`123456789`,
+  `12345678900012`) and two typos with an extra run of digits (`05337773030`,
+  `0547190078111111`); none belongs to a driver who has flipped his switch recently. A
+  `tel:`/`wa.me` builder must check the **`05` shape, not the length**: `123456789` is nine
+  digits, so "strip the leading zero, expect nine" accepts it and produces
+  `wa.me/972123456789` — a WhatsApp conversation with a stranger. There is no click-to-call
+  or WhatsApp for a driver anywhere on the server (`notification-service.js` has
+  `{websocket, push, email, sms}` and no WhatsApp channel; respond.io is customer-only), so
+  any such link is client-side.
 - **Location**: `POST /api/delivery/driver/location` writes `currentLocation` (GeoJSON) +
   `driverLocationHistory` (TTL) + broadcasts to admin/tracking. Driver app sends fg (10s) + background.
 - **Shifts** (`routes/driver-shift-manager.js`, `driverShifts` collection): booking system
@@ -302,7 +357,18 @@ colour pairing (`getOrderColor(bookId)`, a hash into a fixed 15-slot palette) li
 `src/utils/driver-map-markers.ts` so every admin map draws the same order in the same colour.
 The live-ops board (`views/admin/live-ops/`) reads `POST analytics/deliveries` like the delivery
 list, resolves `pickupTime` (bare `"HH:mm"`, wraps at midnight) against `expectedDeliveryAt`,
-and re-assigns through `delivery/admin/reassign` with the same 409 `needsConfirmation` handshake. **The area/coverage CONTROL PANEL**
+and re-assigns through `delivery/admin/reassign` with the same 409 `needsConfirmation` handshake.
+Its **couriers-per-zone** chips (`live-ops/components/ZoneBar.tsx`, `logic/zones.ts`) re-implement
+the navbar zone bar (`components/Navbars/AdminNavbar.js`, inline, not exported) with the SAME reads
+and rules: `GET delivery/city-areas`, then per region `delivery/company/employees?cityAreaId=`
+(active = `isActive === true`, no location = no `lastLocationUpdate` in 10 min) and
+`delivery/city-area/:id/disabled-areas`. A region reads **shut when ANY `areas` connection in it is
+`isActive:false`** (there is no zone-level flag), and "כבה"/"הפעל" are
+`POST delivery/city-area/:id/bulk-toggle-areas {isActive}`, the navbar's own call, so the
+availability trace and the admin audit row are unchanged. That endpoint takes **no reason and no
+duration** (the server hard-codes the trace reason) and has **no role check**. Zones are re-read at
+most every 30 s, because `company/employees` counts every courier's open bookDelivery rows per call.
+**The area/coverage CONTROL PANEL**
 lives here: `views/admin/delivery-areas/*` — full CRUD for cities, parent-cities, city-areas,
 delivery-areas, company-areas, geometries (draw/fill-gaps/suggest). **Config**:
 `views/admin/settings/DeliverySettings.tsx` (`admin/delivery-config`, `admin/twin-order-config`).

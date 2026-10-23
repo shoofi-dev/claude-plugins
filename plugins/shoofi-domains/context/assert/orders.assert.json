@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@a0e8bdb2 / 2026-09-23",
+  "lastVerified": "shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -268,6 +268,41 @@
           "file": "routes/order.js",
           "regex": "eventType: 'order_viewed',[\\s\\S]{0,600}?readyMinutes: updateobj\\.readyMinutes,[\\s\\S]{0,200}?previousStatus: order\\.status,",
           "desc": "readyMinutes lives only in order_viewed metadata, and previousStatus is read from the post-update order (always the new status) - reference.md §2/§5 traps; if this changes, fix both notes"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "const HISTORY_DAYS = 90;\\s*const MAX_ORDERS = 30;[\\s\\S]*?\\.slice\\(-MAX_ORDERS\\);[\\s\\S]*?status: \\{ \\$in: COMPLETED_STATUSES \\}",
+          "desc": "reference §5: the For-you / AI-helper history is the newest 30 customers.orders[] entries in 90 days, capped BEFORE the store-side COMPLETED_STATUSES filter - every taste fact and deliveredOrders count completed orders, never courier deliveries"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "projection: \\{\\s*created: 1,\\s*orderDate: 1,\\s*originalOrderDate: 1,\\s*\"order\\.items\\.item_id\": 1,\\s*\"order\\.items\\.qty\": 1,\\s*\"order\\.items\\.nameAR\": 1,\\s*\"order\\.items\\.nameHE\": 1,\\s*\"order\\.items\\.selectedExtras\": 1,",
+          "desc": "reference §5: the order fields the taste history reads - rename one of them and a taste fact silently disappears; change the list and the doc's list is wrong"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "orderMs: Date\\.parse\\(row\\.originalOrderDate \\|\\| row\\.orderDate \\|\\| row\\.created\\)",
+          "desc": "reference §5: facts meal_time buckets the DUE time frozen before any delay (CORE invariant 10's originalOrderDate), never the placed time"
+        },
+        {
+          "file": "services/ordering-intelligence/taste-profile.js",
+          "regex": "const INFERRED_TTL_MS = 60 \\* 60 \\* 1000;[\\s\\S]*?async function refreshInferredIfStale\\(",
+          "desc": "CORE invariant 1 / reference §5: the taste profile's `inferred` is a lazy cache refreshed on read after 1h, NOT an order-completion hook (there is no single completed transition)"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "deliveredOrders: taste\\.totalOrders",
+          "desc": "CORE invariant 1 / reference §5: deliveredOrders is taste.js's COMPLETED-order count, not bookDelivery deliveries"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "const CHECKOUT_EVENTS = new Set\\(\\[",
+          "desc": "doc §Where an order that never happened lives: the For-you funnel copies the checkout events (menu-catalog CORE invariant 22)"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "^  \"checkout_left\",$",
+          "desc": "doc §Where an order that never happened lives: checkout_left is among the copied checkout events"
         }
       ]
     },
@@ -278,7 +313,8 @@
         "screens/checkout/index.tsx",
         "components/checkout/FutureOrderPicker.tsx",
         "hooks/checkout/use-checkout-validate.ts",
-        "screens/cart/cart.tsx"
+        "screens/cart/cart.tsx",
+        "helpers/for-you-attribution.ts"
       ],
       "patterns": [
         {
@@ -325,6 +361,51 @@
           "file": "screens/cart/cart.tsx",
           "regex": "cart_checkout_blocked",
           "desc": "closed/busy-store bounces from the cart, previously unlogged (CORE: where an order that never happened lives)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "if \\(chip\\.kind === \"checkout\"\\) \\{[\\s\\S]{0,160}?navigate\\(\"cart\"\\)",
+          "desc": "CORE Known status (DEFERRED 2026-10-16) / reference C1: the chat's 'complete the order' hands off to the existing cart -> checkout"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*(?:submitOrder|SUBMIT_ORDER_API|use-checkout-submit))",
+          "desc": "CORE Known status: the For-you chat never submits an order - building the DEFERRED in-chat checkout card (client-computed total, postChargeOrderActions, consent) needs a new decision and this doc first"
+        },
+        {
+          "file": "components/for-you/CartDock.tsx",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*cartStore\\s*\\.\\s*(?:add|remove|[uU]pdate|reset|set|submit))",
+          "desc": "reference C1: the cart dock stays read-only - the chat's cart writes live only in hooks/useChatAddToCart.ts (CORE invariant 13); a cart mutator here bypasses that path and the doc is wrong"
+        },
+        {
+          "file": "stores/cart/index.ts",
+          "regex": "addProductToCartForStore = async \\(product, storeData\\) => \\{(?:(?!@storage_storeDB|storeDataStore)[\\s\\S])*?\\n  \\};",
+          "desc": "CORE invariant 13: the chat's cart entry point never reads or writes the BROWSED store (@storage_storeDB / storeDataStore) anywhere in its body - addProductToCart does, which is why the chat must not use it"
+        },
+        {
+          "file": "stores/cart/index.ts",
+          "regex": "addProductToCartForStore = async \\(product, storeData\\) => \\{[\\s\\S]{0,300}?if \\(this\\.cartItems\\.length === 0\\) \\{\\s*await this\\.setCartStoreDBName\\(appName\\);\\s*await this\\.setCartStoreData\\(storeData\\);\\s*await this\\.setIsSchoolProject\\(false\\);[\\s\\S]{0,200}?\\} else if \\(\\(await this\\.getCartStoreDBName\\(\\)\\) !== appName\\) \\{\\s*throw new Error\\(",
+          "desc": "CORE invariant 13: an empty cart is stamped with the GIVEN store (cart store name + storeData snapshot, not a school cart) - checkout sends the order to that store - and a cart of another store is refused, never mixed"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "storeDataStore\\.getStoreDataFromServer\\(appName\\),\\s*menuStore\\.getMenuFromServer\\(appName, false\\),",
+          "desc": "CORE invariant 13 / reference C1: the chat loads the dish's store and menu with the fetch-only calls, which write no global"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*(?:\\b(?:setStoreDBName|getStoreData|getMenu)\\s*\\(|@storage_storeDB|storeDataStore\\.storeData\\b))",
+          "desc": "CORE invariant 13: the chat never moves the browsed-store globals - no setStoreDBName( / getStoreData( / getMenu( call, no @storage_storeDB, no storeDataStore.storeData (other screens read them; the cart and checkout repoint storeDataStore themselves)"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "(?<![\\s\\S])(?=[\\s\\S]*cartStore\\.addProductToCartForStore\\()(?![\\s\\S]*(?:\\.addProductToCart\\s*\\(|\\.addProductListToCart\\s*\\(|\\.resetCartForNewStore\\s*\\(|submitOrder|SUBMIT_ORDER_API|use-checkout-submit))",
+          "desc": "CORE invariant 13 + Known status: the chat's only way into the cart is addProductToCartForStore (never addProductToCart / addProductListToCart / resetCartForNewStore, which stamp the browsed store), and it never submits an order - the in-chat checkout card is DEFERRED"
+        },
+        {
+          "file": "hooks/checkout/use-checkout-submit.ts",
+          "regex": "\\.\\.\\.forYouOrderProps\\(order\\?\\.products\\),",
+          "desc": "doc CORE (abandonment layers): order_submit_success carries the For-you lines — analytics only, the order payload untouched"
         }
       ]
     },
