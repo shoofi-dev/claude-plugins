@@ -33,7 +33,8 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "services/delivery/driver-availability-feed.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -111,6 +112,13 @@
           "/api/delivery/delivery-only/book",
           "/api/delivery/delivery-only/list",
           "isDeliveryOnly"
+        ],
+        "services/delivery/driver-availability-feed.js": [
+          "summaryOnly",
+          "MAX_TAGGED_WINDOW_MINUTES",
+          "shiftTagAt",
+          "loadShiftTimeline",
+          "loadActiveOrderCounts"
         ]
       },
       "patterns": [

@@ -269,6 +269,24 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+16. **The driver-availability feed decorates its rows CONDITIONALLY — twice over, and both
+    gaps are silent.** `GET /api/driver-shift-manager/admin/driver-availability-changes`
+    (`services/delivery/driver-availability-feed.js`) is the admin's availability screen AND
+    the issues rail's badge, and it answers the two callers differently.
+    **(a) `summary=true` returns counts ONLY.** `summaryOnly` skips `loadShiftTimeline` and
+    `loadActiveOrderCounts` outright and then deletes `events`, `bookedNotActive`,
+    `activeNotBooked` and `activeDriverIds` from the payload — the rail polls it every 60s and
+    none of that contributes a digit to `attention`. So a screen that reuses the rail's call to
+    look cheap gets no rows at all, no pin for the map drawer and nothing to filter.
+    **(b) `shiftTag` is `null` above a 24-hour window.** `MAX_TAGGED_WINDOW_MINUTES = 24 * 60`;
+    past it the timeline is not loaded and `shiftTagAt` returns `null` for every row, because
+    tagging costs one shift query per business day spanned. `null` therefore means *"not
+    judged"* and must **never** be read as `no_shift` — doing so turns every long-range row
+    into a false "on without a slot", and it silently kills any client rule keyed on
+    `shiftTag === 'in_shift'` (the admin board pins "switched off during his own slot" on
+    exactly that). `outside_hours` is the third real value and is not "no shift" either: the
+    template makes no slots between 02:00 and 09:00, so being off-roster then is the designed
+    state.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
