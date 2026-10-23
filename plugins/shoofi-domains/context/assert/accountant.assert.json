@@ -13,13 +13,27 @@
         "lib/payments/calc.js",
         "utils/vat.js",
         "utils/greeninvoice.js",
-        "utils/invoice-provider.js"
+        "utils/invoice-provider.js",
+        "services/compensations/validate-parties.js",
+        "services/compensations/report-window.js",
+        "services/financial-overview/compute.js",
+        "services/financial-overview/metrics.js",
+        "services/financial-overview/contract-charges.js",
+        "routes/financial-overview.js",
+        "utils/hashavshevet-movein.js",
+        "services/accountant-export/movein.js",
+        "services/accountant-export/accounts.js",
+        "services/exec-dashboard/store-registry.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
           "getFullDiscountMatrix",
           "effectiveDeliveryFee",
           "couponDeliveryPortion",
+          "couponDeliverySplit",
+          "isPercentageStoreDeliveryCoupon",
+          "shoofiCouponCredit",
+          "appliedCouponAmount",
           "calculateCommission",
           "getDateRange"
         ],
@@ -35,9 +49,63 @@
           "validateOrdersClosed",
           "calculateCommissionTiered",
           "generateStoreReportData",
-          "totalForTransfer"
+          "totalForTransfer",
+          "validateCompensationsApproved"
         ],
-        "utils/invoice-provider.js": ["getActiveProvider"]
+        "utils/invoice-provider.js": [
+          "getActiveProvider"
+        ],
+        "services/compensations/validate-parties.js": [
+          "validateCompensationParties"
+        ],
+        "services/financial-overview/compute.js": [
+          "computeFinancialOverview",
+          "getFinancialOverview",
+          "probeNonLiveStores"
+        ],
+        "services/financial-overview/metrics.js": [
+          "storeMetrics",
+          "driverMetrics",
+          "deliveryFeeSplit",
+          "compareWithStoredReport",
+          "flattenApprovedItems",
+          "storeHasData",
+          "storedReportCoverage",
+          "STORE_ACTIVITY_FIELDS"
+        ],
+        "services/financial-overview/contract-charges.js": [
+          "classifyOneTimeCharges"
+        ],
+        "routes/driver-reports.js": [
+          "generateDriverReportData"
+        ],
+        "utils/hashavshevet-movein.js": [
+          "ezcountInclusiveTotals",
+          "buildFile",
+          "salesInvoiceRecord",
+          "salesCreditNoteRecord",
+          "purchaseInvoiceRecord"
+        ],
+        "services/accountant-export/movein.js": [
+          "collectStoreDocuments",
+          "collectDriverDocuments",
+          "storeInvoiceTotals",
+          "settlementInvoiceLinePrices",
+          "documentDateOf"
+        ],
+        "services/exec-dashboard/store-registry.js": [
+          "getAllNonMockStores"
+        ],
+        "services/compensations/report-window.js": [
+          "storeReportBounds",
+          "storeCompensationWindow",
+          "driverCompensationWindow",
+          "buildCreatedAtFilter",
+          "affectedParties",
+          "findCoveringStoreReport",
+          "findCoveringDriverReport",
+          "checkCompensationLock"
+        ]
       },
       "patterns": [
         {
@@ -81,6 +149,31 @@
           "desc": "cash-vs-card driver payout branch"
         },
         {
+          "file": "routes/payments/admin.js",
+          "regex": "if\\s*\\(storeDiscount\\s*&&\\s*!isSpecificToCustomers\\s*&&\\s*appliedCoupon\\.coupon\\?\\.discountType\\s*!==\\s*'full_discount'\\)",
+          "desc": "CORE invariant 7: the store is billed a coupon's nominal storeDiscount whenever it is not customer-specific and not full_discount — the gate is blind to discountType, so a delivery coupon lands here too"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "discountAmount\\s*=\\s*\\(storeDiscount\\s*/\\s*100\\)\\s*\\*\\s*orderPrice",
+          "desc": "CORE invariant 7: a percentage-type coupon bills the store a percentage of the ITEMS subtotal even when its discountType is 'delivery' — couponDeliverySplit deliberately diverges and takes the share off order.shippingPrice instead (owner ruling 2026-08-12)"
+        },
+        {
+          "file": "lib/payments/calc.js",
+          "regex": "Math\\.min\\(nominal,\\s*applied\\)",
+          "desc": "CORE invariant 7: couponsFromShoofi credits the discount APPLIED on the order, capped by Shoofi's share — never the coupon's nominal value per redemption (a partial-use coupon was credited in full at every store; owner decision 2026-10)"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "appliedAmount:\\s*appliedCouponAmount\\(appliedCoupon\\)",
+          "desc": "stores-export-new routes the customer-specific order_items credit through shoofiCouponCredit with the order's applied amount"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "shoofiDiscount\\s*=\\s*appliedCoupon\\.coupon\\.value\\s*\\|\\|\\s*0",
+          "desc": "CORE invariant 7: an empty shoofiDiscount on a customer-specific coupon falls back to coupon.value — INTENTIONAL, it credits back a store-paid COMP-* compensation coupon against its one-time compensationsToCustomers charge"
+        },
+        {
           "file": "routes/admin/masav.js",
           "regex": "CP862|cp862",
           "desc": "MASAV DOS-Hebrew encoding"
@@ -89,6 +182,96 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "appNameBackfill\\.reportId'\\s*:\\s*getId\\(reportId\\)",
           "desc": "deleting a report releases its carry-over compensations back to pending, so the regenerated report re-bills them"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "totalDriverCompensations\\s*\\+\\s*totalShoofiRecipientCompensations\\s*\\+\\s*carryoverToCustomers",
+          "desc": "store→Shoofi compensations (compensationFor 'shoofi') are an OUTCOME inside totalOutcomes — never credited back, never a coupon"
+        },
+        {
+          "file": "services/exec-dashboard/billing-metrics.js",
+          "regex": "field:\\s*\"totalDeliveryBookingStoreFees\"",
+          "desc": "every term of totalOutcomes must be a BILLING_COMPONENT, or the dashboard's reconciliation delta lies"
+        },
+        {
+          "file": "services/financial-overview/compute.js",
+          "regex": "generateStoreReportData",
+          "desc": "the live overview runs the store report ENGINE over the range — it must never re-derive settlement math"
+        },
+        {
+          "file": "services/financial-overview/compute.js",
+          "regex": "status:\\s*\"4\",\\s*isDeliveryOnly:\\s*\\{\\s*\\$ne:\\s*true\\s*\\}",
+          "desc": "delivery-fee population is the settlement one (delivered, not delivery-only), not the dashboard's completedAt"
+        },
+        {
+          "file": "services/financial-overview/compute.js",
+          "regex": "await getAllNonMockStores\\(appDb\\)",
+          "desc": "CORE invariant 9: the overview's store candidates are every non-mock store, not the live-today registry (getLiveStores dropped hidden stores that were still owed money)"
+        },
+        {
+          "file": "services/financial-overview/compute.js",
+          "regex": "metrics\\.storeHasData\\(rd, \\{ live: s\\.live \\}\\)",
+          "desc": "CORE invariant 9: inclusion is decided on the engine output (not all zeros), with contract charges counting only for live stores"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "originalPrice: baseOriginal \\? baseOriginal \\+ extrasPrice : undefined",
+          "desc": "CORE invariant 3 (combo note): a line's originalPrice adds the extras portion undiscounted — for a combo that is surcharges + nested extras, and the customer-facing combo 'savings' is never part of it, so it never becomes a productDiscount"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "productDiscount = Math\\.max\\(0, originalOrderPrice - chargedOrderPrice\\)",
+          "desc": "CORE invariant 3: productDiscount is derived from the order's own originalOrderPrice vs charged price — nothing else (not a combo's display savings) feeds it"
+        },
+        {
+          "file": "utils/hashavshevet-movein.js",
+          "regex": "body\\.join\\(LINE_END \\+ LINE_END\\)",
+          "desc": "movein records are separated by an EMPTY line — byte-tested against the accountant's own export"
+        },
+        {
+          "file": "services/accountant-export/accounts.js",
+          "regex": "revenueAccount:\\s*\"50001\"",
+          "desc": "stores-tab accounts (50001 revenue / 40002 output VAT) are the accountant's, proven by their export — never guess them"
+        },
+        {
+          "file": "services/accountant-export/accounts.js",
+          "regex": "expenseAccount:\\s*null",
+          "desc": "drivers-tab accounts are unknown until the accountant supplies them; the export refuses (422 missing-config) meanwhile — when they land, update reference §7b"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "/api/payments/admin/accountant/movein",
+          "desc": "the accountant's Hashavshevet export endpoint (reference §7b)"
+        },
+        {
+          "file": "services/accountant-export/movein.js",
+          "regex": "listUnder\\(skippedByParty, doc, doc\\.partyAccount",
+          "desc": "a missing/invalid מספר תיק SKIPS the document (listed, re-downloadable via docs=) — it does not block the file (owner decision 2026-09-29); reference §7b"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "createdAt:\\s*\\{\\s*\\$gte:\\s*window\\.start,\\s*\\$lt:\\s*window\\.endExclusive\\s*\\}",
+          "desc": "CORE invariant 5: the compensations-approved guard queries createdAt (a BSON Date) with Date bounds over the report's own compensation window — the old string bounds matched nothing and the guard never fired"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "endExclusive:\\s*'true'",
+          "desc": "CORE invariant 10: the store report reads compensations over exact [start, next period start) bounds — without the flag the list endpoint stretches the end to 23:59:59 and the 1st of the next month is billed twice"
+        },
+        {
+          "file": "services/compensations/report-window.js",
+          "regex": "endExclusive:\\s*new Date\\(storeReportBounds\\(nextDay,\\s*nextDay,\\s*storeData\\)\\.start\\)",
+          "desc": "CORE invariant 10: a period's compensation window ends exactly where the next period's starts (same function), so consecutive reports tile with no overlap and no gap"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "endExclusive:\\s*req\\.query\\.endExclusive\\s*===\\s*'true'",
+          "desc": "CORE invariant 10: only the report's self-call gets exact exclusive bounds; the admin date filter keeps end-of-day stretching"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "rejectIfCompensationPeriodClosed\\(req,\\s*res,\\s*existingCompensation,\\s*null\\)",
+          "desc": "CORE invariant 10: deleting a compensation is refused once a report covering its createdAt exists (add/edit/approve-item are locked by the same helper)"
         }
       ]
     }

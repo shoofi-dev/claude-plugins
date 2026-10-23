@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@561e3ca / 2026-07-28
+last-verified: shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -17,11 +17,16 @@ customer order history, order crons, and the order-side wiring of secondary feat
 (coins, world-cup, attribution, coupon usage).
 Server: `routes/order.js`, `routes/twin-order.js`, `routes/order-fraud-*.js`,
 `routes/admin/order-monitoring.js`, `services/twin-order/*`, `utils/order-stock.js`,
-order crons. Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
+`utils/order-pricing.js` + `utils/order-pricing-shadow.js`, `routes/order-amend.js`,
+order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
 (shoofir), monitoring/twin-admin (delivery-web).
 
 **Not yours:** payment internals (`payments`), settlement/payouts (`accountant`), driver
-assignment & areas (`delivery`), auth (`customers`). Hand off in the PR.
+assignment & areas (`delivery`), auth (`customers`), the For-you chat / AI helper
+(suggestions `menu-catalog`, taste-profile ownership + login merge `customers`) — it READS
+orders, ADDS to the cart only through `addProductToCartForStore` and never places an order
+(reference §5, C1). Yours: that cart entry point (invariant 13) and the deferred in-chat
+checkout (Known status). Hand off in the PR.
 
 ## ⚠️ HIGH-RISK — draft PR, flagged, never merge
 Order creation (`processCreditCardPayment`/`processHypTokenPayment`/`finalizeApplePayOrder`
@@ -33,7 +38,14 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
 1. **Status source of truth is the server** — `ORDER_STATUS` in `consts/consts.js`
    (`1` in-progress … `6` pending … `13` fraud-review, `14` future, `15` ramadan; completed
    bucket `2,3,10,11,12`, cancelled `4,5,7,8,9`). Each client repo keeps its **own copy** in
-   `consts/shared.ts` — a status change is a **multi-repo PR**.
+   `consts/shared.ts` — a status change is a **multi-repo PR**. The driver endpoints
+   never write `orders.status`: delivered = `bookDelivery.completedAt`, and
+   `readyMinutes` is not an order field (reference §2). So there is **no single
+   "delivered/completed" transition to hook** — completion is written on several paths
+   (partner/admin `order/update`, the `fix-stuck-orders` crons) and arrival only on
+   `bookDelivery`. A consumer that needs post-completion data reads lazily instead (the AI
+   helper's `inferred` taste cache), and the AI helper's `deliveredOrders` counts COMPLETED
+   statuses, not courier deliveries (reference §5).
 2. **Transition guards:** PENDING(`6`) only from FRAUD_REVIEW; store-accept rejects
    already-cancelled; `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
    not `order/update`.
@@ -47,7 +59,15 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    completion/revenue from it — join the store `orders` collection. Reuse
    `getSuccessfulOrdersByCustomerIds` (`utils/customer-orders.js`). See `docs/customer-orders-snapshot.md`.
 6. **Secondary never breaks primary** — coins, world-cup, attribution, notifications are
-   try/caught and swallowed. Never let one throw into the order path.
+   try/caught and swallowed. Never let one throw into the order path. **Notifications must
+   also never HOLD it:** the store-owner new-order alert is fired with
+   `fireStoreOwnerNotifications` (`routes/order.js`) and **not awaited** on every create
+   path, `updateCCPayment` and `finalizeApplePayOrder`, always after the order is persisted
+   at its final status. try/catch is not enough: a push that hangs never throws, and on
+   brixta 2026-10-03 an awaited one held the create response 128s/257s → app timeout →
+   customer resubmitted → duplicate orders. Push sends themselves have a hard timeout
+   (`PUSH_SEND_TIMEOUT_MS`, 10s, at most 1 retry, none after a timeout — reference §7).
+   Only the admin fraud-approval path in `/api/order/update` still awaits it.
 7. **Multi-tenant:** orders live in the **store** DB (`getOrInitializeDb(app-name)`);
    **customers are central** (`shoofi`). Don't cross them.
 8. **Twin peers** are mutated by `services/twin-order/*` directly, never via
@@ -61,6 +81,208 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    "Is this order for a later day?" must therefore test **both**, **truthily** — as the server
    does (`routes/order.js`: `$or: [{isFutureOrder:{$ne:true}},{isFutureOrder:{$exists:false}}]`).
    Testing `isFutureOrder` alone silently misses every ramadan order.
+10. **A store delay ACCUMULATES the live fields and freezes the originals ONCE — and
+    `delayMinutes` is never a running total.** `POST /api/order/update-delay`
+    (`routes/order.js`) writes three preserve-once fields (`order.originalOrderDate`, and on the
+    `bookDelivery` row `originalPickupTime` + `originalExpectedDeliveryAt`, each written as
+    `existing || current`) beside three that accumulate (`orderDate`, `pickupTime`,
+    `expectedDeliveryAt`). `delayMinutes` on **both** documents is overwritten with the LAST
+    declared delay: after 10 then 10 it reads `10`, not `20`. Total accumulated delay is only
+    recoverable by diffing an original against its live twin — anything summing `delayMinutes`
+    is wrong on every twice-delayed order.
+    Two consequences that have already caused bugs, both in reporting rather than here:
+    (a) `pickupTime` is deliberately **not** wrapped at 24, so `"24:05"` is a real stored value
+    and a `HH:mm` parser that rejects it discards the row; (b) a promise and a pickup clock must
+    be compared **within the same era** — the frozen promise against the frozen clock, or the
+    live against the live. Mixing them makes a zero-minute ETA sentinel
+    (`services/delivery/late-delivery.js`) look like a genuine promise and vice versa, which is
+    exactly what `originalExpectedDeliveryAt` exists to prevent. Delivery owns the reading rule;
+    orders owns the fields, and this is the contract between them.
+
+11. **Line pricing has ONE server reference and two client copies that must stay in lockstep:**
+    `utils/order-pricing.js` `calculateExtrasPrice(extras, selections, { soldByWeight })` is a
+    port of `shoofi-app/stores/extras/index.ts` and `shoofi-partner/stores/extras/index.ts`.
+    The weight extra prices as the delta from `defaultValue` when the product has
+    `soldByWeight === true` (`calculateItemUnitPrice` reads the flag off the product loaded by
+    `loadPricedProducts`, which must keep returning it) or when the weight is the only
+    non-header extra; otherwise as an add-on with the first step bundled. Creation charges
+    the client total and only **shadow-compares** (`utils/order-pricing-shadow.js` →
+    `order.serverPricing.driftDetected`); **amend** (`routes/order-amend.js` `repriceOrder`)
+    is server-authoritative through `calculateOrderPricing`. **Combo lines add a fourth
+    function to the same lockstep:** `calculateComboExtrasPrice(comboProduct, item, components)`
+    (`utils/order-pricing.js`) is a port of `shoofi-app/helpers/combo-pricing.ts`
+    (`calculateComboX`) and its `shoofi-partner` twin, and `loadPricedProducts` must keep
+    loading every `item_id` ∪ every `comboSelections[].productId` in ONE find with NO projection
+    — the combo needs `productType` + `combo`, its components need `extras` + `soldByWeight`.
+    Change one copy, change all three (both functions), and extend
+    `test/integration/order-pricing-parity.js` (it has a "Combo deals" section). **The For-you
+    chat adds one more copy of the unit formula:** `shoofi-app/helpers/chat-cart-line.ts`
+    `priceLine` repeats `screens/meal/index2.tsx` (base + discounted extras over the same
+    `extrasStore.calculateExtrasPrice`) on purpose, so the menu screen stays untouched — change
+    the formula there too, and in `calculateItemUnitPrice`. Catalog side
+    of the same rule: menu-catalog CORE invariants 7 and 9; `docs/sold-by-weight.md`,
+    `docs/combo-deals.md`.
+12. **A COMBO IS ONE ORDER LINE** (`docs/combo-deals.md`). `item_id` = the combo product,
+    every existing item field unchanged, plus
+    `comboSelections[{ sectionId, slot, productId, nameAR, nameHE, surcharge, selectedExtras, extrasPrice }]`.
+    The server reads ONLY `sectionId`, `productId` and `selectedExtras`; the rest are display
+    snapshots for tickets.
+    - **Catalog surcharge only.** A pick's money is the CATALOG `option.surcharge`
+      (`Number(option.surcharge)` off the combo's own section) plus the COMPONENT's own extras
+      definition priced against `sel.selectedExtras`. `sel.surcharge` and `sel.extrasPrice`
+      are never charged — the same "item.price is the untrusted input" rule as every line.
+      X (surcharges + nested extras + combo-level extras) takes the place of a plain product's
+      extras: `price = discounted(combo.price) + (d > 0 ? Math.round(X × (1 − d/100)) : X)`,
+      `originalPrice = baseOriginal + X` undiscounted (the existing asymmetry). The client's
+      "you save ₪N" is display only and never reaches the server.
+    - **Issues are recorded at create and refused at amend.** The pricer never throws: a pick
+      the catalogue cannot price is priced as far as it can be and recorded —
+      `COMBO_SELECTION_NOT_IN_SECTION` (ignored for the price), `COMBO_COMPONENT_MISSING`
+      (surcharge still charged, nested extras unknown), `COMBO_SLOT_COUNT_MISMATCH
+      { expected, got }` — on the line (`item.comboIssues`) and top-level (`comboIssues[]` with
+      `itemIndex`/`item_id`). Creation persists them as `serverPricing.comboIssues` and
+      suppresses `driftDetected` ONLY for `COMBO_COMPONENT_MISSING` (a data gap, like
+      `missingProductIds`); the other two mean the client priced a different deal than the
+      catalogue describes and ARE drift. Amend has no client number to fall back on, so any
+      `comboIssues` after `repriceOrder` is `409 COMBO_SELECTION_INVALID` — the same posture as
+      `PRODUCT_NOT_FOUND`.
+    - **Stock is symmetric by construction.** `expandStockLines(items)` (`utils/order-stock.js`)
+      turns a line into `item_id × qty` PLUS every `comboSelections[].productId × qty`,
+      aggregated (a burger in two slots of a combo ordered twice moves four burgers).
+      Decrement, restore and the amend delta (`applyStockDelta`, `minQty: 0`) all go through
+      it — whatever confirm took is exactly what cancel gives back. A component at 0 disables
+      the component only; the combo document is never touched (the menu snapshot carries
+      `isInStore`). Invariant 3's gates are unchanged.
+    - **Amend is qty/remove only (phase 1).** A change carrying `selectedExtras` or
+      `comboSelections` for a combo line is `400 COMBO_EXTRAS_NOT_AMENDABLE` (`indexes` names
+      them); `comboSelections` ride along untouched and are never diffed; `comboIssues` is
+      stripped with the other bookkeeping fields before `order.items` is written, so the
+      persisted item shape never carries it.
+13. **A cart filled outside a store's menu must name its store — the order goes wherever the
+    cart is stamped.** Checkout submits with `storeData: cartStoreData || storeDataStore.storeData`
+    (`cartStoreData` = the `@storage_cart_storeData` snapshot written with the first line), and
+    `submitOrder` sends its `appName` as `app-name` on `order/create`. `addProductToCart` stamps
+    an EMPTY cart with the BROWSED store (`storeDataStore.storeData`, else `@storage_storeDB`) —
+    the menu's assumption (reorder loads the order's store first for the same reason). So the
+    For-you chat (`shoofi-app/hooks/useChatAddToCart.ts`, behind `isChatOrderingEnabled`, built
+    2026-10-17) adds ONLY through `cartStore.addProductToCartForStore(line, storeData)`: it stamps
+    an empty cart with the GIVEN store (`setCartStoreDBName` + `setCartStoreData`,
+    `isSchoolProject` false, `@storage_cartCreatedDate`), never reads or writes the browsed
+    store, and **throws** on a cart of another store. The chat never calls `addProductToCart` /
+    `resetCartForNewStore` and never moves the browsed-store globals (`setStoreDBName`,
+    `getStoreData`, `getMenu`, `@storage_storeDB`) — it loads with the fetch-only
+    `getStoreDataFromServer` / `getMenuFromServer`; the cart screen (mount) and checkout (focus)
+    repoint `storeDataStore` to the cart's store themselves. Another store's cart is never mixed
+    or silently emptied: the chat asks, and "replace" = `resetCart()` + add. Twin flows and
+    school carts get no chat add (it opens the store instead). App tests:
+    `__tests__/stores/cart-add-for-store.test.ts`, `__tests__/hooks/use-chat-add-to-cart.test.tsx`.
+
+## Where an order that never happened lives
+**There is no server-side cart.** The cart is MobX + AsyncStorage in
+`shoofi-app/stores/cart/index.ts` and nothing about it reaches the server until submit, so
+"the customer built a cart and left" exists ONLY as events in central **`shoofi.apps-logs`**
+(written by `routes/app-logs.js`). Three layers answer "abandoned", an order of magnitude
+apart — always establish which is meant:
+
+1. **Blocked before submit** — `checkout_validation_failed`, `properties.step` ∈
+   {`store_closed`, `store_closed_select_time`, `shipping_method_invalid`, `address_invalid`,
+   `payment_method_invalid`, `car_details_missing`, `future_order_date_missing`}, from
+   `shoofi-app/hooks/checkout/use-checkout-validate.ts`. **"Store closed" and "no delivery
+   available" create NO order document at all** — this is their only record anywhere. The
+   top-level failure in `screens/checkout/index.tsx` sends no `step`, but it is a
+   **duplicate**: it fires after the stepped event for the same press, so ~half the rows have
+   no step. Count reasons from the stepped rows only; the step-less row adds a price snapshot,
+   not a reason (verified 2026-09-24: 158 of 168 blocked sessions had both).
+   `payment_method_invalid` is mostly friction, not loss — checkout starts with NO payment
+   method (the cash default is commented out) and forgets the choice on remount, so ~94% of
+   those customers pick one and order within 30 min.
+2. **Submitted and never paid** — status `"0"` order rows, per store DB. See the
+   `FAILED_PAYMENT_STATUS` note; that is the only layer carrying an issuer reason.
+3. **Never reached checkout** — `page_viewed` with `properties.page_name` ∈
+   {`ProductAddToCart`, `Cart`} and no `order_submit_success`. Add-to-cart uses
+   `trackPageView`, not `trackEvent`, so it is a `page_viewed` row and easy to miss.
+   A For-you chat add logs the same `ProductAddToCart` page view (its `storeDBName` is the
+   dish's store, plus `source: "for_you_chat"` and the reply's `suggestionId`) and also
+   `button_clicked` `button_id: "for_you_quick_add"` (fallbacks `for_you_quick_add_fallback` +
+   `reason`). An order that holds For-you dishes says so on its `order_submit_success` event:
+   `for_you_lines` + `for_you_suggestion_ids` (`shoofi-app helpers/for-you-attribution.ts` —
+   noted on the phone for 24 h when a dish is added from the chat or from a store a card opened,
+   cleared once counted). Analytics only: the order payload, cart lines and `getCartData` are
+   untouched; a failure there adds nothing to the event and never blocks the submit.
+   The cart's continue button logs `cart_checkout_pressed`, and `cart_checkout_blocked`
+   with `reason` ∈ {`store_closed`, `store_busy`, `store_custom_message`,
+   `school_order_time_invalid`, `store_status_error`} (from `screens/cart/cart.tsx`). Before
+   those events, a cart stopped by a closed/busy store left no trace at all.
+   The For-you funnel copies all of these checkout events (and `checkout_left`) into
+   `shoofi.forYouEvents` to explain a picked dish that was not ordered (menu-catalog CORE
+   invariant 22) — renaming one, or a `reason` / `step` / `error_code` value, changes its
+   "why" columns too.
+
+Checkout-screen events that explain the "reached checkout, didn't send" layer:
+- **`checkout_left`** — checkout lost focus (`reason`: `blur`|`unmount`) without a completed
+  order: `seconds_on_screen`, `attempted`, and the payment method / shipping / timing / price
+  the customer had at that moment. Payment method and order timing live in screen state
+  and **reset on every mount**, so a customer who goes back to the cart and returns loses
+  both; this event is the only record of the dropped choice.
+- **`page_viewed` `Checkout`** carries `cart_store` and `browsed_store`. The future-order
+  picker is gated on the **browsed** store's flags (`storeDataStore.storeData`), not the
+  cart's — a mismatch explains a picker that is missing.
+- **`order_timing_changed`** is what the customer chose, but it also fires `now→now` on
+  every picker mount — noise, not a choice. Changes the SCREEN makes (auto-flip to future
+  delivery, twin mode forcing `now`) log `order_timing_auto_changed` with a `reason`.
+- **`future_order_picker_opened` / `_closed`**, and **`future_order_no_slots`** when future
+  ordering is enabled but no day has a slot left.
+- A future slot picked then silently lost is real: in Sep 2026, 13 of 47 orders whose last
+  timing pick was `future` were sent as ASAP after the customer left and re-entered
+  checkout.
+
+Traps that cost a day if you meet them cold:
+- **`apps-logs.created` is a real BSON `Date`** — the exact opposite of `orders.created`. One
+  query cannot span both, and mixing them matches nothing and raises nothing.
+- **The only indexes are `_id` and `{userId, created}`.** A match on `created` alone is a full
+  scan of a ~4.6 GB collection. Bound `_id` instead (`ObjectId.createFromTime`, widened by a
+  minute and re-filtered on `created`) — index-covered, and roughly 50× faster.
+- **No TTL and no retention job**, so history is complete back to the first event on
+  **2026-02-06**. Anything earlier is *no data*, not zero — report it as null.
+- **No `appName` field on the document**, so a per-store split is impossible from this data.
+  `app_type` is always `"shoofi-shopping"`: the partner and driver apps do not log at all.
+- **The launch event is not a usable "app open".** `ota_check_started` (`trigger: "launch"`,
+  `shoofi-app/hooks/useOTAUpdates.ts`) fires before `userDetailsStore` hydrates, so ~99% of
+  launch rows carry `userId: null`, and it only exists from 2026-07-29.
+- **"Did they actually use it?" = did the device-day emit anything that is NOT `ota_*`.** The
+  OTA hook is the only writer in the client that is not a user action (it fires on mount and
+  on an `AppState` resume, then emits its check/download consequences). There is no background
+  execution path at all — no registered task, no headless JS, no silent-push handler, and the
+  server never sends `content-available` — so nothing runs while the app is away, and an
+  `ota_*`-only device-day is "came to the front, nothing was looked at". Note `page_viewed` is
+  NOT a clean "a screen rendered" proxy: `StoreSelectAuto` fires during boot with no screen,
+  `ProductAddToCart` is a button press, and `Menu1`/`Menu2` sit outside their `isFocused`
+  guard so they fire on blur too (`shoofi-app/screens/menu/menu.tsx`).
+- **`user_visit_id` IS a stable identity** — the `device-id` header, generated once into
+  AsyncStorage and **not cleared on logout** — measured at 97.9% one device per customer. Do
+  not confuse it with `orders.deviceId`, which prefers the per-order `unique_hash` and churns
+  every order.
+- **⚠️ `userId: null` does NOT mean "logged out"** — it means *we did not learn who this was*.
+  `userDetailsStore.userDetails` is in-memory only and filled by a network round-trip, so a
+  fully signed-in customer emits `userId: null` for a whole session in three cases: events
+  fired before that call returns; a token-hydration race where `authStore.isLoggedIn()` is
+  still false when `App.tsx`'s `prepare()` tests it, so `getUserDetails()` is never called at
+  all for that run; and a failed or timed-out call, which is **never retried**. So any
+  "anonymous" figure is an **upper bound**, and must be labelled in devices or sessions rather
+  than people. Resolve identity across the whole (device × business day) — if any event that
+  day carried a `userId`, the day is that customer — which drops measured anonymity from ~99%
+  on the launch event to ~12%. Keep it as a SET: a device can carry two customers in a day.
+- **Impersonation is invisible in this data.** A `master` operator can drive the app as a
+  customer (`shoofi-app/stores/auth/impersonation.ts`) and `trackEvent` sends no impersonation
+  marker, so those sessions are indistinguishable from the real customer's and inflate any
+  unique-user count.
+- **`POST /api/app-logs/insert` is unauthenticated and takes `userId` from the body.** A
+  product metric, never an auditable one.
+- Logging is killable per store via `isAppLogsEnabled`, and the collection handle is bound to
+  `db.driversBonuses` by `DatabaseInitializationService` — always use
+  `db.collection('apps-logs')` explicitly.
+
+Worked example: `services/exec-dashboard/engagement-metrics.js`.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **BY DESIGN:** `verifiedAppName` in `routes/order.js` is a pass-through; the multi-tenant
@@ -70,6 +292,14 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
 - **Awareness (not bugs):** coins-redeem-after-charge failure logs CRITICAL for manual
   reconciliation; HYP "verified=false but paid" is logged paid-but-stuck; background work in
   store-accept runs after the 200 response so failures never reach the client.
+- **DEFERRED (Sari, 2026-10-16) — do NOT build without a new decision:** the in-chat
+  **checkout** card in the For-you chat. Adding to the cart from the chat IS built (Sari,
+  2026-10-17 — invariant 13), but the chat still places no order: the read-only cart dock and
+  the "complete the order" chip open the existing `cart` screen → normal checkout (no order or
+  payment API changed). Reasons for keeping the checkout card out: the charged total
+  is client-computed in `shoofi-app/screens/checkout/index.tsx` (`totalPrice` from
+  `TotalPriceCMP`, which the server charges — invariant 11); the post-charge reset and
+  navigation is `postChargeOrderActions` in the same file; and customer consent. Reference C1.
 
 ## Recipe — add a field to an order, end-to-end
 1. **Customer app** — add it where the cart payload is built (`stores/cart` `getCartData`).

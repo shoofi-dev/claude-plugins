@@ -14,10 +14,47 @@
         "routes/translations.js",
         "routes/global-search.js",
         "utils/menu-cache.js",
-        "utils/order-stock.js"
+        "utils/order-stock.js",
+        "utils/combo-validation.js",
+        "utils/client-features.js",
+        "services/menu/combo-snapshots.js",
+        "services/ordering-intelligence/",
+        "routes/for-you.js",
+        "utils/crons/suggest-index-cron.js",
+        "bin/build-suggest-index.js",
+        "bin/label-products.js",
+        "utils/crons/product-labels-cron.js",
+        "routes/admin/dish-taxonomy.js",
+        "routes/admin/ai-usage.js",
+        "services/ai/usage-log.js",
+        "services/ai/pricing.js",
+        "routes/ai-helper.js",
+        "utils/extras-required.js"
       ],
-      "shoofi-partner": ["screens/admin/product", "screens/menu"],
-      "shoofi-app": ["screens/menu"]
+      "shoofi-partner": [
+        "screens/admin/product",
+        "screens/menu"
+      ],
+      "shoofi-app": [
+        "screens/menu",
+        "components/for-you",
+        "screens/for-you",
+        "stores/for-you/",
+        "helpers/for-you-copy.ts",
+        "hooks/useOpenStoreAtProduct.ts",
+        "components/ai-helper/",
+        "screens/ai-helper/",
+        "stores/ai-helper/",
+        "helpers/ai-helper-copy.ts",
+        "hooks/useChatAddToCart.ts",
+        "helpers/chat-cart-line.ts"
+      ],
+      "shoofi-delivery-web": [
+        "src/views/admin/dish-types/",
+        "src/apis/admin/dish-taxonomy.ts",
+        "src/views/admin/ai-usage/",
+        "src/apis/admin/ai-usage.ts"
+      ]
     },
     "orders": {
       "shoofi-server": [
@@ -32,7 +69,9 @@
         "utils/customer-orders.js",
         "utils/crons/order-overdue-checker.js",
         "utils/crons/fix-stuck-orders.js",
-        "consts/consts.js"
+        "consts/consts.js",
+        "utils/order-pricing",
+        "routes/order-amend.js"
       ],
       "shoofi-app": [
         "screens/checkout",
@@ -40,7 +79,8 @@
         "stores/cart/",
         "stores/orders/",
         "stores/twin-order/",
-        "consts/shared.ts"
+        "consts/shared.ts",
+        "hooks/useChatAddToCart.ts"
       ],
       "shoofi-partner": [
         "screens/admin/order",
@@ -51,6 +91,7 @@
         "src/apis/admin/order",
         "src/views/admin/orders.tsx",
         "src/components/Cards/CardOrder.tsx",
+        "src/components/Cards/order-actions/",
         "src/components/Cards/CardTwinOrder.tsx",
         "src/components/OrderMonitoring/",
         "src/consts/shared.ts"
@@ -88,7 +129,8 @@
         "lib/payments/",
         "utils/vat.js",
         "utils/greeninvoice.js",
-        "utils/invoice-provider.js"
+        "utils/invoice-provider.js",
+        "services/compensations/"
       ],
       "shoofi-delivery-web": [
         "src/views/admin/DriverPayments.tsx",
@@ -128,7 +170,10 @@
         "src/views/admin/settings/DeliverySettings.tsx",
         "src/consts/shared.ts"
       ],
-      "shoofi-partner": ["hooks/useAvailableDrivers.ts", "screens/book-delivery/"]
+      "shoofi-partner": [
+        "hooks/useAvailableDrivers.ts",
+        "screens/book-delivery/"
+      ]
     },
     "customers": {
       "shoofi-server": [
@@ -141,7 +186,9 @@
         "utils/auth-service.js",
         "utils/admin-auth-service.js",
         "utils/app-name-helper.js",
-        "controllers/customerAddressController.js"
+        "controllers/customerAddressController.js",
+        "routes/ai-helper.js",
+        "services/ordering-intelligence/taste-profile.js"
       ],
       "shoofi-app": [
         "screens/login",
@@ -151,10 +198,21 @@
         "screens/addresses",
         "stores/auth/",
         "stores/user-details/",
-        "stores/address/"
+        "stores/address/",
+        "stores/ai-helper/"
       ],
-      "shoofi-partner": ["screens/login", "screens/verify-code", "stores/auth/", "stores/user-details/"],
-      "shoofi-shoofir": ["screens/login", "screens/verify-code", "stores/auth/", "stores/user-details/"],
+      "shoofi-partner": [
+        "screens/login",
+        "screens/verify-code",
+        "stores/auth/",
+        "stores/user-details/"
+      ],
+      "shoofi-shoofir": [
+        "screens/login",
+        "screens/verify-code",
+        "stores/auth/",
+        "stores/user-details/"
+      ],
       "shoofi-delivery-web": [
         "src/contexts/AdminAuthContext.tsx",
         "src/views/admin/users/",
