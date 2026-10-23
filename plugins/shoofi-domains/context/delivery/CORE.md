@@ -50,6 +50,28 @@ scope documents above it — `cityAreas.isActive` and `parentCities.isActive` re
 `{$ne: false}`, so absent means active *there*. Same field name, opposite default, one collection
 apart. Anything reasoning about whether an area was serving must use `isActive === true`.
 
+## Driver identity on the wire — `fullName` is the record, `name` is the response
+In `delivery-company.customers` the driver's name is **`fullName`**; the `name` field is
+**never populated** (0 of 246 driver/admin records, checked 2026-09-30). But
+`GET /delivery/drivers/locations` collapses the two before it answers —
+`name: driver.fullName || driver.name` in `routes/delivery/driver.js` — so the live map
+(`shoofi-delivery-web/src/views/admin/driver-locations/DriverLocationsMap.tsx`) must read
+**`name`**, while `DriversList.tsx`, which gets raw docs from a different route, must read
+**`fullName`**. Copying a field name from one driver screen to the other yields `undefined`,
+never an error.
+- **Phones on those records are not uniformly `05XXXXXXXX`** — 241 of 246 are; the rest
+  include one stored with a **leading space** and a few of other lengths. Match a phone on
+  **digits only, on both sides** (`digitsOnly` / `driverMatchesSearch` in
+  `DriverLocationsMap.tsx`), and guard the empty term: stripping non-digits from a Hebrew
+  name leaves `""`, and `includes("")` is true for every phone on earth.
+- **That endpoint drops any driver with no fix** — `currentLocation: {$exists:true}` plus a
+  trailing `.filter(driver => driver.location !== null)` in `routes/delivery/driver.js`;
+  22 of 246 today. A driver who has never reported a location cannot be shown *or searched*
+  on the live map at any filter setting — `/admin/drivers` is the surface for him.
+- Its projection whitelists `fullName`/`name`/`phone` inline, but `PUBLIC_DRIVER_FIELDS`
+  (`lib/delivery/helpers.js`) has **neither `name` nor `phone`**. Refactoring this route onto
+  `sanitizeAvailableCompanies` would silently delete the phone from the map and its search.
+
 ## Delivery-only — a courier with no order behind it
 A store can book a driver for goods **Shoofi never sold**: owner picks a town, gives a phone
 and a ready-time, a courier goes. `services/delivery/delivery-only.js` +

@@ -34,7 +34,8 @@
         "services/delivery/driver-availability-feed.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "lib/delivery/helpers.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -386,6 +387,21 @@
           "desc": "the deactivation path takes no account of the driver's active deliveries, on purpose - 59% of switch-offs happen while he holds one and it produced 0 orphaned deliveries in 30 days. If a bookDelivery read appears here, somebody has built the alert reference.md 5 says not to"
         },
         {
+          "file": "routes/delivery/driver.js",
+          "regex": "name:\\s*driver\\.fullName\\s*\\|\\|\\s*driver\\.name",
+          "desc": "the driver-locations read collapses fullName||name into a response field called `name`"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "\\.filter\\(driver\\s*=>\\s*driver\\.location\\s*!==\\s*null\\)",
+          "desc": "a driver with no usable fix is dropped from /drivers/locations, so he cannot be searched on the live map"
+        },
+        {
+          "file": "lib/delivery/helpers.js",
+          "regex": "const\\s+PUBLIC_DRIVER_FIELDS\\s*=\\s*\\[",
+          "desc": "the shared driver whitelist carries no name/phone; the locations route must keep its own inline projection"
+        },
+        {
           "file": "services/delivery/driver-load.js",
           "regex": "ACTIVE_ORDER_STATUSES\\s*=\\s*\\[\"1\",\\s*\"2\",\\s*\"3\",\\s*\"5\"\\]",
           "desc": "the canonical in-flight status list, strings, INCLUDING \"5\" WAITING_IN_STORE - a hand-written [\"1\",\"2\",\"3\"] drops the driver standing in the restaurant, and three competing spellings are already live"
@@ -457,6 +473,7 @@
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
         "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/views/admin/driver-locations/DriverLocationsMap.tsx",
         "src/utils/driver-map-markers.ts",
         "src/views/admin/live-ops/data/liveOpsApi.ts"
       ],
@@ -475,6 +492,16 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isDeliveryOnlySupport",
           "desc": "the platform-wide delivery-only switch lives in admin Settings"
+        },
+        {
+          "file": "src/views/admin/driver-locations/DriverLocationsMap.tsx",
+          "regex": "driverMatchesSearch",
+          "desc": "the live driver map is searchable by driver name and phone"
+        },
+        {
+          "file": "src/views/admin/driver-locations/DriverLocationsMap.tsx",
+          "regex": "digitsOnly\\(driver\\.phone\\)\\.includes\\(termDigits\\)",
+          "desc": "phone search compares digits only on both sides (one stored phone carries a leading space)"
         },
         {
           "file": "src/utils/driver-map-markers.ts",
