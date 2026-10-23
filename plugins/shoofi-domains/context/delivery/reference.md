@@ -203,10 +203,25 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
 - **Active-status chokepoint:** NEVER write `customers.isActive` directly — always
   `services/delivery/driver-status-service.js:setDriverActiveStatus` (it writes
   `driverStatusHistory` in lock-step + WS-pushes `driver_status_updated`). Direct writes create phantom history.
-- **`isActive` is the only availability flag that means anything.** `isOnline` is written
-  only by the location ping and defaults to `true` with nothing writing it back
-  (`routes/delivery/driver.js:893`) — sticky-true after the first GPS fix (220/242 true vs
-  3 `isActive`, 2026-09-25). `isAvailable`/`availabilityReason`/`lastAvailabilityUpdate`
+- **`driver-status-history` is the availability audit trail** (code `db.driverStatusHistory`,
+  collection **hyphenated**). 27,891 rows on 2026-09-25 and **all** of them are `isActive`
+  changes — `{timestamp(offset STRING), driverId(ObjectId), driverName, companyId(string),
+  changes:{isActive:{old,new}}, oldValues, newValues, changedFields:['isActive'], updateType,
+  updatedBySource, updatedByName, updatedById, userAgent, ipAddress}`. The driver document
+  has **no** toggle timestamp (see CORE invariant 3), so this is the only source of "when".
+  Sort "latest per driver" on `_id`, not `timestamp` (offset string, DST-unsafe). Join it as
+  a LEFT join: drivers are hard-deleted (`routes/delivery/company.js`, `driver.js`) and 26 of
+  the 231 driver ids in the history have no `customers` document left — the row's own
+  `driverName` is the fallback. Existing readers:
+  `GET /api/driver-shift-manager/admin/driver-status-history` (per-driver, per-month
+  forensics → `DriverActiveHours.tsx`) and
+  `GET /api/driver-shift-manager/admin/driver-availability-changes`
+  (`services/delivery/driver-availability-feed.js` → the admin's driver-activity board).
+- **`isActive` (on shift/enabled) is the only availability flag that means anything.**
+  `isOnline` is written only by the location ping and defaults to `true` with nothing
+  writing it back (`routes/delivery/driver.js:893`) — sticky-true after the first GPS fix
+  (220/242 true vs 3 `isActive`, 2026-09-25).
+  `isAvailable`/`availabilityReason`/`lastAvailabilityUpdate`
   (`POST /api/delivery/driver/availability`, `routes/delivery/driver.js:1377`) are
   populated on **0 of 242** drivers and their only client method has no UI caller. Dispatch
   reads `isActive`. See CORE.md invariant 4.
