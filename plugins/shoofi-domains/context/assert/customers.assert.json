@@ -258,13 +258,30 @@
     "shoofi-delivery-web": {
       "files": [
         "src/contexts/AdminAuthContext.tsx",
-        "src/utils/http-interceptor/index.ts"
+        "src/utils/http-interceptor/index.ts",
+        "src/components/Modals/CustomerDetailsModal.tsx",
+        "src/components/retention/RetentionGrantPanel.tsx",
+        "src/views/admin/orders.tsx",
+        "src/views/admin/live-ops/LiveOpsScreen.tsx",
+        "src/views/admin/customers/deletion-requests/DeletionRequests.tsx",
+        "src/views/admin/analytics/DeliveryListAnalytics.tsx",
+        "src/views/admin/growth/churn-360/ChurnRisk360.tsx"
       ],
       "patterns": [
         {
           "file": "src/utils/http-interceptor/index.ts",
           "regex": "Bearer",
           "desc": "admin uses Bearer (RN apps use 'Token')"
+        },
+        {
+          "file": "src/components/Modals/CustomerDetailsModal.tsx",
+          "regex": "retentionContext\\?: 'churn_360' \\| 'deletion_request' \\| 'other'",
+          "desc": "the shared customer card records which queue it was opened from, and the prop stays optional (LiveOpsScreen passes neither it nor onBlockStatusChanged)"
+        },
+        {
+          "file": "src/components/Modals/CustomerDetailsModal.tsx",
+          "regex": "<RetentionGrantPanel customerId=\\{customerId\\} context=\\{retentionContext\\} />",
+          "desc": "retentionContext is renamed to `context` at the call site, inside the COUPONS tab"
         }
       ]
     }

@@ -173,6 +173,26 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
      there: the event copy (`forYouEvents`) carries no customer id, the reviews (`forYouReviews`)
      only a one-way hash, and golden cases none (menu-catalog CORE invariant 22).
 
+10. **`CustomerDetailsModal` is ONE shared customer card, rendered from five screens, with no
+    per-view tab gating.** `shoofi-delivery-web src/components/Modals/CustomerDetailsModal.tsx`
+    is mounted by `views/admin/orders.tsx`, `views/admin/live-ops/LiveOpsScreen.tsx`,
+    `views/admin/customers/deletion-requests/DeletionRequests.tsx`,
+    `views/admin/analytics/DeliveryListAnalytics.tsx` and
+    `views/admin/growth/churn-360/ChurnRisk360.tsx`. Its tab strip is one unconditional list,
+    so **a tab added there appears for every caller** — including the `viewer`-role control-room
+    accounts that reach it from the live-ops board, which carries no `roles` by design
+    (`shoofi-delivery-web CLAUDE.md` → "Live ops board"). There is no UI role check to fall back
+    on: admin permissions are enforced server-side only. Two consequences when editing it:
+    - **Every prop must stay optional.** `LiveOpsScreen` passes `customerId`, `customerPhone`
+      and `onClose` and nothing else — making `onBlockStatusChanged` or `retentionContext`
+      required breaks that call site.
+    - **`retentionContext` is where the card was opened from**
+      (`'churn_360' | 'deletion_request' | 'other'`, default `'other'`), renamed to `context`
+      at the `RetentionGrantPanel` call site inside the **coupons** tab. The panel sits above
+      the coupon list deliberately — that list is how an agent answers "did they use it?" — and
+      runs its own `master`/`admin` gate via `useAdminAuth`. Don't harmonise the two prop names
+      and don't relocate the panel.
+
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
 - **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin
