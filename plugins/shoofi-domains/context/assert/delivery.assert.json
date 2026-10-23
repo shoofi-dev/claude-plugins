@@ -34,7 +34,8 @@
         "services/delivery/driver-availability-feed.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "lib/delivery/helpers.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -391,9 +392,44 @@
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
         },
         {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "Invalid customer location coordinates",
+          "desc": "createPendingDelivery refuses to insert a pending booking whose customer coordinates do not parse — so a document waiting for assignment always carries both ends of the journey, and a blank map there is a READ that dropped them"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "storeLocation\\?\\.lat \\|\\| deliveryData\\?\\.storeLocation\\?\\.latitude",
+          "desc": "storeLocation is read as lat||latitude because both shapes exist in the wild; a GeoJSON storeLocation has neither key and aborts the booking"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "customerLocation: 1,\\s*\\n\\s*storeLocation: 1,",
+          "desc": "POST /api/analytics/deliveries is a projection whitelist; without these two keys live-ops, the delivery list and the ops dashboard get rows with no geometry, and a delivery waiting for assignment has no courier whose order list could backfill them"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "isApproximateLocation: true,",
+          "desc": "isApproximateLocation is written in exactly one literal, beside isDeliveryOnly: true — it implies delivery-only and never the converse; the point is a town centroid, not an address anybody typed"
+        },
+        {
           "file": "services/delivery/driver-status-service.js",
           "regex": "async function setDriverActiveStatus",
           "desc": "the deactivation path takes no account of the driver's active deliveries, on purpose - 59% of switch-offs happen while he holds one and it produced 0 orphaned deliveries in 30 days. If a bookDelivery read appears here, somebody has built the alert reference.md 5 says not to"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "name:\\s*driver\\.fullName\\s*\\|\\|\\s*driver\\.name",
+          "desc": "the driver-locations read collapses fullName||name into a response field called `name`"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "\\.filter\\(driver\\s*=>\\s*driver\\.location\\s*!==\\s*null\\)",
+          "desc": "a driver with no usable fix is dropped from /drivers/locations, so he cannot be searched on the live map"
+        },
+        {
+          "file": "lib/delivery/helpers.js",
+          "regex": "const\\s+PUBLIC_DRIVER_FIELDS\\s*=\\s*\\[",
+          "desc": "the shared driver whitelist carries no name/phone; the locations route must keep its own inline projection"
         },
         {
           "file": "services/delivery/driver-load.js",
@@ -467,6 +503,9 @@
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
         "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/views/admin/live-ops/logic/map-focus.ts",
+        "src/utils/geo-point.ts",
+        "src/views/admin/driver-locations/DriverLocationsMap.tsx",
         "src/utils/driver-map-markers.ts",
         "src/views/admin/live-ops/data/liveOpsApi.ts"
       ],
@@ -485,6 +524,26 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isDeliveryOnlySupport",
           "desc": "the platform-wide delivery-only switch lives in admin Settings"
+        },
+        {
+          "file": "src/views/admin/live-ops/logic/map-focus.ts",
+          "regex": "task\\.unassigned \\? null : task\\.driverId",
+          "desc": "the live-ops map drawer decides whose map it is from the row's own `unassigned` test, not driverId — a delayed-assignment claim still carries a courier id, and reading it opened that courier's map for a row the list prints as 'no courier'"
+        },
+        {
+          "file": "src/utils/geo-point.ts",
+          "regex": "finiteNumber",
+          "desc": "one reader for all three stored coordinate shapes, refusing a half-missing pair rather than coercing null to 0 (which is a legitimate latitude)"
+        },
+        {
+          "file": "src/views/admin/driver-locations/DriverLocationsMap.tsx",
+          "regex": "driverMatchesSearch",
+          "desc": "the live driver map is searchable by driver name and phone"
+        },
+        {
+          "file": "src/views/admin/driver-locations/DriverLocationsMap.tsx",
+          "regex": "digitsOnly\\(driver\\.phone\\)\\.includes\\(termDigits\\)",
+          "desc": "phone search compares digits only on both sides (one stored phone carries a leading space)"
         },
         {
           "file": "src/utils/driver-map-markers.ts",
