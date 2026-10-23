@@ -97,7 +97,14 @@ pickup zone (`area.cityId`) + dropoff geometry.
 **Driver eligibility** (`findAllMatchingDrivers`): company must match BOTH `supportedAreas`
 (areaId) AND `supportedCities` (cityId); `personalSupportedAreas` overrides. Then a
 store allow/block list (`storeAssignmentMode`/`assignedStoreAppNames`).
-**Load/selection**: counts active `bookDelivery` (status `1,2,3`) per driver, drops those
+**Load/selection**: counts active `bookDelivery` (**`ACTIVE_ORDER_STATUSES = ["1","2","3","5"]`**,
+the canonical list, `services/delivery/driver-load.js:23` — **import it, never retype it**;
+`"5"` WAITING_IN_STORE is the driver standing in the restaurant, which is in flight, and
+every hand-written `["1","2","3"]` drops him. Values are **strings**; `driver._id` is an
+**ObjectId** and is absent on the 0.27% of rows not yet assigned. Three competing spellings
+are live today: the canonical one, `["2","3","5"]` at `routes/delivery/driver.js:997,:1133`
+(the location broadcast and the live map), and the inline `["1","2","3","5"]` literal at
+`routes/delivery/company.js:324`) per driver, drops those
 at `maxOrdersByAdmin`, sorts ascending by load, **random tie-break**.
 **Manual-admin routing**: companies with `isControlledByAdmin && manualAssignmentOnly`
 route the order to a company **admin**, not a driver (`assignmentMethod:'manual-admin-routed'`).

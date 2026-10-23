@@ -78,6 +78,8 @@
           "appliedCoupon"
         ],
         "services/delivery/driver-load.js": [
+          "ACTIVE_ORDER_STATUSES",
+          "UNCOLLECTED_ORDER_STATUSES",
           "byConcurrencyTierThenScore"
         ],
         "services/delivery/book-delivery.js": [
@@ -382,6 +384,11 @@
           "file": "services/delivery/driver-status-service.js",
           "regex": "async function setDriverActiveStatus",
           "desc": "the deactivation path takes no account of the driver's active deliveries, on purpose - 59% of switch-offs happen while he holds one and it produced 0 orphaned deliveries in 30 days. If a bookDelivery read appears here, somebody has built the alert reference.md 5 says not to"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "ACTIVE_ORDER_STATUSES\\s*=\\s*\\[\"1\",\\s*\"2\",\\s*\"3\",\\s*\"5\"\\]",
+          "desc": "the canonical in-flight status list, strings, INCLUDING \"5\" WAITING_IN_STORE - a hand-written [\"1\",\"2\",\"3\"] drops the driver standing in the restaurant, and three competing spellings are already live"
         }
       ]
     },
