@@ -20,7 +20,7 @@ Primary files: `routes/order.js` (~7k lines), `routes/twin-order.js`,
 `routes/order-origin-validator.js`, `routes/admin/order-monitoring.js`,
 `routes/admin/twin-order-config.js`, `services/twin-order/*`,
 `utils/order-stock.js` (stock semantics), `utils/crons/*order*`,
-`utils/centralized-flow-monitor.js`. Status constants: `consts/consts.js`.
+`services/monitoring/centralized-flow-monitor.js`. Status constants: `consts/consts.js`.
 
 **⚠️ HIGH-RISK code (change via draft PR flagged HIGH-RISK; never merge):**
 - `POST /api/order/create` — the creation pipeline (`order.js`)
@@ -68,12 +68,25 @@ Buckets (`docs/customer-orders-snapshot.md`): **completed** `2,3,10,11,12` ·
 - **Future → in-progress** (`/start-preparing`) → `14`→`1`.
 - **Cancel/reject** → `4,5,7,8,9`; cascades stock restore + delivery cancel + refunds (§3, §6).
 - **Cron** `fix-stuck-orders` bumps stale `1` → `3` (delivery) or `2` (takeaway).
+- **The delivery leg never writes `orders.status`.** Driver `approve`/`waiting-in-store`/
+  `start`/`complete`/`cancel` (`routes/delivery/orders.js`) update only
+  `delivery-company.bookDelivery` (+ flow events / pushes); `complete` reads the store order
+  only to schedule the feedback push. So "delivered" = `bookDelivery.status "4"` +
+  `bookDelivery.completedAt` — the order stays at `3`/`2`. `10`/`11` come from the
+  partner's `order/update`; no live client sends `9`/`12` (label-only), though
+  `/api/order/update` still handles a `9` if one arrives.
 - **Twin cascade** mutates the peer side **directly via services**, not routes (avoids recursion).
 
 **Transition guards you must not weaken:** PENDING(`6`) only from FRAUD_REVIEW
 (`order.js`); `/update/viewd` rejects already-cancelled (`4732`);
 `start-preparing` only from `14`. Fields: `status`, `statusUpdatedAt`,
 `statusUpdateReason`, `completedAt`, `viewdAt`, `isViewd`, `isPrinted`, `orderDate`.
+**`readyMinutes` is NOT an order field** — accept takes it as a request param and does not
+persist it (~0% of prod orders carry it; only `/update-start-preparing` writes it, on future
+orders). Recover it from the `order_viewed` flow event's `metadata.readyMinutes`, or as
+`orderDate − viewdAt` (default branch only; `orderDate` is on the tablet's clock, `viewdAt`
+the server's). Anything reading `order.readyMinutes` (e.g. `computeOrderDelays` in
+`admin/order-monitoring.js`) gets `null`.
 
 ## 3. Order creation pipeline (understand; do not edit without sign-off)
 `POST /api/order/create` (`order.js`) — ordered side effects:
@@ -82,7 +95,8 @@ lock (Redis `SET NX` + in-mem fallback + 30s dup check) → fraud checks → gen
 (no debit) → build `orderDoc` → **insert into store `orders`** (authoritative) →
 **stock decrement if status≠"0"** → first-order attribution → Apple Pay session
 self-heal → fraud persistence → **push `customers.orders[]` snapshot (central)** →
-notify store owner (**a repeating alert, not one push** — see §7) → flow event →
+notify store owner (**a repeating alert, not one push**, **fired in the background and
+never awaited** — `fireStoreOwnerNotifications`, see §7) → flow event →
 (CC/HYP branch: charge → set `6`/`1`/`13`, stock,
 coupon usage, coins, invoice) → success flow event → release lock in `finally`.
 Delivery is **not** booked here — it's booked at store-accept.
@@ -122,9 +136,17 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   back to the store `orders` by `orderId`→`_id`. Reuse
   `getSuccessfulOrdersByCustomerIds` (`utils/customer-orders.js`). Read
   `docs/customer-orders-snapshot.md` before ANY logic about a customer's order status.
+- **`shoofi.customers` has NO `phone` index in prod.** `utils/create-indexes.js` defines
+  `phone_index` but is a standalone script never run against `shoofi` — a lookup by phone
+  is a collection scan.
 - **`shoofi.orderFlowEvents`** = append-only audit timeline keyed on `orderNumber`
   (`order_created`, `payment_*`, `status_change`, `delivery_booked`, ...). Read via
-  admin order-monitoring + the `investigate-order` skill.
+  admin order-monitoring + the `investigate-order` skill. Traps:
+  - **No TTL, no retention.** `cleanupOldEvents` (`centralized-flow-monitor.js`) is never
+    called; history runs back to 2025-07-24 (~11.8M docs, 2026-10-06).
+  - **`order_viewed` `metadata.previousStatus` is always wrong** — `/update/viewd` reads it
+    from the order re-fetched *after* its `$set`, so it equals the new status. Pre-accept
+    status (normally `6`) is not recorded there; take it from the prior event.
 - **`delivery-company.bookDelivery`** keyed by `bookId` = order `orderId`; mirrors
   `DELIVERY_STATUS` (`1` waiting_approve … `3` collected/pickup … `4` delivered).
 - **`shoofi.twinOrderGroups`** links `orders.twinGroup` ↔ group `primary`/`secondary`.
@@ -139,6 +161,36 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   which is why code that displays "the order's date" tends to pick `datetime` and go unnoticed
   until a future/ramadan order arrives — see shoofi-dev/shoofi-partner#8. Date windows must be
   built as offset strings to compare correctly.
+
+- **Whole-history readers.** The unit-economics dashboard (shoofi-server
+  `services/unit-economics/`, `docs/unit-economics.md`) sweeps EVERY completed order in every
+  non-mock store DB (projection: `customerId`, `created`, `shippingPrice`, `appliedCoupon`,
+  `order.receipt_method`, `twinGroup.groupId`) and counts a twin group as one customer basket.
+  It relies on `COMPLETED_STATUSES` and on `created` being an Israel-offset ISO string (it reads
+  the local date off the first 13 characters, falling back to moment-timezone otherwise).
+
+- **Per-customer history reader — For you / AI helper** (shoofi-server
+  `services/ordering-intelligence/taste.js` `loadCompletedOrders`, menu-catalog's code,
+  `docs/ai-helper.md`). It follows CORE invariant 5: `customers.orders[]` only says where to
+  look — its newest `MAX_ORDERS` = 30 entries whose `created` is inside `HISTORY_DAYS` = 90 —
+  and each store's `orders` keeps `status ∈ COMPLETED_STATUSES`. The cap is taken **before** the
+  status filter, so unpaid/cancelled snapshot rows use up slots. Projection: `created`,
+  `orderDate`, `originalOrderDate`, `order.items.{item_id, qty, nameAR, nameHE, selectedExtras}`
+  — rename one and a taste fact silently disappears. On top of it:
+  - `deliveredOrders` (`GET /api/ai-helper/profile`, `ai-helper-service.js`) = `totalOrders` =
+    **completed** orders in that window (per-instance 10-min cache) — **not** courier-delivered
+    (`bookDelivery.completedAt`). The app routes ≥ 2 (`HISTORY_MIN_ORDERS`,
+    `shoofi-app/stores/ai-helper`) to the history onboarding.
+  - `facts.js` `meal_time` buckets `orderMs = originalOrderDate || orderDate || created` by
+    **Israel** hour: the DUE time frozen before any delay (CORE invariant 10) — after a default
+    accept that is the tablet-clock ready time (§2), for `14`/`15` the requested time — never when
+    the order was placed. `likes_spicy` matches `selectedExtras` (`"id"` and legacy `["id"]`)
+    against the product's CURRENT extras.
+  - `inferred` on `shoofi.tasteProfiles` is a **lazy cache, not an order hook**:
+    `refreshInferredIfStale` (`taste-profile.js`) rewrites it on `GET /profile` when older than
+    `INFERRED_TTL_MS` (1 h), customers only; nothing reads it yet. There is no single
+    delivered/completed transition to hook (CORE invariant 1) — don't add one to a
+    status-transition path for it.
 
 ## 6. Idempotency & invariants — never break these
 1. **Stock**: `decrementOrderStock`/`restoreOrderStock` gated by the
@@ -201,6 +253,29 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   written before the fix (the cleanup cron deletes alerts after 24h).
   `clearPersistentAlert` (on `isViewd`) is what stops it, and it is the `persistentAlerts`
   collection — not `notifications` — that holds the pending state.
+  ⚠️ **The alert never holds a customer response.** Every create path (cash / inline
+  Apple Pay, ZCredit token, HYP_TOKEN, HYP wallets), `/api/order/updateCCPayment` and
+  `finalizeApplePayOrder` call `fireStoreOwnerNotifications`, which starts
+  `sendStoreOwnerNotifications` and returns; its `.catch` (and the helper's own catches)
+  log `[STORE_ALERT_FAILED]` with `orderNumber`/`appName`/`stage`. Each call sits after the
+  order's final-status write, and nothing after it reads the result — keep both true. The
+  one awaited caller left is the fraud-approval branch of `/api/order/update` (13 → 6,
+  an admin request, already try/caught). Why: brixta 2026-10-03, an awaited alert on a
+  stalled Expo socket held the create response 128s and 257s, and the customer
+  resubmitted (5095-6430/7257-3591, 6096-0808/0490-5740).
+  **Push transport** (`services/notification/notification-service.js`
+  `sendPushNotification`): each Expo/Firebase attempt is raced against
+  `PUSH_SEND_TIMEOUT_MS` (default 10000); `retryAttempts = 2` = **at most one retry**,
+  and **no retry after a timeout** (the abandoned request is not cancelled — neither SDK
+  takes a signal). A timeout is a **failed** push: `results.push = 'failed'` and an
+  `orderFlowEvents` row `eventType: 'notification_push_failed'`, `status: 'failed'`,
+  `metadata.reason: 'timeout'`, `metadata.durationMs` (other failures carry
+  `reason: 'error'` / `'rejected'`; `push_sent` rows carry `durationMs` too). Log tags
+  (winston → OpenSearch `shoofi-server-logs`, fields folded into `message`):
+  `[PUSH_TIMEOUT]` error — recipientId, recipientType, notificationType, appName,
+  orderNumber, provider, elapsedMs, timeoutMs; `[PUSH_FAILED]` warn — thrown or
+  ticket-rejected attempt; `[PUSH_SLOW]` warn — any send over `PUSH_SLOW_WARN_MS`
+  (default 3000), even a successful one.
 - **FRAUD**: `order-fraud-*`, `fraud-config-loader`, `fraud-check-storage` →
   `shoofi.fraudChecks`/`deviceCustomers`/`ipCustomers`.
 - **GROWTH/COINS (secondary)**: `coinsService`, `worldCupService`, attribution — must never fail the order.
@@ -236,6 +311,11 @@ could break" section. Payments/invoicing files stay off-limits — hand off in t
 - **Awareness (not a bug):** HYP "verified=false but paid" → logged paid-but-stuck; no auto-recovery.
 - **Awareness:** background work in `/update/viewd` (delivery booking, external
   provider, twin coordination) runs after the 200 response — failures never reach the client.
+- **DEFERRED (Sari, 2026-10-16) — do not build without a new decision:** the For-you in-chat
+  **checkout** card. Adding to the cart from the chat is built (2026-10-17, CORE invariant 13);
+  ordering still hands off to the existing cart → checkout (C1). Reasons: the client-computed
+  total in `shoofi-app/screens/checkout/index.tsx`, `postChargeOrderActions` (same file), and
+  customer consent. See CORE Known status.
 
 # PART 2 — Client repos (full-stack view)
 You own orders across the clients too. Each subsection is where that repo drives
@@ -254,7 +334,10 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
   `produtsAdapter`) via `hooks/checkout/use-checkout-submit.ts` from
   `screens/checkout/index.tsx`. **Client computes the totals** (`total`, `orderPrice`,
   `shippingPrice`) and the server trusts them (matches the server doc's pricing note).
-  Initial status is `"0"` (CC) or `"6"` (digital success), decided client-side.
+  Initial status is `"0"` (CC) or `"6"` (digital success), decided client-side. **The target
+  store is the cart's stamp:** checkout passes `storeData: cartStoreData || storeDataStore.storeData`
+  and `submitOrder` sends `app-name: order.storeData?.appName` — so whatever stamps an empty
+  cart decides the store DB the order lands in (CORE invariant 13).
 - **Payment**: CC is charged **server-side inside `order/create`** (client passes
   `paymentData`; the client-side charge is deprecated). Apple/Google Pay use a ZCredit
   session + `order/save-apple-pay-session` → `update-apple-pay-order-session` →
@@ -272,9 +355,38 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
 - **Gotchas**: `order/create` is **multipart** (twin / Apple-Pay / HYP calls are JSON);
   the client `ORDER_STATUS` enum **omits `"0"` and `"13"`** (used only as literals) — keep
   in mind when reasoning about pending-payment/fraud states on the customer side.
+- **The For-you chat ADDS to the cart but never places an order** (`screens/for-you/ForYouScreen.tsx`,
+  menu-catalog's code; the cart side is CORE invariant 13). All behind `isChatOrderingEnabled`:
+  - **Read-only parts.** The cart dock (`components/for-you/CartDock.tsx` — reads `cartStore`,
+    writes nothing) and the context chips (`components/for-you/context-chips.ts`): with items in
+    the cart "complete the order" → `navigate("cart")` → normal checkout; with an active order
+    (the shared `ordersStore.activeOrders` list — the chat runs no poll) "where is my order?" →
+    the `active-orders` tab. The dock's ₪ is `cartStore.getProductsPrice()` (Σ line price × qty)
+    — **not** the order total: no delivery fee, coupon or coins (checkout's `TotalPriceCMP`).
+  - **Quick-add** (`hooks/useChatAddToCart.ts`, built 2026-10-17): the "+" on a `SuggestionCard`
+    or a `CrossSellPill` loads the store and its menu with the fetch-only
+    `getStoreDataFromServer` / `getMenuFromServer` (2-min per-store cache), builds the line as the
+    menu's product screen does (`helpers/chat-cart-line.ts` `buildCartLine`; choices in
+    `ChatProductSheet`, `single` / `multi` only) and calls `cartStore.addProductToCartForStore`.
+    Straight in only when there is nothing to choose and no default pre-chosen. A dish the store
+    no longer sells (not `isInStore`, stock 0, a mandatory choice all out of stock) is said in
+    the chat (`add_unavailable`) and nothing is added. Anything it cannot do exactly like the
+    menu opens the store at the dish instead (`openStoreAtProduct`, logged
+    `for_you_quick_add_fallback` + `reason`): a twin order or twin cart, a school cart, an
+    age-checked store not yet approved, combo / by-weight / pizza / counter / free-count /
+    unsupported extras, a failed load, a cart with no stored store.
+  - **Another store's cart:** the chat asks (`store_conflict`, replace / keep); "replace" re-reads
+    the cart, `resetCart()`s it if it is still another store's, then adds; "keep" changes
+    nothing. The stepper's "−" is `updateProductCount` / `removeProduct` on the dish's LAST line
+    (`removeProduct` clears the cart's store stamp when the cart empties).
+  - **Server traffic:** `/api/store` + `/api/menu` (fetch-only) and `/api/for-you/suggest` with
+    `cart: { appName, productIds }` (drink / sweet, and one `cross_sell` per store per chat after
+    the first add). No order API changed; server `docs/ai-helper.md` records a local end-to-end
+    check (the order landed in the dish's store with the chosen extras, shadow-pricing drift 0).
+    The in-chat checkout card stays DEFERRED (CORE Known status, §10).
 
 ## C2. shoofi-shoofir — the DRIVER app (React Native, MobX)
-Role: executes the **delivery leg**; drives the delivery-side status transitions.
+Role: executes the **delivery leg**; drives `bookDelivery` status only — never the order's.
 - **API client**: axios in `utils/http-interceptor/index.ts` — token `@storage_userToken`
   as `Authorization: "Token …"`; headers `app-type: shoofi-shoofir`, `app-name`
   default `"delivery-company"` (per-call overridable). Base `consts/api.js`.
@@ -285,8 +397,9 @@ Role: executes the **delivery leg**; drives the delivery-side status transitions
 - **Status scheme (important):** the driver UI works on the **bookDelivery
   `DELIVERY_STATUS`** numeric strings (`consts/shared.ts`: 1 waiting-approve, 2
   approved, 3 collected/pickup, 4 delivered, 5 waiting-in-store, -1 cancelled) —
-  **NOT** the customer `ORDER_STATUS` 0-15. The **server endpoints bridge** driver
-  actions to customer statuses (9/10/11/12). Don't conflate the two schemes.
+  **NOT** the customer `ORDER_STATUS` 0-15. **Nothing bridges them:** the driver endpoints
+  (`routes/delivery/orders.js`) write only `bookDelivery`, so `orders.status` never learns
+  about pickup/delivery (§2). Delivered = `bookDelivery.completedAt`. Don't conflate the two schemes.
 - **Twin**: two bookDelivery docs sharing `twinGroupId` render as one `TwinOrderCard`;
   `twinAssignmentMode` single|split (split = each driver sees only their side).
 - **Realtime**: `hooks/use-websocket.ts` (WS `?appType=shoofi-shoofir`), notifications
@@ -305,7 +418,7 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   as `"Token …"`, `app-type: shoofi-partner`, `app-name` = `@storage_storeDB` (per-call overridable).
 - **Endpoints** (`stores/orders/index.tsx`, controller `order/`): `admin/orders` (list),
   `admin/not-viewd` (incoming feed), **`update/viewd` = ACCEPT** (→ `6→1`, future `14→1`,
-  sets `readyMinutes`), `update` (forward/back status + note), `update-item-collected`,
+  sends `readyMinutes` — not persisted, §2), `update` (forward/back status + note), `update-item-collected`,
   `start-preparing` / `update-start-preparing`, `update-delay`, `printed`,
   `book-delivery`, `*-custom-delivery`, `addRefund`, `future-orders-ready`, `drive-in-arrival-confirm`.
 - **Transition rule**: ACCEPT goes through **`order/update/viewd`** (NOT `order/update`);
@@ -367,7 +480,8 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   (manual status/cancel/fraud-reject, stamped `updatedBySource:"shoofi_support"`),
   `order/update/viewd` (approve), `admin/order/delete/{id}`, `admin/impersonation/order-token`
   (open-as store/driver/customer, **master-only**), `admin/order-monitoring/summary/{orderNumber}`
-  (timeline), `twin-order/admin/{group/:id/full, degrade, undo-degrade, cancel, assign-driver}`,
+  (timeline; every `admin/order-monitoring/*` route is `auth.required` +
+  `checkAdminRole` with ALL admin roles — customer tokens 403, no token 401), `twin-order/admin/{group/:id/full, degrade, undo-degrade, cancel, assign-driver}`,
   `admin/twin-order-config` (GET/POST), `delivery/admin/{cancel,assign,reassign,drivers,orders}`.
 - **Refunds**: `order/addRefund` is **NOT** used here — admin refunds surface via twin
   `degrade`/`cancel` (`refundOwed`/`refundBreakdown`) and `shoofiAdmin/compensations/*`.
@@ -406,7 +520,8 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   `shoofi-server/consts/consts.js`. The **admin-web copy has already drifted** (above).
   A change to statuses is a **multi-repo PR** touching every client's constants.
 - **Driver app speaks `DELIVERY_STATUS`** (bookDelivery), everyone else speaks
-  `ORDER_STATUS`; the server bridges them. Don't cross the wires.
+  `ORDER_STATUS`; nothing bridges them — delivery progress lives only on `bookDelivery`.
+  Don't cross the wires.
 - **ACCEPT is `order/update/viewd`** (partner + admin); generic transitions are `order/update`.
 - Every client sends `app-name` (tenant) + its own `app-type`; the server branches on `app-type`.
 
