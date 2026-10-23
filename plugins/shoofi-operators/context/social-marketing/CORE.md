@@ -129,9 +129,19 @@ Never invent a code. Never create, modify or expire a campaign — that is a mon
   through `services/ai/complete.js` with `MODELS.best` and `backend: "bridge"` — the droplet's
   Claude subscription, falling back to the metered key by itself.
 - **`routes/social-media-ideas.js`** — `POST /api/admin/social-media-ideas/generate`,
-  `GET /api/admin/social-media-ideas`, `PATCH /…/:generationId/ideas/:ideaIndex/used`.
-  Generations persist to `shoofi.socialMediaIdeas`. `NO_API_KEY` → 503, `NO_STORES` → 404.
-  **See §3a — none of these are authenticated.**
+  `GET /api/admin/social-media-ideas`, `GET /…/:generationId`,
+  `PATCH /…/:generationId/ideas/:ideaIndex/used`, `POST /…/:generationId/ideas/:ideaIndex/post`.
+  All gated (§3a). Generations persist to `shoofi.socialMediaIdeas`.
+  **Generation is fire-and-forget (2026-10-11):** `/generate` returns a `generating` row (202)
+  and the screen polls `GET /:generationId` until `ready` or `failed`; errors (`NO_API_KEY`,
+  `NO_STORES`, a reply cut at `max_tokens`) land on the row as `error`/`errorCode`, not as an
+  HTTP status. It used to await the model in the request — bridge wait plus API fallback ran
+  past the proxy's 60s and the screen showed a **504**. Rows from before have no `status`; read
+  them as ready.
+  **`/ideas/:i/post`** turns an idea into a `socialPosts` row — the posts screen's pipeline
+  (Claude caption options → a person picks → Artlist render). The idea's CDN pictures become
+  attachments (store logo → `logo`, cover → `style`, product → `subject`); a reel maps to the
+  `story` format. One post per idea (`ideas.N.postId`).
 - **Images** are Spaces CDN URLs (`https://shoofi-spaces.fra1.cdn.digitaloceanspaces.com/`)
   via `buildImageUrl()`. Instagram's publishing API requires a *publicly reachable* image URL,
   so a CDN URL is the right shape — but verify it actually resolves before promising it.
