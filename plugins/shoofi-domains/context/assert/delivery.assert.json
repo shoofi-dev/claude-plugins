@@ -73,15 +73,20 @@
           "PICKUP_HEADROOM_TARGET_MIN",
           "MAX_PICKUP_HEADROOM_PENALTY",
           "currentPickupInstantOf",
-          "scoreBreakdown"
+          "scoreBreakdown",
+          "createPendingDelivery",
+          "appliedCoupon"
         ],
         "services/delivery/driver-load.js": [
+          "ACTIVE_ORDER_STATUSES",
+          "UNCOLLECTED_ORDER_STATUSES",
           "byConcurrencyTierThenScore"
         ],
         "services/delivery/book-delivery.js": [
           "originalBookId",
           "findBestDeliveryCompany",
-          "coverageRadius"
+          "coverageRadius",
+          "appliedCoupon"
         ],
         "services/delivery/delivery-promise.js": [
           "computeDeliveryPromise",
@@ -129,6 +134,11 @@
           "file": "utils/init-location-indexes.js",
           "regex": "lastLocationUpdate",
           "desc": "only lastLocationUpdate is indexed - lastFixAt is not, so a recency rule filters in JS after the fetch rather than in the query"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "shouldIncludeOffline",
+          "desc": "GET drivers/locations hides couriers whose lastLocationUpdate is older than 10 minutes, but includeOffline skips that filter entirely - so for the admin maps and the live-ops board a returned position carries NO recency guarantee and the client must age the fix itself"
         },
         {
           "file": "consts/consts.js",
@@ -379,6 +389,16 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "services/delivery/driver-status-service.js",
+          "regex": "async function setDriverActiveStatus",
+          "desc": "the deactivation path takes no account of the driver's active deliveries, on purpose - 59% of switch-offs happen while he holds one and it produced 0 orphaned deliveries in 30 days. If a bookDelivery read appears here, somebody has built the alert reference.md 5 says not to"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "ACTIVE_ORDER_STATUSES\\s*=\\s*\\[\"1\",\\s*\"2\",\\s*\"3\",\\s*\"5\"\\]",
+          "desc": "the canonical in-flight status list, strings, INCLUDING \"5\" WAITING_IN_STORE - a hand-written [\"1\",\"2\",\"3\"] drops the driver standing in the restaurant, and three competing spellings are already live"
         }
       ]
     },
@@ -446,7 +466,9 @@
       "files": [
         "src/views/admin/analytics/DeliveryListAnalytics.tsx",
         "src/views/admin/delivery-areas/CityAreasList.tsx",
-        "src/views/admin/settings/ShoofiSettings.tsx"
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/utils/driver-map-markers.ts",
+        "src/views/admin/live-ops/data/liveOpsApi.ts"
       ],
       "patterns": [
         {
@@ -463,6 +485,16 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "isDeliveryOnlySupport",
           "desc": "the platform-wide delivery-only switch lives in admin Settings"
+        },
+        {
+          "file": "src/utils/driver-map-markers.ts",
+          "regex": "STALE_LOCATION_MINUTES\\s*=\\s*10",
+          "desc": "the web's single staleness window, matching the server's filter and LOCATION_FIX_RECOVERY_MS - every screen that ages a courier's position reuses this rather than picking its own number"
+        },
+        {
+          "file": "src/views/admin/live-ops/data/liveOpsApi.ts",
+          "regex": "includeOffline:\\s*true",
+          "desc": "the live-ops board asks for offline couriers, which turns the server's 10-minute staleness filter off - so the board itself must age every fix before claiming where a courier is"
         }
       ]
     }
