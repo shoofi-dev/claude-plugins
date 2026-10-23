@@ -60,6 +60,26 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 2. **`actualDriverPayment` cash-vs-card branch** (`routes/driver-reports.js`): CARD → full
    `effectiveDeliveryFee`; CASH + coupon → the coupon-covered amount; **CASH, no coupon → 0**.
    A bug here **double-pays a driver who already pocketed the cash**.
+   **A delivery company's `netTotal` and its additions-invoice amount are the same arithmetic
+   written in five places, and every term must appear in all five.** The authoritative form is
+   `additionsAmount = compensations + bonuses − driverCharges − deliveryBookingFees + coupons
+   + minGuarantee` (`create-company-invoice`, `routes/hyp.js`). The other four:
+   `generateDriverReportData`'s `netTotal` and `recomputeMinGuarantee` (both
+   `routes/driver-reports.js` — the second rebuilds the figure from scratch on an hours edit,
+   so patching one silently refunds the company whatever the other subtracts), the
+   `invoiceAmountAbove9999` `$expr` in the admin list route, and
+   `services/accountant-export/movein.js`. The newest term is
+   **`totalDeliveryBookingDriverFees`** — what Shoofi charges a company's drivers for
+   store-booked phone-order deliveries, a deduction like `driverCharges`
+   (`services/delivery/delivery-only.js`, `docs/delivery-only-bookings.md`). It is also read by
+   `services/financial-overview/metrics.js`. A copy missing it over-states additions, so a
+   report hyp.js will never invoice reads as one that still owes a tax document.
+   ⚠️ **There is a third invoice state besides issued and expected-but-absent.** When
+   `deliveryBookingFees > 0`, `create-company-invoice` **refuses with a 400** unless
+   `creditCardAmount + additionsAmount` reconciles to `netTotal` within 0.01 — deliberately
+   scoped to that path, because a company doing mostly phone-order work can have deductions
+   exceed additions. Such a report is expected, absent **and un-issuable from the UI**; do not
+   build a "missing invoice" view that tells a human to press a button that will 400.
 3. **Commission base is the FINAL items price actually charged** — `order.orderPrice`,
    after the store's own product discounts. Store commission is **tiered**
    (`calculateCommissionTiered`, from `store.accounting.contract.commissionTiers`); the flat

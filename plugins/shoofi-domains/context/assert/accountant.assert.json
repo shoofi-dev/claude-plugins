@@ -149,6 +149,21 @@
           "desc": "cash-vs-card driver payout branch"
         },
         {
+          "file": "routes/hyp.js",
+          "regex": "compensations \\+ bonuses - driverCharges - deliveryBookingFees \\+ coupons \\+ minGuarantee",
+          "desc": "CORE invariant 2: the authoritative additions-invoice amount for a delivery company — totalDeliveryBookingDriverFees is a DEDUCTION, and the same six terms must appear in generateDriverReportData's netTotal, recomputeMinGuarantee, the invoiceAmountAbove9999 $expr and services/accountant-export/movein.js"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "deliveryBookingFees > 0 && Math\\.abs\\(invoicedTotal",
+          "desc": "CORE invariant 2: when a company carries delivery-only driver fees, create-company-invoice REFUSES (400) unless the two on-behalf invoices tile netTotal — so expected-and-absent is not the same as issuable, and a missing-invoice screen must not promise a button that 400s"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "\\$multiply: \\[-1, \\{ \\$ifNull: \\['\\$reportData\\.totalDeliveryBookingDriverFees', 0\\] \\}\\]",
+          "desc": "CORE invariant 2: the admin list's invoiceAmountAbove9999 filter must deduct the delivery-only driver fee, or it measures a different additions amount than the invoice it is screening for"
+        },
+        {
           "file": "routes/payments/admin.js",
           "regex": "if\\s*\\(storeDiscount\\s*&&\\s*!isSpecificToCustomers\\s*&&\\s*appliedCoupon\\.coupon\\?\\.discountType\\s*!==\\s*'full_discount'\\)",
           "desc": "CORE invariant 7: the store is billed a coupon's nominal storeDiscount whenever it is not customer-specific and not full_discount — the gate is blind to discountType, so a delivery coupon lands here too"
