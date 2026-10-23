@@ -120,6 +120,16 @@
           "desc": "authoritative delivery status enum"
         },
         {
+          "file": "lib/payments/calc.js",
+          "regex": "twinAssignmentMode\\s*\\|\\|\\s*'single'",
+          "desc": "an absent twinAssignmentMode means single — the money path defaults it, so any twin-aware reader that uses a bare === \"single\" counts two trips where the payouts count one"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "\\$ifNull:\\s*\\[\"\\$twinAssignmentMode\",\\s*\"single\"\\]",
+          "desc": "the driver payouts default twinAssignmentMode to single in the aggregation — this is the figure a dashboard twin count gets reconciled against"
+        },
+        {
           "file": "routes/delivery/driver.js",
           "regex": "lastLocationUpdate:\\s*timestamp,\\s*\\n\\s*lastFixAt:\\s*fixAt",
           "desc": "the two location timestamps are written together and mean different things: lastLocationUpdate = server RECEIVE time (offset string, deliberately unchanged for existing consumers), lastFixAt = DEVICE fix time (BSON Date). Any staleness rule must read lastFixAt first and fall back to lastLocationUpdate, because lastFixAt only shipped 2026-09-12 and 141 of 224 located couriers still lack it"

@@ -113,6 +113,19 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
 5. **Twins always go pending** and (single mode) must share ONE driver: the
    `twinPickupSequence:1` side drives selection, the peer mirrors it, and `assignDriverAt` is
    aligned to the later side. Breaking any of it splits a twin.
+   **An ABSENT `twinAssignmentMode` means `"single"`, and every reader must say so.** The
+   field lives at the **root** of a `bookDelivery` row (never `twinGroup.groupId` — that is
+   the *order* document's shape), the vocabulary is exactly two values (`routes/twin-order.js`
+   refuses anything else), and absence is single on every path that reads it:
+   `lib/payments/calc.js:63` and `services/delivery/delayed-assignment.js:1708`
+   (`(x.twinAssignmentMode || "single") === "single"`), `routes/delivery/orders.js:173`,
+   `routes/order.js:6965`, `routes/driver-reports.js:133` (`$ifNull → "single"`), and
+   `routes/delivery/driver.js:319` / `routes/payments/admin.js:546` from the other side
+   (`!== "split"`). A bare `=== "single"` therefore counts a twin with no stored mode as
+   **two** trips where the payouts count **one** — the gap presents as "the payouts disagree
+   with the dashboard", not as a bug in the reader. 2,134 rows carry a `twinGroupId`; 2,126
+   are explicitly `"single"`, so the 8 that are not are exactly the rows that expose this.
+   ⚠️ Never key a trip on `bookId` either — it is not unique across tenants.
 6. **Manual-admin routing:** companies with `isControlledByAdmin && manualAssignmentOnly` route
    to a company **admin**, not a driver. Don't auto-assign them. Corollary for reports: a
    company's admin login (`delivery-company.customers`, `role: "admin"`) **also takes jobs** —
