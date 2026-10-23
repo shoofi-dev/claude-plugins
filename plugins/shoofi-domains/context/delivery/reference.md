@@ -222,7 +222,6 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
 - **Active-status chokepoint:** NEVER write `customers.isActive` directly — always
   `services/delivery/driver-status-service.js:setDriverActiveStatus` (it writes
   `driverStatusHistory` in lock-step + WS-pushes `driver_status_updated`). Direct writes create phantom history.
-- **`isActive` (on shift/enabled) ≠ `isAvailable` ≠ `isOnline`** — three separate flags.
 - **`driver-status-history` is the availability audit trail** (code `db.driverStatusHistory`,
   collection **hyphenated**). 27,891 rows on 2026-09-25 and **all** of them are `isActive`
   changes — `{timestamp(offset STRING), driverId(ObjectId), driverName, companyId(string),
@@ -237,6 +236,14 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
   forensics → `DriverActiveHours.tsx`) and
   `GET /api/driver-shift-manager/admin/driver-availability-changes`
   (`services/delivery/driver-availability-feed.js` → the admin's driver-activity board).
+- **`isActive` (on shift/enabled) is the only availability flag that means anything.**
+  `isOnline` is written only by the location ping and defaults to `true` with nothing
+  writing it back (`routes/delivery/driver.js:893`) — sticky-true after the first GPS fix
+  (220/242 true vs 3 `isActive`, 2026-09-25).
+  `isAvailable`/`availabilityReason`/`lastAvailabilityUpdate`
+  (`POST /api/delivery/driver/availability`, `routes/delivery/driver.js:1377`) are
+  populated on **0 of 242** drivers and their only client method has no UI caller. Dispatch
+  reads `isActive`. See CORE.md invariant 4.
 - ⚠️ **Most of what the `isActive` stream looks like is normal operation. Measure before
   you build an alert on it** (`driver-status-history`, 30 days to 2026-09-27: **1,660
   switch-offs, 49 drivers**):
@@ -253,7 +260,7 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
     flip to that delivery completing is 6–15 min. `isActive:false` does not stop a driver
     completing what he holds, and the cron switches drivers off exactly as they finish their
     last run. The narrow version (uncollected, and then >20 min to finish) is still 13.7%
-    and still dominated by the cron. **Do not build a "went offline holding a delivery"
+    and still dominated by the cron. **Do not build a "switched off holding a delivery"
     alert** — a naive definition manufactures a red row for something that is working, the
     same trap as tuning the assignment penalty. There is also no orphaned-delivery detector
     anywhere, and `setDriverActiveStatus` does not block, warn, reassign or notify on
@@ -305,12 +312,21 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   courier: it is `undefined` for every company, so `company.location.coordinates[0]` throws,
   and inside `calculateDriverScore` that lands in the catch and returns `score: 9999` with
   `distanceToStore: 0` — silently mis-ranking instead of erroring.
-- `customers` (drivers) — `role, isActive, isAvailable, isOnline, companyId(string),
-  currentLocation, lastLocationUpdate, lastFixAt, locationMetadata,
+- `customers` (drivers) — `role, isActive, isOnline(sticky-true — NOT availability),
+  companyId(string), currentLocation, lastLocationUpdate, lastFixAt, locationMetadata,
   personalSupportedAreas[areaId], maxOrdersByAdmin,
-  storeAssignmentMode, assignedStoreAppNames[]`. A `role: "admin"` row is the company's
-  admin login and **also takes jobs** (~1,164 in 30 days on one account) — flag it in
-  per-driver tables (CORE invariant 6).
+  storeAssignmentMode, assignedStoreAppNames[]`.
+  ⚠️ `isOnline` is on the documents but means nothing, and
+  `isAvailable`/`availabilityReason`/`lastAvailabilityUpdate` are populated on **0** drivers
+  — which is why they are not in the list above at all. `isActive` is the only availability
+  flag; see §5 and CORE invariant 4. Matching a driver: `role:'driver'` is 242 docs and
+  `isDriver:true` is 243 (2026-09-25) — the one extra is a `role: "admin"` row, the
+  company's admin login, which **also takes jobs when `isActive`** (~1,164 in 30 days on
+  that account) and must be flagged in per-driver tables (CORE invariant 6). So a complete
+  sweep is `{$or:[{role:'driver'},{isDriver:true}]}`, equal today to
+  `role:{$in:['driver','admin']}` — which is the form dispatch itself queries, and the one
+  to prefer, since `isDriver` is request-body-supplied and an admin created without it would
+  be dispatchable yet invisible to the `$or`.
 - Geo: `cities, parentCities, cityAreas, areas, areasGeometry`. Ops: `driverStatusHistory,
   driverLocationHistory(30-day TTL on `expiresAt`), driverShifts, driverDailyHours, deliveryConfig`.
 
