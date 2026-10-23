@@ -89,18 +89,23 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
    atomic `updateOne({isPendingAssignment:true})` (`matchedCount===0` = another container won).
    Never bypass either.
    **Delayed assignment is ON in production, and the window is 15 — not the code's 10.**
-   `DEFAULT_CONFIG` in `services/delivery/delayed-assignment.js:17-19` says
+   `DEFAULT_CONFIG` in `services/delivery/delayed-assignment.js` (`DEFAULT_CONFIG`) says
    `useDelayedAssignment: false, assignmentWindowMinutes: 10`; both are overridden by
    `delivery-company.delivery-config {type:'driver-assignment'}`, which holds
    `{useDelayedAssignment: true, assignmentWindowMinutes: 15}`. Read the DB document, never
    the constant. Consequence: the platform is *designed* to dispatch at `pickupTime − 15`
-   (`delayed-assignment.js:483-485`), so "this courier only got twelve minutes' notice" is
+   (`createPendingDelivery`, `assignDriverAt = pickupTimeDate − assignmentWindowMinutes`), so "this courier only got twelve minutes' notice" is
    normal operation rather than an anomaly — 559 of 4,957 completed deliveries in 1–17 Aug
    2026 reached their first courier under ten minutes before pickup. Any rule that measures
    notice-before-pickup from the other end (the late-delivery grace,
    `services/delivery/late-delivery.js`) is measuring the same quantity as
    `assignmentWindowMinutes` and moves as a step function of it: the lever for that
    population is the config value, not the report.
+   **Measuring assignment lag:** whenever ready-minutes < 15, `assignDriverAt` is already in
+   the past at the moment the booking is created, so `assignedAt − assignDriverAt` reports a
+   fake lag (≈5 min on a 10-minute order) that is pure window arithmetic. Measure
+   `assignedAt − max(assignDriverAt, created)`. All three are offset strings — parse to
+   instants; and an admin reassign (`routes/delivery/driver.js`) overwrites `assignedAt`.
 3. **Never write `customers.isActive` directly** — always `setDriverActiveStatus`
    (`services/delivery/driver-status-service.js`), which writes `driverStatusHistory` in
    lock-step and pushes a websocket update. Direct writes create phantom history.
@@ -122,7 +127,10 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
    `twinPickupSequence:1` side drives selection, the peer mirrors it, and `assignDriverAt` is
    aligned to the later side. Breaking any of it splits a twin.
 6. **Manual-admin routing:** companies with `isControlledByAdmin && manualAssignmentOnly` route
-   to a company **admin**, not a driver. Don't auto-assign them.
+   to a company **admin**, not a driver. Don't auto-assign them. Corollary for reports: a
+   company's admin login (`delivery-company.customers`, `role: "admin"`) **also takes jobs** —
+   one such account took ~1,164 in 30 days — so it is a fleet, not a courier. Any per-driver
+   table (lateness, load, pay) must flag `role === "admin"` rows rather than rank them.
    **`centralizedFlowMonitor.trackOrderFlowEvent` RETHROWS — always wrap it.** It logs and then
    `throw error` (`services/monitoring/centralized-flow-monitor.js:63-66`), so an `await`ed call
    with no local try/catch turns a monitoring failure into a 5xx on the dispatch route *after*
@@ -193,16 +201,87 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `order` are whole embedded documents, so a wished-for or misspelled field reads as
     `undefined` rather than throwing, and a guarded `if (d.field)` branch then quietly never
     runs — which looks identical to a correction that is simply rare.
-
-10. **A cancelled delivery must lose `isPendingAssignment`.** `processPendingAssignments`
-    scans `{isPendingAssignment: true, assignDriverAt: {$lte: now}}`; the status filter added
-    there is a second line of defence, not the fix — and `$nin` still matches documents with
-    no `status` field. Every cancel path (`routes/order.js`, `routes/delivery/admin.js`) writes
-    `isPendingAssignment: false` or the cancel un-cancels itself minutes later.
-11. **Never assume a delivery has an order.** `deliveryOrder.order` is absent on every
+    Same trap, live instances:
+    - **`readyForPickupAt` is partial.** `routes/order.js` writes `isReadyForPickup` +
+      `readyForPickupAt` (offset string) when the store presses ready **only if a driver is
+      already assigned** at that moment (`if (deliveryRecord && deliveryRecord.driver?._id)`,
+      ~`:5634-5652`); a booking still in the queue never gets it. The complete source is the
+      flow event above.
+    - **`company.storeName` and `driver.name` are never populated** on the embedded copies —
+      read `company.nameHE`/`nameAR` and `driver.fullName`. So the flow events'
+      `metadata.companyInfo.name` (`book-delivery.js`, reads `company.storeName`) is always
+      `undefined`, and `utils/crons/delivery-completion-delay-checker.js` reads
+      `order.driver?.name`, so its admin push always says "נהג: לא ידוע".
+    - **Driver arrival at the store has no field.** Only the optional driver tap
+      (`delivery_waiting_in_store` flow event, status `5`) or a reconstruction from
+      `delivery-company.driverLocationHistory` (30-day TTL on `expiresAt`) — first fix within
+      150 m of `bookDelivery.storeLocation` after dispatch. Pending: shoofi-server PR #285
+      (`lib/support-analytics/delay-analysis.js`, not merged) implements exactly that.
+12. **`isPendingAssignment` is a queue-membership CLAIM TOKEN, not a status — and every exit
+    from the queue must burn it, not only cancel.** `processPendingAssignments`
+    (`services/delivery/delayed-assignment.js`) dispatches on
+    `{isPendingAssignment: true, assignDriverAt: {$lte: now}}` every 60s, so a booking that
+    keeps the token is re-dispatched forever. Cancels are the obvious case (the cancel
+    un-cancels itself minutes later), but until 2026-09 the *forward* transitions —
+    approve, collect, deliver, waiting-in-store — wrote a status and a timestamp and left the
+    token set. Two bookings marked DELIVERED by support through
+    `POST /api/delivery/order/status/update`, neither of which ever had a driver, reached
+    85,296 dispatch attempts each: 97.6% of every row in
+    `delivery-company.assignment-decisions`, which makes that collection unreadable as a
+    measure of dispatch pressure until you filter them out. The token is minted in exactly
+    one place (`createPendingDelivery`, always alongside status `"1"`), so
+    **`WAITING_FOR_APPROVE` is the only status a genuinely-queued booking can hold** — the
+    status filter in the scan excludes all seven others. That filter is a second line of
+    defence, not the fix; and keep it a `$nin`, never an `$in` of `"1"`, because `$nin` also
+    matches documents with no `status` field and a malformed pending row must stay
+    dispatchable rather than silently vanish. Two places read the token where the status
+    filter cannot help, because they are different queries: the twin sequence-2 defer gate
+    reads the *peer's* flag (a stranded peer defers a live booking forever, logged only as
+    `DEFERRED`, which raises no alert), and `GET /api/admin/delivery-config/pending` lists the
+    admin "ready for assignment" screen. Both must test queue membership — use
+    `isAwaitingAssignment()` / `PENDING_ASSIGNMENT_EXCLUDED_STATUSES`, exported from
+    `delayed-assignment.js`. Do **not** add anything to the atomic claim filter itself
+    (invariant 2) while doing so.
+13. **Never assume a delivery has an order.** `deliveryOrder.order` is absent on every
     delivery-only booking, so anything keyed on `order.customerId`, `order.total` or
     `order.orderId` silently no-ops there. That is exactly how admin cancellation used to
     notify nobody while the driver was still driving to the store.
+14. **A new `scoringWeights` key must be defaulted in TWO places or it ships dead.** The live
+    `delivery-company.delivery-config {type:'driver-assignment'}` document holds exactly three
+    weights — `{distanceToStore: 3, distanceToCustomer: 1, routeDeviation: 0.5}` — while
+    `DEFAULT_CONFIG.scoringWeights` in `services/delivery/delayed-assignment.js` carries every
+    term the scorer actually charges. `getAssignmentConfig` merges the two **per key**; it used
+    to read `config.scoringWeights || DEFAULT_CONFIG.scoringWeights`, a wholesale swap, so any
+    weight present in code and absent from the document arrived `undefined` and multiplied out
+    to `NaN` — in production only, while every spec passed. And the merge is not sufficient on
+    its own: `config` also reaches `calculateDriverScore` from the simulator and from the specs,
+    which hold their own copies of that table and never pass through `getAssignmentConfig`.
+    Default at the read site too. A `NaN` total is silent rather than loud — it makes every
+    comparison in `byConcurrencyTierThenScore` (`services/delivery/driver-load.js`) false and
+    leaves the candidate order down to whatever `Array.prototype.sort` happened to do, which
+    for two twin peers scored microseconds apart is a coin flip no decision log can reproduce.
+15. **`assignmentMetadata.estimatedArrivalAtStore` is scored, not a diagnostic — so
+    `assumedDriverSpeedKmh` is a dispatch lever.** The scored path's total is
+    `distance + orderPenalty + customer + routeDeviation + sameStoreBonus + uncollectedPenalty
+    + overduePenalty + pickupHeadroomPenalty` (`services/delivery/delayed-assignment.js`), and
+    the last term is `min(max(0, 10 − headroomMinutes) × w, 20)` where headroom is the pickup
+    clock minus the predicted arrival. It was added Sep 2026; for a year the estimate was
+    written beside the assignment and read by nothing, and 490 of 3,718 scored allocations
+    (13%) went to a courier the engine itself predicted would reach the store after the food
+    was ready — 97% of them couriers mid-run, priced at their next drop point by the
+    future-location shortcut. Two consequences: lowering `assumedDriverSpeedKmh` in that config
+    document now moves couriers down the ranking rather than only flattering a report, and the
+    headroom term is **capped in points, never a filter** — a delivery the engine fails to
+    assign is never inserted at all, so there is no pending record to retry from. The term
+    needs a pickup *instant*, so it is computed via `late-delivery.currentPickupInstantOf`
+    (invariant 10) and `bookDelivery.created` is threaded into the scorer for it; with no
+    resolvable clock or no estimate it contributes 0 and reports
+    `pickupHeadroomMinutes: null` — which is "no opinion", not "plenty of time". Both
+    twin-mirroring spreads null it on purpose, because the peer's estimate was measured against
+    the peer's store. Every component has a `scoreBreakdown` key, always present even at 0;
+    `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
+    `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
+    describing a score they no longer break down.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
@@ -217,6 +296,36 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
 - **BY DESIGN — keep it off:** the scored-assignment **recency filter is intentionally
   disabled** in `services/delivery/delayed-assignment.js` (stale-location drivers stay eligible
   so assignment isn't starved). Do not re-enable without an explicit task.
+- **How old a courier's position is: `lastFixAt`, and mind the rollout gap.** Two timestamps sit
+  side by side in the same `$set` in `POST /api/delivery/driver/location`
+  (`routes/delivery/driver.js`) and they mean different things. **`lastFixAt`** is a BSON **Date**
+  and is the **device** fix time, so it is the real recency — the driver app replays failed posts
+  from AsyncStorage, so one request can carry a fix that is hours old. **`lastLocationUpdate`** is
+  an **offset string** and is the server **receive** time, kept that way deliberately so existing
+  consumers keep working; a phone re-POSTing a cached fix therefore looks fresh by that measure
+  forever. Prefer `lastFixAt`.
+  But do **not** read it alone: it shipped 2026-09-12, and of the 224 couriers holding a
+  `currentLocation` on 2026-09-29 only **83** had it — **141 had none**, the oldest of those
+  carrying a `lastLocationUpdate` 319 days old. Any staleness rule that keys on `lastFixAt`
+  exclusively silently ignores the couriers most likely to be stale. Fall back to
+  `lastLocationUpdate` when `lastFixAt` is absent: for a courier who has not posted in weeks both
+  are equally old, and the receive-time weakness only appears on a phone that IS posting — which
+  has `lastFixAt`. `parseDeviceFixTime` also falls back to receive time for an absent, unparseable
+  or implausible client timestamp, so `lastFixAt` is not a guarantee of device provenance either.
+  ⚠️ **Compare both as instants, never as strings.** `lastLocationUpdate` carries its offset, so
+  a lexicographic `$gte` (which is what the disabled filter above used) mis-windows across
+  Israeli DST. Only `lastLocationUpdate` is indexed (`utils/init-location-indexes.js`);
+  `lastFixAt` is not, so filter in JS after the fetch rather than in the query.
+- **A delivery company has NO location.** `delivery-company.store` carries no `location` and no
+  `coverageRadius` — verified 2026-09-29 across all 173 documents. So "assume the courier is at
+  his depot" is not an available fallback, however natural it sounds: `company` IS attached to
+  every scored candidate (`delayed-assignment.js`, where `{...driver, company}` is built), which
+  makes `driver.company.location` look free and correct right up to the point it throws. In
+  `calculateDriverScore` that throw is caught and returns `score: 9999` / `distanceToStore: 0`,
+  so the failure is a silently mis-ranked fleet, not an error anyone sees. Use the **pickup
+  zone's** interior point instead (`cities.geometry` → `pointInsideGeometry`, never
+  `computePolygonCentroid`). Consequence worth knowing: `findBestDeliveryCompany` guards on both
+  missing fields and therefore returns `null` for every input in production (reference §4).
 - **FIXED:** the partner app's `DELIVERY_STATUS` was off by one (showed "delivered" at pickup);
   it now matches the server. Server `consts/consts.js` is the single source of truth.
 - **Awareness:** a legacy `updateDelivery` path uses different status literals; `driver-inactivate-cron`
