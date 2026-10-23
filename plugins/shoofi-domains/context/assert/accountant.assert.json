@@ -14,6 +14,7 @@
         "utils/vat.js",
         "utils/greeninvoice.js",
         "utils/invoice-provider.js",
+        "utils/invoice-allocation.js",
         "services/compensations/validate-parties.js",
         "services/compensations/report-window.js",
         "services/financial-overview/compute.js",
@@ -272,6 +273,31 @@
           "file": "routes/shoofi-admin.js",
           "regex": "rejectIfCompensationPeriodClosed\\(req,\\s*res,\\s*existingCompensation,\\s*null\\)",
           "desc": "CORE invariant 10: deleting a compensation is refused once a report covering its createdAt exists (add/edit/approve-item are locked by the same helper)"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "hypStoreInvoicePdfLink:\\s*invoiceResult\\.pdfLink",
+          "desc": "CORE invariant 11: hypStoreInvoicePdfLink (the store→Shoofi card invoice) is written in routes/hyp.js and nowhere else — there is no GreenInvoice-era equivalent, so its absence on a pre-HYP report is not a missed invoice"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "const totalForInvoice = creditCardRevenue \\+ driveInCreditCard",
+          "desc": "CORE invariant 11: the store→Shoofi card invoice is expected only when creditCardRevenue + driveInCreditCard > 0 — the create endpoint 400s otherwise, so bare absence is not 'missing'"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "greenInvoiceId:\\s*invoiceResult\\.invoiceId",
+          "desc": "CORE invariant 11: greenInvoiceId is the GreenInvoice-era marker for the Shoofi→store commission invoice; a check keyed on hypInvoicePdfLink alone misreads the whole GreenInvoice era as missing"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "invoiceProvider:\\s*'hyp'",
+          "desc": "CORE invariant 11: invoiceProvider is only ever written by the HYP path, so it must never be used to decide whether a report has its commission invoice"
+        },
+        {
+          "file": "utils/invoice-allocation.js",
+          "regex": "INVOICE_ALLOCATION_THRESHOLD \\* VAT_MULTIPLIER",
+          "desc": "CORE invariant 11: the allocation-number ceiling is a pre-VAT amount, so the bound on a stored (gross) settlement figure is the ceiling × VAT_MULTIPLIER — comparing gross against the bare 4999 blocks stores ~18% too early"
         }
       ]
     }

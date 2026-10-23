@@ -261,6 +261,33 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     Not covered: `services/payments/cancel-compensation.js` inserts compensations
     automatically (createdAt = now) without the lock — it can only collide with a report
     generated for a period that has not ended.
+11. **A store report's two invoices run in OPPOSITE directions, and only ONE of them has two
+    provider eras.** Anything answering "did this report get its tax document?" has to know
+    both, or it gets a whole era wrong:
+    - **store → Shoofi**, for the card money Shoofi collected on the store's behalf, issued
+      with the store's own HYP api_key. Marker **`hypStoreInvoicePdfLink`**, gated on
+      `creditCardRevenue + driveInCreditCard > 0` (`routes/hyp.js` create-store-invoice).
+      **HYP-era only** — `utils/greeninvoice.js` exports exactly one issuing function
+      (`createInvoice`) and it is the other direction, so this field is written in
+      `routes/hyp.js` and nowhere else, and **no GreenInvoice-era report has it at all**. A
+      bare-absence check therefore flags the whole pre-HYP era as missing an invoice, with no
+      remedy — the document could not have existed.
+    - **Shoofi → store**, for commission and fees, gated on `reportData.totalOutcomes > 0`.
+      Marker **`greenInvoiceId`** (GreenInvoice era, `routes/payments/admin-reports.js`
+      create-invoice) **OR `hypInvoicePdfLink`** (HYP era) — test both families.
+      **Never key this off `invoiceProvider`**: only the HYP path ever writes it
+      (`routes/hyp.js`), so every GreenInvoice-era report reads as missing.
+    "Missing" is **expected-and-absent, never plain absence.** Both create endpoints 400 on a
+    non-positive amount, so a period with no card revenue was never meant to produce the first
+    document and one with no outcomes was never meant to produce the second; counting bare
+    absence invites someone to force-issue a zero-amount tax document. Expected-and-absent
+    still includes **blocked, not only missed**: `create-store-invoice` refuses above the
+    allocation ceiling when the store's tax-authority connection is invalid. That ceiling is a
+    **pre-VAT** amount (`utils/invoice-allocation.js`) — bound the stored gross figure with
+    `INVOICE_ALLOCATION_THRESHOLD_GROSS`, never the bare `4999`, which blocks stores ~18% too
+    early. Nothing is persisted when a create fails, and cancel/reset `$unset` the fields
+    again, so missed, failed, cancelled and blocked are indistinguishable from the markers
+    alone — a reader can answer "which", never "why".
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
