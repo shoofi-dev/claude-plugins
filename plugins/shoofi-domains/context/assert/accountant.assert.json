@@ -15,6 +15,7 @@
         "utils/greeninvoice.js",
         "utils/invoice-provider.js",
         "services/compensations/validate-parties.js",
+        "services/compensations/report-window.js",
         "services/financial-overview/compute.js",
         "services/financial-overview/metrics.js",
         "services/financial-overview/contract-charges.js",
@@ -31,6 +32,8 @@
           "couponDeliveryPortion",
           "couponDeliverySplit",
           "isPercentageStoreDeliveryCoupon",
+          "shoofiCouponCredit",
+          "appliedCouponAmount",
           "calculateCommission",
           "getDateRange"
         ],
@@ -46,7 +49,8 @@
           "validateOrdersClosed",
           "calculateCommissionTiered",
           "generateStoreReportData",
-          "totalForTransfer"
+          "totalForTransfer",
+          "validateCompensationsApproved"
         ],
         "utils/invoice-provider.js": [
           "getActiveProvider"
@@ -91,6 +95,16 @@
         ],
         "services/exec-dashboard/store-registry.js": [
           "getAllNonMockStores"
+        ],
+        "services/compensations/report-window.js": [
+          "storeReportBounds",
+          "storeCompensationWindow",
+          "driverCompensationWindow",
+          "buildCreatedAtFilter",
+          "affectedParties",
+          "findCoveringStoreReport",
+          "findCoveringDriverReport",
+          "checkCompensationLock"
         ]
       },
       "patterns": [
@@ -143,6 +157,21 @@
           "file": "routes/payments/admin.js",
           "regex": "discountAmount\\s*=\\s*\\(storeDiscount\\s*/\\s*100\\)\\s*\\*\\s*orderPrice",
           "desc": "CORE invariant 7: a percentage-type coupon bills the store a percentage of the ITEMS subtotal even when its discountType is 'delivery' — couponDeliverySplit deliberately diverges and takes the share off order.shippingPrice instead (owner ruling 2026-08-12)"
+        },
+        {
+          "file": "lib/payments/calc.js",
+          "regex": "Math\\.min\\(nominal,\\s*applied\\)",
+          "desc": "CORE invariant 7: couponsFromShoofi credits the discount APPLIED on the order, capped by Shoofi's share — never the coupon's nominal value per redemption (a partial-use coupon was credited in full at every store; owner decision 2026-10)"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "appliedAmount:\\s*appliedCouponAmount\\(appliedCoupon\\)",
+          "desc": "stores-export-new routes the customer-specific order_items credit through shoofiCouponCredit with the order's applied amount"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "shoofiDiscount\\s*=\\s*appliedCoupon\\.coupon\\.value\\s*\\|\\|\\s*0",
+          "desc": "CORE invariant 7: an empty shoofiDiscount on a customer-specific coupon falls back to coupon.value — INTENTIONAL, it credits back a store-paid COMP-* compensation coupon against its one-time compensationsToCustomers charge"
         },
         {
           "file": "routes/admin/masav.js",
@@ -218,6 +247,76 @@
           "file": "services/accountant-export/movein.js",
           "regex": "listUnder\\(skippedByParty, doc, doc\\.partyAccount",
           "desc": "a missing/invalid מספר תיק SKIPS the document (listed, re-downloadable via docs=) — it does not block the file (owner decision 2026-09-29); reference §7b"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "createdAt:\\s*\\{\\s*\\$gte:\\s*window\\.start,\\s*\\$lt:\\s*window\\.endExclusive\\s*\\}",
+          "desc": "CORE invariant 5: the compensations-approved guard queries createdAt (a BSON Date) with Date bounds over the report's own compensation window — the old string bounds matched nothing and the guard never fired"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "endExclusive:\\s*'true'",
+          "desc": "CORE invariant 10: the store report reads compensations over exact [start, next period start) bounds — without the flag the list endpoint stretches the end to 23:59:59 and the 1st of the next month is billed twice"
+        },
+        {
+          "file": "services/compensations/report-window.js",
+          "regex": "endExclusive:\\s*new Date\\(storeReportBounds\\(nextDay,\\s*nextDay,\\s*storeData\\)\\.start\\)",
+          "desc": "CORE invariant 10: a period's compensation window ends exactly where the next period's starts (same function), so consecutive reports tile with no overlap and no gap"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "endExclusive:\\s*req\\.query\\.endExclusive\\s*===\\s*'true'",
+          "desc": "CORE invariant 10: only the report's self-call gets exact exclusive bounds; the admin date filter keeps end-of-day stretching"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "rejectIfCompensationPeriodClosed\\(req,\\s*res,\\s*existingCompensation,\\s*null\\)",
+          "desc": "CORE invariant 10: deleting a compensation is refused once a report covering its createdAt exists (add/edit/approve-item are locked by the same helper)"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "Body:\\s*pdfBuffer,\\s*[\\r\\n]+\\s*ACL:\\s*\"public-read\"",
+          "desc": "store settlement PDFs are UPLOADED world-readable — the doc's 'a report PDF on Spaces is published' note. Anchored on the Body/ACL pair because a bare ACL match is also satisfied by the delete path, which would let the upload go private unnoticed"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "Body:\\s*pdfBuffer,\\s*[\\r\\n]+\\s*ContentType:[^\\r\\n]*[\\r\\n]+\\s*ACL:\\s*\"public-read\"",
+          "desc": "courier settlement PDFs are uploaded world-readable, same as the store ones (ACL sits after ContentType here, unlike admin-reports.js)"
+        },
+        {
+          "file": "backfill-invoices.js",
+          "regex": "Key:\\s*s3Key,\\s*[\\r\\n]+\\s*Body:\\s*pdfBuffer,\\s*[\\r\\n]+\\s*ACL:\\s*\"public-read\"",
+          "desc": "the bulk variant: one run republishes every historical invoice PDF world-readable. Listed in the doc because a grep of routes/ alone misses it"
+        },
+        {
+          "file": "utils/invoice-mail.js",
+          "regex": "Key:\\s*`invoices/doc-\\$\\{searchString\\}\\.pdf`",
+          "desc": "the worst case for guessability in the doc's note — the customer invoice key is a short sequential provider document id, not an ObjectId"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "const key\\s*=\\s*`reports/\\$\\{appName\\}/\\$\\{reportId\\}\\.pdf`",
+          "desc": "the public URL is public store slug + report ObjectId. NOTE this literal appears twice (upload and deletePDFFromSpaces) — change both"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "const key\\s*=\\s*`driver-reports/\\$\\{companyId\\}/\\$\\{reportId\\}\\.pdf`",
+          "desc": "the courier key is a delivery-company ObjectId, not a public slug — the doc distinguishes the two. Also duplicated in the delete path"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "const result = await dbAdmin\\.storeReports\\.insertOne\\(report\\)",
+          "desc": "reportId is minted client-side by the driver (no _id is set, it is read off the insert) — the basis for the doc's 'enumerable within a monthly run' claim"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "'monthly_report'",
+          "desc": "the pdfUrl leaves as a WhatsApp monthly_report template parameter, NOT by email (the email block above it is commented out) — that is why the link cannot be recalled"
+        },
+        {
+          "file": "services/ai-tasks/constants.js",
+          "regex": "MAX_ATTACHMENT_BYTES = 8 \\* 1024 \\* 1024",
+          "desc": "the doc points at Mongo-stored, admin-gated bytes as the pattern for a NEW internal artefact, and quotes this cap as the working number under the 16MB BSON limit"
         }
       ]
     }
