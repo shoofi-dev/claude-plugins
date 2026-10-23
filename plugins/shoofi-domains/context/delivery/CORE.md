@@ -288,6 +288,20 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+14. **The delayed path REWRITES part of the booking, so a field absent from the data you hand
+    `bookDelivery()` can still exist on the stored row.** `createPendingDelivery`
+    (`services/delivery/delayed-assignment.js`) does not persist `deliveryData` verbatim: it
+    spreads it and then sets `status: "1"`, `isPendingAssignment`, `assignDriverAt`, `created`,
+    `area`, `bookId`, `appName`, `expectedDeliveryAt`, `expectedDeliveryBasis` — and
+    **`appliedCoupon: deliveryData.appliedCoupon || null`**, which MINTS the key on every
+    pending booking in the platform, coupon or no coupon. The immediate path in
+    `services/delivery/book-delivery.js` does the same. So "the caller left field X out" and
+    "field X is absent from the document" are two different claims, and only the second one is
+    what a `{$exists: true}` filter answers. It matters for any booking that must stay invisible
+    to a money aggregate: an explicitly-null key is still a key. Writing against the field
+    rather than its presence is the robust form — the one reader of this one,
+    `routes/order.js`'s coupon-order list, filters `{$ne: null, $exists: true}` and so is
+    unaffected by the minting.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
@@ -322,6 +336,24 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
   a lexicographic `$gte` (which is what the disabled filter above used) mis-windows across
   Israeli DST. Only `lastLocationUpdate` is indexed (`utils/init-location-indexes.js`);
   `lastFixAt` is not, so filter in JS after the fetch rather than in the query.
+- **`includeOffline` switches the 10-minute staleness filter OFF — and then the CALLER owns
+  freshness.** `GET /api/delivery/drivers/locations` normally hides couriers whose
+  `lastLocationUpdate` is older than 10 minutes, but that whole `$expr` is skipped when the query
+  carries `includeOffline` (`'true'` or `true` — `routes/delivery/driver.js`). Every admin screen
+  that wants disconnected couriers drawn sends it: the full driver map, and the live-ops board
+  (`shoofi-delivery-web src/views/admin/live-ops/data/liveOpsApi.ts`, `includeOffline: true`). For
+  those callers **a position in the response carries no recency guarantee at all** — so anything
+  derived from it ("he is at the restaurant", "he is not moving", an ETA) must age the fix itself
+  or it states an hour-old pin as a fact about now. That is a real bug this cost us: the live-ops
+  stage label said "במסעדה" for any courier on status `2` whose last fix happened to be within
+  150 m of the store, however old. 10 minutes is the platform's number in four places
+  (`LOCATION_FIX_RECOVERY_MS` and this filter in `routes/delivery/driver.js`,
+  `DEFAULT_STALE_LOCATION_MINUTES` in `services/delivery/delayed-assignment.js`, and
+  `STALE_LOCATION_MINUTES` in delivery-web `src/utils/driver-map-markers.ts`) — reuse it rather
+  than inventing a window. It is deliberately generous: the phone goes quiet exactly when the
+  courier stands still (`distanceInterval: 5` in shoofir `utils/locationBackgroundTask.ts`), which
+  is the state "waiting at the restaurant" describes, so a tight window flaps him out of it while
+  he is in the kitchen.
 - **A delivery company has NO location.** `delivery-company.store` carries no `location` and no
   `coverageRadius` — verified 2026-09-29 across all 173 documents. So "assume the courier is at
   his depot" is not an available fallback, however natural it sounds: `company` IS attached to
