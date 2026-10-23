@@ -109,6 +109,21 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
 3. **Never write `customers.isActive` directly** — always `setDriverActiveStatus`
    (`services/delivery/driver-status-service.js`), which writes `driverStatusHistory` in
    lock-step and pushes a websocket update. Direct writes create phantom history.
+   **`driverStatusHistory.timestamp` is an offset-suffixed STRING, compared
+   lexicographically** — `moment(...).utcOffset(off).format()`
+   (`services/delivery/driver-status-service.js:98`), e.g. `2026-10-23T14:05:01+03:00`.
+   Two consequences every reader has to carry: a range bound must be a full
+   `moment().format()` value, never a bare date (a `$lte` of midnight drops the last
+   day's events — `utils/shift-attendance.js`, `routes/driver-shift-manager.js`), and
+   lexicographic order diverges from chronological order by an hour across the DST
+   flip. That is why `driver-availability-feed.js:440` widens its Mongo bound by an
+   hour and cuts precisely in JS, and why `loadLastStatusRows` sorts "the last change
+   per driver" on `_id` (monotonic) rather than on `timestamp`. Indexes exist on
+   `{driverId,timestamp}`, `{timestamp:-1}` and `{driverId,_id:-1}`
+   (`services/database/DatabaseInitializationService.js`) — they make the scans fast,
+   they do not remove either workaround. `driverStatusHistory.driverId` is an
+   **ObjectId**: a raw string matches zero documents, which looks like a working
+   index returning nothing.
 4. **`isActive` ≠ `isAvailable` ≠ `isOnline`** — three separate flags, don't conflate.
 5. **Twins always go pending** and (single mode) must share ONE driver: the
    `twinPickupSequence:1` side drives selection, the peer mirrors it, and `assignDriverAt` is

@@ -33,7 +33,9 @@
         "services/monitoring/centralized-flow-monitor.js",
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
-        "docs/delivery-only-bookings.md"
+        "docs/delivery-only-bookings.md",
+        "services/delivery/driver-availability-feed.js",
+        "utils/shift-attendance.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -353,6 +355,21 @@
           "file": "routes/delivery/orders.js",
           "regex": "\\[delivery-only\\] booked",
           "desc": "the booking success log line documented in docs/delivery-only-bookings.md"
+        },
+        {
+          "file": "services/delivery/driver-status-service.js",
+          "regex": "timestamp: moment\\(new Date\\(\\)\\)\\.utcOffset\\(offsetMinutes\\)\\.format\\(\\)",
+          "desc": "driverStatusHistory.timestamp is written as an offset-suffixed STRING, so every reader range-compares it lexicographically - a bound must be a full moment().format() value and never a bare date, or a $lte of midnight drops the last day of events"
+        },
+        {
+          "file": "services/delivery/driver-availability-feed.js",
+          "regex": "subtract\\(1, .hour.\\)\\.format\\(\\)",
+          "desc": "the activity feed widens its lexicographic $gte by an hour and cuts precisely in JS, because string timestamp order diverges from chronological order across the DST flip - the {driverId,timestamp} and {timestamp:-1} indexes make this fast, they do not remove the workaround"
+        },
+        {
+          "file": "services/delivery/driver-availability-feed.js",
+          "regex": "\\$sort: \\{ _id: -1 \\}",
+          "desc": "last-change-per-driver sorts on the monotonic ObjectId, never on the string timestamp - which is why {driverId:1,_id:-1} is a separate index from {driverId:1,timestamp:1} and neither makes the other redundant"
         }
       ]
     },
