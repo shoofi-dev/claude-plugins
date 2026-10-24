@@ -117,6 +117,29 @@ The rules:
   before anything merges. Say plainly in the session's answer what each side
   wanted and what the resolution kept.
 
+### When you are consulted to fix red CI before a merge
+The merge job doesn't refuse a red PR. First it re-runs the failed jobs once (a flaky
+test needs no code). If the PR is still red, it may start a session on the PR's branch
+with the failing logs:
+- **Fix the cause, never the gate.** The bridge rejects a fix that:
+  - edits `.github/` or `package.json` `"scripts"`;
+  - raises a number in a `*baseline*` file;
+  - adds `.skip(`, `.only(`, `xit(`, `eslint-disable`, `@ts-nocheck` or `test.todo(`;
+  - deletes a test file.
+
+  If the test is right and the code is wrong, fix the code. If the test is wrong, say why
+  in the answer.
+- **Commit on the PR's branch** and push it as a fast-forward: never force, never `main`,
+  never merge. If the failure needs no code (it is flaky, or a `Docs:` line is missing
+  from the PR body), say so and fix it there (`gh pr edit`), with no commit.
+- A model's code fix **pauses for an owner** before it merges, like a conflict
+  resolution, so explain the cause and the fix plainly.
+- **A `docs:check` failure in a group that has a docs PR** is usually an ordering
+  deadlock, not a bug. Make the docs PR's pins hold on both the code's `main` and the PR
+  head (README, "Moving or changing a pinned line without deadlocking"); the job then
+  merges the docs PR first. When you move a pinned line yourself, write the docs PR that
+  way from the start.
+
 ## 1b. You are full-stack by default
 Your domain is a **territory across all 5 repos**, not one repo: `shoofi-server`
 (Node API), `shoofi-app` (customer RN), `shoofi-partner` (store RN), `shoofi-shoofir`
