@@ -65,17 +65,28 @@ function checkSymbol(root, rel, symbol) {
   return body.includes(symbol) ? null : `symbol not found: "${symbol}" in ${rel}`;
 }
 
-/** Assert a regex still matches a file (for constants, enum values, config keys). */
+/**
+ * Assert a regex still matches a file (for constants, enum values, config keys).
+ *
+ * `file` may be a list: the pattern passes when ANY listed file exists and matches.
+ * That is for a pinned line that moves to another file. The docs PR lists both
+ * (`["new/place.ts", "old/place.tsx"]`), so it holds on the code's main before
+ * AND after the code PR merges, and can land first. A single-file pin can't move
+ * without deadlocking: the code PR's CI checks docs from claude-plugins MAIN (the
+ * old pin fails it), and merging the new pin first fails every other PR of that
+ * repo until the code lands. Drop the old path once the code has merged.
+ */
 function checkPattern(root, { file, regex, desc }) {
-  const body = readFileSafe(path.join(root, file));
-  if (body === null) return `missing file: ${file} (expected pattern ${regex})`;
+  const files = Array.isArray(file) ? file : [file];
   let re;
   try {
     re = new RegExp(regex, "m");
   } catch (e) {
     return `invalid regex in manifest: ${regex} (${e.message})`;
   }
-  return re.test(body) ? null : `pattern not found: ${desc || regex} in ${file}`;
+  const bodies = files.map((f) => [f, readFileSafe(path.join(root, f))]).filter(([, body]) => body !== null);
+  if (!bodies.length) return `missing file: ${files.join(" | ")} (expected pattern ${regex})`;
+  return bodies.some(([, body]) => re.test(body)) ? null : `pattern not found: ${desc || regex} in ${bodies.map(([f]) => f).join(" | ")}`;
 }
 
 function checkRepo(root, spec) {
