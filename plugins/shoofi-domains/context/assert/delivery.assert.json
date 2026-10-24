@@ -35,6 +35,7 @@
         "services/delivery/delivery-only.js",
         "scripts/delivery-only-preflight.js",
         "docs/delivery-only-bookings.md",
+        "services/delivery/manual-assignment-ranking.js",
         "lib/delivery/helpers.js"
       ],
       "symbols": {
@@ -435,6 +436,11 @@
           "file": "services/delivery/driver-load.js",
           "regex": "ACTIVE_ORDER_STATUSES\\s*=\\s*\\[\"1\",\\s*\"2\",\\s*\"3\",\\s*\"5\"\\]",
           "desc": "the canonical in-flight status list, strings, INCLUDING \"5\" WAITING_IN_STORE - a hand-written [\"1\",\"2\",\"3\"] drops the driver standing in the restaurant, and three competing spellings are already live"
+        },
+        {
+          "file": "services/delivery/manual-assignment-ranking.js",
+          "regex": "RANK_REASONS",
+          "desc": "the server side of the contract: reason codes the admin web must translate"
         }
       ]
     },
@@ -508,7 +514,9 @@
         "src/utils/geo-point.ts",
         "src/views/admin/driver-locations/DriverLocationsMap.tsx",
         "src/utils/driver-map-markers.ts",
-        "src/views/admin/live-ops/data/liveOpsApi.ts"
+        "src/views/admin/live-ops/data/liveOpsApi.ts",
+        "src/utils/driver-assignment-score.ts",
+        "src/views/admin/live-ops/strings.ts"
       ],
       "patterns": [
         {
@@ -565,6 +573,21 @@
           "file": "src/views/admin/live-ops/data/liveOpsApi.ts",
           "regex": "includeOffline:\\s*true",
           "desc": "the live-ops board asks for offline couriers, which turns the server's 10-minute staleness filter off - so the board itself must age every fix before claiming where a courier is"
+        },
+        {
+          "file": "src/utils/driver-assignment-score.ts",
+          "regex": "RANK_REASON_LABELS",
+          "desc": "the ONE Hebrew label table for the server's RANK_REASONS codes"
+        },
+        {
+          "file": "src/utils/driver-assignment-score.ts",
+          "regex": "RANK_REASON_LABELS\\[code\\]\\)[\\s\\S]{0,40}filter\\(Boolean\\)",
+          "desc": "an untranslated reason code is DROPPED, never printed raw - so a new code with no label vanishes from four pickers silently"
+        },
+        {
+          "file": "src/views/admin/live-ops/strings.ts",
+          "regex": "export \\{ RANK_REASON_LABELS \\} from",
+          "desc": "live-ops RE-EXPORTS the labels rather than holding a second table"
         }
       ]
     }
