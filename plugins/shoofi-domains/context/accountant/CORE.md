@@ -18,7 +18,8 @@ invoices, and bank payouts. Distinct from `payments` (money IN).
 ## Scope
 Server: `routes/payments/{admin-reports,admin,summaries}.js`, `routes/driver-reports.js`,
 `routes/admin/masav.js`, `routes/hyp.js` (EZcount invoicing), `lib/payments/calc.js`,
-`utils/{vat,greeninvoice,invoice-provider}.js`, `services/financial-overview/` (the live overview —
+`utils/{vat,greeninvoice,invoice-provider}.js`, `services/compensations/report-window.js` (which
+report a compensation belongs to + the post-report lock, invariant 10), `services/financial-overview/` (the live overview —
 it RUNS the two report engines over any range; never re-derive money there), and the accountant's
 Hashavshevet export `services/accountant-export/` + `utils/hashavshevet-movein.js` (reference §7b —
 its amounts are EZcount's per-line rounding, never `round2(totalOutcomes)`). Client: the
@@ -116,6 +117,15 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    wrong, and the fix is delete + regenerate. But delete **must release the carry-over
    compensations** that `/send` consumed (`appNameBackfill.pendingReportCarryover` back to
    `true`), or the regenerated report silently drops those amounts.
+   **The compensations-approved guard (`validateCompensationsApproved`) must query with BSON
+   `Date` bounds** — `compensations.createdAt` is a Date, and until 2026-10 the guard passed
+   `moment().format()` strings, which never match a Date, so it found 0 compensations and
+   **never blocked a single report** (Sep 2026: 0 by string vs 156 by Date). It now uses the
+   report's own compensation window (invariant 10), the same store key as the report fetch
+   (`order.storeData.appName`), and counts only pending items that move the store's money
+   (`payingParty` or `compensationFor` is `business`). The driver report's guard
+   (`validateDriverCompensationsApproved`) already used Dates; it counts only
+   `compensationFor: 'driver'` items, not driver-PAID ones.
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
 7. **A store's coupon cost (`reportData.campaigns`) is the coupon's NOMINAL
@@ -150,8 +160,8 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    - **`storeDiscount` carries two different units and no field says which.**
      Shekels normally; percentage points when `type === 'percentage'`. There is no
      validation bounding it to 0-100 in that case — `lib/schemas/newCoupon.json` sets
-     only `minimum: 0`, and `routes/coupon.js:1364` bounds the split only for
-     `fixed_amount`. **`splitType: 'percentage'` is the exception:** those coupons
+     only `minimum: 0`, and `routes/coupon.js:1462` (create) / `:1702` (update) bound the
+     split only for `fixed_amount`. **`splitType: 'percentage'` is the exception:** those coupons
      resolve the share into shekels before the order is written
      (`routes/coupon.js:48-74`, `:345`), so `storeDiscount` on the applied snapshot is
      already an amount. Any reader dividing by 100 must exclude them or it bills ₪0.14
@@ -169,6 +179,29 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    *(Do not mirror `admin.js:907-944` either — that is the legacy `/stores-export`
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
+
+   **The other direction — `couponsFromShoofi` (Shoofi credits the store) — is the APPLIED
+   amount, capped by Shoofi's share** (owner decision 2026-10). For a customer-specific
+   `order_items` coupon, `stores-export-new` credits
+   `min(nominal, applied)` via `shoofiCouponCredit` (`lib/payments/calc.js`), where
+   `nominal = shoofiDiscount` (or `(shoofiDiscount/100) * orderPrice` for `type:
+   'percentage'`) and `applied = appliedCoupon.discountAmount ?? appliedCoupon.coupon.discountAmount`
+   (`appliedCouponAmount`). `applied` missing (legacy orders) → the nominal, unchanged.
+   Before this, every redemption was credited the nominal value, so a **partial-use**
+   coupon paid out its full value at every store it touched (IMGOJRNG: ₪200 credited for a
+   ₪49 use AND ₪200 for a ₪151 use; 27 rows / ₪1,775.5 Mar-Oct 2026). The pushed
+   `shoofiCouponsData` row carries `itemsAmount = credited, deliveryAmount = 0` so the PDF
+   columns reconcile with `amount`. Note the asymmetry with `campaigns` above, which is
+   still the nominal — that is a separate, undecided question; do not "align" them.
+   **The `coupon.value` fallback is CORRECT, do not remove it:** a customer-specific coupon
+   with an empty `shoofiDiscount` is treated as Shoofi-credited at `coupon.value`, even when
+   it has `storeDiscount` set. That is how a **store-paid compensation** balances: the store
+   is charged ONCE as `compensationsToCustomers` in the month the compensation is approved,
+   and each redemption of the resulting `COMP-*` coupon is credited back via
+   `couponsFromShoofi`, offsetting the food it handed over — net, the store bears the
+   compensation exactly once. (With the old nominal credit, a ₪200 COMP coupon spent ₪90
+   at the store refunded it ₪200: its real cost fell to ₪90.) Guarded in
+   `test/integration/settlement-guards.js`.
 
 8. **Compensation parties.** `compensationFor ∈ {customer, business, driver, shoofi}`,
    `payingParty ∈ {shoofi, business, driver}`, and **payer ≠ recipient** — enforced server-side
@@ -194,9 +227,74 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    "optimise" back to `getLiveStores` — narrow the non-live PROBE instead, and only towards
    over-selection. Details: reference §4.
 
+10. **A compensation belongs to the report whose period contains its `createdAt` — never the
+    month it was approved in — and the windows tile with no overlap and no gap.**
+    `services/compensations/report-window.js` is the one place this is decided; the store
+    report fetch, the generate guard (invariant 5) and the post-report lock all call it.
+    - **Store:** `storeCompensationWindow` = `[report start, next day's start)` — the start is
+      the report's business-day start (`storeReportBounds`, extracted verbatim from
+      `generateStoreReportData`: snapped openHours + the openHours transition-month rule); the
+      **exclusive** end is that same function's start for the day after `endDate`, so
+      September ends at the exact instant October begins. The report passes these as exact
+      instants with `endExclusive=true` to `GET /api/shoofiAdmin/compensations`; without that
+      flag (the admin screen's date filter) a plain `endDate` is still stretched to 23:59:59.999.
+      Before 2026-10 the report's end was stretched too, so everything created on the 1st of
+      the next month after the store opened was billed in BOTH months (snooshy, ₪17, Oct 1
+      22:36 IL). Orders keep their own `[start, end]` window — unchanged.
+    - **Driver:** Israel calendar days, inclusive (`routes/driver-reports.js`) — already tiled;
+      mirrored by `driverCompensationWindow` for the lock only. A compensation touching both a
+      store and a driver can therefore land in different months on the two reports in the
+      first hours of the 1st; each report is still exactly-once.
+    - **The lock:** once a store or driver report (any status) covers a compensation's
+      `createdAt`, a change that moves money on it is refused **409**
+      (`code: 'compensation_period_closed'`, Hebrew message) by add / edit / approve-item /
+      delete in `routes/shoofi-admin.js` (`checkCompensationLock`). "Moves money" =
+      `affectedParties`: an item whose report footprint (status 1 + approvedAmount +
+      parties + company/driver) changes, a NEW item (even pending — it could never be
+      approved into any report), or deleting an approved item. Text edits and declining a
+      never-approved item stay open. Without the lock the change reached no report at all
+      (vapego-taibe, ₪2000 driver→business, edited 2026-09-19 after the August report — the
+      store was never credited). **The way out is delete + regenerate** (a deleted report no
+      longer locks) or a new compensation, which lands in the current period.
+      New reports store their exact window in `reportData.compensationWindow`; for older
+      reports the lock recomputes it from the store's CURRENT openHours.
+    Not covered: `services/payments/cancel-compensation.js` inserts compensations
+    automatically (createdAt = now) without the lock — it can only collide with a report
+    generated for a period that has not ended.
+
+11. **A compensation does NOT store the 8-digit order number — derive it.** An order keeps
+    two forms of the same id: `originalOrderId` (`1872-733742-4868`, 14 digits in three
+    segments) and `orderId` (`1872-4868`, the 8 digits every app, receipt, push notification
+    and order card shows). `shoofi-delivery-web`'s `CompensationModal` deliberately stores
+    the LONG one on `order.orderNumber`, because the `COMP-<orderNumber>` coupon code it
+    mints has to be unique across the ~250 store DBs and the short form is only store-local —
+    and `normalizeCompensationOrder` (`routes/shoofi-admin.js`) then overwrites
+    `order.orderId` with the Mongo `_id` (2,381 of 2,431 production rows). So no field holds
+    the number a person recognises: **`utils/order-number.js` → `shortOrderNumber()`**
+    derives it, and the store report PDF (`routes/payments/admin-reports.js`), the driver
+    report PDF (`routes/driver-reports.js`) and every admin screen call it. Prod, 2026-10:
+    262 of 2,431 compensations stored the long form and 2,169 the short one, which is why one
+    column showed two shapes for the same order while the modal that FILES a compensation
+    showed the short one. Three riders:
+    - **Never shorten an `_id`.** Eight hex characters read exactly like a real order number
+      and are not one, so `shortOrderNumber` returns `""` there. That is why
+      `${c.orderNumber || c.orderId}` is not a fallback on a driver-report row.
+    - **The search has to expand.** `compensationOrderNumberQuery` (same file) keeps the
+      unanchored substring match AND adds `^NNNN-\d+-NNNN$` for a typed two-segment term, so
+      the number now on screen still finds a row that stored the long form.
+    - **It is display only, never a key or a join.** The long form is what gets stored
+      precisely because the short one is not unique platform-wide. Settlement keys on
+      `createdAt` plus store/company identity; the order number appears in no invoice, credit
+      note or MASAV row.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
+- **FIXED 2026-10, keep it that way:** `couponsFromShoofi` credits the discount APPLIED on
+  the order (capped by Shoofi's share), not the coupon's nominal value per redemption — see
+  invariant 7. **INTENTIONAL, do NOT "fix":** the customer-specific `coupon.value` fallback
+  that credits a store-paid `COMP-*` compensation coupon (it offsets the one-time
+  `compensationsToCustomers` charge).
 - **INTENTIONAL, do NOT "restore":** delete accepts **any** report status (2026-08-03). The
   old "only draft reports can be deleted" guard was removed on purpose so a wrong report that
   already went out to a store/driver can be regenerated. Deleting a report that carries an
@@ -209,6 +307,49 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 - **Awareness:** MASAV is **decoupled** from the reports — payout amounts are re-keyed into an
   Excel by a human; there is no automated report→MASAV link. Hardcoded GreenInvoice
   `businessId`/`itemId` constants exist.
+- **Awareness — a report PDF on Spaces is published, not protected.** All **8**
+  `PutObjectCommand` call sites in this repo pass `ACL: "public-read"`, with no exception:
+  `routes/payments/admin-reports.js:239` (store settlement), `routes/driver-reports.js:687`
+  (courier settlement), `utils/invoice-mail.js:155` (the customer invoice PDF),
+  `backfill-invoices.js:205` (the bulk variant — one run republishes every historical
+  invoice), `utils/images-service.js:36`, `utils/image-variants.js:127`,
+  `routes/product.js:113` and `services/social-posts/render-service.js:204`. Counting by
+  grep overshoots: `routes/payments.js:14`, `routes/payments/admin.js:14` and
+  `routes/payments/summaries.js:14` **import** `PutObjectCommand` and never call it — dead
+  imports from the `payments.js` split. The URL handed back to the admin —
+  `https://shoofi-spaces.fra1.digitaloceanspaces.com/reports/<appName>/<reportId>.pdf`
+  (`admin-reports.js:233`, `:247`) and `driver-reports/<companyId>/<reportId>.pdf`
+  (`driver-reports.js:679`, `:691`) — carries no token, so anyone holding it reads a
+  store's or a courier's whole period. Note this is the **origin** host; the invoice URLs
+  in `routes/order.js` use the `.cdn.` host instead, the one place the two differ. Read
+  "on Spaces" as "the code publishes it", never as "behind the admin login" — whether a
+  given object is actually reachable also depends on bucket settings that code can't tell
+  you, but `routes/order.js` handing these URLs to customers is the behavioural proof.
+- **Awareness — report ids are enumerable *within a monthly run*.** `<appName>` is the
+  public `app-name` slug (returned by unauthenticated `routes/shoofi-admin.js:766` and
+  `routes/store.js:193`); `<companyId>` is a `delivery-company.store` ObjectId, not a slug.
+  `<reportId>` is a Mongo ObjectId minted client-side by the driver — neither report doc
+  sets `_id`, it is read off the insert (`admin-reports.js:1604`, `driver-reports.js:1158`).
+  Under the pinned `mongodb@^3.3.3`/`bson@1.x` that is timestamp + **5 random per-process
+  bytes** + counter, so cold guessing is infeasible. But every report in one monthly run is
+  inserted in a single loop in a single process, so they share those bytes and differ only
+  by a consecutive counter: **one leaked report id exposes that whole batch's ids by
+  arithmetic** — i.e. every store's settlement for that month. Worst case in the repo is not
+  the report key at all but `utils/invoice-mail.js:153`, `invoices/doc-<providerDocId>.pdf`,
+  where the id is a short sequential provider number.
+- **Awareness — you cannot un-send those links, so design around them.** This is a
+  **property, not a bug to fix opportunistically**: `pdfUrl` is stored on the report doc
+  (`admin-reports.js:1630`, `driver-reports.js:1168`) and has already gone out as parameter
+  `{{2}}` of the WhatsApp `monthly_report` template (`admin-reports.js:2491`,
+  `driver-reports.js:1575`) — not by email; that block is commented out at
+  `admin-reports.js:2423-2433` and `sendEmail` is required and never called. A URL sitting
+  in a third party's WhatsApp thread is less revocable than one you mailed, and WhatsApp's
+  own link-preview fetch is an unauthenticated reader. Flipping the ACL breaks reports that
+  have gone out. When a NEW artefact must stay internal, keep the bytes in Mongo and serve
+  them from an admin-gated route — `routes/ai-tasks.js:718` (`...adminOnly`, `sendFile()` at
+  `:706` with `Cache-Control: private`) and `routes/team-tasks.js:752` both do this — and cap
+  one file per document well under the 16MB BSON limit, the way
+  `services/ai-tasks/constants.js:180` pins `MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024`.
 
 ## Recipe — change a payout or invoice amount
 1. **Trace the money first**: who collected (cash/card) → who is owed → which formula line.
