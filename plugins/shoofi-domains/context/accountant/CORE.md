@@ -262,6 +262,31 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     automatically (createdAt = now) without the lock — it can only collide with a report
     generated for a period that has not ended.
 
+11. **A compensation does NOT store the 8-digit order number — derive it.** An order keeps
+    two forms of the same id: `originalOrderId` (`1872-733742-4868`, 14 digits in three
+    segments) and `orderId` (`1872-4868`, the 8 digits every app, receipt, push notification
+    and order card shows). `shoofi-delivery-web`'s `CompensationModal` deliberately stores
+    the LONG one on `order.orderNumber`, because the `COMP-<orderNumber>` coupon code it
+    mints has to be unique across the ~250 store DBs and the short form is only store-local —
+    and `normalizeCompensationOrder` (`routes/shoofi-admin.js`) then overwrites
+    `order.orderId` with the Mongo `_id` (2,381 of 2,431 production rows). So no field holds
+    the number a person recognises: **`utils/order-number.js` → `shortOrderNumber()`**
+    derives it, and the store report PDF (`routes/payments/admin-reports.js`), the driver
+    report PDF (`routes/driver-reports.js`) and every admin screen call it. Prod, 2026-10:
+    262 of 2,431 compensations stored the long form and 2,169 the short one, which is why one
+    column showed two shapes for the same order while the modal that FILES a compensation
+    showed the short one. Three riders:
+    - **Never shorten an `_id`.** Eight hex characters read exactly like a real order number
+      and are not one, so `shortOrderNumber` returns `""` there. That is why
+      `${c.orderNumber || c.orderId}` is not a fallback on a driver-report row.
+    - **The search has to expand.** `compensationOrderNumberQuery` (same file) keeps the
+      unanchored substring match AND adds `^NNNN-\d+-NNNN$` for a typed two-segment term, so
+      the number now on screen still finds a row that stored the long form.
+    - **It is display only, never a key or a join.** The long form is what gets stored
+      precisely because the short one is not unique platform-wide. Settlement keys on
+      `createdAt` plus store/company identity; the order number appears in no invoice, credit
+      note or MASAV row.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
