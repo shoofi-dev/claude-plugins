@@ -215,6 +215,13 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       "10% over ₪200" charged MORE for less food, and a card hold refused the edit). The amend
       also writes `promotions` into the `bookDelivery` snapshot (cash courier reimbursement)
       and reconciles `promotionRedemptions` (removed deal → row deleted, reduced → new amount).
+    - **Once per order (`promotion.repeatInCart`)**: the quantity types (`items_for_price`,
+      `buy_x_pay_y`, `amount_off_per_item`) repeat as often as the cart allows — 4 sides under
+      "2 for ₪40" = two bundles. `repeatInCart: false` (admin checkbox "המבצע חל כמה פעמים
+      באותה הזמנה", unticked) = one bundle / one free group / `minItems` units, cheapest first.
+      **Absent = true** (deals saved before the flag). `REPEATABLE_TYPES` in
+      `utils/promotion-discount.js`; read only by `evaluatePromotion`, so quote, creation
+      clamp, amend, twins and the preview all follow it. "4 sides, one bundle" is this flag.
     - **One ranking, three readers**: `rankDeals` (`promotion-service.js`) is the only place
       that picks the winning deal of each kind — `quotePromotions` (the menu/cart/checkout
       quote) and the admin form's live preview (`previewPromotionQuote`,
