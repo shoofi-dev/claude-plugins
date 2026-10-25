@@ -148,7 +148,10 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    risk**: a visitor profile holds food preferences only, and nothing account-derived is ever
    returned for a device owner. Never let a device id unlock anything account-shaped, and never
    take the device id, `owner` or `inferred` from a request body (`PUT` whitelists `stated`,
-   `confirmed`, `onboardedAt`, `skippedAt`). One profile per owner: unique partial indexes on
+   `confirmed`, `onboardedAt`, `skippedAt`, `people`, `family` — `routes/ai-helper.js` copies
+   exactly these into the update; a field missing there is silently never saved, and the
+   reply's default then wipes the app's copy: found 2026-10-25 for `people`, pinned by a route
+   test in `test/integration/ai-helper.js`). One profile per owner: unique partial indexes on
    `owner.customerId` and `owner.deviceId` — **partial on `$type: "string"`, so every owner query
    states `$type: "string"` too** (`ownerFilter`); plain equality cannot use a partial index and
    scanned the whole collection on every suggestion (IXSCAN pinned in `test/integration/ai-helper.js`).
@@ -161,7 +164,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
      `POST /api/ai-helper/merge` is `auth.required` (customer token only) and reads the device id
      from the header; `validateAuthCode` knows nothing about it — keep it that way. The account's
      non-empty `stated` wins field by field, `confirmed` is unioned, the earliest `onboardedAt`
-     is kept, and the **device profile is DELETED**, so the next person to log in on a shared
+     is kept, the account's `people` (the family members it orders for) win when it has any,
+     else the device's, and its `family` answer when answered, else the device's — and the
+     **device profile is DELETED**, so the next person to log in on a shared
      phone does not inherit it. Idempotent: no device profile → no-op.
    - The customer app drops its cached copy — and the For-you conversation, minimized bubble and
      home picks (`forYouStore.resetForAccountChange()`) — on `logOut`, `deleteAccount` and a

@@ -478,6 +478,18 @@ boundary and say so in the PR.
      saved whenever a meal time was picked and weighted the ranking. A first local profile starts
      from `UNKNOWN_STATED`, never the screens' `EMPTY_STATED` defaults, so a skip stores no spice,
      meal time or budget the customer never gave. `budget: null` is neutral, like `budget: 2`.
+   - **Ordering for a family member: `forPerson` swaps WHOSE taste, never the rules.**
+     `POST /api/for-you/suggest` with `forPerson: <id from people[]>` (`suggest-service.js`,
+     `suggest.js` `personMode`, `docs/ai-helper.md` › Ordering for a family member): that person's
+     `avoid` REPLACES the customer's — the same keys, the same guaranteed/best-effort split, the
+     same last check at serve time — and the customer's own taste is dropped (`EMPTY_TASTE`), so
+     "for Mom" never shows the customer's usual. Their tagged dishes come first (most ordered,
+     then most recent; fetched by id in `candidateQuery` even when not popular), then popular;
+     `for_person` / `for_person_new`. Typed text stays text mode (with their avoid list). An
+     unknown id is the customer's own reply, never an error. Tags count only after an order goes
+     through (app `takePersonDishes` on `order_submit_success`); the onboarding's family step and
+     the chat's once-a-week offer feed `people` (app `helpers/family.ts`). Pinned in
+     `test/integration/for-you-family.js` and `for-you-seen.js`.
    - **The persona's peek is seen, or not shown at all.** On a cold start the home mounts UNDER the
      launch splash; the peek (once per session: no profile yet, or a meal window) and the persona's
      `ai_helper_fab` / `ai_helper_peek` impressions wait for `helpers/splash-state.ts` (App.tsx marks
