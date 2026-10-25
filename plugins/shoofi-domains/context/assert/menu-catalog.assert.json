@@ -83,7 +83,8 @@
         "utils/crons/for-you-review-cron.js",
         "docs/for-you-quality.md",
         "test/integration/for-you-quality.js",
-        "test/integration/for-you-seen.js"
+        "test/integration/for-you-seen.js",
+        "services/menu/promotions.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -342,6 +343,9 @@
         "utils/general-category-order.js": [
           "sortGeneralCategories",
           "compareGeneralCategories"
+        ],
+        "services/menu/promotions.js": [
+          "applyMenuPromotions"
         ]
       },
       "patterns": [
@@ -2421,7 +2425,7 @@
           "desc": "doc reference §7g / §8: the two chat-minimize switches under Settings → Shoofi, default off"
         },
         {
-          "file": "src/components/Sidebar/Sidebar.tsx",
+          "file": ["src/components/Sidebar/menu-sections.ts", "src/components/Sidebar/Sidebar.tsx"],
           "regex": "path: \"/admin/for-you-quality\".*roles: \\[\"master\", \"admin\"\\]",
           "desc": "doc CORE invariant 22: For you quality — the screen is master/admin only, matching the server"
         },

@@ -54,6 +54,25 @@ instead of misleading the next agent.
 
 In `shoofi-server` it's wired as `npm run docs:check` and runs in CI alongside lint/deadcode.
 
+### Moving or changing a pinned line without deadlocking
+
+Every code repo's CI checks its docs against claude-plugins **`main`**. So when a code PR
+moves or rewrites a line a pin matches, the old pin fails that PR until the docs PR merges.
+And a docs PR carrying only the new pin fails every *other* PR of that repo once it merges,
+until the code lands. Make the docs PR hold on **both** sides, then merge it first:
+
+- **A line moving to another file:** `"file"` may be a list. The pattern passes when any
+  listed file exists and matches:
+  ```json
+  { "file": ["src/components/Sidebar/menu-sections.ts", "src/components/Sidebar/Sidebar.tsx"],
+    "regex": "path: \"/admin/for-you-quality\".*roles: \\[\"master\", \"admin\"\\]" }
+  ```
+- **A line whose text changes:** a regex alternation that matches the old text and the new one.
+
+Prove it before merging: run docs-check from the docs branch against the code repo's `main`
+**and** against the code PR's head. Both must pass. Drop the old form once the code has
+merged. The admin's merge job does exactly this when a group's code PR fails `docs:check`.
+
 ## Adding a domain
 
 1. `agents/<domain>.md` — routing `description` (this is how the main agent picks it) +

@@ -177,6 +177,71 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     school carts get no chat add (it opens the store instead). App tests:
     `__tests__/stores/cart-add-for-store.test.ts`, `__tests__/hooks/use-chat-add-to-cart.test.tsx`.
 
+13. **A STORE PROMOTION IS THE STORE'S PRICE, NOT A COUPON** (`docs/promotions.md` in
+    shoofi-server). It lives on **`order.promotions = { items, delivery }`** — one deal of each
+    kind (but see "combined" below), each `{ promotionId, type, titleHE, titleAR, discountAmount, deliveryMode?,
+    eligibleItemIds, fundedBy: "store" }` — and **never in `appliedCoupon`** (the coupon slot is
+    the customer's coupon only). Order of pricing: items → **items deal** → coupon (minimum and %
+    measured on the price AFTER the deal) → coins; fee → **delivery deal**. Shape on the order:
+    the items deal is netted into `orderPrice`, `originalOrderPrice` stays the LIST price;
+    `shippingPrice` is **never lowered** — the delivery deal comes off `total` only.
+    - **Creation clamps, never rejects** (`enforcePromotions`, `routes/order.js`): every claimed
+      deal is re-derived from the catalogue-priced items; an over-claim is added back
+      (items → `orderPrice` AND `total`; delivery → `total`) and logged on
+      `promotionEntitlement`. A deal that ended, a used-up cap, a cart that no longer qualifies
+      or a deal in the wrong slot is dropped; a deleted promotion or a catalogue gap keeps the
+      client's number; the server never RAISES a claim. The delivery fee a deal may discount is
+      bounded by `resolveDeliveryTariffCeiling` (never 0).
+    - **The one conflict with a coupon**: a delivery deal and a delivery coupon
+      (`discountType: 'delivery'` or `type: 'free_delivery'`) never both apply — the larger
+      wins, a tie goes to the deal, and the dropped coupon is not sent so it is not spent
+      (`resolveDeliveryConflict`; the app picks first, creation re-checks).
+    - **Uses** are one row per (order, promotion) in `shoofi.promotionRedemptions` (unique,
+      idempotent), written at the four `couponUsages` write points with the same status gates
+      and released on cancel. NOT `couponUsages` — settlement and every coupon cap read that.
+    - **Twin orders**: each side carries ITS OWN store's deal, judged on its own items
+      (`services/twin-order/twin-promotions.js`, run per side in `/place` and
+      `/digital-place-pending` before coins); never split like the twin coupon. Only the
+      primary carries the fee, so only its store's delivery deal applies; the combination fee
+      is never discounted. Uses are recorded with the twin coupon usages (cash: the route; card:
+      `applyCaptureSuccess`) and released in `cascadeCancel`.
+    - **Amend re-runs the rules** (`repricePromotions` in `utils/order-pricing.js`): the items
+      deal on the new items, then the delivery deal on the subtotal after it; never above the
+      checkout grant; `promotionPricing.<kind>.basis` = `recomputed` | `kept-original` |
+      `catalogue-gap`.
+      **A store edit never makes the customer pay more**: the amend passes
+      `previousItemsPrice` and the deals keep at least `granted − removedValue` (items first,
+      then delivery) — the store absorbs it, `protectedAmount` reports it (without this a lost
+      "10% over ₪200" charged MORE for less food, and a card hold refused the edit). The amend
+      also writes `promotions` into the `bookDelivery` snapshot (cash courier reimbursement)
+      and reconciles `promotionRedemptions` (removed deal → row deleted, reduced → new amount).
+    - **Once per order (`promotion.repeatInCart`)**: the quantity types (`items_for_price`,
+      `buy_x_pay_y`, `amount_off_per_item`) repeat as often as the cart allows — 4 sides under
+      "2 for ₪40" = two bundles. `repeatInCart: false` (admin checkbox "המבצע חל כמה פעמים
+      באותה הזמנה", unticked) = one bundle / one free group / `minItems` units, cheapest first.
+      **Absent = true** (deals saved before the flag). `REPEATABLE_TYPES` in
+      `utils/promotion-discount.js`; read only by `evaluatePromotion`, so quote, creation
+      clamp, amend, twins and the preview all follow it. "4 sides, one bundle" is this flag.
+    - **Combined items deals (`promotion.combinable`)**: two items deals stack only when BOTH
+      are `combinable: true` (absent = false — deals saved before the flag never stack;
+      delivery deals never combine). `pickItemsDeals` (`utils/promotion-discount.js`) takes the
+      best single deal or the best stack, trying every order (≤ 6 deals); no unit is discounted
+      twice (`evaluation.consumed` / `removeConsumed`), and an order-level minimum is measured on
+      the price after the earlier deals. The order keeps ONE `promotions.items`: total +
+      `"A + B"` title + **`combined: [parts]`** — so every reader that sums/shows it (checkout,
+      partner ticket, `orderPrice` → settlement) needs no change, and **per-deal readers MUST go
+      through `dealParts(deal)`**: the redemption ledger (row per part), the creation clamp
+      (re-derives the stack from the claimed promotions), amend repricing + ledger reconcile
+      (`allocateAcrossParts`). Reading `promotions.items.promotionId` alone silently ignores
+      the second deal.
+    - **One ranking, three readers**: `rankDeals` (`promotion-service.js`) is the only place
+      that picks the winning deal of each kind — `quotePromotions` (the menu/cart/checkout
+      quote) and the admin form's live preview (`previewPromotionQuote`,
+      `POST /api/admin/promotions/preview`) both call it. The preview ranks the UNSAVED draft
+      with the store's other running deals (minus the saved copy of the deal being edited),
+      ignores the draft's dates/active switch, skips caps and writes nothing. Do not give the
+      preview its own ranking: it exists to tell support what checkout will really do.
+
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
 `shoofi-app/stores/cart/index.ts` and nothing about it reaches the server until submit, so
