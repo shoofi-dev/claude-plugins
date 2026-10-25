@@ -58,6 +58,88 @@ Two hard rules:
   One task → one reviewable PR.
 - If a change is large or risky, say so in the PR body and offer to split it.
 
+### Where the human's merge happens, and what that asks of your PR
+The human merges either on GitHub or from the admin's **"מיזוג PRs"** screen
+(`/admin/ai-merge`, owners only). On that screen one press merges a whole feature
+group — the PRs across repos that share a branch name, reference each other, or
+stack. The AI bridge does the merge as plain code: it brings each branch up to date,
+waits for green CI on the exact head SHA, and merges that SHA. It is not a session,
+and it is not you.
+Neither route lets an agent merge. `gh pr merge` stays denied to every session.
+
+What that means for the PR you open:
+- **No `shoofi-dev` repo has branch protection.** GitHub would merge a red PR. CI
+  green is enforced only by the bridge's check before its merge, so never write
+  "CI will block it" in a PR body as a safety argument.
+- **The screen's extra stop keys on the text `HIGH-RISK`.** A group needs the owner
+  to type its branch name before merging only when a PR's **title or head branch**
+  contains `HIGH-RISK`, or a PR is a draft. A money or identity change therefore
+  carries `HIGH-RISK` in its branch name or title, not only in the body.
+  The body alone is invisible to that check.
+- **Grouping comes from your cross-links, in both directions.** Give every PR of one
+  change the **same branch name** in each repo, or link the PRs **both ways** as
+  `shoofi-dev/<repo>#N` or by full URL: each PR names the others, and they name it
+  back. Edit the earlier PR's body once the later one exists. A one-way mention
+  joins nothing, on purpose; across a month of history, "found while building #X"
+  lines chained unrelated features together. A linked set merges together and in a
+  safe order: server first, the clients next, claude-plugins after them, and
+  shoofi-bridge last. A docs PR whose code PR doesn't link back, or that names it
+  only in prose ("links to follow"), lands in a group of its own.
+- **Stacked PRs are handled.** A child whose base is another PR's head is retargeted
+  to `main` before that head branch is deleted.
+
+### Your PR becomes a release note
+The admin's **"הערות שחרור"** screen (`/admin/ai-merge/releases`) lists every PR
+merged into `main` in the org, from the screen or from GitHub. It groups them the
+same way the merge screen does and gives each feature one line.
+- That line is written from your **title** and the start of your **body**, and the
+  category (feature / bug / improvement / infra / docs) also reads the conventional
+  prefix (`feat`, `fix`, `docs`, `chore|ci|refactor|build|test`). So write the title
+  for the team, not for git: what changed, for whom. Put the "What" paragraph first.
+- **Released means merged into `main`.** A PR merged into another branch (a stack
+  merged in the wrong order) is stored but never listed as released.
+- shoofi-app, shoofi-partner and shoofi-shoofir changes are listed as **waiting for
+  an app update**. A merge does not put them on phones; that takes an `eas update`
+  or a store build. Never write "released" or "live" in an app PR on the strength
+  of a merge.
+
+### When you are consulted to resolve a merge conflict
+The merge job may start a session on an **existing** PR branch whose merge with
+`main` conflicts, and that session may consult you about files in your territory.
+The rules:
+- Your job there is to **reconcile both sides' intent**: the PR's change and what
+  `main` gained since. Add no new behaviour, refactors or fixes. The bridge rejects
+  a merge commit that touches any file outside the conflicted files and `main`'s
+  own changes.
+- The result is one merge commit, the **last** commit on the branch, pushed to that
+  branch. Never force-push, never push to `main`, never merge.
+- An owner reads the resolution (`git show --remerge-diff`) and presses Continue
+  before anything merges. Say plainly in the session's answer what each side
+  wanted and what the resolution kept.
+
+### When you are consulted to fix red CI before a merge
+The merge job doesn't refuse a red PR. First it re-runs the failed jobs once (a flaky
+test needs no code). If the PR is still red, it may start a session on the PR's branch
+with the failing logs:
+- **Fix the cause, never the gate.** The bridge rejects a fix that:
+  - edits `.github/` or `package.json` `"scripts"`;
+  - raises a number in a `*baseline*` file;
+  - adds `.skip(`, `.only(`, `xit(`, `eslint-disable`, `@ts-nocheck` or `test.todo(`;
+  - deletes a test file.
+
+  If the test is right and the code is wrong, fix the code. If the test is wrong, say why
+  in the answer.
+- **Commit on the PR's branch** and push it as a fast-forward: never force, never `main`,
+  never merge. If the failure needs no code (it is flaky, or a `Docs:` line is missing
+  from the PR body), say so and fix it there (`gh pr edit`), with no commit.
+- A model's code fix **pauses for an owner** before it merges, like a conflict
+  resolution, so explain the cause and the fix plainly.
+- **A `docs:check` failure in a group that has a docs PR** is usually an ordering
+  deadlock, not a bug. Make the docs PR's pins hold on both the code's `main` and the PR
+  head (README, "Moving or changing a pinned line without deadlocking"); the job then
+  merges the docs PR first. When you move a pinned line yourself, write the docs PR that
+  way from the start.
+
 ## 1b. You are full-stack by default
 Your domain is a **territory across all 5 repos**, not one repo: `shoofi-server`
 (Node API), `shoofi-app` (customer RN), `shoofi-partner` (store RN), `shoofi-shoofir`

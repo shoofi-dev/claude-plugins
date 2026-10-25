@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@6a87cf44 / 2026-10-03",
+  "lastVerified": "shoofi-server@1870b2ff (feat/for-you-taste-redis-cache) / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -11,6 +11,7 @@
         "routes/translations.js",
         "routes/global-search.js",
         "utils/menu-cache.js",
+        "utils/general-category-order.js",
         "utils/order-stock.js",
         "services/database/DatabaseInitializationService.js",
         "utils/create-indexes.js",
@@ -58,6 +59,31 @@
         "utils/crons/menu-spellcheck-cron.js",
         "routes/admin/menu-spellcheck.js",
         "docs/menu-spellcheck.md",
+        "routes/ai-helper.js",
+        "utils/extras-required.js",
+        "services/ordering-intelligence/avoid.js",
+        "services/ordering-intelligence/taste-profile.js",
+        "services/ordering-intelligence/ai-helper-service.js",
+        "services/ordering-intelligence/facts.js",
+        "docs/ai-helper.md",
+        "test/integration/ai-helper.js",
+        "test/integration/config-home-layout-flags.js",
+        "services/ordering-intelligence/access.js",
+        "services/ordering-intelligence/chat-limits.js",
+        "services/ordering-intelligence/taste.js",
+        "test/integration/for-you-taste-cache.js",
+        "services/ordering-intelligence/served-log.js",
+        "test/integration/for-you-pilot-guards.js",
+        "services/for-you-quality/events.js",
+        "services/for-you-quality/funnel.js",
+        "services/for-you-quality/health.js",
+        "services/for-you-quality/reviewer.js",
+        "services/for-you-quality/targets.js",
+        "routes/admin/for-you-quality.js",
+        "utils/crons/for-you-review-cron.js",
+        "docs/for-you-quality.md",
+        "test/integration/for-you-quality.js",
+        "test/integration/for-you-seen.js",
         "services/menu/promotions.js"
       ],
       "symbols": {
@@ -138,7 +164,14 @@
         "services/ordering-intelligence/suggest-service.js": [
           "applyLiveMenu",
           "candidateQuery",
-          "suggestForCustomer"
+          "suggestForCustomer",
+          "modeClauses",
+          "loadProfile",
+          "filterByAvoid",
+          "hasRequiredOptions",
+          "replyAfterAvoid",
+          "dropAtServe",
+          "topUpSeen"
         ],
         "utils/crons/suggest-index-cron.js": [
           "startSuggestIndexCron",
@@ -164,7 +197,11 @@
           "parseCraving",
           "satisfies",
           "cravingQuery",
-          "cravingLabel"
+          "cravingLabel",
+          "isExcluded",
+          "hasExclusions",
+          "exclusionLine",
+          "ALLERGEN_WORDS"
         ],
         "utils/crons/product-labels-cron.js": [
           "startProductLabelsCron",
@@ -183,7 +220,9 @@
           "aiChatTurn",
           "buildShortlist",
           "parseChatReply",
-          "loadChatAiConfig"
+          "loadChatAiConfig",
+          "safeReply",
+          "BUDGET_COST"
         ],
         "services/ai/usage-log.js": [
           "recordUsage",
@@ -212,6 +251,95 @@
         "utils/crons/menu-spellcheck-cron.js": [
           "startMenuSpellcheckJob",
           "runMenuSpellcheck"
+        ],
+        "services/ordering-intelligence/avoid.js": [
+          "filterByAvoid",
+          "conflictsWithAvoid",
+          "sanitizeAvoid",
+          "GUARANTEED_AVOID",
+          "AVOID_KEYS",
+          "isSeafoodType"
+        ],
+        "services/ordering-intelligence/suggest.js": [
+          "applyProfile",
+          "profileBias",
+          "rejectedFacts",
+          "addStatedCuisines",
+          "fromCartStoreFirst",
+          "drinkMode",
+          "sweetMode",
+          "crossSellMode",
+          "SEEN_MODES",
+          "appliesSeen",
+          "modeCaps",
+          "topUpWithSeen"
+        ],
+        "utils/extras-required.js": [
+          "hasRequiredOptions"
+        ],
+        "services/ordering-intelligence/ai-helper-service.js": [
+          "getCuisines",
+          "rankCuisines",
+          "MAX_CUISINES",
+          "MIN_CUISINES"
+        ],
+        "services/ordering-intelligence/taste-profile.js": [
+          "getProfileDoc",
+          "deviceIdFromRequest",
+          "sanitizeAvoid"
+        ],
+        "routes/for-you.js": [
+          "sanitizeCart",
+          "deviceIdFromRequest",
+          "sanitizeSeen"
+        ],
+        "services/ordering-intelligence/access.js": [
+          "resolveAccess",
+          "accessFor"
+        ],
+        "services/ordering-intelligence/chat-limits.js": [
+          "takeChatAiTurn"
+        ],
+        "services/ordering-intelligence/served-log.js": [
+          "newSuggestionId",
+          "servedEvent",
+          "servedRow",
+          "recordServed",
+          "deleteCustomerServed"
+        ],
+        "services/ai/pricing.js": [
+          "UNPRICED_BUDGET_PRICE"
+        ],
+        "services/ai/complete.js": [
+          "apiTimeoutMs",
+          "apiMaxRetries"
+        ],
+        "services/for-you-quality/reviewer.js": [
+          "runReview",
+          "decide",
+          "calibration",
+          "priorityOf",
+          "ownerOf",
+          "PROMPT_VERSION"
+        ],
+        "services/for-you-quality/funnel.js": [
+          "computeFunnel",
+          "ONBOARDING_FLOWS"
+        ],
+        "services/for-you-quality/events.js": [
+          "isForYouEvent",
+          "mirrorForYouEvent"
+        ],
+        "services/ordering-intelligence/taste.js": [
+          "getCustomerTaste",
+          "serializeTaste",
+          "deserializeTaste",
+          "invalidateCustomerTaste",
+          "redisKeyOf"
+        ],
+        "utils/general-category-order.js": [
+          "sortGeneralCategories",
+          "compareGeneralCategories"
         ],
         "services/menu/promotions.js": [
           "applyMenuPromotions"
@@ -287,6 +415,41 @@
           "file": "routes/menu.js",
           "regex": "store.hasGeneralCategories",
           "desc": "doc reference §2: the menu reads this flag from the PER-STORE store doc, while the admin form writes central shoofi.stores. If this line changes, re-check the two-document drift note."
+        },
+        {
+          "file": "utils/general-category-order.js",
+          "regex": "Number\\.isFinite\\(n\\) \\? n : Infinity",
+          "desc": "doc CORE invariant 6: a general-category tile with a missing/invalid `order` sorts LAST (Mongo's {order:1} would put it first)"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "sortGeneralCategories\\(await db\\.collection\\('general-categories'\\)\\.find",
+          "desc": "doc CORE invariant 6: GET /api/menu (and /menu/refresh) serve general-category tiles sorted, never in natural order — the app renders the array as-is"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "sortGeneralCategories\\(await mockDb\\.collection\\('general-categories'\\)",
+          "desc": "doc CORE invariant 6: GET /api/menu/mock sorts tiles with the same comparator"
+        },
+        {
+          "file": "routes/category.js",
+          "regex": "sortGeneralCategories\\(await db\\.generalCategories\\.find\\(\\)",
+          "desc": "doc CORE invariant 6: the admin tile list (general/all/by-store) uses the menu's comparator, so admin and app agree"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "clearMenuCachesAfterReorder\\(appName, \"store-category/update-order\"\\)",
+          "desc": "doc CORE invariants 2 + 6: the store-category reorder clears both menu cache keys"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "clearMenuCachesAfterReorder\\(appName, \"category/general/update-order\"\\)",
+          "desc": "doc CORE invariants 2 + 6: the general-category reorder clears both menu cache keys"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "menuCache\\.clearStore\\(appName\\);\\n\\s*await menuCache\\.clearStore\\(`\\$\\{appName\\}_schoolProject`\\);\\n\\s*\\} catch \\(err\\) \\{\\n\\s*logger\\.warn\\(\"menu cache clear after reorder failed\"",
+          "desc": "doc reference §3: clearMenuCachesAfterReorder clears BOTH keys and swallows+logs a failure — the reorder is already saved"
         },
         {
           "file": "utils/catalog-lint.js",
@@ -897,6 +1060,636 @@
           "file": "services/catalog/menu-spellcheck.js",
           "regex": "combo\\.sections\\.\\$\\[s\\]",
           "desc": "doc reference §7e: combo sections are written by section id"
+        },
+        {
+          "file": "services/ordering-intelligence/avoid.js",
+          "regex": "const GUARANTEED_AVOID = \\[\"vegetarian\", \"no_seafood\"\\];",
+          "desc": "doc CORE invariant 18 / reference §7f: exactly these two avoid keys are guaranteed (label-backed); the app mirrors this list and stars the rest — promote a key here and in stores/ai-helper/index.ts together, after new label fields + a forced relabel"
+        },
+        {
+          "file": "services/ordering-intelligence/avoid.js",
+          "regex": "const AVOID_KEYS = \\[\"vegetarian\", \"vegan\", \"gluten_free\", \"lactose_free\", \"nut_allergy\", \"no_seafood\"\\];",
+          "desc": "doc reference §7f: the six avoid keys (sanitizeAvoid keeps only these, in this order)"
+        },
+        {
+          "file": "services/ordering-intelligence/avoid.js",
+          "regex": "vegetarian: \\(d\\) => d\\.vegetarian !== true,",
+          "desc": "doc CORE invariant 18: vegetarian keeps only a TRUSTED-label vegetarian === true — an unlabelled product is dropped"
+        },
+        {
+          "file": "services/ordering-intelligence/avoid.js",
+          "regex": "no_seafood: \\(d\\) =>\\s*d\\.protein == null \\|\\| d\\.protein === \"fish\" \\|\\| d\\.protein === \"seafood\" \\|\\| isSeafoodType\\(d\\.dishType\\) \\|\\| hasWord\\(d, SEAFOOD_WORDS\\),",
+          "desc": "doc CORE invariant 18 / reference §7f: no_seafood keeps only a labelled non-seafood protein (protein null = unlabelled = dropped), plus seafood dish types and name words"
+        },
+        {
+          "file": "services/ordering-intelligence/avoid.js",
+          "regex": "const SEAFOOD_TYPE_PATTERN = /fish\\|seafood\\|shrimp\\|sushi\\|salmon\\|tuna/;",
+          "desc": "doc reference §7f: any dish-type key naming fish or seafood counts as seafood"
+        },
+        {
+          "file": "services/ordering-intelligence/avoid.js",
+          "regex": "const GLUTEN_TYPES = new Set\\(\\[\"burger\", \"shawarma\", \"tortilla\", \"pizza\", \"falafel\", \"schnitzel\", \"pasta\", \"sandwich\", \"breakfast\"\\]\\);",
+          "desc": "doc reference §7f: the dish types gluten_free drops (best effort)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const docs = filterByAvoid\\(found, profile\\?\\.stated\\?\\.avoid\\);",
+          "desc": "doc CORE invariant 18: avoid filters the candidates right after the index read — before the rules AND before Claude"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const forClaude = applyProfile\\(docs, taste, profile\\);\\s*const ai = await aiChatTurn\\(\\{ shoofiDb, text, lang, history, docs: forClaude\\.docs, stores, closedStores, taste: forClaude\\.taste, customerId, now \\}\\)",
+          "desc": "doc CORE invariant 18 / reference §7f: Claude picks only from the avoid-filtered docs and gets the PROFILE-APPLIED taste, so rejected facts hold on the Claude path too"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "if \\(stated\\.length\\) or\\.push\\(\\{ dishType: \\{ \\$in: stated \\} \\}\\);",
+          "desc": "doc reference §2 / §7f: stated cuisines widen the index query (non-text modes)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "return \\[\\{ appName: cart\\.appName, \\$or: \\[\\{ course: \\{ \\$in: \\[\"drink\", \"side\", \"sauce\"\\] \\} \\}, \\{ dishType: \\{ \\$in: \\[\"drink\", \"side\"\\] \\} \\}\\] \\}\\];",
+          "desc": "doc CORE invariant 19 / reference §7f: cross_sell reads only the cart's store — drinks, sides, sauces"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "logger\\.warn\\(\"\\[for-you\\] taste profile read failed\"",
+          "desc": "doc CORE invariant 18: a failed profile read answers as if there were no profile"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "supportedCategoryIds: 1, extras: 1, soldByWeight: 1,",
+          "desc": "doc CORE invariant 11 / 19, reference §2: the live re-check projects extras + soldByWeight, only for hasRequiredOptions"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "hasRequiredOptions: hasRequiredOptions\\(row\\),",
+          "desc": "doc CORE invariant 19: every card that survives applyLiveMenu (rules and Claude paths) carries product.hasRequiredOptions"
+        },
+        {
+          "file": "utils/extras-required.js",
+          "regex": "if \\(product\\.soldByWeight === true\\) return true;",
+          "desc": "doc CORE invariant 19: a by-weight product always needs the product sheet"
+        },
+        {
+          "file": "utils/extras-required.js",
+          "regex": "e\\.isGroupHeader !== true && \\(e\\.type === \"single\" \\|\\| e\\.type === \"weight\"\\)",
+          "desc": "doc CORE invariant 19 / reference §4: any non-header single (default or not) or weight extra needs the sheet; `required` is never read"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "drink: drinkMode,\\n\\s*sweet: sweetMode,\\n\\s*cross_sell: crossSellMode,",
+          "desc": "doc CORE invariant 19 / reference §7: the MODES map includes the three cart modes (routes/for-you.js accepts only MODES keys)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const weighted = \\(d\\) => \\(d\\.qty30d \\|\\| 0\\) \\* \\(d\\._bias \\?\\? 1\\);",
+          "desc": "doc CORE invariant 18 / reference §7f: popularity sorts use qty30d x _bias, neutral (1) without a profile"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(!profile\\) return \\{ docs, taste \\};",
+          "desc": "doc CORE invariant 18: without a profile the docs and taste reach the modes untouched"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(doc\\.dishType && \\(stated\\.cuisines \\|\\| \\[\\]\\)\\.includes\\(doc\\.dishType\\)\\) bias \\*= 1\\.4;",
+          "desc": "doc reference §7f: a stated cuisine weighs x1.4"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(stated\\.spice === 0\\) bias \\*= 0\\.3;\\n\\s*else if \\(stated\\.spice >= 2\\) bias \\*= 1 \\+ 0\\.15 \\* stated\\.spice;",
+          "desc": "doc reference §7f: spice 0 sinks a spicy product (x0.3); 2 / 3 lift it (x1.3 / x1.45)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(stated\\.budget === 1\\) bias \\*= ratio <= 1 \\? 1\\.15 : ratio > 1\\.3 \\? 0\\.8 : 1;\\n\\s*if \\(stated\\.budget === 3\\) bias \\*= ratio >= 1 \\? 1\\.15 : ratio < 0\\.7 \\? 0\\.85 : 1;",
+          "desc": "doc reference §7f: budget against the dish type's median price among the candidates"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "code: \"you_like\", params: \\{ dishType: label \\}, confidence: 0",
+          "desc": "doc CORE invariant 18: a stated cuisine is shown as you_like — the customer's own claim, no order evidence"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "else if \\(stated > 0\\) replyCode = \"opener_stated\";",
+          "desc": "doc CORE invariant 18: a customer with no orders and a stated-cuisine card gets opener_stated"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(onboarded\\) return \\{ \\.\\.\\.result, replyCode: \"opener_onboarded\", replyParams: \\{\\} \\};",
+          "desc": "doc CORE invariant 18: onboarded: true makes the opener answer opener_onboarded"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const usualRejected = !!taste\\.rejected\\?\\.usualStores\\.has\\(doc\\.appName\\);",
+          "desc": "doc CORE invariant 18: a rejected usual:<appName> is never claimed at that store (ordered_before instead)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "!rejected\\.has\\(t\\.dishType\\)",
+          "desc": "doc CORE invariant 18: a rejected liked_type:<key> is never offered as a liked type"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(code === \"usual\" && arg\\) usualStores\\.add\\(arg\\);\\n\\s*if \\(code === \"liked_type\" && arg\\) types\\.add\\(arg\\);",
+          "desc": "doc reference §7f: only usual and liked_type rejections change ranking (meal_time / likes_spicy answers do not)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(!cart\\?\\.appName \\|\\| !storesByApp\\.has\\(cart\\.appName\\)\\) return \\{ replyCode: \"cross_sell\", replyParams: \\{\\}, cards: \\[\\] \\};",
+          "desc": "doc CORE invariant 19: cross_sell offers nothing when the cart's store is not open"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "!\\(d\\.appName === cart\\?\\.appName && inCart\\.has\\(String\\(d\\.productId\\)\\)\\)",
+          "desc": "doc CORE invariant 19: the cart modes never suggest what is already in the cart"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "createPicker\\(storesByApp, limit, cart\\?\\.appName \\? limit : RULES\\.MAX_PER_STORE\\)",
+          "desc": "doc CORE invariant 19: no per-store cap on the cart's store (other stores keep 2 each)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const isSweet = \\(d\\) => d\\.sweet === true \\|\\| \\(d\\.sweet == null && d\\.dishType === \"dessert\"\\) \\|\\| d\\.course === \"dessert\";",
+          "desc": "doc reference §7f: what sweet mode counts as sweet"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "replyCode: cards\\.length \\? \"drink_ideas\" : \"drink_unavailable\"",
+          "desc": "doc reference §7f: drink mode's reply codes (the app words them in for-you-copy.ts)"
+        },
+        {
+          "file": "services/ordering-intelligence/index-builder.js",
+          "regex": "await collection\\.createIndex\\(\\{ appName: 1, course: 1 \\}\\);",
+          "desc": "doc CORE invariant 19 / reference §2: the {appName, course} index serving the cart modes"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "\"isAiHelperEnabled\",\\n\\s*\"isAiHelperForAll\",\\n\\s*\"isAiHelperOnboardingEnabled\",\\n\\s*\"isChatOrderingEnabled\",",
+          "desc": "doc CORE invariant 18 / reference §7f: the four AI-helper flags are in SHOOFI_CONFIG_PUBLIC_FIELDS — drop one and the app never sees the switch"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "deviceId: customerId \\? null : deviceIdFromRequest\\(req\\),",
+          "desc": "doc reference §2 / §7: a visitor's profile is read by device-id only when there is no customer"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "cart\\.productIds\\.map\\(String\\)\\.slice\\(0, 50\\)",
+          "desc": "doc reference §7: sanitizeCart keeps at most 50 product ids"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "onboarded: onboarded === true,",
+          "desc": "doc reference §7: onboarded counts only when strictly true"
+        },
+        {
+          "file": "routes/ai-helper.js",
+          "regex": "router\\.get\\(\"/api/ai-helper/cuisines\", auth\\.optional",
+          "desc": "doc reference §7: the onboarding cuisines endpoint, no login needed"
+        },
+        {
+          "file": "routes/ai-helper.js",
+          "regex": "return res\\.status\\(200\\)\\.json\\(\\{ cuisines: \\[\\] \\}\\);",
+          "desc": "doc CORE invariant 19: a cuisines failure is an empty list, never an error the onboarding has to handle"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "const MAX_CUISINES = 9;",
+          "desc": "doc CORE invariant 19: at most 9 tiles"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "const MIN_CUISINES = 4;",
+          "desc": "doc CORE invariant 19 / reference §7f: a tier with fewer than 4 types widens to the next"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "const areaNames = \\[\\.\\.\\.openNames, \\.\\.\\.closed\\.map\\(\\(s\\) => s\\.appName\\)\\];",
+          "desc": "doc reference §7f: tier 2 = the area's open + closed stores"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "\\$group: \\{ _id: \\{ dishType: \"\\$dishType\", appName: \"\\$appName\" \\}, img: \\{ \\$first: \"\\$img\" \\}",
+          "desc": "doc reference §7f: tier 3 = the whole catalog, one row per dish type x store carrying its best seller's image"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "\\.filter\\(\\(t\\) => t\\.meal && byType\\.has\\(t\\.key\\)\\)",
+          "desc": "doc CORE invariant 19: only active MEAL types that occur in the rows"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "img: typeImages\\.get\\(t\\.key\\) \\|\\| e\\.best\\?\\.img \\|\\| null",
+          "desc": "doc CORE invariant 19: the type's own dishTaxonomy img wins, else the best seller's"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "\\.filter\\(\\(t\\) => t\\.img\\)",
+          "desc": "doc CORE invariant 19: a type with no image is left out"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-helper-service.js",
+          "regex": "find\\(\\{ status: \"active\", img: \\{ \\$type: \"string\", \\$ne: \"\" \\} \\}",
+          "desc": "doc reference §2 / §7f: dishTaxonomy.img is read only for active types with a non-empty string"
+        },
+        {
+          "file": "routes/admin/dish-taxonomy.js",
+          "regex": "const \\{ label_ar, label_he, meal \\} = req\\.body \\|\\| \\{\\};",
+          "desc": "doc reference §2: the dish-type PATCH writes labels / meal / words only — NO img. If this line gains img, the 'no code writes dishTaxonomy.img' claims in CORE 19 and reference §2/§7f must go"
+        },
+        {
+          "file": "test/integration/ai-helper.js",
+          "regex": "profile ranking: with no profile the reply is exactly as before",
+          "desc": "doc CORE invariant 18: the test that pins 'no profile = no behaviour change'"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "if \\(!avoidEmptied \\|\\| ranked\\.replyCode === \"store_closed\"\\)",
+          "desc": "doc CORE invariant 18 / reference §7f: when avoid emptied the reply it says avoid_no_match — except a named closed store keeps store_closed"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "return \\{ replyCode: \"avoid_no_match\", replyParams: \\{\\} \\};",
+          "desc": "doc CORE invariant 18 / reference §7f: the reply code the app words as for_you_reply_avoid_no_match"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "discountPercent > 0\\n\\s*\\? Math\\.round\\(extrasPrice \\* \\(1 - discountPercent / 100\\)\\)\\n\\s*: extrasPrice;\\n\\s*\\n\\s*return \\{\\n\\s*price: basePrice \\+ discountedExtrasPrice,",
+          "desc": "doc CORE invariant 19 / reference §4, §7f: the server's line formula — one of the THREE copies (with shoofi-app screens/meal/index2.tsx and helpers/chat-cart-line.ts priceLine) that must stay in lockstep; shadow pricing compares against it"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "\"isChatMinimizeEnabled\",\\n\\s*\"isChatMinimizeForAll\",",
+          "desc": "doc CORE invariant 20 / reference §7g: the two chat-minimize flags are in SHOOFI_CONFIG_PUBLIC_FIELDS — off the list, the admin switch saves and the app never sees it"
+        },
+        {
+          "file": "test/integration/config-home-layout-flags.js",
+          "regex": "\"isChatMinimizeEnabled\",\\n\\s*\"isChatMinimizeForAll\",",
+          "desc": "doc reference §7g: the flags test pins the six AI-helper / chat flags as served to the customer app"
+        },
+        {
+          "file": "services/ordering-intelligence/craving.js",
+          "regex": "if \\(isExcluded\\(doc, craving\\)\\) return false;",
+          "desc": "doc CORE invariant 13: 'not X' is an exclusion, never a filter for X — satisfies rejects excluded products"
+        },
+        {
+          "file": "services/ordering-intelligence/craving.js",
+          "regex": "if \\(ex\\.avoidKeys\\.length && conflictsWithAvoid\\(doc, ex\\.avoidKeys\\)\\) return true;",
+          "desc": "doc CORE invariant 13: 'not X' is an exclusion, never a filter for X — an allergen-group word uses the avoid word lists"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const skip = \\(d\\) => isExcluded\\(d, craving\\);",
+          "desc": "doc CORE invariant 13: 'not X' is an exclusion, never a filter for X — the popular/fill fallbacks skip what they said no to"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "return \\{ replyCode: \"without_results\", replyParams: \\{ without: ex\\.words\\.join\\(\", \"\\) \\}, cards: picker\\.cards \\};",
+          "desc": "doc CORE invariant 13: 'not X' is an exclusion, never a filter for X — a name-based exclusion says it is best effort"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "if \\(!customerId\\) return fallback\\(\"not_eligible\"\\);",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — logged-in customers only"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "const turn = await takeTurn\\(customerId, now\\);",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — the per-customer cap is taken before the call"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "const TIMEOUT_MS = 6000;",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — 6 s"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "apiTimeoutMs: TIMEOUT_MS,",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — the SDK aborts the request, not a Promise.race"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "apiMaxRetries: 0,",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — no retries while a person waits"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "const model = MODELS\\.chat;",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it / invariant 16 — the chat's own model key"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "if \\(!safeReply\\(parsed\\.reply, \\{ lang: language, shortlist \\}\\)\\) return fallback\\(\"filtered\"",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — the output filter (prompt-injection guard) sends a rejected reply to the rules"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "const HISTORY_MAX_CHARS = 600;",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — the history cap"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "if \\(isExcluded\\(doc, craving\\)\\) return;",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it / invariant 13 — never an excluded product on Claude's list"
+        },
+        {
+          "file": "services/ordering-intelligence/chat-limits.js",
+          "regex": "const LIMITS = \\{ perHour: 20, perDay: 60 \\};",
+          "desc": "doc CORE invariant 15: who gets Claude, and the guards around it — the per-customer cap"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "const CACHE_TTL_MS = 10 \\* 60 \\* 1000;\\s*const CACHE_MAX = 2000;\\s*const CACHE_VERSION = \\d+;\\s*const REDIS_TIMEOUT_MS = 150;\\s*const REDIS_BACKOFF_MS = 30 \\* 1000;",
+          "desc": "doc CORE invariant 11 / reference §7c: the taste cache is 10 min, memory capped at 2000, Redis given 150 ms and skipped 30 s after a failure"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "const redisKeyOf = \\(customerId\\) => `fy:taste:v\\$\\{CACHE_VERSION\\}:\\$\\{customerId\\}`;",
+          "desc": "doc CORE invariant 11 / reference §7c: the shared key carries the shape version, so a shape change never reads an old value"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "const redisConfigured = \\(\\) => !process\\.env\\.E2E_SANDBOX && Boolean\\(process\\.env\\.REDIS_URL \\|\\| process\\.env\\.REDIS_HOST\\);",
+          "desc": "doc CORE invariant 11 / reference §7c: Redis only when configured and never in the E2E sandbox (same gate as chat-limits.js)"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "redis\\.set\\(redisKeyOf\\(customerId\\), payload, \\\"PX\\\", CACHE_TTL_MS\\)\\)\\.catch\\(",
+          "desc": "doc CORE invariant 11 / reference §7c: the Redis write expires with the TTL and is fire-and-forget"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "if \\(fromRedis\\.taste\\) return fromRedis\\.taste;\\s*shared = fromRedis\\.ok;[\\s\\S]*?if \\(!shared\\) \\{\\s*const cached = cacheGet\\(cacheKey, now\\);",
+          "desc": "doc CORE invariant 11: while Redis answers it is the truth - a Redis miss recomputes, memory is read only when Redis is absent or failed"
+        },
+        {
+          "file": "services/ordering-intelligence/taste.js",
+          "regex": "if \\(!opts\\.dishTypes\\) \\{\\s*cacheSet\\(cacheKey, taste, now\\);\\s*if \\(shared\\) redisSetTaste\\(cacheKey, taste\\);",
+          "desc": "doc CORE invariant 11 / reference §7c: the dry run's supplied dish types are never cached, in memory or Redis"
+        },
+        {
+          "file": "services/ordering-intelligence/ai-chat.js",
+          "regex": "\\{ \\$group: \\{ _id: null, usd: \\{ \\$sum: BUDGET_COST \\} \\} \\},",
+          "desc": "doc CORE invariant 16: the budget counts an unpriced call at UNPRICED_BUDGET_PRICE, never $0"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const cards = dropAtServe\\(live, docsByKey, avoid, craving, trace\\)\\.slice\\(0, limit\\);",
+          "desc": "doc CORE invariant 18: the last check at serve time, on both paths"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(!storesByApp\\.has\\(cart\\.appName\\)\\) return picker\\.cards;",
+          "desc": "doc CORE invariant 19: with a cart, drink/sweet come from the cart's store ONLY"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "return nothingAtCartStore\\(\"drink_unavailable\", input\\);",
+          "desc": "doc CORE invariant 19: with a cart, drink/sweet come from the cart's store ONLY — the reply names the store"
+        },
+        {
+          "file": "services/ordering-intelligence/access.js",
+          "regex": "const chat = !!config\\?\\.isChatSuggestEnabled && \\(!!config\\?\\.isChatSuggestForAll \\|\\| !!employee\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — the master switch"
+        },
+        {
+          "file": "services/ordering-intelligence/access.js",
+          "regex": "const aiHelper = chat && !!config\\?\\.isAiHelperEnabled && \\(!!config\\?\\.isAiHelperForAll \\|\\| !!employee\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — the AI helper lives inside the chat"
+        },
+        {
+          "file": "services/ordering-intelligence/access.js",
+          "regex": "return \\{ chat: false, aiHelper: false \\};",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — a gate that cannot read its switches stays shut"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "const \\{ chat \\} = await access\\.resolveAccess\\(shoofiDb, customerId\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — checked before any work"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "return res\\.status\\(200\\)\\.json\\(\\{ \\.\\.\\.result, suggestionId \\}\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — every reply carries its suggestionId"
+        },
+        {
+          "file": "routes/ai-helper.js",
+          "regex": "if \\(!\\(await helperOn\\(req\\)\\)\\) return res\\.status\\(403\\)\\.json\\(OFF\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged / invariant 18 — switched off, no profile is created or merged"
+        },
+        {
+          "file": "services/ordering-intelligence/served-log.js",
+          "regex": "const RETENTION_DAYS = 30;",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — the served audit is kept 30 days"
+        },
+        {
+          "file": "services/ordering-intelligence/served-log.js",
+          "regex": "await c\\.createIndex\\(\\{ createdAt: 1 \\}, \\{ expireAfterSeconds: RETENTION_DAYS \\* 24 \\* 60 \\* 60 \\}\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — by a TTL index"
+        },
+        {
+          "file": "services/ordering-intelligence/served-log.js",
+          "regex": "logger\\.info\\(\"\\[for-you\\] served\", servedEvent\\(\\{ suggestionId, input, result, trace \\}\\)\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — one log line per reply"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "const RETENTION_DAYS = 90;",
+          "desc": "doc CORE invariant 22: For you quality — the event copy is kept 90 days"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "const \\{ _id, userId, \\.\\.\\.doc \\} = logDoc;",
+          "desc": "doc CORE invariant 22: For you quality — the event copy carries no customer id"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "^    ensureIndexes\\(shoofiDb\\);$",
+          "desc": "doc CORE invariant 22: For you quality — an event copy never waits for its indexes"
+        },
+        {
+          "file": "services/ordering-intelligence/served-log.js",
+          "regex": "^  ensureIndexesOnce\\(shoofiDb\\);$",
+          "desc": "doc CORE invariant 22: For you quality — the served audit row never waits for its indexes"
+        },
+        {
+          "file": "routes/app-logs.js",
+          "regex": "if \\(appType === 'shoofi-shopping'\\) forYouEvents\\.mirrorForYouEvent\\(shoofiDb, logDoc\\);",
+          "desc": "doc CORE invariant 22: For you quality — the copy is made for the customer app only, fire-and-forget"
+        },
+        {
+          "file": "services/for-you-quality/funnel.js",
+          "regex": "if \\(Number\\(p\\.for_you_lines\\) > 0\\) j\\.ordered = true;",
+          "desc": "doc CORE invariant 22: For you quality — ordered means an order whose success event carries For-you lines"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "const FEATURE = \"for-you-review\";",
+          "desc": "doc CORE invariant 22: For you quality — the judge has its own usage feature and budget"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "backend: \"api\",",
+          "desc": "doc CORE invariant 22: For you quality — the judge runs on the paid API"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "if \\(avoidConflicts\\(row\\) > 0\\) out\\.push\\(\\{ code: \"avoid_conflict\", severity: \"critical\", turn \\}\\);",
+          "desc": "doc CORE invariant 22: For you quality — an avoid conflict is critical"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "if \\(ignored\\) out\\.push\\(\\{ code: \"ignored_negation\", severity: \"critical\", turn \\}\\);",
+          "desc": "doc CORE invariant 22: For you quality — an ignored \"not X\" is critical"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "\\$setOnInsert: \\{ createdAt: now, status: \"open\", judge: null \\}",
+          "desc": "doc CORE invariant 22: For you quality — a re-run never overwrites a person's decision"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "prev\\.promptVersion === PROMPT_VERSION && prev\\.turns === it\\.conversation\\.rows\\.length",
+          "desc": "doc CORE invariant 22: For you quality — a conversation already judged by this prompt version is not paid for twice"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "hash: crypto\\.createHash\\(\"sha256\"\\)\\.update\\(raw\\)\\.digest\\(\"hex\"\\)\\.slice\\(0, 16\\),",
+          "desc": "doc CORE invariant 22: For you quality — a review keeps a one-way hash of its owner, never the customer id"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "add_to_tests: review\\.status === \"open\" \\? \"in_tests\" : review\\.status",
+          "desc": "doc CORE invariant 22: For you quality — add to tests is its own outcome"
+        },
+        {
+          "file": "routes/admin/for-you-quality.js",
+          "regex": "const ADMIN = \\[auth\\.required, checkAdminRole\\(\\[\"master\", \"admin\"\\]\\)\\];",
+          "desc": "doc CORE invariant 22: For you quality — the API is master/admin only"
+        },
+        {
+          "file": "utils/crons/for-you-review-cron.js",
+          "regex": "const SCHEDULE = \"30 5 \\* \\* \\*\";",
+          "desc": "doc CORE invariant 22: For you quality — the review runs nightly at 05:30 Israel time"
+        },
+        {
+          "file": "services/ai/complete.js",
+          "regex": "^  review: \"claude-",
+          "desc": "doc CORE invariant 22: For you quality — the judge has its own model key"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "const MAX_SEEN = 40;\\nconst MAX_SEEN_ID_LENGTH = 120;",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — seen keeps at most 40 ids of at most 120 characters"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "if \\(!Array\\.isArray\\(seen\\)\\) return \\[\\];",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — anything but an array is ignored, never a 400"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "if \\(typeof id === \"string\" && id\\.length > 0 && id\\.length <= MAX_SEEN_ID_LENGTH\\) ids\\.add\\(id\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — only strings of 1-120 characters, each kept once"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "if \\(ids\\.size >= MAX_SEEN\\) break;",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the first 40 sent are kept — the newest, as the list is newest first"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "seen: sanitizeSeen\\(seen\\),",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the service only ever gets the sanitised list"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const SEEN_MODES = new Set\\(\\[\"popular\", \"surprise\", \"new\", \"drink\", \"sweet\", \"cross_sell\"\\]\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — exactly these six modes; never usual or the opener"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const appliesSeen = \\(mode, text\\) => !\\(text && text\\.trim\\(\\)\\) && SEEN_MODES\\.has\\(mode\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — typed text never applies seen (a match is relevant again)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "MIN_UNSEEN_CARDS: 2,",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — fewer than 2 unseen cards and the seen ones top the reply up"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "const unseen = input\\.docs\\.filter\\(\\(d\\) => !seenIds\\.has\\(keyOf\\(d\\.appName, d\\.productId\\)\\)\\);\\n\\s*const fresh = MODES\\[effectiveMode\\]\\(\\{ \\.\\.\\.input, docs: unseen \\}\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the same mode, every rule of it, on the unseen candidates, cut from the profile-weighted docs so the weights do not shift"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(mode === \"surprise\"\\) return \\{ perStore: 1, limit: Math\\.min\\(limit, SURPRISE_MAX\\) \\};",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — a surprise top-up stays one per store and 4 cards"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "return \\{ perStore: RULES\\.MAX_PER_STORE, limit \\};",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — other top-ups keep 2 per store"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(ids\\.has\\(c\\.id\\) \\|\\| n >= perStore\\) continue;",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the top-up never breaks the per-store cap"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const cards = dropAtServe\\(live, docsByKey, avoid, craving, trace\\)\\.slice\\(0, limit\\);\\n\\s*const served = await topUpSeen\\(ranked, cards, \\{ limit, dbFor, docsByKey, avoid, craving, trace \\}\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the top-up is decided on the cards that passed the live re-check and the last check"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "if \\(!normal \\|\\| cards\\.length >= RULES\\.MIN_UNSEEN_CARDS\\) return \\{ reply: ranked, cards \\};",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — only when fewer than 2 unseen cards survived"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const live = await applyLiveMenu\\(rest, dbFor\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the top-up's cards go through the live re-check"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const kept = dropAtServe\\(live, docsByKey, avoid, craving, lastCheck\\);",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — and through the last check"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "return \\{ reply: cards\\.length \\? ranked : normal, cards: merged \\};",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — nothing unseen survived: the normal reply's code (drink_ideas, not drink_unavailable_store)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "trace\\.seen = appliesSeen\\(mode, text\\) \\? \\(seen \\|\\| \\[\\]\\)\\.length : 0;",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the served line counts the ids applied, 0 when the mode ignores them"
+        },
+        {
+          "file": "services/ordering-intelligence/served-log.js",
+          "regex": "seen: trace\\.seen \\?\\? 0,\\n\\s*seenTopUp: trace\\.seenTopUp \\?\\? 0,",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the [for-you] served line carries seen and seenTopUp"
+        },
+        {
+          "file": "test/integration/for-you-seen.js",
+          "regex": "popular after the opener: none of the opener's dishes come back while enough others exist",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the test of the bug as recorded"
+        },
+        {
+          "file": "test/integration/for-you-seen.js",
+          "regex": "top-up is decided AFTER the live re-check: a sold-out unseen dish never leaves a one-card reply",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the test that pins the decision after the checks"
+        },
+        {
+          "file": "test/integration/for-you-seen.js",
+          "regex": "top-up: nothing unseen left — the reply is the normal one, never empty",
+          "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the test that pins never empty because of seen"
         }
       ]
     },
@@ -906,9 +1699,86 @@
         "screens/menu/components/GeneralCategoriesList.tsx",
         "__tests__/components/general-categories-open-product.test.tsx",
         "helpers/for-you-copy.ts",
-        "hooks/useVoiceInput.ts"
+        "hooks/useVoiceInput.ts",
+        "stores/ai-helper/index.ts",
+        "screens/ai-helper/OnboardingSteps.tsx",
+        "components/ai-helper/AiHelperFab.tsx",
+        "components/for-you/context-chips.ts",
+        "components/for-you/CartDock.tsx",
+        "helpers/ai-helper-copy.ts",
+        "helpers/chat-cart-line.ts",
+        "hooks/useChatAddToCart.ts",
+        "components/for-you/ChatProductSheet.tsx",
+        "components/for-you/CrossSellPill.tsx",
+        "screens/meal/index2.tsx",
+        "__tests__/helpers/chat-cart-line.test.ts",
+        "__tests__/hooks/use-chat-add-to-cart.test.tsx",
+        "components/for-you/bubble-math.ts",
+        "components/for-you/ChatBubbleOverlay.tsx",
+        "components/layout/app-container/index.tsx",
+        "navigation/MainStackNavigator.tsx",
+        "__tests__/components/bubble-math.test.ts",
+        "__tests__/stores/for-you-chat-ui.test.ts",
+        ".maestro/chat-minimize/flow.yaml",
+        "helpers/for-you-access.ts",
+        "helpers/for-you-attribution.ts",
+        ".maestro/pilot-readiness/README.md",
+        "helpers/splash-state.ts",
+        "__tests__/helpers/arabic-punctuation-copy.test.ts",
+        "__tests__/helpers/splash-state.test.ts",
+        "components/for-you/ChatHeader.tsx",
+        "components/for-you/chat-layout.ts"
       ],
-      "symbols": {},
+      "symbols": {
+        "stores/ai-helper/index.ts": [
+          "GUARANTEED_AVOID",
+          "decideFabRoute"
+        ],
+        "components/for-you/context-chips.ts": [
+          "chipsFor"
+        ],
+        "helpers/chat-cart-line.ts": [
+          "chatSheetSupport",
+          "prepareProduct",
+          "defaultSelections",
+          "selectionsValid",
+          "priceLine",
+          "buildCartLine",
+          "mandatoryChoicesAvailable",
+          "isOptionOutOfStock",
+          "maxQuantity"
+        ],
+        "hooks/useChatAddToCart.ts": [
+          "useChatAddToCart",
+          "findMenuProduct",
+          "addProductToCartForStore"
+        ],
+        "components/for-you/bubble-math.ts": [
+          "BUBBLE_HIDDEN_ROUTES",
+          "overlayVisible",
+          "isChatMinimizeOn",
+          "snapBubble",
+          "isOverTarget",
+          "leaveAction",
+          "isUserBack"
+        ],
+        "stores/for-you/index.ts": [
+          "chatUi",
+          "openFull",
+          "minimize",
+          "undoClose",
+          "closedToast",
+          "onBotTurn",
+          "customerTurns"
+        ],
+        "helpers/for-you-access.ts": [
+          "forYouAccess"
+        ],
+        "helpers/for-you-attribution.ts": [
+          "noteForYouLine",
+          "forYouOrderProps"
+        ]
+      },
       "patterns": [
         {
           "file": "screens/menu/components/GeneralCategoriesList.tsx",
@@ -944,6 +1814,531 @@
           "file": "hooks/useVoiceInput.ts",
           "regex": "requireOptionalNativeModule\\(\"ExpoSpeechRecognition\"\\) \\? require\\(\"expo-speech-recognition\"\\)",
           "desc": "doc CORE invariant 11: the speech package is required ONLY after the native module is confirmed — a top-level import crashes every older binary that gets this JS by OTA"
+        },
+        {
+          "file": "stores/ai-helper/index.ts",
+          "regex": "export const GUARANTEED_AVOID: AvoidKey\\[\\] = \\[\"vegetarian\", \"no_seafood\"\\];",
+          "desc": "doc CORE invariant 18: the app's guaranteed list must equal the server's (avoid.js GUARANTEED_AVOID)"
+        },
+        {
+          "file": "screens/ai-helper/OnboardingSteps.tsx",
+          "regex": "GUARANTEED_AVOID\\.includes\\(k\\) \\? \"\" : \" \\*\"",
+          "desc": "doc CORE invariant 18 / reference §7f: every best-effort avoid chip is starred"
+        },
+        {
+          "file": "screens/ai-helper/OnboardingSteps.tsx",
+          "regex": "aiCopy\\(t, \"ai_helper_avoid_best_effort\"\\)",
+          "desc": "doc CORE invariant 18: the 'we can't guarantee' note is shown when a best-effort key is picked"
+        },
+        {
+          "file": "screens/ai-helper/OnboardingSteps.tsx",
+          "regex": "const cta = empty \\? \\{ key: \"ai_helper_next\", n: 0, enabled: true \\}",
+          "desc": "doc reference §7f: an empty cuisines list never traps the onboarding"
+        },
+        {
+          "file": "helpers/ai-helper-copy.ts",
+          "regex": "ai_helper_avoid_best_effort:",
+          "desc": "doc reference §7f: the best-effort note's copy key"
+        },
+        {
+          "file": "screens/explore.tsx",
+          "regex": "isAiHelperForAll \\|\\| !!userDetailsStore\\?\\.userDetails\\?\\.isShoofiEmployee",
+          "desc": "doc CORE invariant 18: the persona is gated to Shoofi employees until isAiHelperForAll"
+        },
+        {
+          "file": "screens/explore.tsx",
+          "regex": "chatSuggestEnabled && !aiHelperEnabled && !isMapMode",
+          "desc": "doc CORE invariant 11 / 18: the For-you home entry hides while the persona shows"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "fromOnboarding \\? \\{ mode: initialMode, onboarded: true \\} : \\{ mode: initialMode \\}",
+          "desc": "doc CORE invariant 18 / reference §8: the first opener after the onboarding sends onboarded: true"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "mode === \"drink\" \\|\\| mode === \"sweet\" \\? await cartForServer\\(\\) : undefined",
+          "desc": "doc CORE invariant 19 / reference §7f: only drink / sweet are sent with the cart"
+        },
+        {
+          "file": "components/for-you/context-chips.ts",
+          "regex": "\\{ kind: \"mode\", mode: \"drink\", key: \"for_you_chip_drink\" \\}",
+          "desc": "doc reference §7f: the cart chips (isChatOrderingEnabled) include a drink chip"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_reason_you_like",
+          "desc": "doc CORE invariant 18: the app words the you_like reason"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_reply_opener_onboarded",
+          "desc": "doc CORE invariant 18: the app words opener_onboarded"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_reply_cross_sell",
+          "desc": "doc reference §7f: the app has copy for the cross_sell reply"
+        },
+        {
+          "file": "components/ai-helper/AiHelperFab.tsx",
+          "regex": "isAiHelperOnboardingEnabled",
+          "desc": "doc reference §8: the persona opens the onboarding only with isAiHelperOnboardingEnabled"
+        },
+        {
+          "file": "stores/ai-helper/index.ts",
+          "regex": "/ai-helper/cuisines\\?lat=",
+          "desc": "doc reference §8: the onboarding reads its tiles from GET /api/ai-helper/cuisines"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "if \\(isComboProduct\\(product\\)\\) return \\{ ok: false, reason: \"combo\" \\};\\n\\s*if \\(product\\.soldByWeight === true\\) return \\{ ok: false, reason: \"weight\" \\};",
+          "desc": "doc CORE invariant 19 / reference §7f: the chat sheet never takes a combo or a soldByWeight product — those open the store at the dish"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "if \\(Number\\(e\\.freeCount\\) > 0\\) return \\{ ok: false, reason: \"free_count\" \\};",
+          "desc": "doc CORE invariant 19 / reference §7f: a group header with freeCount > 0 opens the store (the sheet does not stamp isFree)"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "if \\(e\\.type === \"weight\" \\|\\| e\\.categoryId === \"weight\"\\) return \\{ ok: false, reason: \"weight\" \\};\\n\\s*if \\(e\\.type === \"pizza-topping\"\\) return \\{ ok: false, reason: \"pizza\" \\};\\n\\s*if \\(e\\.type === \"counter\"\\) return \\{ ok: false, reason: \"counter\" \\};\\n\\s*if \\(e\\.type !== \"single\" && e\\.type !== \"multi\"\\) return \\{ ok: false, reason: \"unsupported\" \\};",
+          "desc": "doc CORE invariant 19 / reference §7f: chatSheetSupport — chips ONLY for single + multi; weight (incl. legacy categoryId weight), pizza-topping, counter and any other type open the store"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "if \\(Array\\.isArray\\(data\\.extras\\)\\) data\\.extras = ensureOptionIds\\(data\\.extras\\);\\n\\s*data\\.basePrice = data\\.price;\\n\\s*data\\.baseOriginalPrice = data\\.originalPrice;",
+          "desc": "doc reference §7f: prepareProduct prepares the product as the menu screen does — deep copy, option ids, basePrice from the discounted menu price"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "const discounted = discountPercent > 0 \\? Math\\.round\\(extrasPrice \\* \\(1 - discountPercent / 100\\)\\) : extrasPrice;\\n\\s*return \\{\\n\\s*price: basePrice \\+ discounted,\\n\\s*\\.\\.\\.\\(baseOriginal \\? \\{ originalPrice: baseOriginal \\+ extrasPrice \\} : \\{\\}\\),",
+          "desc": "doc CORE invariant 19 / reference §4, §7f: priceLine mirrors screens/meal/index2.tsx and the server's utils/order-pricing.js — change one, change all three"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "if \\(!extrasStore\\.validateWith\\(prepared\\?\\.extras, selections\\)\\) return false;",
+          "desc": "doc reference §4 / §7f: the chat's add gate is the menu's validateWith (every non-header single answered)"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "const cap = Number\\(e\\.maxCount \\?\\? e\\.max\\);",
+          "desc": "doc reference §7f: selectionsValid adds the maxCount ?? max cap the menu's checkbox enforces (validateWith reads max only)"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "\\.filter\\(\\(e\\) => e && !e\\.isGroupHeader && e\\.type === \"single\"\\)\\n\\s*\\.every\\(\\(e\\) => Array\\.isArray\\(e\\.options\\) && e\\.options\\.some\\(\\(o: any\\) => !isOptionOutOfStock\\(o, outOfStockExtras\\)\\)\\);",
+          "desc": "doc reference §7f: a single with no options or every option out of stock makes the dish unavailable in the chat (the lint's SINGLE_WITHOUT_OPTIONS / REQUIRED_GROUP_ALL_OUT_OF_STOCK cases)"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "outOfStockExtras\\.includes\\(option\\.nameAR\\)",
+          "desc": "doc reference §7f: out-of-stock options are matched by nameAR, exactly, as the menu does (Known status)"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "if \\(storeData\\?\\.isStockManagment === true && typeof prepared\\?\\.quantity === \"number\"\\)",
+          "desc": "doc reference §7f: the quantity cap applies only to stock-managed stores (CORE invariant 4)"
+        },
+        {
+          "file": "screens/meal/index2.tsx",
+          "regex": "const discountedExtrasPrice = discountPercent > 0\\n\\s*\\? Math\\.round\\(extrasPrice \\* \\(1 - discountPercent / 100\\)\\)\\n\\s*: extrasPrice;",
+          "desc": "doc reference §4 / §7f: the menu product screen's line formula — the source helpers/chat-cart-line.ts priceLine mirrors"
+        },
+        {
+          "file": "screens/meal/index2.tsx",
+          "regex": "price: basePrice \\+ discountedExtrasPrice,\\n\\s*\\.\\.\\.\\(baseOriginal \\? \\{ originalPrice: baseOriginal \\+ extrasPrice \\} : \\{\\}\\),",
+          "desc": "doc reference §4 / §7f: the menu screen's unit price and original price — mirrored by priceLine"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "storeDataStore\\.getStoreDataFromServer\\(appName\\),\\n\\s*menuStore\\.getMenuFromServer\\(appName, false\\),",
+          "desc": "doc CORE invariant 19 / reference §7f: the chat loads the dish's store and menu with the FETCH-ONLY calls (explicit app-name, isSchoolProject=false)"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*\\b(?:getMenu|getStoreData|setStoreDBName)\\()",
+          "desc": "doc CORE invariant 19 / reference §7f: NEGATIVE pin — matches only while the hook calls none of getMenu( / getStoreData( / setStoreDBName( (they overwrite the browsed store other screens read); the lookbehind anchors it to the start of the file. If this fails, the hook started writing global store/menu state"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "if \\(card\\.product\\.hasRequiredOptions\\) setSheet\\(\\{ \\.\\.\\.CLOSED_SHEET, visible: true, card \\}\\);",
+          "desc": "doc CORE invariant 19: hasRequiredOptions is only a hint — it opens the sheet early; the full menu product decides"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "if \\(twinOrderStore\\?\\.isTwinModeActive \\|\\| twinCartStore\\.cartItems\\.length > 0\\) return fallback\\(card, \"twin\"\\);\\n\\s*if \\(cartStore\\.cartItems\\.length > 0 && \\(await cartStore\\.getIsSchoolProject\\(\\)\\)\\) return fallback\\(card, \"school\"\\);",
+          "desc": "doc CORE invariant 19 / reference §7f: twin orders and a school cart open the store instead of a chat add"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "if \\(storeData\\.isCheckAge && !\\(await AsyncStorage\\.getItem\\(\"@age_check_approved\"\\)\\)\\) return fallback\\(card, \"age_check\"\\);",
+          "desc": "doc CORE invariant 19 / reference §7f: an age-checked store opens the store (its age gate) instead"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "if \\(raw && !support\\.ok\\) return fallback\\(card, \\(support as any\\)\\.reason\\);",
+          "desc": "doc CORE invariant 19: whatever chatSheetSupport refuses opens the store at the dish"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "if \\(Object\\.keys\\(defaults\\)\\.length === 0 && selectionsValid\\(prepared, \\{\\}\\)\\)",
+          "desc": "doc CORE invariant 19 / reference §7f: straight into the cart only with no defaults and nothing to choose — a priced default is shown in the sheet, never added silently"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "for \\(const category of menu\\?\\.menu \\|\\| \\[\\]\\)",
+          "desc": "doc reference §7f: the product is found in menu.menu[].products — GET /api/menu's full category list, also for tile-grid stores"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "forYouStore\\.ask\\(location, \\{ mode: \"cross_sell\", cart: \\{ appName: storeData\\.appName, productIds \\} \\}, undefined, \\{\\n\\s*dropIfEmpty: true,",
+          "desc": "doc CORE invariant 19 / reference §7f: cross_sell is asked after a chat add (once per store per chat); an empty reply is dropped"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "await cartStore\\.addProductToCartForStore\\(line, storeData\\);",
+          "desc": "doc CORE invariant 19 / reference §7f: the line goes in through the store-explicit cart add (orders domain), never addProductToCart"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "opts\\.dropIfEmpty && reply\\.cards\\.length === 0",
+          "desc": "doc reference §7f: a cross-sell with nothing to offer shows nothing"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "const isCrossSell = orderingEnabled && item\\.replyCode === \"cross_sell\";",
+          "desc": "doc reference §7f / §8: cross_sell replies render as compact pills (CrossSellPill)"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_reply_avoid_no_match",
+          "desc": "doc reference §7f: the app words the avoid_no_match reply"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_reply_add_unavailable",
+          "desc": "doc reference §7f: the chat's own message when the dish cannot be added (sold out, stock 0, a mandatory choice with nothing left)"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "export const BUBBLE_HIDDEN_ROUTES = \\[\\n\\s*\"for-you\",\\n\\s*\"checkout-screen\",\\n\\s*\"pick-time-screen\",\\n\\s*\"credit-cards\",\\n\\s*\"add-credit-card\",\\n\\s*\"order-submitted\",\\n\\s*\"login\",\\n\\s*\"verify-code\",\\n\\s*\"insert-customer-name\",\\n\\s*\"ai-helper-onboarding\",\\n\\s*\"product-preview\",\\n\\];",
+          "desc": "doc CORE invariant 20 / reference §7g: the bubble never floats over the chat, checkout, payment, order-submitted, login or onboarding — matched by ROUTE NAME, so a new money / order / login screen must be added here"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "if \\(!input\\.enabled \\|\\| input\\.mode !== \"minimized\" \\|\\| input\\.keyboardOpen\\) return false;\\n\\s*return !BUBBLE_HIDDEN_ROUTES\\.includes\\(input\\.routeName \\|\\| \"\"\\);",
+          "desc": "doc CORE invariant 20: the bubble shows only with the flag on, the chat minimized, the keyboard closed, and not on a hidden route"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "return !!storeData\\?\\.isChatMinimizeEnabled && \\(!!storeData\\?\\.isChatMinimizeForAll \\|\\| !!isShoofiEmployee\\);",
+          "desc": "doc CORE invariant 20: the staged gate — employees until isChatMinimizeForAll"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "export const MAGNET_RADIUS = 80;",
+          "desc": "doc reference §7g: the x target catches the bubble within 80 px"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "close\\(\\) \\{\\n\\s*this\\.chatUi = \\{ \\.\\.\\.this\\.chatUi, mode: \"closed\", unread: 0, peek: null \\};\\n\\s*\\}",
+          "desc": "doc CORE invariant 20: close() changes the window state ONLY — never the messages, never the cart"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "reset\\(\\) \\{\\n\\s*this\\.messages = \\[\\];\\n\\s*this\\.busy = false;\\n\\s*this\\.draft = \"\";\\n\\s*this\\.scrollOffset = 0;\\n\\s*\\}",
+          "desc": "doc reference §7g: reset() clears the conversation only (window state is the caller's; the cart is never touched)"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "if \\(this\\.chatUi\\.mode !== \"minimized\"\\) return;\\n\\s*this\\.chatUi = \\{ \\.\\.\\.this\\.chatUi, unread: this\\.chatUi\\.unread \\+ 1, peek: \\{ messageId, at: Date\\.now\\(\\) \\} \\};",
+          "desc": "doc reference §7g: a bot turn that lands while minimized counts as unread and peeks from the bubble"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "return \\(\\) => \\{\\n\\s*if \\(!minimizeOn\\) \\{\\n\\s*forYouStore\\.reset\\(\\);\\n\\s*return;\\n\\s*\\}",
+          "desc": "doc CORE invariant 20: flag OFF keeps the old lifecycle — the chat resets on unmount, a fresh chat each time"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "if \\(forYouStore\\.chatUi\\.mode !== \"minimized\"\\) forYouStore\\.close\\(\\);",
+          "desc": "doc CORE invariant 20: flag ON, leaving the chat any way but minimize closes the WINDOW only — the conversation stays"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "const restoring = useRef\\(minimizeOn && forYouStore\\.messages\\.length > 0 && !fromOnboarding\\)\\.current;",
+          "desc": "doc CORE invariant 20 / reference §7g: flag ON continues the same conversation on reopen (until the app restarts); a new onboarding starts fresh"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "if \\(minimizeOn\\) forYouStore\\.minimize\\(\\);\\n\\s*openStoreAtProduct\\(card\\.store, card\\.product\\._id\\);",
+          "desc": "doc reference §7g: a card tap leaves for the store as before, and with the flag on the chat minimizes instead of closing"
+        },
+        {
+          "file": "components/for-you/ChatBubbleOverlay.tsx",
+          "regex": "if \\(chatInStack\\) navigationRef\\.dispatch\\(StackActions\\.popTo\\(\"for-you\", \\{ restore: true \\}\\)\\);\\n\\s*else \\(navigationRef as any\\)\\.navigate\\(\"for-you\", \\{ mode: \"opener\", restore: true \\}\\);",
+          "desc": "doc CORE invariant 20 / reference §7g: expand pops back to a chat still in the stack (never a second copy), else navigates with restore"
+        },
+        {
+          "file": "components/for-you/ChatBubbleOverlay.tsx",
+          "regex": "const routes = s\\.routes\\.filter\\(\\(r: any\\) => r\\.name !== \"for-you\"\\);",
+          "desc": "doc reference §7g: dropping the bubble also removes a chat left under a store's menu, so back does not land in it"
+        },
+        {
+          "file": "components/for-you/ChatBubbleOverlay.tsx",
+          "regex": "const visible = overlayVisible\\(\\{ enabled, mode: ui\\.mode, routeName, keyboardOpen \\}\\);",
+          "desc": "doc CORE invariant 20: the overlay's visibility is bubble-math's overlayVisible (hidden routes, keyboard)"
+        },
+        {
+          "file": "components/for-you/ChatBubbleOverlay.tsx",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*cartStore\\??\\.(?:resetCart|removeProduct|updateProductCount|addProductToCart\\w*|setCart\\w*)\\()",
+          "desc": "doc CORE invariant 20: NEGATIVE pin — matches only while the bubble calls no cart mutator (it reads getProductsCount only); the lookbehind anchors it to the start of the file. If this fails, closing / dismissing started touching the cart"
+        },
+        {
+          "file": "components/layout/app-container/index.tsx",
+          "regex": "<ChatBubbleOverlay routeName=\\{currentRouteName\\} />",
+          "desc": "doc reference §7g: the bubble is mounted once, above the navigator, fed the focused route name"
+        },
+        {
+          "file": "components/ai-helper/AiHelperFab.tsx",
+          "regex": "\\(forYouStore\\.chatUi\\.mode === \"minimized\" \\|\\| forYouStore\\.chatUi\\.mode === \"full\" \\|\\| forYouStore\\.closedToast\\)",
+          "desc": "doc reference §7g: the persona hides while the chat is open (the genie lands on its spot), while the bubble is out or its closed toast is up"
+        },
+        {
+          "file": "navigation/MainStackNavigator.tsx",
+          "regex": "const FOR_YOU_OPTIONS = \\(\\{ route \\}: any\\) =>\\n\\s*route\\?\\.params\\?\\.restore \\? \\{ animation: \"none\" as const, \\.\\.\\.CHAT_SEE_THROUGH_OPTIONS \\} : \\{\\};",
+          "desc": "doc reference §7g: expanding from the bubble skips the stack animation and is see-through (the chat draws its own genie)"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "for_you_closed_toast",
+          "desc": "doc reference §7g: the 'closed · undo' toast copy"
+        },
+        {
+          "file": "helpers/for-you-access.ts",
+          "regex": "const chat = !!d\\.isChatSuggestEnabled && \\(!!d\\.isChatSuggestForAll \\|\\| staff\\);",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — the app reads the switches as the server does"
+        },
+        {
+          "file": "screens/explore.tsx",
+          "regex": "const aiHelperEnabled =\n    chatSuggestEnabled &&",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged / invariant 18 — the persona needs For you on"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "if \\(!forYouAccess\\(storeData, isShoofiEmployee\\)\\.chat\\) return false;",
+          "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged / invariant 20 — the bubble needs For you on"
+        },
+        {
+          "file": "stores/auth/index.ts",
+          "regex": "forYouStore\\.resetForAccountChange\\(\\);",
+          "desc": "doc CORE invariant 20: logout, delete and a forced sign-out clear the For-you conversation"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "silent: true,",
+          "desc": "doc CORE invariant 21 / docs/for-you.md: a For-you request never opens the app-wide error dialog"
+        },
+        {
+          "file": "utils/http-interceptor/index.ts",
+          "regex": "if \\(error\\?\\.config\\?\\.silent\\) \\{",
+          "desc": "the interceptor's opt-in silent flag (For you only; every other request unchanged)"
+        },
+        {
+          "file": "components/for-you/SuggestionCard.tsx",
+          "regex": "zIndex: 3,\n    elevation: 3,",
+          "desc": "the reason tag sits above custom-fast-image-v4's layers (zIndex 1-2) — without it the 'why' is never visible"
+        },
+        {
+          "file": "components/for-you/context-chips.ts",
+          "regex": "if \\(lastReplyCode && NOTHING_OPEN\\.has\\(lastReplyCode\\)\\) return \\[BROWSE\\];",
+          "desc": "doc CORE invariant 18: a reply with nothing to show always offers a next step"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "if \\(this\\.messages\\.length === 0\\) this\\.conversationId = newConversationId\\(\\);",
+          "desc": "reference §7h: a conversation id is born with the chat's first turn, so starting over gets a new one"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "fetchSuggestions\\(location, \\{ mode: \"opener\", surface: \"home\" \\}\\)",
+          "desc": "reference §7h: the home box's load says it is the home box"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "export const SEEN_MODES: ForYouMode\\[\\] = \\[\"popular\", \"surprise\", \"new\", \"drink\", \"sweet\", \"cross_sell\"\\];",
+          "desc": "doc CORE invariant 23: the app sends seen for exactly the server's six modes"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "const seen = !input\\.text && input\\.mode && SEEN_MODES\\.includes\\(input\\.mode\\) \\? this\\.seenCardIds\\(\\) : \\[\\];",
+          "desc": "doc CORE invariant 23: never for typed text, only for the seen modes"
+        },
+        {
+          "file": "screens/ai-helper/AiHelperOnboardingScreen.tsx",
+          "regex": "budget: budgetChosen\\.current \\? budget : null,",
+          "desc": "doc CORE invariant 18: the budget is saved only once tapped"
+        },
+        {
+          "file": "stores/ai-helper/index.ts",
+          "regex": "stated: \\{ \\.\\.\\.UNKNOWN_STATED \\},",
+          "desc": "doc CORE invariant 18: a first local profile starts from unknown, not the UI defaults"
+        },
+        {
+          "file": "stores/ai-helper/index.ts",
+          "regex": "export const EMPTY_STATED: TasteStated = \\{ cuisines: \\[\\], spice: 1, avoid: \\[\\], mealTimes: \\[\"dinner\"\\], budget: null \\};",
+          "desc": "doc CORE invariant 18: the budget is never pre-selected"
+        },
+        {
+          "file": "components/ai-helper/AiHelperFab.tsx",
+          "regex": "const stop = splashState\\.whenGone\\(\\(\\) => \\{",
+          "desc": "doc CORE invariant 18: the peek and the persona's impressions wait for the splash to be gone"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "splashState\\.markGone\\(\\);",
+          "desc": "doc CORE invariant 18: App.tsx marks the splash gone when its fade ends"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "const clearSheet = useCallback\\(\\(\\) => setSheet\\(\\(s\\) => \\(s\\.visible \\? s : CLOSED_SHEET\\)\\), \\[\\]\\);",
+          "desc": "doc reference §7f: the sheet's content is cleared only after it has hidden"
+        },
+        {
+          "file": "components/for-you/ChatProductSheet.tsx",
+          "regex": "onModalHide=\\{onHidden\\}",
+          "desc": "doc reference §7f: cleared on the modal's onModalHide"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "return input\\.enabled && \\(input\\.customerTurns > 0 \\|\\| input\\.cartCount > 0\\) \\? \"minimize\" : \"default\";",
+          "desc": "doc reference §7g / doc CORE invariant 20: back and the edge swipe minimize a used chat; an unused one closes"
+        },
+        {
+          "file": "components/for-you/bubble-math.ts",
+          "regex": "export const isUserBack = \\(actionType\\?: string \\| null\\) => actionType === \"GO_BACK\" \\|\\| actionType === \"POP\";",
+          "desc": "doc CORE invariant 20: only the customer's own back is a leave — never a reset after an order"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "return navigation\\.addListener\\(\"beforeRemove\"",
+          "desc": "doc reference §7g: back arrives through beforeRemove"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "if \\(minimizing\\.current \\|\\| !isUserBack\\(type\\)\\) return;",
+          "desc": "doc CORE invariant 20: the listener lets every non-back action through"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "\\.enabled\\(minimizeOn && Platform\\.OS === \"ios\"\\)",
+          "desc": "doc reference §7g: the chat's own iOS edge swipe, flag ON only"
+        },
+        {
+          "file": "components/layout/header/header.tsx",
+          "regex": "^  \"for-you\",$",
+          "desc": "doc reference §7g: the chat is full screen — no app header above it"
+        },
+        {
+          "file": "components/for-you/ChatHeader.tsx",
+          "regex": "direction: \"ltr\",",
+          "desc": "doc reference §7g: the minimize header is laid out physically — the chevron at the left end in every language"
+        },
+        {
+          "file": "components/for-you/chat-layout.ts",
+          "regex": "inputPaddingBottom: keyboardHeight \\|\\| parentAppliesInset \\? 8 : insetsBottom \\+ 8,",
+          "desc": "doc reference §7g: the input 8 pt above the safe area, whoever applies the inset"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "parentAppliesInset: !minimizeOn,",
+          "desc": "doc reference §7g: with minimize on the chat owns its bottom inset (home under the see-through chat must not resize)"
+        },
+        {
+          "file": "components/for-you/chat-layout.ts",
+          "regex": "presentation: \"transparentModal\" as const,",
+          "desc": "doc reference §7g: the chat's card is see-through during the bubble transitions (no white flash, no parallax)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "frameRef\\.current\\?\\.measureInWindow",
+          "desc": "doc reference §7g: the animation's frame is measured on an untransformed wrapper"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "export const GENIE_MS = 520;",
+          "desc": "doc reference §7g: the genie runs 520 ms both ways"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "let sx = key\\(1, 0\\.5, b / Math\\.max\\(W, 1\\)\\);\\n\\s*let sy = key\\(1, 0\\.92, b / Math\\.max\\(H, 1\\)\\);",
+          "desc": "doc reference §7g: the genie narrows first (0.5 wide, 0.92 tall at m 0.45), then drops to the bubble's 64 × 64"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "const r = t === 0 \\? 0 : Math\\.min\\(key\\(44, 90, 800\\), Math\\.min\\(W, H\\) / 2\\);",
+          "desc": "doc reference §7g: radius 44 → 90 → 800 clamped to half the box, square at rest"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "sx: seg\\(\\[0, 0\\.55, 0\\.75, 1\\], \\[0\\.6, 1\\.22, 0\\.9, 1\\]\\),\\n\\s*sy: seg\\(\\[0, 0\\.55, 0\\.75, 1\\], \\[0\\.6, 0\\.78, 1\\.12, 1\\]\\),",
+          "desc": "doc reference §7g: the bubble lands with a squash (1.22 × 0.78) and a stretch (0.9 × 1.12)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "const GENIE_EASE = Easing\\.bezier\\(0\\.6, 0, 0\\.3, 1\\);",
+          "desc": "doc reference §7g: the genie's curve"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "const GENIE_UNIFORM = false;",
+          "desc": "doc reference §7g: the Android uniform-scale fallback is OFF until a low-end Android is measured"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "m\\.value = Math\\.min\\(GENIE_DRAG_MAX, Math\\.max\\(0, e\\.translationY / \\(frame\\.value\\.h \\* 0\\.55\\)\\)\\);",
+          "desc": "doc reference §7g: the header drag drives only the narrowing (m ≤ 0.45)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "if \\(dy > 120 \\|\\| e\\.velocityY > 600\\) \\{",
+          "desc": "doc reference §7g: a header swipe minimizes past 120 px or at over 600 px/s"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "aimAtBubble\\(\\(\\) => \\{",
+          "desc": "doc reference §7g: the close measures the frame on the tap and starts in the measure's callback (a mount measure can land mid-push and aim at the mirror)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "shouldRasterizeIOS=\\{frozen\\}\\n\\s*renderToHardwareTextureAndroid=\\{frozen\\}",
+          "desc": "doc reference §7g: the chat is rasterized only while it genies"
+        },
+        {
+          "file": "components/for-you/ChatBubbleOverlay.tsx",
+          "regex": "withTiming\\(1, \\{ duration: LANDING_MS, easing: Easing\\.out\\(Easing\\.cubic\\) \\}\\)",
+          "desc": "doc reference §7g: the bubble's landing after the genie, 620 ms ease-out"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "export const GENIE_HANDOFF = 0\\.9;",
+          "desc": "doc reference §7g: closing, the chat is fully faded by m 0.9 and hands over to the bubble there"
+        },
+        {
+          "file": "components/for-you/genie.ts",
+          "regex": "const o = opts\\.fadeOutBy \\? \\(t <= K \\? 1 : Math\\.max\\(0, 1 - \\(t - K\\) / \\(opts\\.fadeOutBy - K\\)\\)\\) : key\\(1, 1, 0\\.2\\);",
+          "desc": "doc reference §7g: opacity 1 → 1 → 0.2 (the open); the close fades to 0 by the hand-off"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "\\(\\) => closing\\.value === 1 && m\\.value >= GENIE_HANDOFF,",
+          "desc": "doc reference §7g: the close hands over to the bubble at GENIE_HANDOFF, not at the curve's end"
+        },
+        {
+          "file": "components/layout/app-container/index.tsx",
+          "regex": "FLOATING_TAB_BAR_SCREENS\\.indexOf\\(currentRouteName\\) > -1 \\|\\| chatOwnsInset",
+          "desc": "doc reference §7g: AppContainer drops its bottom edge for the chat with minimize on — else home's footer jumps on open / close"
         }
       ]
     },
@@ -954,7 +2349,10 @@
         "src/views/admin/ai-usage/AiUsage.tsx",
         "src/apis/admin/ai-usage.ts",
         "src/views/admin/stores/MenuSpellcheck.tsx",
-        "src/apis/admin/menu-spellcheck.ts"
+        "src/apis/admin/menu-spellcheck.ts",
+        "src/views/admin/settings/ShoofiSettings.tsx",
+        "src/views/admin/for-you-quality/ForYouQuality.tsx",
+        "src/apis/admin/for-you-quality.ts"
       ],
       "symbols": {},
       "patterns": [
@@ -972,6 +2370,26 @@
           "file": "src/apis/admin/menu-spellcheck.ts",
           "regex": "/admin/menu-spellcheck/accept",
           "desc": "doc reference §7: the admin screen accepts fixes through the spellcheck endpoint"
+        },
+        {
+          "file": "src/views/admin/settings/ShoofiSettings.tsx",
+          "regex": "isAiHelperEnabled: false,\\n\\s*isAiHelperForAll: false,\\n\\s*isAiHelperOnboardingEnabled: false,\\n\\s*isChatOrderingEnabled: false,",
+          "desc": "doc reference §7f / §8: the four AI-helper flags are toggled under Settings → Shoofi, default off"
+        },
+        {
+          "file": "src/views/admin/settings/ShoofiSettings.tsx",
+          "regex": "isChatMinimizeEnabled: false,\\n\\s*isChatMinimizeForAll: false,",
+          "desc": "doc reference §7g / §8: the two chat-minimize switches under Settings → Shoofi, default off"
+        },
+        {
+          "file": ["src/components/Sidebar/menu-sections.ts", "src/components/Sidebar/Sidebar.tsx"],
+          "regex": "path: \"/admin/for-you-quality\".*roles: \\[\"master\", \"admin\"\\]",
+          "desc": "doc CORE invariant 22: For you quality — the screen is master/admin only, matching the server"
+        },
+        {
+          "file": "src/views/admin/settings/ShoofiSettings.tsx",
+          "regex": "forYouReviewDailyBudgetUsd",
+          "desc": "doc CORE invariant 22: For you quality — the reviewer's daily budget is set in Settings → Shoofi"
         }
       ]
     }

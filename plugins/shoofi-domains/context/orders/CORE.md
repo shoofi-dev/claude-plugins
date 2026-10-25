@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@a0e8bdb2 / 2026-09-23
+last-verified: shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -22,7 +22,11 @@ order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkou
 (shoofir), monitoring/twin-admin (delivery-web).
 
 **Not yours:** payment internals (`payments`), settlement/payouts (`accountant`), driver
-assignment & areas (`delivery`), auth (`customers`). Hand off in the PR.
+assignment & areas (`delivery`), auth (`customers`), the For-you chat / AI helper
+(suggestions `menu-catalog`, taste-profile ownership + login merge `customers`) — it READS
+orders, ADDS to the cart only through `addProductToCartForStore` and never places an order
+(reference §5, C1). Yours: that cart entry point (invariant 13) and the deferred in-chat
+checkout (Known status). Hand off in the PR.
 
 ## ⚠️ HIGH-RISK — draft PR, flagged, never merge
 Order creation (`processCreditCardPayment`/`processHypTokenPayment`/`finalizeApplePayOrder`
@@ -36,7 +40,12 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    bucket `2,3,10,11,12`, cancelled `4,5,7,8,9`). Each client repo keeps its **own copy** in
    `consts/shared.ts` — a status change is a **multi-repo PR**. The driver endpoints
    never write `orders.status`: delivered = `bookDelivery.completedAt`, and
-   `readyMinutes` is not an order field (reference §2).
+   `readyMinutes` is not an order field (reference §2). So there is **no single
+   "delivered/completed" transition to hook** — completion is written on several paths
+   (partner/admin `order/update`, the `fix-stuck-orders` crons) and arrival only on
+   `bookDelivery`. A consumer that needs post-completion data reads lazily instead (the AI
+   helper's `inferred` taste cache), and the AI helper's `deliveredOrders` counts COMPLETED
+   statuses, not courier deliveries (reference §5).
 2. **Transition guards:** PENDING(`6`) only from FRAUD_REVIEW; store-accept rejects
    already-cancelled; `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
    not `order/update`.
@@ -106,7 +115,11 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     loading every `item_id` ∪ every `comboSelections[].productId` in ONE find with NO projection
     — the combo needs `productType` + `combo`, its components need `extras` + `soldByWeight`.
     Change one copy, change all three (both functions), and extend
-    `test/integration/order-pricing-parity.js` (it has a "Combo deals" section). Catalog side
+    `test/integration/order-pricing-parity.js` (it has a "Combo deals" section). **The For-you
+    chat adds one more copy of the unit formula:** `shoofi-app/helpers/chat-cart-line.ts`
+    `priceLine` repeats `screens/meal/index2.tsx` (base + discounted extras over the same
+    `extrasStore.calculateExtrasPrice`) on purpose, so the menu screen stays untouched — change
+    the formula there too, and in `calculateItemUnitPrice`. Catalog side
     of the same rule: menu-catalog CORE invariants 7 and 9; `docs/sold-by-weight.md`,
     `docs/combo-deals.md`.
 12. **A COMBO IS ONE ORDER LINE** (`docs/combo-deals.md`). `item_id` = the combo product,
@@ -145,6 +158,24 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       them); `comboSelections` ride along untouched and are never diffed; `comboIssues` is
       stripped with the other bookkeeping fields before `order.items` is written, so the
       persisted item shape never carries it.
+13. **A cart filled outside a store's menu must name its store — the order goes wherever the
+    cart is stamped.** Checkout submits with `storeData: cartStoreData || storeDataStore.storeData`
+    (`cartStoreData` = the `@storage_cart_storeData` snapshot written with the first line), and
+    `submitOrder` sends its `appName` as `app-name` on `order/create`. `addProductToCart` stamps
+    an EMPTY cart with the BROWSED store (`storeDataStore.storeData`, else `@storage_storeDB`) —
+    the menu's assumption (reorder loads the order's store first for the same reason). So the
+    For-you chat (`shoofi-app/hooks/useChatAddToCart.ts`, behind `isChatOrderingEnabled`, built
+    2026-10-17) adds ONLY through `cartStore.addProductToCartForStore(line, storeData)`: it stamps
+    an empty cart with the GIVEN store (`setCartStoreDBName` + `setCartStoreData`,
+    `isSchoolProject` false, `@storage_cartCreatedDate`), never reads or writes the browsed
+    store, and **throws** on a cart of another store. The chat never calls `addProductToCart` /
+    `resetCartForNewStore` and never moves the browsed-store globals (`setStoreDBName`,
+    `getStoreData`, `getMenu`, `@storage_storeDB`) — it loads with the fetch-only
+    `getStoreDataFromServer` / `getMenuFromServer`; the cart screen (mount) and checkout (focus)
+    repoint `storeDataStore` to the cart's store themselves. Another store's cart is never mixed
+    or silently emptied: the chat asks, and "replace" = `resetCart()` + add. Twin flows and
+    school carts get no chat add (it opens the store instead). App tests:
+    `__tests__/stores/cart-add-for-store.test.ts`, `__tests__/hooks/use-chat-add-to-cart.test.tsx`.
 
 13. **A STORE PROMOTION IS THE STORE'S PRICE, NOT A COUPON** (`docs/promotions.md` in
     shoofi-server). It lives on **`order.promotions = { items, delivery }`** — one deal of each
@@ -209,10 +240,22 @@ apart — always establish which is meant:
 3. **Never reached checkout** — `page_viewed` with `properties.page_name` ∈
    {`ProductAddToCart`, `Cart`} and no `order_submit_success`. Add-to-cart uses
    `trackPageView`, not `trackEvent`, so it is a `page_viewed` row and easy to miss.
+   A For-you chat add logs the same `ProductAddToCart` page view (its `storeDBName` is the
+   dish's store, plus `source: "for_you_chat"` and the reply's `suggestionId`) and also
+   `button_clicked` `button_id: "for_you_quick_add"` (fallbacks `for_you_quick_add_fallback` +
+   `reason`). An order that holds For-you dishes says so on its `order_submit_success` event:
+   `for_you_lines` + `for_you_suggestion_ids` (`shoofi-app helpers/for-you-attribution.ts` —
+   noted on the phone for 24 h when a dish is added from the chat or from a store a card opened,
+   cleared once counted). Analytics only: the order payload, cart lines and `getCartData` are
+   untouched; a failure there adds nothing to the event and never blocks the submit.
    The cart's continue button logs `cart_checkout_pressed`, and `cart_checkout_blocked`
    with `reason` ∈ {`store_closed`, `store_busy`, `store_custom_message`,
    `school_order_time_invalid`, `store_status_error`} (from `screens/cart/cart.tsx`). Before
    those events, a cart stopped by a closed/busy store left no trace at all.
+   The For-you funnel copies all of these checkout events (and `checkout_left`) into
+   `shoofi.forYouEvents` to explain a picked dish that was not ordered (menu-catalog CORE
+   invariant 22) — renaming one, or a `reason` / `step` / `error_code` value, changes its
+   "why" columns too.
 
 Checkout-screen events that explain the "reached checkout, didn't send" layer:
 - **`checkout_left`** — checkout lost focus (`reason`: `blur`|`unmount`) without a completed
@@ -288,6 +331,14 @@ Worked example: `services/exec-dashboard/engagement-metrics.js`.
 - **Awareness (not bugs):** coins-redeem-after-charge failure logs CRITICAL for manual
   reconciliation; HYP "verified=false but paid" is logged paid-but-stuck; background work in
   store-accept runs after the 200 response so failures never reach the client.
+- **DEFERRED (Sari, 2026-10-16) — do NOT build without a new decision:** the in-chat
+  **checkout** card in the For-you chat. Adding to the cart from the chat IS built (Sari,
+  2026-10-17 — invariant 13), but the chat still places no order: the read-only cart dock and
+  the "complete the order" chip open the existing `cart` screen → normal checkout (no order or
+  payment API changed). Reasons for keeping the checkout card out: the charged total
+  is client-computed in `shoofi-app/screens/checkout/index.tsx` (`totalPrice` from
+  `TotalPriceCMP`, which the server charges — invariant 11); the post-charge reset and
+  navigation is `postChargeOrderActions` in the same file; and customer consent. Reference C1.
 
 ## Recipe — add a field to an order, end-to-end
 1. **Customer app** — add it where the cart payload is built (`stores/cart` `getCartData`).

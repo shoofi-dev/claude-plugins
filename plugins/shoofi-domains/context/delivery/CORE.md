@@ -49,6 +49,36 @@ sets**, and the second one is wrong for anything dispatch-related. Note the asym
 scope documents above it — `cityAreas.isActive` and `parentCities.isActive` really are read as
 `{$ne: false}`, so absent means active *there*. Same field name, opposite default, one collection
 apart. Anything reasoning about whether an area was serving must use `isActive === true`.
+**Paused ≠ out of zone.** Staff pause delivery by switching areas off (the region "כבה" button
+→ `areas.isActive=false`), so the active-only lookup misses exactly as for "no area here".
+`checkStoreDeliveryAvailability` (`services/delivery/availability.js`, behind
+`POST /api/delivery/available-drivers`) then looks again with `ignoreAreaActive: true` and
+returns `isDeliveryPaused: true` (area exists, switched off) or `false` (no area). `isAreaSupported`
+stays `false` for a paused area on purpose — old app bundles keep their behaviour and no
+scheduled order opens into it. The customer app shows "delivery not available right now" for
+paused and "outside the delivery area" only for `isDeliveryPaused: false`.
+
+## Driver identity on the wire — `fullName` is the record, `name` is the response
+In `delivery-company.customers` the driver's name is **`fullName`**; the `name` field is
+**never populated** (0 of 246 driver/admin records, checked 2026-09-30). But
+`GET /delivery/drivers/locations` collapses the two before it answers —
+`name: driver.fullName || driver.name` in `routes/delivery/driver.js` — so the live map
+(`shoofi-delivery-web/src/views/admin/driver-locations/DriverLocationsMap.tsx`) must read
+**`name`**, while `DriversList.tsx`, which gets raw docs from a different route, must read
+**`fullName`**. Copying a field name from one driver screen to the other yields `undefined`,
+never an error.
+- **Phones on those records are not uniformly `05XXXXXXXX`** — 241 of 246 are; the rest
+  include one stored with a **leading space** and a few of other lengths. Match a phone on
+  **digits only, on both sides** (`digitsOnly` / `driverMatchesSearch` in
+  `DriverLocationsMap.tsx`), and guard the empty term: stripping non-digits from a Hebrew
+  name leaves `""`, and `includes("")` is true for every phone on earth.
+- **That endpoint drops any driver with no fix** — `currentLocation: {$exists:true}` plus a
+  trailing `.filter(driver => driver.location !== null)` in `routes/delivery/driver.js`;
+  22 of 246 today. A driver who has never reported a location cannot be shown *or searched*
+  on the live map at any filter setting — `/admin/drivers` is the surface for him.
+- Its projection whitelists `fullName`/`name`/`phone` inline, but `PUBLIC_DRIVER_FIELDS`
+  (`lib/delivery/helpers.js`) has **neither `name` nor `phone`**. Refactoring this route onto
+  `sanitizeAvailableCompanies` would silently delete the phone from the map and its search.
 
 ## Delivery-only — a courier with no order behind it
 A store can book a driver for goods **Shoofi never sold**: owner picks a town, gives a phone
@@ -85,6 +115,16 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
    approved → `3` collected/pickup → `4` delivered; `5` waiting-in-store; cancels `-1` driver,
    `-2` store, `-3` admin. **This is NOT `ORDER_STATUS`** (where DELIVERED = `12`) — never mix
    the two. Each client keeps its own copy; a change is a multi-repo PR.
+   **The stored value is a STRING on 95,989 production rows and a BSON `int` on 72 of them**
+   (all `-3`, created 2025-08-05 → 2025-11-30; no current writer produces them — every one
+   goes through the const). A string-only `$in` therefore under-counts silently: the delivery
+   list's own filter builds `match.status = { $in: status }` from the client's strings
+   (`routes/analytics.js:314-316`), so ticking "בוטל על ידי המנהל" returns 1,107 rows when
+   1,179 exist. **Any query that filters on `status` must accept both types**
+   (`{$in: ["-3", -3]}`); display is safe, because a JS object lookup coerces the key. The
+   cancels are not a corner either — `-3` is the second-largest status in the collection after
+   `4`, 1,089 of them `cancelledBy: "admin"`, so a label map or a report that omits it is
+   blanking a four-figure population, not an edge case.
 2. **Assignment idempotency:** de-dupe on `originalBookId`; the pending→assigned claim is an
    atomic `updateOne({isPendingAssignment:true})` (`matchedCount===0` = another container won).
    Never bypass either.
@@ -109,7 +149,39 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
 3. **Never write `customers.isActive` directly** — always `setDriverActiveStatus`
    (`services/delivery/driver-status-service.js`), which writes `driverStatusHistory` in
    lock-step and pushes a websocket update. Direct writes create phantom history.
-4. **`isActive` ≠ `isAvailable` ≠ `isOnline`** — three separate flags, don't conflate.
+   **And that collection is the ONLY place "when did he switch on/off" exists.** The driver
+   document has no `isActiveUpdatedAt`, no `lastActiveAt`, no `activeSince` (0 of 242 carry
+   any of them), and its `updatedAt` is bumped by unrelated profile edits — so `updatedAt`
+   is **not** a toggle time. `delivery-company.driver-status-history` (code handle
+   `db.driverStatusHistory` — **the collection is hyphenated**) is a complete availability
+   audit trail: 27,891 rows on 2026-09-25, oldest 2025-12-20, and **every single one is an
+   `isActive` change** (`changedFields:['isActive']` on 27,891/27,891, `newValues.isActive`
+   present on all of them). Each row carries `timestamp`, `driverId`, a denormalised
+   `driverName`/`companyId`, `changes.isActive.{old,new}` and — since the attribution fix —
+   `updatedBySource` + `updatedByName`. So a "who turned what on, when, and who did it"
+   feature is a read, never a schema change. Three traps: (a) `timestamp` is an
+   offset-suffixed STRING, so a lexicographic bound is an hour out across the DST flip —
+   widen the Mongo bound and cut precisely in JS, and sort "latest per driver" on **`_id`**,
+   which is monotonic in insertion order; (b) `updatedBySource` is absent on 11,879
+   historical rows (newest unattributed: 2026-08-17) — that is `unknown`, not a default to
+   guess at; (c) the hourly `driver-shift` cron writes ~4,200 of the rows in bursts, so any
+   "who did this" feed must separate `driver_app` / `shoofi_support` / `cron` or the human
+   actions are buried. Attribution split of all rows: `shoofi_support` 7,407 ·
+   `cron` 4,223 · `driver_app` 4,042 · `admin_web` 60 · `shift_admin` 11 · legacy 12,148.
+4. **`isActive` is the ONLY real availability flag. `isOnline` and `isAvailable` are not
+   what they look like** — "three separate flags, don't conflate" reads as though all three
+   carry meaning, and two of them do not. `isOnline` is written **only** by the location
+   ping, defaults to `true` and is never written back to `false`
+   (`routes/delivery/driver.js:893`, `$set` at `:981`) — so it is sticky-true forever after
+   a driver's first GPS fix: measured 2026-09-25, **220 of 242 drivers `isOnline:true` while
+   3 were `isActive:true`**. `isAvailable` / `availabilityReason` / `lastAvailabilityUpdate`
+   are written by `POST /api/delivery/driver/availability`
+   (`routes/delivery/driver.js:1377`), whose only client method
+   (`shoofi-shoofir/stores/delivery-driver/index.ts:433`) has no UI caller: **0 of 242
+   drivers carry any of the three**. Dispatch reads `isActive` and nothing else. The only
+   other durable presence signal is `customers.lastLocationUpdate` (an offset STRING, not a
+   Date), which the map treats as stale at 10 minutes — useful as "GPS fresh / stale", never
+   as "available". A screen built on `isOnline` reports a fleet of 220 that is really 3.
 5. **Twins always go pending** and (single mode) must share ONE driver: the
    `twinPickupSequence:1` side drives selection, the peer mirrors it, and `assignDriverAt` is
    aligned to the later side. Breaking any of it splits a twin.
@@ -269,6 +341,66 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `scripts/analyze-assignments.js` sums them key by key, so a component missing from its
     `totals` object is dropped from `avgTotal` too and the percentages stay plausible while
     describing a score they no longer break down.
+16. **The delayed path REWRITES part of the booking, so a field absent from the data you hand
+    `bookDelivery()` can still exist on the stored row.** `createPendingDelivery`
+    (`services/delivery/delayed-assignment.js`) does not persist `deliveryData` verbatim: it
+    spreads it and then sets `status: "1"`, `isPendingAssignment`, `assignDriverAt`, `created`,
+    `area`, `bookId`, `appName`, `expectedDeliveryAt`, `expectedDeliveryBasis` — and
+    **`appliedCoupon: deliveryData.appliedCoupon || null`**, which MINTS the key on every
+    pending booking in the platform, coupon or no coupon. The immediate path in
+    `services/delivery/book-delivery.js` does the same. So "the caller left field X out" and
+    "field X is absent from the document" are two different claims, and only the second one is
+    what a `{$exists: true}` filter answers. It matters for any booking that must stay invisible
+    to a money aggregate: an explicitly-null key is still a key. Writing against the field
+    rather than its presence is the robust form — the one reader of this one,
+    `routes/order.js`'s coupon-order list, filters `{$ne: null, $exists: true}` and so is
+    unaffected by the minting.
+17. **A new `RANK_REASONS` code needs exactly ONE Hebrew label, and without it the chip
+    vanishes with nothing failing.** `RANK_REASONS` in
+    `services/delivery/manual-assignment-ranking.js` is the server's contract for "why is
+    this courier here in the list"; the wording lives in the admin web, and
+    `reasonLabels()` in `shoofi-delivery-web/src/utils/driver-assignment-score.ts` does
+    `.map((code) => RANK_REASON_LABELS[code]).filter(Boolean)` — an unknown code is
+    **dropped rather than printed raw**. That is deliberate (a raw `late_for_pickup` in the
+    middle of a Hebrew line is worse than nothing), and it means a code nobody translated
+    disappears from every picker — the live-ops popover, `ReassignDriverModal`,
+    `AssignDriverModal` and the twin modal — silently, with no console warning and no
+    failing test. `RANK_REASON_LABELS` is the **single** definition: `live-ops/strings.ts`
+    re-exports it (`export { RANK_REASON_LABELS } from "utils/driver-assignment-score"`)
+    and `live-ops/logic/driver-ranking.ts` holds no label table at all, so there is one
+    place to edit and adding a second would put two vocabularies on four screens. Note also
+    that `scoreSummaryLine()` in the same file filters `idle`, `en_route` and `same_store`
+    out of the one-line form as context — a new code is treated as a warning and WILL show
+    there, which is right for a penalty and wrong for a bonus.
+18. **A booking always carries BOTH ends of the journey — but which admin read hands them
+    to you does not.** `createPendingDelivery` refuses to insert without them: it
+    `parseFloat`s `customerLocation.latitude/longitude` and
+    `storeLocation.lat||latitude / lng||longitude` and returns
+    `"Invalid customer/store location coordinates"` on a `NaN`, before the insert
+    (`services/delivery/delayed-assignment.js`). So a *document* waiting for assignment that
+    has no customer point is not a thing — and a screen that shows none is a READ that
+    dropped it. Three reads, three different answers:
+    `GET /api/delivery/order/:id` is **unprojected** (the whole document — which is why the
+    admin order-detail modal working proves nothing about the others);
+    `POST /api/analytics/deliveries` is a **projection whitelist** (it carried neither
+    coordinate until Oct 2026, so live-ops, the delivery list and the ops dashboard all read
+    rows with no geometry); and `GET /api/delivery/driver/:id/orders` carries both but filters
+    on `driver._id`. **Generalise that last one: any admin backfill keyed on the courier is
+    blind to exactly the pending-assignment population** — the state where "where is this
+    going?" is the whole question. The admin web's live-ops board had been filling its map
+    coordinates from the per-courier call for that reason, so the map button on a delivery
+    nobody had been sent to drew the restaurant pin and nothing else.
+    Two shape traps go with it. `customerLocation` is `{latitude, longitude}` from all four
+    production writers (`routes/order.js` × 4 via `order.order.geo_positioning`,
+    `delayed-assignment.js`, `routes/delivery/orders.js` via `pointInsideGeometry`,
+    `routes/delivery/admin.js`), while `storeLocation` is `{lat, lng}` in 7,999 of the last
+    8,000 bookings and **both** forms appear — the guard above reads `lat || latitude` for
+    exactly that reason, which also means a **GeoJSON** `storeLocation` has neither key and
+    *aborts the booking*. Neither field is the GeoJSON `shoofi.stores.location`; that is a
+    different document. And `isApproximateLocation` is written in exactly one literal, beside
+    `isDeliveryOnly: true` (`routes/delivery/orders.js`), so it **implies** delivery-only and
+    never the converse — a map drawing that point as a doorstep is stating a town centroid
+    nobody typed.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
@@ -303,6 +435,24 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
   a lexicographic `$gte` (which is what the disabled filter above used) mis-windows across
   Israeli DST. Only `lastLocationUpdate` is indexed (`utils/init-location-indexes.js`);
   `lastFixAt` is not, so filter in JS after the fetch rather than in the query.
+- **`includeOffline` switches the 10-minute staleness filter OFF — and then the CALLER owns
+  freshness.** `GET /api/delivery/drivers/locations` normally hides couriers whose
+  `lastLocationUpdate` is older than 10 minutes, but that whole `$expr` is skipped when the query
+  carries `includeOffline` (`'true'` or `true` — `routes/delivery/driver.js`). Every admin screen
+  that wants disconnected couriers drawn sends it: the full driver map, and the live-ops board
+  (`shoofi-delivery-web src/views/admin/live-ops/data/liveOpsApi.ts`, `includeOffline: true`). For
+  those callers **a position in the response carries no recency guarantee at all** — so anything
+  derived from it ("he is at the restaurant", "he is not moving", an ETA) must age the fix itself
+  or it states an hour-old pin as a fact about now. That is a real bug this cost us: the live-ops
+  stage label said "במסעדה" for any courier on status `2` whose last fix happened to be within
+  150 m of the store, however old. 10 minutes is the platform's number in four places
+  (`LOCATION_FIX_RECOVERY_MS` and this filter in `routes/delivery/driver.js`,
+  `DEFAULT_STALE_LOCATION_MINUTES` in `services/delivery/delayed-assignment.js`, and
+  `STALE_LOCATION_MINUTES` in delivery-web `src/utils/driver-map-markers.ts`) — reuse it rather
+  than inventing a window. It is deliberately generous: the phone goes quiet exactly when the
+  courier stands still (`distanceInterval: 5` in shoofir `utils/locationBackgroundTask.ts`), which
+  is the state "waiting at the restaurant" describes, so a tight window flaps him out of it while
+  he is in the kitchen.
 - **A delivery company has NO location.** `delivery-company.store` carries no `location` and no
   `coverageRadius` — verified 2026-09-29 across all 173 documents. So "assume the courier is at
   his depot" is not an available fallback, however natural it sounds: `company` IS attached to
