@@ -271,7 +271,8 @@
           "SEEN_MODES",
           "appliesSeen",
           "modeCaps",
-          "topUpWithSeen"
+          "topUpWithSeen",
+          "personMode"
         ],
         "utils/extras-required.js": [
           "hasRequiredOptions"
@@ -344,6 +345,11 @@
         ]
       },
       "patterns": [
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const taste = person \\? EMPTY_TASTE : ownTaste",
+          "desc": "doc CORE invariant 18: forPerson drops the customer's own taste — 'for Mom' never shows the customer's usual"
+        },
         {
           "file": "routes/product.js",
           "regex": "update/isInStore/byCategory",
@@ -1713,6 +1719,9 @@
     },
     "shoofi-app": {
       "files": [
+        "helpers/family.ts",
+        "screens/ai-helper/FamilyScreen.tsx",
+        "screens/ai-helper/FamilyStep.tsx",
         "hooks/useOpenStoreAtProduct.ts",
         "screens/menu/components/GeneralCategoriesList.tsx",
         "__tests__/components/general-categories-open-product.test.tsx",
@@ -1749,6 +1758,7 @@
         "components/for-you/ReplyFeedback.tsx"
       ],
       "symbols": {
+        "helpers/family.ts": ["familyOfferAllowed", "withFamilyFrom", "takePersonDishes", "detectMention"],
         "stores/ai-helper/index.ts": [
           "GUARANTEED_AVOID",
           "decideFabRoute"

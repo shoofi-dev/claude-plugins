@@ -203,7 +203,9 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
 - **`shoofi.shoofiAdminUsers`** — `phoneNumber`, `password`(bcrypt), `roles[]`, `refreshToken`,
   `resetCode`+`resetCodeExpiry`, `isFirstLogin`.
 - **`shoofi.tasteProfiles`** (AI helper) — one doc per owner, `owner: {customerId}` **or**
-  `owner: {deviceId}`; `stated`, `confirmed`, server-only `inferred`,
+  `owner: {deviceId}`; `stated`, `confirmed`, server-only `inferred`, `people` (≤ 8 family
+  members the customer orders for: name, relation, what they don't eat, tagged dishes) and
+  `family` (the onboarding's answer + the chat offer's dates and switch),
   `onboardedAt`/`skippedAt`/`createdAt`/`updatedAt`, `version: 1`. Not on the customer doc.
   Owner rules, merge and lifecycle: §5a.
 - ⚠️ **`customers.orders[]` is a create-time snapshot with NO status** — never infer
@@ -289,8 +291,9 @@ per process (`ensureIndexes`). ⚠️ `owner.customerId` is the 24-hex **string*
 `String(_id)` and compare with ISO strings (cf. CORE invariant 5).
 
 **Writes** (`saveProfile`). `PUT` builds its update from `stated`, `confirmed`, `onboardedAt`,
-`skippedAt` only. `saveProfile` sanitises (`sanitizeStated`, `sanitizeConfirmed`), replaces
-`stated` whole when sent, sets `confirmed.<key>` per key, and writes `owner` only through
+`skippedAt`, `people`, `family` only. `saveProfile` sanitises (`sanitizeStated`,
+`sanitizeConfirmed`, `sanitizePeople`, `sanitizeFamily`), replaces `stated`, `people` and
+`family` whole when sent, sets `confirmed.<key>` per key, and writes `owner` only through
 `$setOnInsert` from the server-derived owner — `owner` and `inferred` are never read from the
 body (test: "a client cannot set owner or inferred"). `inferred` is written only by
 `refreshInferredIfStale`, for customer owners, lazily on `GET /profile` (details: the design doc).
@@ -303,6 +306,8 @@ body (test: "a client cannot set owner or inferred"). `inferred` is written only
   count as empty); no account profile yet → the device's.
 - `confirmed`: the union; on a shared key the account's answer wins.
 - `onboardedAt`: the earlier of the two; `skippedAt`: the account's if set, else the device's.
+- `people`: the account's when it has any, else the device's; `family`: the account's when its
+  `answer` is set, else the device's (never a union — two lists of "Mom" would duplicate her).
 - Upserts the customer's doc, **then deletes the device doc** — the shared-phone guarantee: the
   next person to log in on that phone does not inherit it. The delete belongs to a successful
   merge only; if the call fails, the device profile stays on the server under that device id.

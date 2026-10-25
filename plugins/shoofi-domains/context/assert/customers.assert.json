@@ -84,6 +84,11 @@
       },
       "patterns": [
         {
+          "file": "routes/ai-helper.js",
+          "regex": "people: body\\.people,\\n\\s+family: body\\.family",
+          "desc": "doc CORE invariant 9: PUT /profile passes people and family through — a field missing from the route's update is silently never saved"
+        },
+        {
           "file": "routes/admin/school-registrations.js",
           "regex": "const SCHOOL_SECTION_ROLES = \\[\"master\", \"admin\", \"manager\", \"viewer\"\\]",
           "desc": "viewer works the schools section's registration routes"
