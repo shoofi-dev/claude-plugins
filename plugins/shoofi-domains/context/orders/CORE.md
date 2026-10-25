@@ -215,6 +215,13 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       "10% over ₪200" charged MORE for less food, and a card hold refused the edit). The amend
       also writes `promotions` into the `bookDelivery` snapshot (cash courier reimbursement)
       and reconciles `promotionRedemptions` (removed deal → row deleted, reduced → new amount).
+    - **One ranking, three readers**: `rankDeals` (`promotion-service.js`) is the only place
+      that picks the winning deal of each kind — `quotePromotions` (the menu/cart/checkout
+      quote) and the admin form's live preview (`previewPromotionQuote`,
+      `POST /api/admin/promotions/preview`) both call it. The preview ranks the UNSAVED draft
+      with the store's other running deals (minus the saved copy of the deal being edited),
+      ignores the draft's dates/active switch, skips caps and writes nothing. Do not give the
+      preview its own ranking: it exists to tell support what checkout will really do.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
