@@ -615,6 +615,12 @@ boundary and say so in the PR.
      conversation whose audit row belongs to a customer with `isShoofiEmployee` — `app-logs/insert`
      takes anyone's events. `flags` are always derived from the events, and one newer than a
      person's decision reopens the review.
+   - **A late flag reaches the queue only through the instant path.** `runReview` reads
+     `forYouEvents` from the reviewed day's start to its **end + 1 day**
+     (`services/for-you-quality/reviewer.js`), so a flag arriving later than that is invisible to a
+     re-run of that day — including the reopen above, which compares the newest flag it can see
+     against `human.at`. `recordFeedback` adds the triggering event itself whenever it arrives,
+     which is why the instant path is the one that cannot miss a flag.
    - **Targets are code** (`targets.js`): changed in a reviewed PR; the funnel ones are first guesses
      (2026-10-18), to be reset from pilot data. The API and the screen are `master|admin` only.
 

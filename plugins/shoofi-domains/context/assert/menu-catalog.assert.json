@@ -1708,6 +1708,11 @@
           "file": "routes/admin/for-you-quality.js",
           "regex": "if \\(req\\.query\\.flagged === \"1\"\\) filter\\.flagged = true;",
           "desc": "reference §7h: the queue API filters the testing team's flags"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "created: \\{ \\$gte: start, \\$lte: momentTZ\\.tz\\(end, TZ\\)\\.add\\(1, \"day\"\\)\\.toDate\\(\\) \\}",
+          "desc": "doc CORE invariant 22: For you quality — a run reads the day's events from its start to its end + 1 day, so a flag arriving later cannot reach a re-run of that day; the instant path is what carries it"
         }
       ]
     },
