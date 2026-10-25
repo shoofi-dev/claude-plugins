@@ -29,7 +29,8 @@
         "services/ai/usage-log.js",
         "services/ai/pricing.js",
         "routes/ai-helper.js",
-        "utils/extras-required.js"
+        "utils/extras-required.js",
+        "services/menu/promotions.js"
       ],
       "shoofi-partner": [
         "screens/admin/product",
@@ -71,7 +72,11 @@
         "utils/crons/fix-stuck-orders.js",
         "consts/consts.js",
         "utils/order-pricing",
-        "routes/order-amend.js"
+        "routes/order-amend.js",
+        "routes/promotion.js",
+        "services/promotions/",
+        "utils/promotion-discount.js",
+        "services/twin-order/twin-promotions.js"
       ],
       "shoofi-app": [
         "screens/checkout",
@@ -80,7 +85,10 @@
         "stores/orders/",
         "stores/twin-order/",
         "consts/shared.ts",
-        "hooks/useChatAddToCart.ts"
+        "hooks/useChatAddToCart.ts",
+        "stores/promotions/",
+        "components/promotions/",
+        "components/total-price/"
       ],
       "shoofi-partner": [
         "screens/admin/order",
@@ -130,7 +138,8 @@
         "utils/vat.js",
         "utils/greeninvoice.js",
         "utils/invoice-provider.js",
-        "services/compensations/"
+        "services/compensations/",
+        "services/promotions/"
       ],
       "shoofi-delivery-web": [
         "src/views/admin/DriverPayments.tsx",

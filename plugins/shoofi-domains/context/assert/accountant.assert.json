@@ -36,7 +36,8 @@
           "shoofiCouponCredit",
           "appliedCouponAmount",
           "calculateCommission",
-          "getDateRange"
+          "getDateRange",
+          "promotionDeliveryPortion"
         ],
         "utils/vat.js": [
           "VAT_RATE",

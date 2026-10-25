@@ -83,7 +83,8 @@
         "utils/crons/for-you-review-cron.js",
         "docs/for-you-quality.md",
         "test/integration/for-you-quality.js",
-        "test/integration/for-you-seen.js"
+        "test/integration/for-you-seen.js",
+        "services/menu/promotions.js"
       ],
       "symbols": {
         "utils/menu-cache.js": [
@@ -339,6 +340,9 @@
         "utils/general-category-order.js": [
           "sortGeneralCategories",
           "compareGeneralCategories"
+        ],
+        "services/menu/promotions.js": [
+          "applyMenuPromotions"
         ]
       },
       "patterns": [
