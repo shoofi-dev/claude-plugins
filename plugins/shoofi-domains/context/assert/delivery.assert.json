@@ -158,6 +158,26 @@
           "desc": "global switch gating bookDelivery creation"
         },
         {
+          "file": "routes/delivery/orders.js",
+          "regex": "status:\\s*\\{\\s*\\$ne:\\s*DELIVERY_STATUS\\.WAITING_FOR_APPROVE\\s*\\}",
+          "desc": "POST /api/delivery/list strips status 1 for role driver/employe, so a regular courier's ONLY route to accept is the assignment push - a cleared notification leaves the booking at 1 with a courier attached and no in-app way to approve it. It is also why three admin dispatch paths skip the accept step entirely (invariant 19)"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "status:\\s*DELIVERY_STATUS\\.WAITING_FOR_APPROVE,\\s*\\n\\s*\\},",
+          "desc": "the driver accept route's atomic claim filters on status WAITING_FOR_APPROVE - that filter IS the idempotency guarantee for a double-tapped notification, and nothing may be added to it (see invariant 2)"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "approvedAt:\\s*moment\\(\\)\\.utcOffset\\(offsetHours\\)\\.format\\(\\)",
+          "desc": "the company-admin reassign writes approvedAt as an OFFSET STRING while every other writer uses new Date() - 50 of 101,659 bookDelivery rows are strings, so a {$gte: <Date>} window on approvedAt silently drops them. It also lands the booking at APPROVED with no driver accept, so approvedAt is not 'when the courier accepted' (invariant 19)"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "status:\\s*DELIVERY_STATUS\\.APPROVED,\\s*\\n\\s*isPendingAssignment:\\s*false,\\s*\\n\\s*assignedAt:",
+          "desc": "POST /api/delivery/admin/assign lands an existing delivery at APPROVED with assignedAt and NO approvedAt - so APPROVED-with-no-approvedAt is a real population and approvedAt: {$exists: true} is not a proxy for 'reached approved' (invariant 19)"
+        },
+        {
           "file": "services/database/DatabaseInitializationService.js",
           "regex": "db\\.bookDelivery\\s*=\\s*db\\.collection",
           "desc": "db.bookDelivery is bound to the hyphenated book-delivery collection"

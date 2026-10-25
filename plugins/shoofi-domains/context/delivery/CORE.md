@@ -401,6 +401,43 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `isDeliveryOnly: true` (`routes/delivery/orders.js`), so it **implies** delivery-only and
     never the converse — a map drawing that point as a doorstep is stating a town centroid
     nobody typed.
+19. **`APPROVED` is not "the courier accepted", and `approvedAt` is not "when he accepted".**
+    `status "1"` → `"2"` is the only state change that records an acceptance, and exactly one
+    writer is the driver's own tap: `POST /api/delivery/driver/order/approve`
+    (`routes/delivery/orders.js:76`), whose atomic claim is
+    `{_id, "driver._id", status: WAITING_FOR_APPROVE}` → `$set {status: APPROVED, approvedAt,
+    isPendingAssignment: false}` (`:128-146`), plus the twin peer cascade (`:176-190`). Only its
+    `delivery_approved_by_driver` flow event (`actorType: "driver"`, `:205-233`) separates it
+    from three admin paths that land at `APPROVED` with nobody tapping anything, deliberately:
+    `POST /api/delivery/admin/assign` (`routes/delivery/admin.js:520`), the company-admin
+    reassign (`routes/delivery/driver.js:392`) and the support status override
+    (`routes/delivery/admin.js:1504`). The reason is the other half of the fact:
+    **`POST /api/delivery/list` strips status `"1"` for `role: "driver"|"employe"`**
+    (`routes/delivery/orders.js:902`), so a courier handed a `"1"` row by an admin would never
+    see it. `routes/delivery/driver.js:386-391` says so in-comment — *"Admin dispatch is final…
+    no second accept step is needed."*
+    Four consequences, each of which has already cost something:
+    - **The assignment push is a regular driver's ONLY accept path.** Clear the notification and
+      the booking sits at `"1"` with a courier attached and no in-app route to approve it. Any
+      "stuck, unaccepted" alert is therefore measuring a real failure mode, not a render bug.
+    - **The two admin reassign routes disagree.** `POST /api/delivery/admin/reassign`
+      (`routes/delivery/admin.js:262`) and the twin assign (`routes/twin-order.js`, ~`:1686`)
+      land at `"1"` and DO require an accept; the two above do not. "Which reassign did support
+      use" changes what the next screen means.
+    - **`approvedAt` has two BSON types.** 101,609 rows hold a `date` (the driver route and the
+      support override, `new Date()`); 50 hold a **string** (`routes/delivery/driver.js:393`,
+      `moment().utcOffset(offsetHours).format()`), so a `{$gte: <Date>}` window silently drops
+      them — the same mixed-type trap `created` has, and it cannot be fixed by casting at read
+      time alone, because `$toDate` on a `date` is a no-op but on `null` it throws.
+    - **`APPROVED` with no `approvedAt` at all exists**, because `admin.js:520` writes the status
+      and `assignedAt` and not `approvedAt` (1 row since 2026-09-25 at status 2/3/4/5, against
+      8,277 with one). So `approvedAt: {$exists: true}` is not a usable proxy for "reached
+      approved".
+    The live-ops board's first stepper label reads **"ממתין לאישור שליח"** for `"1"` for exactly
+    this reason (`shoofi-delivery-web/src/views/admin/live-ops/logic/stepper.ts`
+    `STEP_LABELS[0]`); it said "שובץ" until 2026-10-25, which told a support agent a courier was
+    on it while hiding that nobody had answered. The absence of that label still means "nobody is
+    waiting on him", never "he said yes".
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
