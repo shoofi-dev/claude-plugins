@@ -54,12 +54,18 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    pickup *and* delivery: 597 of the last 600 delivered bookings, measured 2026-10-25. So
    an admin screen cannot tell a picked-up order from a waiting one by its label, and
    "advance it to `11`" changes nothing on screen. A screen that must show נאסף **derives
-   it from `bookDelivery.status "3"`** — the live-ops board does, display-only, in
-   `shoofi-delivery-web/src/views/admin/live-ops/logic/order-status.ts`, guarding the three
-   rows that would otherwise be lied about (no order behind the booking, a driverless
-   booking an admin forced to `"3"`, and a cancelled/already-terminal order code). The set
-   that means "waiting" is `WAITING_FOR_DRIVER_ORDER_STATUSES` in
-   `shoofi-delivery-web/src/utils/pickup-overdue.ts`; test the codes, never the Hebrew.
+   it from `bookDelivery.status "3"`**, display-only, guarding the three rows that would
+   otherwise be lied about: no order behind the booking, a driverless booking an admin
+   forced to `"3"`, and a cancelled/already-terminal order code. The set that means
+   "waiting" is `WAITING_FOR_DRIVER_ORDER_STATUSES` in
+   `shoofi-delivery-web/src/utils/pickup-overdue.ts`; test the codes, never the Hebrew —
+   and `String()` them, because ~72 production rows store a status as a BSON number while
+   the Hebrew lookup coerces the key and keeps working, so a missed derivation renders a
+   plausible wrong label instead of failing. Four admin surfaces share one implementation
+   (`shoofi-delivery-web/src/utils/order-status-display.ts`, which `live-ops/logic/
+   order-status.ts` binds for the board); add a fifth by calling it, never by re-deriving.
+   ⚠️ The derived row is still **filtered by its stored code** — a card reading נאסף is
+   matched by the ממתין לשליח filter and not by נאסף.
 2. **Transition guards:** PENDING(`6`) only from FRAUD_REVIEW; store-accept rejects
    already-cancelled; `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
    not `order/update`.
