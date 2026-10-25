@@ -323,6 +323,16 @@
           "file": "services/for-you-quality/events.js",
           "regex": "^  \"checkout_left\",$",
           "desc": "doc §Where an order that never happened lives: checkout_left is among the copied checkout events"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "\\.tz\\(eta\\.add\\(minutes, \"minutes\"\\), \"Asia/Jerusalem\"\\)",
+          "desc": "CORE invariant 10(c): the delayed promise is rendered in the offset of its OWN date via momentTZ.tz, never .utcOffset(getUTCOffset()) which reads NOW - an August ETA re-rendered in October drifts an hour and, across midnight, a calendar day, and pickupTime borrows this string's date and offset to become an instant"
+        },
+        {
+          "file": "test/integration/order-update-delay-eta.js",
+          "regex": "withClockAt\\(\"2026-01-10",
+          "desc": "CORE invariant 10(c): the DST guard - an August promise delayed in January must still render +03:00. Without a frozen clock these assertions pass all summer and fail in winter (they did, on 2026-10-25)"
         }
       ]
     },

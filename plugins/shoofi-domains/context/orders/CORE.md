@@ -98,6 +98,26 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     (`services/delivery/late-delivery.js`) look like a genuine promise and vice versa, which is
     exactly what `originalExpectedDeliveryAt` exists to prevent. Delivery owns the reading rule;
     orders owns the fields, and this is the contract between them.
+    (c) **`expectedDeliveryAt` is an Israel wall-clock offset string whose offset belongs to its
+    OWN date, not to today's.** `getUTCOffset()` (`utils/utc-time.js`, copy-pasted into
+    `routes/order.js` and `utils/store-service.js`) takes no argument and returns the offset in
+    force **now**, in MINUTES — correct only for a timestamp dated today, and an ETA is not
+    always today: a scheduled order's promise can be days out and `/update-delay` has no
+    same-day guard. So the field is serialised through `momentTZ.tz(value, "Asia/Jerusalem")`,
+    which resolves the zone on the value's own instant — never `.utcOffset(getUTCOffset())`.
+    The offset is not cosmetic, because the string is read as TEXT as well as an instant:
+    `pickupTime` is a bare `"HH:mm"` that borrows this field's date AND offset to become one
+    (`shoofi-delivery-web/src/utils/pickup-overdue.ts` `clockFaceOnDayOf`, and
+    `src/views/admin/live-ops/logic/lateness.ts` `resolvePickupBefore`), and the day buckets in
+    `utils/crons/delivery-completion-delay-checker.js`, `routes/delivery/admin.js` and
+    `routes/analytics.js` range-query it lexicographically. Render an August promise with
+    October's offset and the wall clock moves an hour and, across midnight, the calendar DAY —
+    which is also the date `"24:05"` in (a) anchors to. Seen on 2026-10-25, the day Israel DST
+    ended: both admin readers resolved the pickup 1380 minutes into the past and painted an
+    on-time courier as having missed it. A test hardcoding the offset is therefore pinning a
+    real invariant, not a formatting preference — freeze the clock with
+    `test/helpers/fake-now.js` `withClockAt` on BOTH sides of the DST line, or the suite passes
+    all summer and fails in winter.
 
 11. **Line pricing has ONE server reference and two client copies that must stay in lockstep:**
     `utils/order-pricing.js` `calculateExtrasPrice(extras, selections, { soldByWeight })` is a
