@@ -46,6 +46,20 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    `bookDelivery`. A consumer that needs post-completion data reads lazily instead (the AI
    helper's `inferred` taste cache), and the AI helper's `deliveredOrders` counts COMPLETED
    statuses, not courier deliveries (reference §5).
+   ⚠️ **"ממתין לשליח" is three codes, and no order status ever means "the courier has
+   it".** `ORDER_STATUS_TEXT_HEBREW` (`shoofi-delivery-web/src/consts/shared.ts`) maps `2`,
+   `3` **and `11`** to that one string, and `10` PICKED_UP is the *takeaway* collected
+   value — nothing on a delivery path writes it. Combined with the line above (the driver
+   endpoints never write `orders.status`), a delivery order sits at `2`/`3`/`11` through
+   pickup *and* delivery: 597 of the last 600 delivered bookings, measured 2026-10-25. So
+   an admin screen cannot tell a picked-up order from a waiting one by its label, and
+   "advance it to `11`" changes nothing on screen. A screen that must show נאסף **derives
+   it from `bookDelivery.status "3"`** — the live-ops board does, display-only, in
+   `shoofi-delivery-web/src/views/admin/live-ops/logic/order-status.ts`, guarding the three
+   rows that would otherwise be lied about (no order behind the booking, a driverless
+   booking an admin forced to `"3"`, and a cancelled/already-terminal order code). The set
+   that means "waiting" is `WAITING_FOR_DRIVER_ORDER_STATUSES` in
+   `shoofi-delivery-web/src/utils/pickup-overdue.ts`; test the codes, never the Hebrew.
 2. **Transition guards:** PENDING(`6`) only from FRAUD_REVIEW; store-accept rejects
    already-cancelled; `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
    not `order/update`.

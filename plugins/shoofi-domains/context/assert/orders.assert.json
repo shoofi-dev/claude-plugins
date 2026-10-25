@@ -475,6 +475,30 @@
           "desc": "STABILITY PIN, not a regression detector - green both before and after shoofi-partner#22, which did not introduce it. Every notification the device receives while the app runs (including the server's store.wav creation push) runs the badge refresh. This is the ONLY reason that path sees a new order ~30s before the poll, which is the whole premise of the two assertions above and of the C3 warning; drop this wiring and the doc's explanation stops being true"
         }
       ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/consts/shared.ts",
+        "src/utils/pickup-overdue.ts",
+        "src/views/admin/live-ops/logic/order-status.ts"
+      ],
+      "patterns": [
+        {
+          "file": "src/consts/shared.ts",
+          "regex": "ORDER_STATUS_TEXT_HEBREW",
+          "desc": "the admin's Hebrew order-status labels — it maps 2, 3 AND 11 to the single string ממתין לשליח, so a screen cannot tell a picked-up order from a waiting one by its label (CORE invariant 1)"
+        },
+        {
+          "file": "src/utils/pickup-overdue.ts",
+          "regex": "WAITING_FOR_DRIVER_ORDER_STATUSES",
+          "desc": "the three order codes that all render ממתין לשליח; test these, never the rendered Hebrew (CORE invariant 1)"
+        },
+        {
+          "file": "src/views/admin/live-ops/logic/order-status.ts",
+          "regex": "ORDER_STATUS_TEXT_HEBREW",
+          "desc": "the live-ops order line: because no order status ever means 'the courier has it', this module derives נאסף from bookDelivery.status \"3\" for display only — never from the order code (CORE invariant 1)"
+        }
+      ]
     }
   }
 }
