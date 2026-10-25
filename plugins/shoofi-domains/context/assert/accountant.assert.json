@@ -23,7 +23,8 @@
         "utils/hashavshevet-movein.js",
         "services/accountant-export/movein.js",
         "services/accountant-export/accounts.js",
-        "services/exec-dashboard/store-registry.js"
+        "services/exec-dashboard/store-registry.js",
+        "utils/order-number.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -35,7 +36,8 @@
           "shoofiCouponCredit",
           "appliedCouponAmount",
           "calculateCommission",
-          "getDateRange"
+          "getDateRange",
+          "promotionDeliveryPortion"
         ],
         "utils/vat.js": [
           "VAT_RATE",
@@ -105,6 +107,10 @@
           "findCoveringStoreReport",
           "findCoveringDriverReport",
           "checkCompensationLock"
+        ],
+        "utils/order-number.js": [
+          "shortOrderNumber",
+          "compensationOrderNumberQuery"
         ]
       },
       "patterns": [
@@ -272,6 +278,71 @@
           "file": "routes/shoofi-admin.js",
           "regex": "rejectIfCompensationPeriodClosed\\(req,\\s*res,\\s*existingCompensation,\\s*null\\)",
           "desc": "CORE invariant 10: deleting a compensation is refused once a report covering its createdAt exists (add/edit/approve-item are locked by the same helper)"
+        },
+        {
+          "file": "utils/order-number.js",
+          "regex": "THREE_SEGMENT\\s*=\\s*/\\^\\(\\\\d\\+\\)-\\(\\\\d\\+\\)-\\(\\\\d\\+\\)\\$/",
+          "desc": "the 8-digit order number is DERIVED from the long three-segment form (first + last segment) — a compensation stores no short number, so if this derivation moves every report PDF and admin screen shows a different id from the apps"
+        },
+        {
+          "file": "utils/order-number.js",
+          "regex": "if \\(OBJECT_ID\\.test\\(text\\)\\) return \"\"",
+          "desc": "a bare Mongo _id is never shortened into 8 characters that read like a real order number — compensation.order.orderId IS the _id (normalizeCompensationOrder overwrites it), so a naive shortening prints a fake order number on a store payout document"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "compensationOrderNumberQuery\\(searchOrderNumber\\)",
+          "desc": "the compensations screen displays the 8-digit number, so its search must expand a typed NNNN-NNNN to the stored three-segment form (262 of 2,431 rows) — reverting to a raw $regex on order.orderNumber makes the number on screen find nothing, and interpolates user input into a regex"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "shortOrderNumber\\(c\\.orderNumber\\)",
+          "desc": "the driver report PDF prints the 8-digit order number; the old `c.orderNumber || c.orderId` could print a bare 24-hex Mongo _id into a delivery company's payout document"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "Body:\\s*pdfBuffer,\\s*[\\r\\n]+\\s*ACL:\\s*\"public-read\"",
+          "desc": "store settlement PDFs are UPLOADED world-readable — the doc's 'a report PDF on Spaces is published' note. Anchored on the Body/ACL pair because a bare ACL match is also satisfied by the delete path, which would let the upload go private unnoticed"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "Body:\\s*pdfBuffer,\\s*[\\r\\n]+\\s*ContentType:[^\\r\\n]*[\\r\\n]+\\s*ACL:\\s*\"public-read\"",
+          "desc": "courier settlement PDFs are uploaded world-readable, same as the store ones (ACL sits after ContentType here, unlike admin-reports.js)"
+        },
+        {
+          "file": "backfill-invoices.js",
+          "regex": "Key:\\s*s3Key,\\s*[\\r\\n]+\\s*Body:\\s*pdfBuffer,\\s*[\\r\\n]+\\s*ACL:\\s*\"public-read\"",
+          "desc": "the bulk variant: one run republishes every historical invoice PDF world-readable. Listed in the doc because a grep of routes/ alone misses it"
+        },
+        {
+          "file": "utils/invoice-mail.js",
+          "regex": "Key:\\s*`invoices/doc-\\$\\{searchString\\}\\.pdf`",
+          "desc": "the worst case for guessability in the doc's note — the customer invoice key is a short sequential provider document id, not an ObjectId"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "const key\\s*=\\s*`reports/\\$\\{appName\\}/\\$\\{reportId\\}\\.pdf`",
+          "desc": "the public URL is public store slug + report ObjectId. NOTE this literal appears twice (upload and deletePDFFromSpaces) — change both"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "const key\\s*=\\s*`driver-reports/\\$\\{companyId\\}/\\$\\{reportId\\}\\.pdf`",
+          "desc": "the courier key is a delivery-company ObjectId, not a public slug — the doc distinguishes the two. Also duplicated in the delete path"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "const result = await dbAdmin\\.storeReports\\.insertOne\\(report\\)",
+          "desc": "reportId is minted client-side by the driver (no _id is set, it is read off the insert) — the basis for the doc's 'enumerable within a monthly run' claim"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "'monthly_report'",
+          "desc": "the pdfUrl leaves as a WhatsApp monthly_report template parameter, NOT by email (the email block above it is commented out) — that is why the link cannot be recalled"
+        },
+        {
+          "file": "services/ai-tasks/constants.js",
+          "regex": "MAX_ATTACHMENT_BYTES = 8 \\* 1024 \\* 1024",
+          "desc": "the doc points at Mongo-stored, admin-gated bytes as the pattern for a NEW internal artefact, and quotes this cap as the working number under the 16MB BSON limit"
         }
       ]
     }
