@@ -179,7 +179,7 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
 
 13. **A STORE PROMOTION IS THE STORE'S PRICE, NOT A COUPON** (`docs/promotions.md` in
     shoofi-server). It lives on **`order.promotions = { items, delivery }`** — one deal of each
-    kind, each `{ promotionId, type, titleHE, titleAR, discountAmount, deliveryMode?,
+    kind (but see "combined" below), each `{ promotionId, type, titleHE, titleAR, discountAmount, deliveryMode?,
     eligibleItemIds, fundedBy: "store" }` — and **never in `appliedCoupon`** (the coupon slot is
     the customer's coupon only). Order of pricing: items → **items deal** → coupon (minimum and %
     measured on the price AFTER the deal) → coins; fee → **delivery deal**. Shape on the order:
@@ -222,6 +222,18 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       **Absent = true** (deals saved before the flag). `REPEATABLE_TYPES` in
       `utils/promotion-discount.js`; read only by `evaluatePromotion`, so quote, creation
       clamp, amend, twins and the preview all follow it. "4 sides, one bundle" is this flag.
+    - **Combined items deals (`promotion.combinable`)**: two items deals stack only when BOTH
+      are `combinable: true` (absent = false — deals saved before the flag never stack;
+      delivery deals never combine). `pickItemsDeals` (`utils/promotion-discount.js`) takes the
+      best single deal or the best stack, trying every order (≤ 6 deals); no unit is discounted
+      twice (`evaluation.consumed` / `removeConsumed`), and an order-level minimum is measured on
+      the price after the earlier deals. The order keeps ONE `promotions.items`: total +
+      `"A + B"` title + **`combined: [parts]`** — so every reader that sums/shows it (checkout,
+      partner ticket, `orderPrice` → settlement) needs no change, and **per-deal readers MUST go
+      through `dealParts(deal)`**: the redemption ledger (row per part), the creation clamp
+      (re-derives the stack from the claimed promotions), amend repricing + ledger reconcile
+      (`allocateAcrossParts`). Reading `promotions.items.promotionId` alone silently ignores
+      the second deal.
     - **One ranking, three readers**: `rankDeals` (`promotion-service.js`) is the only place
       that picks the winning deal of each kind — `quotePromotions` (the menu/cart/checkout
       quote) and the admin form's live preview (`previewPromotionQuote`,

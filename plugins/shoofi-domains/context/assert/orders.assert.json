@@ -85,7 +85,10 @@
         "utils/promotion-discount.js": [
           "evaluatePromotion",
           "DELIVERY_MODES",
-          "REPEATABLE_TYPES"
+          "REPEATABLE_TYPES",
+          "pickItemsDeals",
+          "dealParts",
+          "combineDealParts"
         ],
         "services/twin-order/twin-promotions.js": [
           "enforceTwinSidePromotions"
