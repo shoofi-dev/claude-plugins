@@ -267,7 +267,9 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     - **Items deal** — already netted into `orderPrice` with `originalOrderPrice` at list price,
       i.e. it IS the store product discount: revenue uses the charged price, **commission the
       list price**, the gap is reported as `productDiscounts`. Putting it in `appliedCoupon`
-      too would bill the store twice (lower revenue AND `campaigns`).
+      too would bill the store twice (lower revenue AND `campaigns`). Two **combined** items
+      deals (`promotions.items.combined`, both `combinable`) are still ONE netted amount in
+      `orderPrice` — settlement needs no per-deal branch.
     - **Delivery deal** — `shippingPrice` stays the full fee (courier pay, delivery tax
       invoice). The store is billed it as a campaign (`totalAppliedCouponsSum`, row code
       `מבצע`, `routes/payments/admin.js`). On a **CASH** order the courier collected that much
