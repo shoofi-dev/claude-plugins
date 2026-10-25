@@ -607,6 +607,14 @@ boundary and say so in the PR.
      the actor from the token. Calibration = how often the judge's verdict matched a person's.
    - **No customer id in what outlives the audit:** `forYouReviews` (90 days) keeps the owner only as
      a one-way hash, golden cases keep none — so account deletion does not need them.
+   - **"Not right?" — an employee's flag is believed, and goes first.** Employees see «مش مزبوط؟»
+     under every chat reply (app `components/for-you/ReplyFeedback.tsx`); it is an analytics event
+     (`button_clicked` `for_you_feedback`, the reply's `suggestionId`, reasons, a note) — no new
+     endpoint. When the event copy sees one, `recordFeedback` queues that whole conversation at once
+     with `flags` and `priority: -1` (above every critical; no judge call). A flag counts only on a
+     conversation whose audit row belongs to a customer with `isShoofiEmployee` — `app-logs/insert`
+     takes anyone's events. `flags` are always derived from the events, and one newer than a
+     person's decision reopens the review.
    - **Targets are code** (`targets.js`): changed in a reviewed PR; the funnel ones are first guesses
      (2026-10-18), to be reset from pilot data. The API and the screen are `master|admin` only.
 

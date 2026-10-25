@@ -931,6 +931,14 @@ at most `forYouReviewMaxPerDay` (300), until today's `for-you-review` spend reac
 `forYouReviewDailyBudgetUsd` ($3; ≈ $0.006 per conversation on Sonnet 5). It answers `{ verdict,
 score, issues[code], explanation, fix{type} }` in Hebrew; unknown codes are dropped.
 
+**The testing team's flag** — employees only, under each chat reply: «مش مزبوط؟» → reason chips
+(`dishes` · `wording` · `missing` · `slow` · `other`) + a note ≤ 500 → `button_clicked`
+`for_you_feedback` `{ suggestionId, conversationId, replyCode, cards, reasons, note }`. The event copy
+calls `reviewer.recordFeedback`, which writes the conversation's review now (`flags[{ turn,
+suggestionId, at, reasons, note }]`, `flagged: true`, `priority: -1`) if the audit row's owner is an
+employee (skips: `no_reply`, `unknown_reply`, `visitor`, `home_box`, `not_employee`). The queue API
+takes `flagged=1` and returns `flaggedOpen`.
+
 **Admin API** (`auth.required` + `checkAdminRole(["master","admin"])`): `GET
 /api/admin/for-you-quality/funnel?from=&to=`, `GET …/health?from=&to=` (Israel days, ≤ 31),
 `GET …/reviews?day=&severity=&status=&verdict=&limit=&skip=` (+ `bySeverity`, `byVerdict`,

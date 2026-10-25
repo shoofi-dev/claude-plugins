@@ -320,7 +320,9 @@
           "calibration",
           "priorityOf",
           "ownerOf",
-          "PROMPT_VERSION"
+          "PROMPT_VERSION",
+          "recordFeedback",
+          "flagsFrom"
         ],
         "services/for-you-quality/funnel.js": [
           "computeFunnel",
@@ -1690,6 +1692,26 @@
           "file": "test/integration/for-you-seen.js",
           "regex": "top-up: nothing unseen left — the reply is the normal one, never empty",
           "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the test that pins never empty because of seen"
+        },
+        {
+          "file": "services/for-you-quality/events.js",
+          "regex": "doc\\.properties\\?\\.button_id === \"for_you_feedback\"",
+          "desc": "doc CORE invariant 22: For you quality — the testing team's flag — the event copy queues a flag at once"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "if \\(flagged\\) return -1;",
+          "desc": "doc CORE invariant 22: For you quality — the testing team's flag — a flagged conversation goes above every critical"
+        },
+        {
+          "file": "services/for-you-quality/reviewer.js",
+          "regex": "if \\(!\\(await isEmployeeConversation\\(shoofiDb, conversation\\)\\)\\) return \\{ skipped: \"not_employee\" \\};",
+          "desc": "doc CORE invariant 22: For you quality — the testing team's flag — only an employee's own conversation is believed"
+        },
+        {
+          "file": "routes/admin/for-you-quality.js",
+          "regex": "if \\(req\\.query\\.flagged === \"1\"\\) filter\\.flagged = true;",
+          "desc": "reference §7h: the queue API filters the testing team's flags"
         }
       ]
     },
@@ -1727,7 +1749,8 @@
         "__tests__/helpers/arabic-punctuation-copy.test.ts",
         "__tests__/helpers/splash-state.test.ts",
         "components/for-you/ChatHeader.tsx",
-        "components/for-you/chat-layout.ts"
+        "components/for-you/chat-layout.ts",
+        "components/for-you/ReplyFeedback.tsx"
       ],
       "symbols": {
         "stores/ai-helper/index.ts": [
@@ -2339,6 +2362,16 @@
           "file": "components/layout/app-container/index.tsx",
           "regex": "FLOATING_TAB_BAR_SCREENS\\.indexOf\\(currentRouteName\\) > -1 \\|\\| chatOwnsInset",
           "desc": "doc reference §7g: AppContainer drops its bottom edge for the chat with minimize on — else home's footer jumps on open / close"
+        },
+        {
+          "file": "components/for-you/ReplyFeedback.tsx",
+          "regex": "appLogsStore\\.trackButtonClick\\(\"for_you_feedback\"",
+          "desc": "doc CORE invariant 22: For you quality — the testing team's flag — the flag is an analytics event, no new endpoint"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "const feedbackOn = !!userDetailsStore\\?\\.userDetails\\?\\.isShoofiEmployee;",
+          "desc": "doc CORE invariant 22: For you quality — the testing team's flag — only employees see «مش مزبوط؟»"
         }
       ]
     },
@@ -2390,6 +2423,11 @@
           "file": "src/views/admin/settings/ShoofiSettings.tsx",
           "regex": "forYouReviewDailyBudgetUsd",
           "desc": "doc CORE invariant 22: For you quality — the reviewer's daily budget is set in Settings → Shoofi"
+        },
+        {
+          "file": "src/views/admin/for-you-quality/ReviewDetail.tsx",
+          "regex": "data-testid=\"review-flags\"",
+          "desc": "reference §7h: the review detail shows the testing team's notes"
         }
       ]
     }
