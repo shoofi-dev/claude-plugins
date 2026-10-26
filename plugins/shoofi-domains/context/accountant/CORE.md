@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@241be1e4 (feat/coupon-drafts) / 2026-10-26
+last-verified: shoofi-server@4165683f (feat/coupon-funder-filter) / 2026-10-26
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -162,10 +162,10 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    - **`storeDiscount` carries two different units and no field says which.**
      Shekels normally; percentage points when `type === 'percentage'`. There is no
      validation bounding it to 0-100 in that case — `lib/schemas/newCoupon.json` sets
-     only `minimum: 0`, and `routes/coupon.js:1462` (create) / `:1702` (update) bound the
+     only `minimum: 0`, and `routes/coupon.js:1480` (create) / `:1720` (update) bound the
      split only for `fixed_amount`. **`splitType: 'percentage'` is the exception:** those coupons
      resolve the share into shekels before the order is written
-     (`resolveCouponSplit`, `routes/coupon.js:66-79`, called at `:357`), so `storeDiscount` on
+     (`resolveCouponSplit`, `routes/coupon.js:67-80`, called at `:358`), so `storeDiscount` on
      the applied snapshot is already an amount (prod check 2026-10-26: P147T5LK on a ₪118
      brixta order carries `shoofiDiscount: 71.5, storeDiscount: 0`). Any reader dividing by
      100 must exclude them. **`stores-export-new` itself does not** (`:1190-1191` checks only
@@ -341,7 +341,7 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       prefill. This applies to `delivery_free_over_min`, `delivery_reduced_price`,
       `delivery_happy_hour` and `store_fixed_off_items` (`needsFunding`). Why percent and not
       shekels: apply time resolves the percents against the discount actually given
-      (`routes/coupon.js:66-79`, `:357` typed, `:1249` auto-apply), so the store pays its share
+      (`routes/coupon.js:67-80`, `:358` typed, `:1250` auto-apply), so the store pays its share
       of the real fee under the ceiling. A shekel split is billed NOMINALLY
       (`routes/payments/admin.js:1192-1194`), which over-bills whenever the fee is below the
       ceiling, and that is the usual case (fees seen: 17, 18, 20, 28, 32, 35). It is safe end
@@ -374,9 +374,9 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       draft can't create two coupons. Any edit reopens the draft.
     - **Central `shoofi` DB only** (`shoofiDbOf = req.app.db.shoofi`): drafts, code reservation,
       translations, settle. The create route itself still picks its DB from the `app-name`
-      header with no fallback (`routes/coupon.js:1368-1369`); the admin web's interceptor
+      header with no fallback (`routes/coupon.js:1386-1387`); the admin web's interceptor
       defaults it to `shoofi`. A coupon written anywhere else is invisible to apply
-      (`routes/coupon.js:142`) and to settlement (`routes/payments/admin.js:1049`).
+      (`routes/coupon.js:143`) and to settlement (`routes/payments/admin.js:1049`).
     - **The #320 default-split trap is handled in drafts but STILL LIVE in the plain picker**
       (`POST /api/admin/coupon-templates/:id/resolve` → prefill → CouponForm). Lowering an
       amount under the fixed default split now returns **422** with the invariant
@@ -385,6 +385,35 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       `shoofiCouponCredit` reimburses the store `min(50, applied)` and the store bears the rest
       of a "Shoofi" compensation. The fix (derive the split from the amount) belongs in
       `coupon-templates.js`, as its own change.
+
+14. **Who funds a GLOBAL coupon is decided by the store's share alone** — the admin coupons
+    list's `funder=shoofi|store|split` filter (`GET /api/admin/coupons`, plus `isActive=now` =
+    on AND within its dates) and each row's `funder`. Rule: `services/coupons/coupon-funder.js`
+    (`funderOf` for one coupon, `funderFilter` for the same rule as Mongo buckets,
+    `activeNowFilter`). **It is a display/filter rule, NOT a billing path.** Settlement never
+    calls it. It restates what `stores-export-new` already does, so if settlement changes,
+    this file follows; never the other way round.
+    - **Share:** `storePercent` out of 100 for `splitType: 'percentage'` (resolved per order,
+      `routes/coupon.js:67-80`); otherwise `storeDiscount` out of `value`. The bucket is
+      `shoofi` when the share is null or 0, `store` when it covers the whole value (or 100%),
+      and `split` for anything between. That is because the store is billed its share
+      (`routes/payments/admin.js:1140`, `:1146-1160` fallback, truthy gate `:1188`), and
+      whatever it isn't billed is Shoofi's (`lib/payments/calc.js:161`).
+    - **`shoofiDiscount` is never read for a public coupon** (only for customer-specific
+      `order_items`, `admin.js:1209`). So both shares null/0 means Shoofi pays, and
+      shoofi + store < value with store > 0 is a split.
+    - **The bucket doesn't say how much the store is billed.** A fixed store share is billed
+      at its nominal amount (`admin.js:1192-1194`): a ₪20 share on a ₪17 fee bills ₪20 and
+      still counts as `store`. A `type: 'percentage'` fixed share is percent points of the
+      items subtotal (`:1190-1191`), compared against `value` in the same units.
+    - **Out of scope (`null`):** customer-specific coupons (never billed to a store, `:1188`)
+      and value-0 tag coupons. An **`onlyForOneCustomer`** voucher is global only until its
+      first use, which claims it and sets `isCustomerSpecific: true`
+      (`services/coupons/coupon-usage.js:171`). From then on its store share is not billed,
+      and it leaves the filter.
+    - **Dates:** `start`/`end` are strings with mixed +02:00/+03:00 offsets, so
+      `activeNowFilter` converts them with `$convert … onError: null` and never compares them
+      as text. Prod 2026-10-26, active now and global: 29 Shoofi, 5 store, 0 split.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
