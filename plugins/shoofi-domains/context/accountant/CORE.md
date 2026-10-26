@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@561e3ca / 2026-07-28
+last-verified: shoofi-server@241be1e4 (feat/coupon-drafts) / 2026-10-26
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -22,7 +22,9 @@ Server: `routes/payments/{admin-reports,admin,summaries}.js`, `routes/driver-rep
 report a compensation belongs to + the post-report lock, invariant 10), `services/financial-overview/` (the live overview —
 it RUNS the two report engines over any range; never re-derive money there), and the accountant's
 Hashavshevet export `services/accountant-export/` + `utils/hashavshevet-movein.js` (reference §7b —
-its amounts are EZcount's per-line rounding, never `round2(totalOutcomes)`). Client: the
+its amounts are EZcount's per-line rounding, never `round2(totalOutcomes)`). Coupon **funding** set by the
+support team's coupon drafts (`services/coupons/coupon-drafts.js`, `routes/admin/coupon-drafts.js`,
+invariant 13) — the coupon itself is still written by `routes/coupon.js` (not yours). Client: the
 reports/payout screens and `views/admin/financial-overview/` in `shoofi-delivery-web`.
 **🔒 CLAUDE.md do-not-touch overlap:** `routes/hyp.js`, `utils/hyp.js`,
 `utils/invoice-provider.js`, `lib/payments/`. You depend on `routes/order.js` for order
@@ -130,7 +132,7 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `customers.orders[]` snapshot. Keep it that way.
 7. **A store's coupon cost (`reportData.campaigns`) is the coupon's NOMINAL
    `storeDiscount`, never the waiver the customer actually got**, and the gate that
-   decides it is **blind to `discountType`** (`routes/payments/admin.js:1135-1142`,
+   decides it is **blind to `discountType`** (`routes/payments/admin.js:1188-1194`,
    feeding `totalAppliedCouponsSum` → `campaignsTotal` → `campaigns`):
    `if (storeDiscount && !isSpecificToCustomers && discountType !== 'full_discount')`.
    Three consequences that keep getting rediscovered:
@@ -149,10 +151,10 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      express. `couponDeliverySplit` (`lib/payments/calc.js`) therefore takes that
      percentage off **`order.shippingPrice`** — the same base `computeDiscountCap`
      strikes a delivery coupon's own `value` against (`utils/coupon-discount.js:34-42`),
-     which is the exact parallel of `:1138` using `orderPrice` for an items coupon. NOT
+     which is the exact parallel of `:1191` using `orderPrice` for an items coupon. NOT
      off the waiver (that halves a partial discount's store share) and NOT off
      `effectiveDeliveryFee` (a coupon can never touch the twin combination fee). It
-     **deliberately diverges from `:1137-1138` for these coupons**;
+     **deliberately diverges from `:1190-1191` for these coupons**;
      `isPercentageStoreDeliveryCoupon` counts them so the divergence is measurable
      (`percentageShareCoupons` on the exec-dashboard month detail) rather than
      invisible. Fixing the report's base to match is a **live billing change** — it
@@ -163,20 +165,41 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      only `minimum: 0`, and `routes/coupon.js:1462` (create) / `:1702` (update) bound the
      split only for `fixed_amount`. **`splitType: 'percentage'` is the exception:** those coupons
      resolve the share into shekels before the order is written
-     (`routes/coupon.js:48-74`, `:345`), so `storeDiscount` on the applied snapshot is
-     already an amount. Any reader dividing by 100 must exclude them or it bills ₪0.14
-     where the store owes ₪14. `splitType: 'percentage'` is also the built-for-purpose
+     (`resolveCouponSplit`, `routes/coupon.js:66-79`, called at `:357`), so `storeDiscount` on
+     the applied snapshot is already an amount (prod check 2026-10-26: P147T5LK on a ₪118
+     brixta order carries `shoofiDiscount: 71.5, storeDiscount: 0`). Any reader dividing by
+     100 must exclude them. **`stores-export-new` itself does not** (`:1190-1191` checks only
+     `type`; nothing under `routes/payments/` or `lib/payments/` reads `splitType`): a
+     `type: 'percentage'` + `splitType: 'percentage'` coupon with a store share bills
+     `storeDiscount × orderPrice / 100`: a ₪30 share on a ₪200 order bills ₪60, and the bill is
+     right only when `orderPrice` is exactly ₪100. **OPEN, awaiting an owner ruling** (Known
+     status). Exposure today is nil: prod has 2 such coupons (P147T5LK, OTWX1AR6, both
+     `storePercent: 0`), so the gate never fires. Coupon drafts exclude `store_percentage_off`
+     for this reason (invariant 13). `splitType: 'percentage'` is also the built-for-purpose
      way to express a varying-fee split — prefer it over `type: 'percentage'` when
-     configuring delivery campaigns.
-   - **The row pushed at `:1145` carries no items/delivery split** (unlike the
-     `full_discount` rows at `:1236`), so `campaignsList` is not splittable for
+     configuring delivery campaigns. **`type: 'fixed_amount'` + `splitType: 'percentage'` is
+     the safe way to give a store a share of a coupon** (verified 2026-10-26). Every reader
+     treats `storeDiscount` as percent points only when `type === 'percentage'`:
+     `stores-export-new` `:1190-1194`, the legacy export `:979-984`, `couponDeliverySplit`
+     (`lib/payments/calc.js:156-161`), `routes/payments/summaries.js:131-135` and
+     `services/exec-dashboard/coupon-funding.js:207`. Prod has 12 such coupons, all auto-applied
+     delivery coupons (ICF86DOX joker 20/80, YNM83RFF 50/50, the vapego coupons 0/100). All
+     333 orders checked carry `storeDiscount = discountAmount × storePercent`, and the sent
+     reports bill exactly that (vapego ₪20/₪28 = the actual fee; joker ₪16; snooshy ₪6.80 on a
+     ₪17 fee). A **shekel** split is billed nominally instead: ₪4/₪16 on a ₪15 fee bills ₪16
+     (Shoofi −₪1), and a store-funded ₪40 ceiling bills ₪40 on a ₪20 fee. Two limits:
+     never combine it with `type: 'percentage'` (the OPEN item above), and never use it on a
+     `full_discount` partial-use coupon, whose breakdown treats the snapshot split as a running
+     budget (`services/coupons/coupon-usage.js:424-425`).
+   - **The row pushed at `:1206` carries no items/delivery split** (unlike the
+     `full_discount` rows at `:1296`), so `campaignsList` is not splittable for
      `delivery`/`order_items` coupons. `full_discount` is the **only** coupon type with a
      stored 2×2 split (`getFullDiscountMatrix`); everything else must be re-derived from
      the order at read time — see `couponDeliverySplit` in `lib/payments/calc.js`.
    `campaigns` is an **outcome** feeding `totalOutcomes` → `totalForTransfer`, so this is
    live money. Do not "fix" the percentage base as a side effect of another change — it
    moves what stores are charged. **Ask.**
-   *(Do not mirror `admin.js:907-944` either — that is the legacy `/stores-export`
+   *(Do not mirror `admin.js:953-986` either — that is the legacy `/stores-export`
    endpoint, which bills `storeDiscount` for every coupon including customer-specific and
    `full_discount`. Settlement uses `/stores-export-new`.)*
 
@@ -305,6 +328,64 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       `createdAt` plus store/company identity; the order number appears in no invoice, credit
       note or MASAV row.
 
+13. **Coupon drafts decide who funds a coupon — they ask, never guess** (support builds a coupon
+    from one #320 template with Claude; shoofi-server `docs/coupon-drafts.md` — read it first;
+    pure rules in `services/coupons/coupon-drafts.js`, endpoints in `routes/admin/coupon-drafts.js`).
+    `shoofiDiscount`/`storeDiscount` don't change what the customer pays; they ARE the
+    settlement (invariant 7), so the draft owns them:
+    - **Funding is a question, and the answer is always a PERCENT split.** `computeDraftView`
+      blocks until `funding.mode ∈ shoofi | store | split` is answered. Then the prefill
+      becomes `splitType: 'percentage'` with Shoofi 100/0 (`FUNDING_SHOOFI_PERCENT.shoofi`),
+      0/100 (`.store`) or `split` `{shoofiPercent: X}` → X / 100−X. `shoofiDiscount` and
+      `storeDiscount` are null, and `assertTemplateInvariants` is re-run on the overridden
+      prefill. This applies to `delivery_free_over_min`, `delivery_reduced_price`,
+      `delivery_happy_hour` and `store_fixed_off_items` (`needsFunding`). Why percent and not
+      shekels: apply time resolves the percents against the discount actually given
+      (`routes/coupon.js:66-79`, `:357` typed, `:1249` auto-apply), so the store pays its share
+      of the real fee under the ceiling. A shekel split is billed NOMINALLY
+      (`routes/payments/admin.js:1192-1194`), which over-bills whenever the fee is below the
+      ceiling, and that is the usual case (fees seen: 17, 18, 20, 28, 32, 35). It is safe end
+      to end; see the prod evidence at invariant 7. 100/0 is settled the same as the old
+      `shoofiDiscount = value` shape (the store is billed 0 and Shoofi's delivery cost is
+      `total − store`). It is stored as percentage only so there is one shape, and so the order
+      shows Shoofi's real cost. If the model leaves funding open without asking, the route adds
+      the question itself (`FUNDING_QUESTION`, `routes/admin/coupon-drafts.js`). The template's
+      fixed defaults (₪10 + ₪10 …) are never used. Templates with no split fields (`delivery_free_personal`,
+      `delivery_free_new_user`, `compensation_full_order`, `referral_reward`) keep the split
+      they derive from their own amount.
+    - **`SHOOFI_FUNDED_TEMPLATES` = `compensation_items_only`, `gift_voucher`**: always
+      `shoofiDiscount = amount, storeDiscount = 0`, no question. Why: a customer-specific coupon's
+      store share is never billed (`routes/payments/admin.js:1188` `!isSpecificToCustomers`), and
+      an empty/0 `shoofiDiscount` there is credited to the store at `coupon.value`
+      (`:1180-1181`). A "store-funded" customer coupon is therefore fiction that Shoofi pays —
+      **a store-paid compensation is a compensations row** (`payingParty: business` →
+      `compensationsToCustomers`, invariant 8), never a coupon split.
+    - **`DRAFT_EXCLUDED_TEMPLATES.store_percentage_off`** — invariant 7's OPEN
+      percentage-split question. Lift it only with the owner's ruling AND a matching change at
+      `routes/payments/admin.js:1190-1191`, never by deleting the entry alone. The ordinary
+      coupon form still creates such coupons.
+    - **Approval never writes a coupon.** `approve` writes the label translations, reserves a
+      code, and returns `buildCreateFields(...)` — the exact multipart fields CouponForm posts
+      (targeting **top-level** JSON strings; numbers as strings so `"0"` survives the route's
+      truthiness checks; `createdBy` = the approver). The admin web posts them to the
+      **unchanged** `POST /api/admin/coupon/create`; `routes/coupon.js` is untouched and every
+      create check applies. `settleApproval` (on every read and on `confirm`) marks an
+      `approving` draft `created` once its reserved code exists in `shoofi.coupons`, so one
+      draft can't create two coupons. Any edit reopens the draft.
+    - **Central `shoofi` DB only** (`shoofiDbOf = req.app.db.shoofi`): drafts, code reservation,
+      translations, settle. The create route itself still picks its DB from the `app-name`
+      header with no fallback (`routes/coupon.js:1368-1369`); the admin web's interceptor
+      defaults it to `shoofi`. A coupon written anywhere else is invisible to apply
+      (`routes/coupon.js:142`) and to settlement (`routes/payments/admin.js:1049`).
+    - **The #320 default-split trap is handled in drafts but STILL LIVE in the plain picker**
+      (`POST /api/admin/coupon-templates/:id/resolve` → prefill → CouponForm). Lowering an
+      amount under the fixed default split now returns **422** with the invariant
+      (`err.code = 'COUPON_TEMPLATE_INVARIANT'`; it used to be a 500). **Raising** the amount
+      is silent: `compensation_items_only` at ₪100 keeps `shoofiDiscount: 50`, so
+      `shoofiCouponCredit` reimburses the store `min(50, applied)` and the store bears the rest
+      of a "Shoofi" compensation. The fix (derive the split from the amount) belongs in
+      `coupon-templates.js`, as its own change.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
@@ -319,6 +400,12 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
   issued tax invoice only **warns** (logging `hypInvoiceDocUuid`, needed by
   `/api/hyp/admin/reports/:id/cancel-invoice` once the row is gone) — cancelling or
   credit-noting at the provider stays a separate, manual step.
+- **OPEN — needs an owner ruling (2026-10-26):** `stores-export-new` reads a percentage-split
+  (`splitType: 'percentage'`) `type: 'percentage'` coupon's already-in-shekels `storeDiscount`
+  as percentage points (`routes/payments/admin.js:1190-1191`) and bills
+  `storeDiscount × orderPrice / 100`. Today it bills ₪0 in prod (the only 2 such coupons are
+  100% Shoofi). Until there is a ruling, coupon drafts refuse `store_percentage_off`
+  (invariant 13); the ordinary form does not. Any fix is a live billing change → HIGH-RISK PR.
 - **OPEN — flagged, needs a decision:** `reset-invoice` only clears the *local* invoice fields;
   it does **not** cancel the document at GreenInvoice/HYP, so a following `create-invoice`
   issues a **second** invoice. Do not silently change behavior — ask.

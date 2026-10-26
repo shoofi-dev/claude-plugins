@@ -30,7 +30,8 @@
         "services/ai/pricing.js",
         "routes/ai-helper.js",
         "utils/extras-required.js",
-        "services/menu/promotions.js"
+        "services/menu/promotions.js",
+        "services/translations/"
       ],
       "shoofi-partner": [
         "screens/admin/product",
@@ -139,14 +140,19 @@
         "utils/greeninvoice.js",
         "utils/invoice-provider.js",
         "services/compensations/",
-        "services/promotions/"
+        "services/promotions/",
+        "routes/admin/coupon-drafts.js",
+        "services/coupons/coupon-drafts.js",
+        "services/coupons/coupon-draft-assistant.js"
       ],
       "shoofi-delivery-web": [
         "src/views/admin/DriverPayments.tsx",
         "src/views/admin/DriverBonuses.tsx",
         "src/views/admin/CompensationManagement.tsx",
         "src/views/admin/driver-reports/",
-        "src/views/admin/generate-stores-summaries.tsx"
+        "src/views/admin/generate-stores-summaries.tsx",
+        "src/views/admin/coupon-drafts/",
+        "src/apis/admin/coupon-drafts.ts"
       ]
     },
     "delivery": {

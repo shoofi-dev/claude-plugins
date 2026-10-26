@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@561e3ca / 2026-07-28",
+  "lastVerified": "shoofi-server@241be1e4 (feat/coupon-drafts) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -24,7 +24,11 @@
         "services/accountant-export/movein.js",
         "services/accountant-export/accounts.js",
         "services/exec-dashboard/store-registry.js",
-        "utils/order-number.js"
+        "utils/order-number.js",
+        "services/coupons/coupon-drafts.js",
+        "routes/admin/coupon-drafts.js",
+        "services/coupons/coupon-templates.js",
+        "routes/admin/coupon-templates.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -111,6 +115,18 @@
         "utils/order-number.js": [
           "shortOrderNumber",
           "compensationOrderNumberQuery"
+        ],
+        "services/coupons/coupon-drafts.js": [
+          "computeDraftView",
+          "buildCreateFields",
+          "pickCouponCode",
+          "DRAFT_EXCLUDED_TEMPLATES",
+          "SHOOFI_FUNDED_TEMPLATES",
+          "VALUE_FIELD"
+        ],
+        "routes/admin/coupon-drafts.js": [
+          "settleApproval",
+          "shoofiDbOf"
         ]
       },
       "patterns": [
@@ -343,6 +359,71 @@
           "file": "services/ai-tasks/constants.js",
           "regex": "MAX_ATTACHMENT_BYTES = 8 \\* 1024 \\* 1024",
           "desc": "the doc points at Mongo-stored, admin-gated bytes as the pattern for a NEW internal artefact, and quotes this cap as the working number under the 16MB BSON limit"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "if\\s*\\(couponType === 'percentage'\\)\\s*\\{\\s*[\\r\\n]+\\s*discountAmount\\s*=\\s*\\(storeDiscount\\s*/\\s*100\\)\\s*\\*\\s*orderPrice;",
+          "desc": "CORE invariant 7 / Known status OPEN: stores-export-new checks only `type`, never `splitType`, so a percentage-split percentage coupon's already-in-shekels storeDiscount is billed as percent points. If this line gains a splitType guard, the OPEN item is resolved — update CORE and lift DRAFT_EXCLUDED_TEMPLATES deliberately"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "const DRAFT_EXCLUDED_TEMPLATES = \\{\\s*[\\r\\n]+\\s*store_percentage_off:",
+          "desc": "CORE invariant 13: drafts refuse store_percentage_off until the owner rules on the percentage-split billing at routes/payments/admin.js:1190-1191"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "const SHOOFI_FUNDED_TEMPLATES = new Set\\(\\['compensation_items_only', 'gift_voucher'\\]\\)",
+          "desc": "CORE invariant 13: customer-specific coupons and vouchers are always Shoofi-funded — a store share on a customer-specific coupon is never billed (admin.js:1188) and an empty shoofiDiscount is credited at coupon.value (admin.js:1180-1181)"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "const FUNDING_SHOOFI_PERCENT = \\{ shoofi: 100, store: 0 \\};",
+          "desc": "CORE invariant 13: the 'shoofi' and 'store' funding modes are 100/0 and 0/100 PERCENT splits — never shoofiDiscount/storeDiscount = value, which settlement bills nominally"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "Object\\.assign\\(prefill, \\{\\s*[\\r\\n]+\\s*splitType: 'percentage',\\s*[\\r\\n]+\\s*shoofiPercent,\\s*[\\r\\n]+\\s*storePercent: [^\\n]*100 - shoofiPercent[^\\n]*,\\s*[\\r\\n]+\\s*shoofiDiscount: null,\\s*[\\r\\n]+\\s*storeDiscount: null,\\s*[\\r\\n]+\\s*\\}\\);\\s*[\\r\\n]+[^\\n]*[\\r\\n]+\\s*assertTemplateInvariants\\(prefill, template\\.id\\);",
+          "desc": "CORE invariant 13: drafts' funding is stored as splitType 'percentage' (X / 100−X) with the shekel fields nulled, and the overridden prefill is re-checked by assertTemplateInvariants — apply time resolves the share against the real discount (routes/coupon.js:66-79)"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "block\\('מי מממן את ההנחה\\?",
+          "desc": "CORE invariant 13: an unanswered funding question is a blocker — approval cannot proceed on a guessed split"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "stores: JSON\\.stringify\\(doc\\.applicableTo\\.stores \\|\\| \\[\\]\\)",
+          "desc": "CORE invariant 13: buildCreateFields puts targeting TOP-LEVEL — routes/coupon.js create reads req.body.stores, and the nested applicableTo alone creates a platform-wide coupon (the store that gets billed)"
+        },
+        {
+          "file": "routes/admin/coupon-drafts.js",
+          "regex": "const shoofiDbOf = \\(req\\) => req\\.app\\.db\\.shoofi;",
+          "desc": "CORE invariant 13: drafts, code reservation, translations and settle use the central shoofi DB only — never the app-name header the create route trusts"
+        },
+        {
+          "file": "routes/admin/coupon-drafts.js",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*\\.coupons\\.(insertOne|insertMany|updateOne|updateMany|replaceOne|findOneAndUpdate|findOneAndReplace|deleteOne|deleteMany|bulkWrite)\\()",
+          "desc": "CORE invariant 13 (negative pin): the drafts router never writes shoofi.coupons — approval returns CouponForm fields and the coupon is created only by the unchanged POST /api/admin/coupon/create"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*\\.(insertOne|insertMany|updateOne|updateMany|replaceOne|bulkWrite)\\()",
+          "desc": "CORE invariant 13 (negative pin): the drafts service is pure — no writes of any kind"
+        },
+        {
+          "file": "routes/admin/coupon-drafts.js",
+          "regex": "shoofiDb\\.coupons\\.findOne\\(\\{ code: draft\\.approval\\.code \\}\\)",
+          "desc": "CORE invariant 13: settle-on-read — an approving draft whose reserved code exists is marked created, so one draft can never create a second coupon"
+        },
+        {
+          "file": "routes/admin/coupon-templates.js",
+          "regex": "err\\.code === 'COUPON_TEMPLATE_INVARIANT'\\)\\s*\\{\\s*[\\r\\n]+\\s*return res\\.status\\(422\\)",
+          "desc": "CORE invariant 13: the plain #320 picker turns a too-low amount under the fixed default split into a 422 — the too-HIGH case is still silent there"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "router\\.post\\('/api/admin/coupon/create', upload\\.array\\(\"img\"\\), async \\(req, res\\) => \\{\\s*[\\r\\n]+\\s*const appName = req\\.headers\\['app-name'\\];",
+          "desc": "CORE invariant 13: the create route still picks its DB from the app-name header with no 'shoofi' fallback, while apply and settlement read shoofi — the reason drafts pin the central DB"
         }
       ]
     }
