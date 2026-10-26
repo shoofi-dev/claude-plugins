@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@561e3ca / 2026-07-28
+last-verified: shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -48,6 +48,9 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 5. **Client-trusts-totals:** the server charges `orderDoc.total` from the client body — it does
    **NOT** recompute the cart in the charge path. The only checks are the mismatch backstop and
    the zero-total→CASH downgrade. **Never weaken this without explicit sign-off.**
+   ONE coupon type is the exception at order CREATION (not in the charge path): a
+   `delivery_price` coupon's discount is recomputed server-side before the charge, because it
+   grows with the client-posted fee. See "Coupons between quote and charge" below.
 6. **Coins/coupons settle only AFTER payment success**; failures log CRITICAL for manual
    reconciliation — never roll back an irreversible capture.
 7. **Order dedup lock** (Redis `SET NX` + fallback + recent-order window) prevents double charges.
@@ -138,6 +141,61 @@ icons. Filters run in this order, and each one can only remove methods:
 ⚠️ **Hiding a method is UI-only.** `/api/order/create` does not check the payment method
 against any of these rules, for any order, school or not. A stale or tampered client can still
 send CASH. Enforcing the rules at order creation is a `routes/order.js` change and needs sign-off.
+
+## Coupons between quote and charge (money-in view)
+The server computes every coupon discount; the app only displays `discountAmount` and posts it
+back in `appliedCoupon` with a client-computed `total` (`components/total-price`). There is ONE
+formula module, `utils/coupon-discount.js` (`computeCouponDiscount`), used by
+`/api/coupons/apply`, the auto-apply scorer (`routes/coupon.js`), amend and shadow pricing
+(`utils/order-pricing.js`). Creation re-checks ownership and partial-use balances only
+(`enforceCouponEntitlement`) — **except** for the fixed-delivery-price type.
+
+**Fixed delivery price** — `type: 'delivery_price'`, `discountType: 'delivery'`,
+`deliveryPrice: X` (what the customer pays for delivery), `value` = `maxDiscount` = the cap
+(required, > 0), always `splitType: 'percentage'`, never `allowPartialUse` / `isFreeDelivery`
+(admin create/update refuse those shapes).
+- Discount = `min(cap, max(0, fee − X))`, rounded to 2dp — `computeDeliveryPriceDiscount`.
+  `computeCouponDiscount` dispatches on the TYPE first, before partial use or the generic cap;
+  anything malformed (missing price/cap, fee ≤ 0) is ₪0.
+- **It is its own type so it FAILS CLOSED:** any reader that does not know it falls to
+  `default: return 0`, and `isCashValuedCoupon` is false (never a wallet cash balance).
+  Do not re-model it as `fixed_amount` — every un-updated reader would then compute
+  `min(cap, fee)` or show ₪cap as money.
+- Auto-apply calls the shared formula for this type (the scorer's own branches are for the
+  other types) and **drops a ₪0 result**, so a fee ≤ X never wins as a ₪0 "coupon applied".
+- **Client-feature gate:** it is shown only to bundles sending
+  `x-client-features: delivery-price-coupon` (`utils/client-features.js`; OTA-safe, unlike
+  `app-version`, which is the binary). Without it the coupon is filtered from active,
+  available, customer-available, wallet and auto-apply; app-type `shoofi-admin` is exempt.
+  Older bundles would be CHARGED correctly (the server computes the discount) — the gate is
+  about what they would show.
+- `/api/coupons/apply` errors: **400 `APP_UPDATE_REQUIRED`** (bundle lacks the feature) and
+  **400 `COUPON_NO_DISCOUNT`** (₪0 on this order — fee ≤ X, or takeaway). The response carries
+  `deliveryPrice` on the coupon; that snapshot is what lands on `order.appliedCoupon.coupon`
+  and what amend re-prices from, so never drop it from the hand-listed response.
+- **Why creation recomputes it, and only it:** every other delivery coupon is bounded by its
+  own value, but this discount grows with `shippingPrice`, which the client posts and nothing
+  else validates. An inflated fee costs the customer nothing (they pay X either way) and the
+  difference lands on Shoofi/store funding and, on cash, the courier reimbursement.
+  `enforceDeliveryPriceCoupon` (`services/coupons/delivery-price-enforcement.js`, called in
+  `/api/order/create` after promotions) re-reads the coupon DOCUMENT, bounds the fee by
+  `resolveDeliveryTariffCeiling`, subtracts a kept store delivery deal, and keeps
+  `min(posted, server)`; ₪0 drops the coupon (no `couponUsages` row). A failed check drops it
+  too. Twin: `enforceTwinSideDeliveryPrice` — one ₪X on the primary's fee, none on the
+  secondary.
+- **Correct, never reject — the charge consequence.** The guard only ever lowers the discount,
+  so it RAISES `total` by `removed` and records `deliveryPriceCouponEntitlement`.
+  - Card / HYP token / HYP native wallet: charged after the guard, so the corrected total is
+    what is charged. Twin card capture sums the persisted side totals (`computeCombinedTotal`),
+    so it charges the corrected amount too.
+  - ZCredit Apple/Google Pay (sheet amount fixed before create): `finalizeApplePayOrder`'s
+    mismatch backstop sees charged < total → **FRAUD_REVIEW**. That is invariant 3 working;
+    do not "fix" it by skipping the guard for wallets.
+  - ⚠️ Flagged, no verdict: the HYP hosted page (`paymentProvider: 'HYP'`, paid before create)
+    and twin digital placement have **no** amount backstop (twin is exempt), so a correction
+    there leaves charged < `order.total` silently — only `deliveryPriceCouponEntitlement`
+    records it. A legitimate current client posts the server's number, so this fires on a
+    tampered or stale fee, or where the tariff ceiling disagrees with the app's area price.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.

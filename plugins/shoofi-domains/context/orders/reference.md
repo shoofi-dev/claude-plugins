@@ -92,7 +92,11 @@ the server's). Anything reading `order.readyMinutes` (e.g. `computeOrderDelays` 
 `POST /api/order/create` (`order.js`) — ordered side effects:
 lock (Redis `SET NX` + in-mem fallback + 30s dup check) → fraud checks → generate
 `originalOrderId`/`orderId` → image upload → decide initial status → validate coins
-(no debit) → build `orderDoc` → **insert into store `orders`** (authoritative) →
+(no debit) → price corrections, in this order: coupon entitlement (`enforceCouponEntitlement`:
+ownership + partial-use balance only) → store promotions + the delivery deal-vs-coupon
+conflict (`enforcePromotions`, `resolveDeliveryConflict`) → **fixed-delivery-price coupon
+recompute** (`enforceDeliveryPriceCoupon`, CORE invariant 14). Each one corrects `total`
+and never rejects → build `orderDoc` → **insert into store `orders`** (authoritative) →
 **stock decrement if status≠"0"** → first-order attribution → Apple Pay session
 self-heal → fraud persistence → **push `customers.orders[]` snapshot (central)** →
 notify store owner (**a repeating alert, not one push**, **fired in the background and
@@ -113,6 +117,15 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   sides `6`. No partial-refund coordination (single capture).
 - **Fee**: customer always pays the full base delivery fee; coupons never reduce
   the combination fee (`twin-fee-service.js`).
+- **Coupons**: each side's `appliedCoupon` is the client's split (`shoofi-app
+  utils/coupon-split.ts`). A delivery coupon goes 100% to the primary, the only side with
+  `shippingPrice`, and the sides are stored as posted. The one server re-price is the
+  fixed-delivery-price coupon: `enforceTwinSideDeliveryPrice` runs after
+  `enforceTwinSidePromotions` in `/place` and `/digital-place-pending`. It gives one ₪X on the
+  primary's tariff-capped fee, and a claim on the secondary (fee 0) is removed (CORE invariant 14).
+  Not handled: `degradeToSingle` with `keepSide:'secondary'` moves the FULL primary fee onto the
+  kept order (`$inc total`) while the primary's coupon usage stays. This was already true for
+  every delivery coupon before this change.
 - **Dispatch**: longer-prep side dispatched first; second side revealed on first accept.
 - **Cancel/degrade**: `cascadeCancel` (both), `degradeToSingle` (keep one, record
   `degrade.refundOwed`), `undoDegrade` (bails if refund cleared).

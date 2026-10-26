@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -18,7 +18,8 @@ customer order history, order crons, and the order-side wiring of secondary feat
 Server: `routes/order.js`, `routes/twin-order.js`, `routes/order-fraud-*.js`,
 `routes/admin/order-monitoring.js`, `services/twin-order/*`, `utils/order-stock.js`,
 `utils/order-pricing.js` + `utils/order-pricing-shadow.js`, `routes/order-amend.js`,
-order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
+`services/coupons/delivery-price-enforcement.js` + `services/twin-order/twin-delivery-price.js`
+(the order-side guard for fixed-delivery-price coupons, invariant 14), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
 (shoofir), monitoring/twin-admin (delivery-web).
 
 **Not yours:** payment internals (`payments`), settlement/payouts (`accountant`), driver
@@ -241,6 +242,56 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       with the store's other running deals (minus the saved copy of the deal being edited),
       ignores the draft's dates/active switch, skips caps and writes nothing. Do not give the
       preview its own ranking: it exists to tell support what checkout will really do.
+
+14. **A FIXED DELIVERY PRICE COUPON IS RE-PRICED BY THE SERVER, unlike every other coupon**
+    (`docs/fixed-delivery-price.md` in shoofi-server). `type: 'delivery_price'`,
+    `discountType: 'delivery'`, `deliveryPrice: X`, cap `maxDiscount` (=`value`, required),
+    percent split only. Discount = `min(cap, max(0, fee − X))` from ONE formula,
+    `computeDeliveryPriceDiscount` (`utils/coupon-discount.js`), which every caller reaches through
+    `computeCouponDiscount`. Its own type is there so that it FAILS CLOSED: a reader that does not
+    know the type gives ₪0 off, never `min(value, fee)`. It needs this because it is the one
+    coupon whose discount GROWS with the client-quoted `shippingPrice`, so an inflated fee costs
+    the customer nothing while the funder and the cash courier pay `fee − X`.
+    - **Creation guard** (`enforceDeliveryPriceCoupon`, `services/coupons/delivery-price-enforcement.js`)
+      runs in `/api/order/create` **after** the entitlement block AND after the promotions block
+      (its `resolveDeliveryConflict`), and **before** `const orderDoc = {`. So the order is:
+      ownership/balance → deals + the deal-vs-coupon conflict (on the POSTED amount) →
+      fixed-price recompute → orderDoc. It runs only when the coupon DOCUMENT or the snapshot says
+      `delivery_price`.
+      - fee = `DELIVERY ? min(shippingPrice, resolveDeliveryTariffCeiling) − kept delivery deal : 0`.
+        The deal subtraction only matters if the promotions block failed and both survived.
+      - The snapshot's money fields (`MONEY_FIELDS`) are overwritten from the document, and the
+        split is re-resolved (`resolveCouponSplit`, now in `utils/coupon-discount.js`) on the final
+        discount.
+      - Final = `min(posted, server)`: never more than quoted (the charge was made for the quote).
+        The difference is added back to `total` and recorded on `order.deliveryPriceCouponEntitlement`.
+      - **₪0 drops the coupon** (`appliedCoupon = null`), so no `couponUsages` row burns a redemption.
+        This covers pickup, a fee ≤ X, a code whose document is not `delivery_price`
+        (`snapshot-type-mismatch`) and a missing document.
+      - **A thrown check also drops a `delivery_price` coupon** (`check-failed`). This is the one
+        deliberate exception to "a failed secondary check keeps the client's number": the order
+        still goes through, it just goes through without an unverifiable discount.
+      - It corrects and never rejects, because with Apple Pay / HYP the money is already taken.
+        A conflict decided on an inflated posted amount can drop a deal and then trim the coupon.
+        The customer gets less, never more.
+    - **Twin**: ONE ₪X for the whole twin order, on the PRIMARY's real fee. The combination fee is
+      never discounted. A fixed-price coupon on the secondary (fee forced to 0) comes off.
+      `enforceTwinSideDeliveryPrice` (`services/twin-order/twin-delivery-price.js`) runs in BOTH
+      `/place` and `/digital-place-pending`, right after the two `enforceTwinSidePromotions` calls.
+      Twin placement still re-validates nothing else about coupons.
+    - **Amend** (`amendedDeliveryPriceDiscount`, `utils/order-pricing.js`) **never grows it**.
+      Amend keeps the fee, so the creation discount is the ceiling: a well-formed snapshot gives
+      `min(kept, recomputed)`, and a snapshot missing `deliveryPrice`/`maxDiscount` keeps
+      `min(kept, fee after deal)`. For this type, `routes/order-amend.js` writes the re-split
+      `appliedCoupon.coupon.{shoofiDiscount,storeDiscount}` in the same `$set` as `discountAmount`.
+      For ANY order, a non-finite `pricing.total` is `409 AMEND_UNPRICEABLE` and is never written.
+    - **Unchanged for every other coupon type:** `discountAmount` and the snapshot stay
+      client-trusted at creation, except `enforceCouponEntitlement` (ownership + partial-use
+      balance). `shippingPrice` is still validated nowhere (the tariff ceiling only BOUNDS a
+      derived discount). Twin side coupons are still stored as posted.
+    - Readers on the order side need no change: the partner invoice, shoofir `order-payment.ts`,
+      admin `CardOrder`/`CardTwinOrder` and the app's `order-header` all read `discountAmount`,
+      so a delivery coupon prints `shippingPrice − discountAmount` = ₪X.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

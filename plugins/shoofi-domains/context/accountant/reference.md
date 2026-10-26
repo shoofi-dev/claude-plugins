@@ -96,6 +96,12 @@ invoiceReceived/transferPerformed`. Carry-over comps marked collected only on **
 - **`effectiveDeliveryFee(delivery)`** (`calc.js`) = courier earning = `order.shippingPrice`;
   twin **single-mode primary** adds `combinationFeeBase` once (one driver, both pickups); split/secondary = base only.
 - **`couponDeliveryPortion`**  peels coupon-covered delivery out of cash/CC buckets.
+- **Fixed delivery price coupons** (`type: 'delivery_price'`) flow through `couponDeliveryPortion` /
+  `couponDeliverySplit` unchanged: `discountType: 'delivery'`, a non-`percentage` type, and shares
+  already resolved in shekels on the order. The discount math is `computeDeliveryPriceDiscount`
+  (`utils/coupon-discount.js`). The split is `resolveCouponSplit`, which moved from `routes/coupon.js`
+  to the same file. The creation guard is `services/coupons/delivery-price-enforcement.js`.
+  Worked numbers and the rules are in CORE invariant 15.
 - **`shoofiCouponCredit({shoofiDiscount, couponType, orderPrice, appliedAmount})`** (`calc.js`)
   = the per-order `couponsFromShoofi` credit for a customer-specific `order_items` coupon:
   `min(nominal, applied)`, nominal = `shoofiDiscount` (percentage → `/100 * orderPrice`),
