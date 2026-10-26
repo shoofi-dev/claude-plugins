@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@1870b2ff (feat/for-you-taste-redis-cache) / 2026-10-19
+last-verified: shoofi-server@514d1a4b (feat/store-card-deal-badge) / 2026-10-26
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -667,6 +667,12 @@ boundary and say so in the PR.
     (`routes/promotion.js`) clear BOTH cache keys (invariant 2). Nothing fires at `endDate`: a
     stale badge can sit up to 5 min, but every quote and order creation re-checks. Promotions
     live in the STORE db (they reference that store's product/category ids).
+    **The store CARD outside the store** learns of a deal only through `storeCardPromotion`
+    (same file): `POST /api/shoofiAdmin/available-stores` and `POST /api/menu/search` put the
+    newest running deal on each store as `store.activePromotion` `{_id,type,kind,titleHE,titleAR}`
+    (null when none). The app card (`screens/stores/components/item.tsx`) shows it as the
+    "offer" badge — after a coupon, before the category-discount badge. A store-list route that
+    skips it makes the store's deals visible only inside the store (support report 2026-10-26).
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified

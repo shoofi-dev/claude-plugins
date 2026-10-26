@@ -345,10 +345,21 @@
           "compareGeneralCategories"
         ],
         "services/menu/promotions.js": [
-          "applyMenuPromotions"
+          "applyMenuPromotions",
+          "storeCardPromotion"
         ]
       },
       "patterns": [
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "activePromotion = await storeCardPromotion\\(storeDb\\)",
+          "desc": "doc CORE invariant 18: the available-stores list carries the store's running deal for the card badge"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "activePromotion = await storeCardPromotion\\(storeDb\\)",
+          "desc": "doc CORE invariant 18: menu search carries the store's running deal for the card badge"
+        },
         {
           "file": "services/ordering-intelligence/suggest-service.js",
           "regex": "const taste = person \\? EMPTY_TASTE : ownTaste",
