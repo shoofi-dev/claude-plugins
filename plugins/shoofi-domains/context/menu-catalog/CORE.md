@@ -672,8 +672,9 @@ boundary and say so in the PR.
     `storesMap`), v1 of it, `POST /api/shoofiAdmin/available-stores` and `POST /api/menu/search`
     put the newest running deal on each store as `store.activePromotion`
     `{_id,type,kind,titleHE,titleAR}` (null when none). The app card
-    (`screens/stores/components/item.tsx`) shows it as the "offer" badge — after a coupon,
-    before the category-discount badge. **The home "حملات"/"מבצעים" row** is a different thing:
+    (`screens/stores/components/item.tsx`) shows a GENERIC "offer" badge for it — "عروض" /
+    "מבצעים" (`promotion-store-tag`), never the title, because a store can run several deals at
+    once — after a coupon, before the category-discount badge. **The home "حملات"/"מבצעים" row** is a different thing:
     a platform category (`shoofi.categories {isCampaign:true}`) whose membership
     `lib/campaign-category-sync.js` writes into `shoofi.stores.categoryIds` — an active coupon
     for the store, OR (`storeHasCampaignTrigger`) a per-store category with `discountPercent>0`
