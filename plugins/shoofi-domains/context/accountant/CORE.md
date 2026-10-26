@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@4165683f (feat/coupon-funder-filter) / 2026-10-26
+last-verified: shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -162,10 +162,12 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    - **`storeDiscount` carries two different units and no field says which.**
      Shekels normally; percentage points when `type === 'percentage'`. There is no
      validation bounding it to 0-100 in that case — `lib/schemas/newCoupon.json` sets
-     only `minimum: 0`, and `routes/coupon.js:1480` (create) / `:1720` (update) bound the
+     only `minimum: 0`, and `routes/coupon.js:1549` (create) / `:1797` (update) bound the
      split only for `fixed_amount`. **`splitType: 'percentage'` is the exception:** those coupons
      resolve the share into shekels before the order is written
-     (`resolveCouponSplit`, `routes/coupon.js:67-80`, called at `:358`), so `storeDiscount` on
+     (`resolveCouponSplit`, now in `utils/coupon-discount.js`, called at `routes/coupon.js:411`
+     typed and `:1314` auto-apply, and re-run at order creation for `delivery_price` coupons —
+     invariant 15), so `storeDiscount` on
      the applied snapshot is already an amount (prod check 2026-10-26: P147T5LK on a ₪118
      brixta order carries `shoofiDiscount: 71.5, storeDiscount: 0`). Any reader dividing by
      100 must exclude them. **`stores-export-new` itself does not** (`:1190-1191` checks only
@@ -339,9 +341,13 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       0/100 (`.store`) or `split` `{shoofiPercent: X}` → X / 100−X. `shoofiDiscount` and
       `storeDiscount` are null, and `assertTemplateInvariants` is re-run on the overridden
       prefill. This applies to `delivery_free_over_min`, `delivery_reduced_price`,
-      `delivery_happy_hour` and `store_fixed_off_items` (`needsFunding`). Why percent and not
+      `delivery_happy_hour`, `store_fixed_off_items` and `delivery_fixed_price` (`needsFunding`
+      — a template carrying `shoofiDiscount` OR `shoofiPercent` fields). `delivery_fixed_price`
+      maps its funding value to `maxDiscount` (`VALUE_FIELD`) and is built percent-split from
+      the start; it never has a shekel split to fall back to (invariant 15). Why percent and not
       shekels: apply time resolves the percents against the discount actually given
-      (`routes/coupon.js:67-80`, `:358` typed, `:1250` auto-apply), so the store pays its share
+      (`resolveCouponSplit` in `utils/coupon-discount.js`; `routes/coupon.js:411` typed, `:1314`
+      auto-apply), so the store pays its share
       of the real fee under the ceiling. A shekel split is billed NOMINALLY
       (`routes/payments/admin.js:1192-1194`), which over-bills whenever the fee is below the
       ceiling, and that is the usual case (fees seen: 17, 18, 20, 28, 32, 35). It is safe end
@@ -374,9 +380,9 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       draft can't create two coupons. Any edit reopens the draft.
     - **Central `shoofi` DB only** (`shoofiDbOf = req.app.db.shoofi`): drafts, code reservation,
       translations, settle. The create route itself still picks its DB from the `app-name`
-      header with no fallback (`routes/coupon.js:1386-1387`); the admin web's interceptor
+      header with no fallback (`routes/coupon.js:1450-1451`); the admin web's interceptor
       defaults it to `shoofi`. A coupon written anywhere else is invisible to apply
-      (`routes/coupon.js:143`) and to settlement (`routes/payments/admin.js:1049`).
+      (`routes/coupon.js:178`) and to settlement (`routes/payments/admin.js:1049`).
     - **The #320 default-split trap is handled in drafts but STILL LIVE in the plain picker**
       (`POST /api/admin/coupon-templates/:id/resolve` → prefill → CouponForm). Lowering an
       amount under the fixed default split now returns **422** with the invariant
@@ -393,8 +399,8 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     `activeNowFilter`). **It is a display/filter rule, NOT a billing path.** Settlement never
     calls it. It restates what `stores-export-new` already does, so if settlement changes,
     this file follows; never the other way round.
-    - **Share:** `storePercent` out of 100 for `splitType: 'percentage'` (resolved per order,
-      `routes/coupon.js:67-80`); otherwise `storeDiscount` out of `value`. The bucket is
+    - **Share:** `storePercent` out of 100 for `splitType: 'percentage'` (resolved per order by
+      `resolveCouponSplit`, `utils/coupon-discount.js`); otherwise `storeDiscount` out of `value`. The bucket is
       `shoofi` when the share is null or 0, `store` when it covers the whole value (or 100%),
       and `split` for anything between. That is because the store is billed its share
       (`routes/payments/admin.js:1140`, `:1146-1160` fallback, truthy gate `:1188`), and
@@ -411,9 +417,101 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       first use, which claims it and sets `isCustomerSpecific: true`
       (`services/coupons/coupon-usage.js:171`). From then on its store share is not billed,
       and it leaves the filter.
+    - **Fixed delivery price (`type: 'delivery_price'`, invariant 15) needs no change here.**
+      It is always `splitType: 'percentage'`, so `storePercent` decides, and its `value` is the
+      cap (`=== maxDiscount`, > 0), so it passes the `value > 0` gate and is never mistaken for
+      a value-0 tag coupon. A storePercent of 20 lands in `split`, 0 in `shoofi`, 100 in `store`
+      — whatever the area fee turns out to be on each order.
     - **Dates:** `start`/`end` are strings with mixed +02:00/+03:00 offsets, so
       `activeNowFilter` converts them with `$convert … onError: null` and never compares them
       as text. Prod 2026-10-26, active now and global: 29 Shoofi, 5 store, 0 split.
+
+15. **A FIXED DELIVERY PRICE coupon needs no settlement change, and must stay a percent split**
+    (`type: 'delivery_price'`, `discountType: 'delivery'`, "משלוח ב-₪10"; shoofi-server
+    `feat/coupon-fixed-delivery-price`). The customer pays `deliveryPrice` (X) for delivery in
+    every area. The discount D is the gap: `min(cap, max(0, fee − X))`
+    (`computeDeliveryPriceDiscount`, `utils/coupon-discount.js:82-94`). A fee at or below X
+    gets ₪0, and a missing price, cap or fee also gives ₪0, never a guess (`:86`).
+    - **Why settlement is untouched.** Every money-out reader branches only on
+      `type === 'percentage'` and on `discountType`, never on `fixed_amount`. It reads the
+      ORDER's `appliedCoupon.discountAmount` plus the shekel shares already resolved on the order:
+      - store `campaigns`: `routes/payments/admin.js:1188-1195`
+      - `couponDeliveryPortion` / `couponDeliverySplit`: `lib/payments/calc.js:92-164`
+      - the CASH courier repayment `actualDriverPayment` and `earningsByCoupons`:
+        `routes/driver-reports.js:171-284`, `admin.js:566-600`, `summaries.js:950-965`
+      - the exec `orderCouponFunding`, delivery-metrics, financial overview and unit economics
+
+      `isPercentageStoreDeliveryCoupon` is false for this type. The delivery tax invoice and
+      the courier commission base are the full `shippingPrice` (`totalFees`), which a coupon
+      never reduces.
+    - **Worked example** (X = 10, store 20 / Shoofi 80, no cap hit; store share =
+      `round2(D × storePercent/100)`, Shoofi = D − store):
+
+      | area fee | D | customer pays delivery | store billed (`campaigns`) | Shoofi bears | CARD: courier paid by Shoofi | CASH: courier collects / Shoofi pays him |
+      |---|---|---|---|---|---|---|
+      | 38 | 28 | 10 | 5.60 | 22.40 | 38 | 10 / 28 |
+      | 20 | 10 | 10 | 2.00 | 8.00 | 20 | 10 / 10 |
+      | 10 or 8 | 0, coupon dropped at creation | fee | 0 | 0 | fee | fee / 0 |
+      | 38, cap 15 | 15 | 23 | 3.00 | 12.00 | 38 | 23 / 15 |
+
+      On CASH the store's 5.60 comes off its card-based transfer like any outcome. It is never
+      collected from the courier.
+    - **`value` = the cap (`=== maxDiscount`, > 0), never X and never 0.** `value` is what every
+      `value`-only reader sees, so it must be a bounded, non-zero "most this coupon takes off
+      one order":
+      - the funder filter's `value > 0` gate (invariant 14)
+      - the drafts' value-0 tag-coupon meaning
+      - the create route's truthiness check
+      - the admin list
+
+      X in `value` would read as "₪10 off". The create route mirrors `value` into
+      `maxDiscount` (`deliveryPriceCouponFields`, `routes/coupon.js:58-62`), and the template
+      invariant enforces it. `isCashValuedCoupon` is false for this type, because the cap is
+      not a balance. The coupon has its own `type` so that it FAILS CLOSED: a reader that
+      doesn't know it computes ₪0, never `min(value, fee)`, which would read the cap as
+      "₪cap off".
+    - **Always `splitType: 'percentage'`** (`deliveryPriceCouponError`, `routes/coupon.js:51`,
+      on create `:1528` and update `:1778`; same rule in `assertTemplateInvariants`). Why: a
+      fixed store share is billed NOMINALLY (`admin.js:1192-1194`), while D swings from ₪0 to
+      the cap with the area fee. Example: a ₪5 fixed share on a ₪8 fee bills the store ₪5
+      for an order that got ₪0 off. A percent share is resolved against the D actually given.
+      This happens three times: at the quote, at creation by `resolveCouponSplit`
+      (`services/coupons/delivery-price-enforcement.js:136-138`), and again on amend
+      (`routes/order-amend.js:583`). So it is always ≤ D and moves with it. Also refused:
+      `allowPartialUse` (meaningless for a cap) and `isFreeDelivery` (the auto-apply scorer
+      would give the full fee).
+    - **Creation recomputes D server-side** (`enforceDeliveryPriceCoupon`, called at
+      `routes/order.js:3994`; twin: `services/twin-order/twin-delivery-price.js`, secondary fee
+      = 0). The steps:
+      - The fee is `min(posted shippingPrice, area tariff)`, minus any store delivery deal
+        kept on the order (`delivery-price-enforcement.js:99-115`).
+      - D is `min(posted D, server D)` (`:120-121`).
+      - A D of ₪0 drops the coupon, so no `couponUsages` row burns a redemption (`:124-131`).
+      - The money fields come from the coupon document, never the posted copy (`:134-135`).
+
+      Why: this is the one coupon whose discount grows with the fee. An inflated posted fee
+      would otherwise turn straight into Shoofi's repayment to a CASH courier and a larger
+      store bill. Before the guard, `/apply` took the fee from the client and creation
+      trusted the posted coupon. Unlike other secondary checks, a failure here REMOVES the
+      coupon (`check-failed`) rather than keeping the client's number.
+    - **A store delivery deal on the same order.** `resolveDeliveryConflict`
+      (`routes/order.js:3957`) still keeps only the larger. Fee 38, X 10 against a ₪15 deal:
+      the coupon (28) wins. Fee 20 against ₪15: the deal wins.
+
+      If both survive (the promotions block fails open), the guard computes D on the fee
+      AFTER the deal. Example: fee 38, deal 15 → D = min(cap, 23 − 10) = 13, so the customer
+      still pays 10. A CASH courier is repaid 13 + 15 = 28, exactly what he did not collect,
+      never more than the fee. The store is billed 15 (`מבצע` row) + 2.60. Without that clamp
+      it would have been D 28 + deal 15 = 43 on a 38 fee: the courier over-repaid by 5 and the
+      items eaten by 5.
+    - **Fallback caveat — under-bills, not over-bills.** If an order's copy of the coupon
+      lacks the split, `stores-export-new` reads the coupon DOCUMENT (`admin.js:1147-1160`).
+      For a percent split that document has `storeDiscount: null`, so the store is billed
+      **₪0** and its share silently becomes Shoofi's cost. The same happens in
+      `couponDeliverySplit`, which has no document lookup. Since the creation guard and
+      the amend re-split, every `delivery_price` order carries resolved shares, so only an
+      order that bypassed both can hit this. Resolving the share from the document there would
+      be a live billing change for every percent-split coupon. **Ask.**
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
