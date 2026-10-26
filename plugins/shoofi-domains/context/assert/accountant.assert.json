@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@4165683f (feat/coupon-funder-filter) / 2026-10-26",
+  "lastVerified": "shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -29,7 +29,9 @@
         "routes/admin/coupon-drafts.js",
         "services/coupons/coupon-templates.js",
         "routes/admin/coupon-templates.js",
-        "services/coupons/coupon-funder.js"
+        "services/coupons/coupon-funder.js",
+        "utils/coupon-discount.js",
+        "services/coupons/delivery-price-enforcement.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -134,6 +136,15 @@
           "funderOf",
           "funderFilter",
           "activeNowFilter"
+        ],
+        "utils/coupon-discount.js": [
+          "DELIVERY_PRICE_TYPE",
+          "computeDeliveryPriceDiscount",
+          "resolveCouponSplit",
+          "isCashValuedCoupon"
+        ],
+        "services/coupons/delivery-price-enforcement.js": [
+          "enforceDeliveryPriceCoupon"
         ]
       },
       "patterns": [
@@ -481,6 +492,66 @@
           "file": "routes/coupon.js",
           "regex": "funder: funderOf\\(coupon\\)",
           "desc": "CORE invariant 14: each admin coupons row carries its funder, from the same rule as the filter"
+        },
+        {
+          "file": "utils/coupon-discount.js",
+          "regex": "return round2\\(Math\\.min\\(cap, Math\\.max\\(0, fee - price\\)\\)\\);",
+          "desc": "CORE invariant 15: a fixed-delivery-price discount is min(cap, max(0, fee − deliveryPrice)) — never min(value, fee), never below 0"
+        },
+        {
+          "file": "utils/coupon-discount.js",
+          "regex": "if \\(coupon\\.deliveryPrice === null \\|\\| coupon\\.deliveryPrice === undefined \\|\\| coupon\\.deliveryPrice === \"\"\\) return 0;",
+          "desc": "CORE invariant 15: a missing deliveryPrice is ₪0 off, not 'free delivery up to the cap' (Number(null) is 0)"
+        },
+        {
+          "file": "utils/coupon-discount.js",
+          "regex": "if \\(coupon\\.type === DELIVERY_PRICE_TYPE\\) return false;",
+          "desc": "CORE invariant 15: a fixed-delivery-price coupon's value is a cap, never a cash balance (isCashValuedCoupon)"
+        },
+        {
+          "file": "utils/coupon-discount.js",
+          "regex": "const storeDiscount = round2\\(\\(Number\\(discountAmount\\) \\|\\| 0\\) \\* \\(storePercent / 100\\)\\);",
+          "desc": "CORE invariants 7/15: a percent split is resolved into shekels of the discount ACTUALLY given (resolveCouponSplit, moved here from routes/coupon.js)"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "if \\(splitType !== 'percentage'\\) return 'A fixed delivery price coupon must use a percentage split",
+          "desc": "CORE invariant 15: a fixed-delivery-price coupon must be a percent split — a fixed store share is billed nominally (routes/payments/admin.js:1192-1194) while the discount swings from ₪0 to the cap"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "return \\{ deliveryPrice: parseFloat\\(getFieldValue\\('deliveryPrice'\\)\\), maxDiscount: cap \\};",
+          "desc": "CORE invariant 15: value is the cap and is mirrored into maxDiscount"
+        },
+        {
+          "file": "services/coupons/delivery-price-enforcement.js",
+          "regex": "const finalDiscount = round2\\(Math\\.min\\(postedDiscount, serverDiscount\\)\\);",
+          "desc": "CORE invariant 15: creation keeps min(posted, server) — never more than quoted, never more than the server's number"
+        },
+        {
+          "file": "services/coupons/delivery-price-enforcement.js",
+          "regex": "if \\(deal > 0\\) \\{\\s*[\\r\\n]+\\s*fee = Math\\.max\\(0, fee - deal\\);",
+          "desc": "CORE invariant 15: the fee is taken AFTER a kept store delivery deal, so coupon + deal never exceed the fee (no CASH courier over-repayment)"
+        },
+        {
+          "file": "services/coupons/delivery-price-enforcement.js",
+          "regex": "if \\(Number\\.isFinite\\(cap\\) && cap > 0 && quoted > cap\\) \\{\\s*[\\r\\n]+\\s*fee = cap;",
+          "desc": "CORE invariant 15: the posted fee is capped at the area's real tariff before the discount is computed"
+        },
+        {
+          "file": "services/coupons/delivery-price-enforcement.js",
+          "regex": "const split = resolveCouponSplit\\(doc, finalDiscount\\);",
+          "desc": "CORE invariant 15: the store/Shoofi shares are re-resolved against the corrected discount from the coupon DOCUMENT"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const enforcedFixedPrice = await enforceDeliveryPriceCoupon\\(\\{",
+          "desc": "CORE invariant 15: order creation runs the fixed-delivery-price guard"
+        },
+        {
+          "file": "routes/order-amend.js",
+          "regex": "resolveCouponSplit\\(order\\.appliedCoupon\\.coupon, pricing\\.couponDiscount\\)",
+          "desc": "CORE invariant 15: amend writes the re-resolved shares together with the new discount"
         }
       ]
     }

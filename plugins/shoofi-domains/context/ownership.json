@@ -77,7 +77,8 @@
         "routes/promotion.js",
         "services/promotions/",
         "utils/promotion-discount.js",
-        "services/twin-order/twin-promotions.js"
+        "services/twin-order/twin-promotions.js",
+        "services/twin-order/twin-delivery-price.js"
       ],
       "shoofi-app": [
         "screens/checkout",
@@ -115,7 +116,8 @@
         "routes/payment-methods.js",
         "utils/hyp-pay.js",
         "utils/invoice-mail.js",
-        "lib/schemas/creditCard.json"
+        "lib/schemas/creditCard.json",
+        "services/coupons/delivery-price-enforcement.js"
       ],
       "shoofi-app": [
         "components/credit-card/",
