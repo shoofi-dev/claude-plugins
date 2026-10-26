@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@241be1e4 (feat/coupon-drafts) / 2026-10-26",
+  "lastVerified": "shoofi-server@4165683f (feat/coupon-funder-filter) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -28,7 +28,8 @@
         "services/coupons/coupon-drafts.js",
         "routes/admin/coupon-drafts.js",
         "services/coupons/coupon-templates.js",
-        "routes/admin/coupon-templates.js"
+        "routes/admin/coupon-templates.js",
+        "services/coupons/coupon-funder.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -127,6 +128,12 @@
         "routes/admin/coupon-drafts.js": [
           "settleApproval",
           "shoofiDbOf"
+        ],
+        "services/coupons/coupon-funder.js": [
+          "FUNDERS",
+          "funderOf",
+          "funderFilter",
+          "activeNowFilter"
         ]
       },
       "patterns": [
@@ -383,7 +390,7 @@
         {
           "file": "services/coupons/coupon-drafts.js",
           "regex": "Object\\.assign\\(prefill, \\{\\s*[\\r\\n]+\\s*splitType: 'percentage',\\s*[\\r\\n]+\\s*shoofiPercent,\\s*[\\r\\n]+\\s*storePercent: [^\\n]*100 - shoofiPercent[^\\n]*,\\s*[\\r\\n]+\\s*shoofiDiscount: null,\\s*[\\r\\n]+\\s*storeDiscount: null,\\s*[\\r\\n]+\\s*\\}\\);\\s*[\\r\\n]+[^\\n]*[\\r\\n]+\\s*assertTemplateInvariants\\(prefill, template\\.id\\);",
-          "desc": "CORE invariant 13: drafts' funding is stored as splitType 'percentage' (X / 100−X) with the shekel fields nulled, and the overridden prefill is re-checked by assertTemplateInvariants — apply time resolves the share against the real discount (routes/coupon.js:66-79)"
+          "desc": "CORE invariant 13: drafts' funding is stored as splitType 'percentage' (X / 100−X) with the shekel fields nulled, and the overridden prefill is re-checked by assertTemplateInvariants — apply time resolves the share against the real discount (routes/coupon.js:67-80)"
         },
         {
           "file": "services/coupons/coupon-drafts.js",
@@ -424,6 +431,56 @@
           "file": "routes/coupon.js",
           "regex": "router\\.post\\('/api/admin/coupon/create', upload\\.array\\(\"img\"\\), async \\(req, res\\) => \\{\\s*[\\r\\n]+\\s*const appName = req\\.headers\\['app-name'\\];",
           "desc": "CORE invariant 13: the create route still picks its DB from the app-name header with no 'shoofi' fallback, while apply and settlement read shoofi — the reason drafts pin the central DB"
+        },
+        {
+          "file": "services/coupons/coupon-funder.js",
+          "regex": "if \\(coupon\\.splitType === 'percentage'\\) return \\{ share: Number\\(coupon\\.storePercent\\) \\|\\| 0, full: 100 \\};\\s*[\\r\\n]+\\s*return \\{ share: Number\\(coupon\\.storeDiscount\\) \\|\\| 0, full: Number\\(coupon\\.value\\) \\|\\| 0 \\};",
+          "desc": "CORE invariant 14: the store's share alone decides who funds a global coupon — storePercent (of 100) for a percent split, else storeDiscount (of value); shoofiDiscount is never read for a public coupon (routes/payments/admin.js:1209)"
+        },
+        {
+          "file": "services/coupons/coupon-funder.js",
+          "regex": "if \\(s\\.share <= 0\\) return 'shoofi';\\s*[\\r\\n]+\\s*if \\(s\\.share >= s\\.full\\) return 'store';\\s*[\\r\\n]+\\s*return 'split';",
+          "desc": "CORE invariant 14: the three thresholds — no store share = Shoofi, a share covering the whole value = store, anything between = split (mirrors the truthy storeDiscount gate at routes/payments/admin.js:1188)"
+        },
+        {
+          "file": "services/coupons/coupon-funder.js",
+          "regex": "coupon\\.isCustomerSpecific === true \\|\\| !\\(Number\\(coupon\\.value\\) > 0\\)\\) return null;",
+          "desc": "CORE invariant 14: customer-specific coupons (never billed to a store) and value-0 tag coupons are outside the funder classification"
+        },
+        {
+          "file": "services/coupons/coupon-funder.js",
+          "regex": "bucket = \\{ \\$or: \\[\\{ \\.\\.\\.isPercentSplit, storePercent: noShare \\}, \\{ \\.\\.\\.isNotPercentSplit, storeDiscount: noShare \\}\\] \\};",
+          "desc": "CORE invariant 14: the Mongo 'shoofi' bucket — null/0/missing store share on either split shape (noShare = $in [null, 0])"
+        },
+        {
+          "file": "services/coupons/coupon-funder.js",
+          "regex": "\\{ \\.\\.\\.isPercentSplit, storePercent: \\{ \\$gte: 100 \\} \\},\\s*[\\r\\n]+\\s*\\{ \\.\\.\\.isNotPercentSplit, storeDiscount: \\{ \\$gt: 0 \\}, \\$expr: \\{ \\$gte: \\['\\$storeDiscount', '\\$value'\\] \\} \\},",
+          "desc": "CORE invariant 14: the Mongo 'store' bucket — storePercent >= 100, or a fixed storeDiscount covering the whole value"
+        },
+        {
+          "file": "services/coupons/coupon-funder.js",
+          "regex": "\\{ \\.\\.\\.isPercentSplit, storePercent: \\{ \\$gt: 0, \\$lt: 100 \\} \\},\\s*[\\r\\n]+\\s*\\{ \\.\\.\\.isNotPercentSplit, storeDiscount: \\{ \\$gt: 0 \\}, \\$expr: \\{ \\$lt: \\['\\$storeDiscount', '\\$value'\\] \\} \\},",
+          "desc": "CORE invariant 14: the Mongo 'split' bucket — 0 < storePercent < 100, or 0 < storeDiscount < value"
+        },
+        {
+          "file": "services/coupons/coupon-funder.js",
+          "regex": "\\$convert: \\{ input: field, to: 'date', onError: null, onNull: null \\}",
+          "desc": "CORE invariant 14: 'in effect now' converts start/end (strings with mixed +02:00/+03:00 offsets) to dates — never a text comparison"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "if \\(req\\.query\\.isActive === 'now'\\) \\{[\\s\\S]{0,120}and\\.push\\(\\.\\.\\.activeNowFilter\\(\\)\\);",
+          "desc": "CORE invariant 14: GET /api/admin/coupons isActive=now = switched on AND within its dates, via activeNowFilter"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "if \\(!FUNDERS\\.includes\\(req\\.query\\.funder\\)\\) \\{\\s*[\\r\\n]+\\s*return res\\.status\\(400\\)[\\s\\S]{0,200}and\\.push\\(\\.\\.\\.funderFilter\\(req\\.query\\.funder\\)\\);",
+          "desc": "CORE invariant 14: GET /api/admin/coupons funder=shoofi|store|split filters through funderFilter ($and-merged); any other value is a 400"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "funder: funderOf\\(coupon\\)",
+          "desc": "CORE invariant 14: each admin coupons row carries its funder, from the same rule as the filter"
         }
       ]
     }
