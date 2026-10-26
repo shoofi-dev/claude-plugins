@@ -109,6 +109,12 @@ invoiceReceived/transferPerformed`. Carry-over comps marked collected only on **
 - **Cost-bearers:** store bears commission+VAT+fees+its coupon share+store-paid comps; Shoofi
   bears customer coupons (reimburses store), Shoofi comps, driver min-guarantee, drive-in cut;
   driver/company earns delivery+combo fees+bonuses+comps.
+- **Who funds a global coupon (display only)** — `services/coupons/coupon-funder.js`
+  (`funderOf`, `funderFilter`, `activeNowFilter`) backs the admin coupons list's
+  `GET /api/admin/coupons?funder=shoofi|store|split&isActive=now` (any other `funder` → 400).
+  The store's share alone decides: `storePercent` for a percent split, otherwise
+  `storeDiscount` vs `value`. It is a restatement of settlement, never an input to it
+  (CORE invariant 14).
 
 ## 4. Financial dashboards + the revenue engine — `routes/payments/{admin,summaries}.js`
 Read-only aggregations: `admin.js` `/overview`, `/partners` (flat 15%), `/drivers`, `/analytics`.
