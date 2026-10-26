@@ -361,6 +361,21 @@
           "desc": "doc CORE invariant 18: menu search carries the store's running deal for the card badge"
         },
         {
+          "file": "lib/campaign-category-sync.js",
+          "regex": "storeDb\\.promotions\\.findOne\\(buildActiveQuery\\(\\)",
+          "desc": "doc CORE invariant 18: a running deal puts the store in the home حملات row"
+        },
+        {
+          "file": "routes/promotion.js",
+          "regex": "await syncCampaignBucket\\(req, appName\\)",
+          "desc": "doc CORE invariant 18: promotion writes re-sync the store's حملات membership"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "futureOrderEnabled,\\s*activePromotion\\s*};",
+          "desc": "doc CORE invariant 18: explore v2 storesMap carries activePromotion"
+        },
+        {
           "file": "services/ordering-intelligence/suggest-service.js",
           "regex": "const taste = person \\? EMPTY_TASTE : ownTaste",
           "desc": "doc CORE invariant 18: forPerson drops the customer's own taste — 'for Mom' never shows the customer's usual"

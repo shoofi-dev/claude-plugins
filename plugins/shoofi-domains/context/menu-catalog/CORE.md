@@ -668,11 +668,20 @@ boundary and say so in the PR.
     stale badge can sit up to 5 min, but every quote and order creation re-checks. Promotions
     live in the STORE db (they reference that store's product/category ids).
     **The store CARD outside the store** learns of a deal only through `storeCardPromotion`
-    (same file): `POST /api/shoofiAdmin/available-stores` and `POST /api/menu/search` put the
-    newest running deal on each store as `store.activePromotion` `{_id,type,kind,titleHE,titleAR}`
-    (null when none). The app card (`screens/stores/components/item.tsx`) shows it as the
-    "offer" badge — after a coupon, before the category-discount badge. A store-list route that
-    skips it makes the store's deals visible only inside the store (support report 2026-10-26).
+    (same file): the home's `GET /api/shoofiAdmin/explore/categories-with-stores-v2` (in
+    `storesMap`), v1 of it, `POST /api/shoofiAdmin/available-stores` and `POST /api/menu/search`
+    put the newest running deal on each store as `store.activePromotion`
+    `{_id,type,kind,titleHE,titleAR}` (null when none). The app card
+    (`screens/stores/components/item.tsx`) shows it as the "offer" badge — after a coupon,
+    before the category-discount badge. **The home "حملات"/"מבצעים" row** is a different thing:
+    a platform category (`shoofi.categories {isCampaign:true}`) whose membership
+    `lib/campaign-category-sync.js` writes into `shoofi.stores.categoryIds` — an active coupon
+    for the store, OR (`storeHasCampaignTrigger`) a per-store category with `discountPercent>0`
+    / `isCampaign`, OR a promotion matching `buildActiveQuery()` right now. Promotion writes call
+    `syncCampaignCategoryForStore`; a deal's start/end edge is picked up by the 10-minute
+    reconcile cron (`utils/crons/coupon-campaign-category-cron.js`), and the explore cache is
+    busted only on a real membership change. Before 2026-10-26 neither path knew about deals,
+    so a deal-only store's offers showed only inside the store (support report, master-burger).
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
