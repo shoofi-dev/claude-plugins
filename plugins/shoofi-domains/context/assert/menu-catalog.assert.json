@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@1870b2ff (feat/for-you-taste-redis-cache) / 2026-10-19",
+  "lastVerified": "shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -84,9 +84,14 @@
         "docs/for-you-quality.md",
         "test/integration/for-you-quality.js",
         "test/integration/for-you-seen.js",
-        "services/menu/promotions.js"
+        "services/menu/promotions.js",
+        "services/translations/owned-translations.js",
+        "services/coupons/coupon-drafts.js",
+        "routes/admin/coupon-drafts.js"
       ],
       "symbols": {
+        "services/translations/owned-translations.js": ["writeOwnedTranslation", "TRANSLATION_KEY_COLLISION", "SEEDED_BY"],
+        "services/coupons/coupon-drafts.js": ["LABEL_KEY_RE", "labelKey", "LABEL_SURFACES"],
         "utils/menu-cache.js": [
           "clearStore",
           "getStats"
@@ -374,6 +379,61 @@
           "file": "routes/shoofi-admin.js",
           "regex": "futureOrderEnabled,\\s*activePromotion\\s*};",
           "desc": "doc CORE invariant 18: explore v2 storesMap carries activePromotion"
+        },
+        {
+          "file": "services/translations/owned-translations.js",
+          "regex": "const SEEDED_BY = 'owned-translations';",
+          "desc": "doc CORE invariant 24 / reference §2: generated rows carry seededBy 'owned-translations'"
+        },
+        {
+          "file": "services/translations/owned-translations.js",
+          "regex": "\\{ key \\},\\s*\\{ \\$setOnInsert: \\{ key, ar, he, createdAt: now, updatedAt: now, seededBy: SEEDED_BY, owner: ownerRef \\} \\},\\s*\\{ upsert: true \\}",
+          "desc": "doc CORE invariant 24: create-if-absent — $setOnInsert upsert on key, never a $set on an existing row"
+        },
+        {
+          "file": "services/translations/owned-translations.js",
+          "regex": "\\{ key, 'owner\\.type': ownerRef\\.type, 'owner\\.id': ownerRef\\.id \\},\\s*\\{ \\$set: \\{ ar, he, updatedAt: now \\} \\}",
+          "desc": "doc CORE invariant 24: a later write updates ONLY rows this owner created"
+        },
+        {
+          "file": "services/translations/owned-translations.js",
+          "regex": "if \\(!updated\\.matchedCount\\)[\\s\\S]{0,400}err\\.code = 'TRANSLATION_KEY_COLLISION';\\s*throw err;",
+          "desc": "doc CORE invariant 24: a key held by someone else throws TRANSLATION_KEY_COLLISION, never overwrites"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "const LABEL_KEY_RE = /\\^coupon\\\\\\.\\[a-f0-9\\]\\{24\\}\\\\\\.\\(checkout\\|store\\|store-sub\\|store-tag\\)\\$/;",
+          "desc": "doc CORE invariant 24 / reference §2: generated coupon label keys are coupon.<draftId>.<surface>, regex-guarded"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "if \\(!LABEL_KEY_RE\\.test\\(key\\)\\) throw",
+          "desc": "doc CORE invariant 24: labelKey refuses any key outside the namespace before a write"
+        },
+        {
+          "file": "routes/admin/coupon-drafts.js",
+          "regex": "await writeOwnedTranslation\\(shoofiDb, \\{ key: k\\.key, ar: k\\.ar, he: k\\.he, owner: \\{ type: 'coupon-draft', id: String\\(draft\\._id\\) \\} \\}\\);[\\s\\S]*?pickCouponCode",
+          "desc": "doc CORE invariant 24 / reference §2: approval writes the label rows BEFORE the coupon code is picked and the coupon created"
+        },
+        {
+          "file": "routes/admin/coupon-drafts.js",
+          "regex": "err\\.code === 'TRANSLATION_KEY_COLLISION'\\) return res\\.status\\(409\\)",
+          "desc": "doc reference §2: a translation key collision on approve answers 409"
+        },
+        {
+          "file": "routes/translations.js",
+          "regex": "const appName = req\\.headers\\['shoofi'\\] \\|\\| 'shoofi';",
+          "desc": "doc reference §7/§9: the READ picks the DB from a header literally named shoofi (always central)"
+        },
+        {
+          "file": "routes/translations.js",
+          "regex": "router\\.post\\(\\\"/api/translations/add\\\", async \\(req, res, next\\) => \\{\\s*try \\{\\s*const appName = req\\.headers\\['app-name'\\] \\|\\| 'shoofi';",
+          "desc": "doc reference §7: the panel WRITE routes pick the DB from app-name (and have no auth)"
+        },
+        {
+          "file": "routes/translations.js",
+          "regex": "\\.sort\\(\\{ createdAt: -1, _id: 1 \\}\\)",
+          "desc": "doc reference §2: duplicate keys — last row in this sort wins (oldest createdAt; missing createdAt beats all)"
         },
         {
           "file": "services/ordering-intelligence/suggest-service.js",
