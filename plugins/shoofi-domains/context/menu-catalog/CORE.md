@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -668,6 +668,22 @@ boundary and say so in the PR.
     (`routes/promotion.js`) clear BOTH cache keys (invariant 2). Nothing fires at `endDate`: a
     stale badge can sit up to 5 min, but every quote and order creation re-checks. Promotions
     live in the STORE db (they reference that store's product/category ids).
+    **The store CARD outside the store** learns of a deal only through `storeCardPromotion`
+    (same file): the home's `GET /api/shoofiAdmin/explore/categories-with-stores-v2` (in
+    `storesMap`), v1 of it, `POST /api/shoofiAdmin/available-stores` and `POST /api/menu/search`
+    put the newest running deal on each store as `store.activePromotion`
+    `{_id,type,kind,titleHE,titleAR}` (null when none). The app card
+    (`screens/stores/components/item.tsx`) shows a GENERIC "offer" badge for it — "عروض" /
+    "מבצעים" (`promotion-store-tag`), never the title, because a store can run several deals at
+    once — after a coupon, before the category-discount badge. **The home "حملات"/"מבצעים" row** is a different thing:
+    a platform category (`shoofi.categories {isCampaign:true}`) whose membership
+    `lib/campaign-category-sync.js` writes into `shoofi.stores.categoryIds` — an active coupon
+    for the store, OR (`storeHasCampaignTrigger`) a per-store category with `discountPercent>0`
+    / `isCampaign`, OR a promotion matching `buildActiveQuery()` right now. Promotion writes call
+    `syncCampaignCategoryForStore`; a deal's start/end edge is picked up by the 10-minute
+    reconcile cron (`utils/crons/coupon-campaign-category-cron.js`), and the explore cache is
+    busted only on a real membership change. Before 2026-10-26 neither path knew about deals,
+    so a deal-only store's offers showed only inside the store (support report, master-burger).
 
 24. **CODE THAT WRITES A TRANSLATION ROW GOES THROUGH `writeOwnedTranslation` — NEVER THE PANEL
     ROUTES, NEVER A SHARED KEY** (`services/translations/owned-translations.js`; reference §2

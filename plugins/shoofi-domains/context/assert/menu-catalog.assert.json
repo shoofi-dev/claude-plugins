@@ -350,10 +350,36 @@
           "compareGeneralCategories"
         ],
         "services/menu/promotions.js": [
-          "applyMenuPromotions"
+          "applyMenuPromotions",
+          "storeCardPromotion"
         ]
       },
       "patterns": [
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "activePromotion = await storeCardPromotion\\(storeDb\\)",
+          "desc": "doc CORE invariant 18: the available-stores list carries the store's running deal for the card badge"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "activePromotion = await storeCardPromotion\\(storeDb\\)",
+          "desc": "doc CORE invariant 18: menu search carries the store's running deal for the card badge"
+        },
+        {
+          "file": "lib/campaign-category-sync.js",
+          "regex": "storeDb\\.promotions\\.findOne\\(buildActiveQuery\\(\\)",
+          "desc": "doc CORE invariant 18: a running deal puts the store in the home حملات row"
+        },
+        {
+          "file": "routes/promotion.js",
+          "regex": "await syncCampaignBucket\\(req, appName\\)",
+          "desc": "doc CORE invariant 18: promotion writes re-sync the store's حملات membership"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "futureOrderEnabled,\\s*activePromotion\\s*};",
+          "desc": "doc CORE invariant 18: explore v2 storesMap carries activePromotion"
+        },
         {
           "file": "services/translations/owned-translations.js",
           "regex": "const SEEDED_BY = 'owned-translations';",
