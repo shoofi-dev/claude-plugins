@@ -265,6 +265,12 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   `{app:"hyp"}` also carries `CUSTOMER_DOC_UA_UUID` (customer-document sub-account; empty = don't send)
   and `USE_DEMO`/`API_ENDPOINT`/`DEMO_ENDPOINT`. **No admin UI edits this document** — prod changes are a manual Mongo write.
 - **`shoofi.couponUsages`** — per-source discount rows (store/shoofi × items/delivery).
+- **`shoofi.coupon-drafts`** (`db.couponDrafts`) — support's coupon drafts, central DB only:
+  `status draft → approving → created | discarded`, `templateId`, `params`, `funding{mode, shoofi?,
+  store?}`, `approval{code, fields, at, by, translationKeys}`, `coupon{_id, code, at}`. Holds NO money
+  of its own — the coupon it produces is an ordinary `shoofi.coupons` doc written by
+  `POST /api/admin/coupon/create`, and settlement never reads the draft. Schema and lifecycle:
+  shoofi-server `docs/coupon-drafts.md`; money rules: CORE invariant 13.
 
 ## 9. Client — shoofi-delivery-web (admin) is the accountant's cockpit
 The reports/settlement/payout UI lives in the **admin** app: `views/admin/DriverPayments.tsx`,
@@ -301,6 +307,15 @@ approves, sends reports, and exports the MASAV Excel. (Full-stack: server comput
    and amount as the invoice our DB records for that store's June report (e.g. brixta 10576 and
    10580, both ₪545.04). Our DB knows only the later one. Unless cancelled at HYP, those stores were
    invoiced twice for June. Found 2026-09-27 — needs a human to check HYP and decide.
+
+9. **Percentage-split percentage coupons are billed as percent points** (`routes/payments/admin.js:1190-1191`,
+   CORE invariant 7 + Known status). Found 2026-10-26 while designing coupon drafts; ₪0 exposure in prod
+   today (2 coupons, both `storePercent: 0`). Drafts exclude `store_percentage_off`; the ordinary form
+   does not. Needs an owner ruling before either path makes one with a store share.
+10. **The #320 template picker's fixed default split** (`services/coupons/coupon-templates.js`
+    `SPLIT_FIELDS`) does not follow the amount. Too low → 422 (`COUPON_TEMPLATE_INVARIANT`); too high →
+    silently leaves part of the value unassigned (CORE invariant 13). Drafts derive the split from the
+    value; the plain picker → CouponForm path still has this.
 
 ## 11. Definition of done
 Inherit `_shared-guardrails.md` §7. For accountant specifically: for ANY change to a payout or

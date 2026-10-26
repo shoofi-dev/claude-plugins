@@ -168,7 +168,62 @@ take `extraName`/`productName` from the app event (Arabic), `groupName`/`optionN
 Resolution: `utils/catalog-lint.js` (`displayName`), copied by `toLintRow`; the write boundary passes
 the product's category ids so its rows get `categoryName` too.
 
-### `translations` — i18n labels: `{ key, ar, he }`.
+### central `shoofi.translations` — i18n labels, one flat key space for every app
+_Verified 2026-10-26 against shoofi-server `routes/translations.js` and the feat/coupon-drafts worktree,
+with local Mongo for the counts. These are not prod counts._
+- **Shape:** one document per key, both languages on it:
+  `{ _id, key, ar, he, createdAt?, updatedAt?, seededBy?, owner? }`.
+  - `createdAt` and `updatedAt` are often missing on old rows (locally 235 and 285 of 1042 docs have them).
+  - `seededBy` names a seed script tag (e.g. `checkout-redesign-pr45`) or `'owned-translations'`.
+  - `owner: { type, id }` is set only by `writeOwnedTranslation` (e.g. `{ type: 'coupon-draft', id: <draftId> }`).
+- **One collection for everyone.** The customer, partner and driver apps all call
+  `GET /api/getTranslations`. There is no split by app or `app-type`, and the read ignores the
+  `app-name` the apps send. The admin web only edits rows (Translations panel); it does not use
+  them for its own UI.
+- **No unique index on `key`.** Only `_id_` exists, and nothing in
+  `DatabaseInitializationService.js` creates one. Locally 8 keys have duplicate rows (`price`,
+  `delete`, `store-is-closed`, `insert-customer-name`, …), so a unique index can't be built until
+  they are de-duplicated.
+- **Which duplicate wins:** `getTranslations` sorts `{ createdAt: -1, _id: 1 }` and the last row
+  written into the map wins. That is the OLDEST `createdAt`; a row with NO `createdAt` sorts last
+  and beats every dated row; a tie goes to the highest `_id`. So inserting a fresh row for an old
+  key shows nothing. An empty `ar`/`he` falls back to the key itself (`element.ar || element.key`).
+- **No cache anywhere on the server** (no Redis, in-memory, ETag or version). Every
+  `getTranslations` and every write re-reads the whole collection (~72 KB) and returns it as
+  `{ arTranslations, heTranslations }`. Nothing needs clearing after a write; the menu cache is
+  unrelated.
+- **When apps see a change: at boot.**
+  - Customer app (`stores/translations`): fetches in `prepare()` at cold start and on the
+    offline-dialog path. It has no AsyncStorage copy and does not refetch on foreground.
+  - Partner and driver apps (identical `utils/translations-boot.ts`): apply the AsyncStorage
+    `@storage_translations` copy first, then the server payload, retrying on backoff up to 6
+    times. They reload at boot and on `PREPARE_APP` / NetInfo.
+  - A missing key renders as its raw slug, unless the call site passes `t(key, { defaultValue })`.
+- **i18n settings:** all three apps run i18next 25.5.2 with default separators (`keySeparator '.'`,
+  `nsSeparator ':'`, `ignoreJSONStructure` true). A dotted flat key resolves through i18next's
+  `deepFind` fallback (prod precedent: `city_filter.title`). A `:` in a key is read as a
+  namespace and the lookup misses.
+- **Naming in the data (local):** mostly kebab-case (832/1033), plus `snake_case` (158), dotted
+  (31: `city_filter.*`, `filters.*`), some uppercase (`Bcool-free-delivery`), no `:`. Coupon
+  labels created by hand share the flat space: `free-delivery`, `delivery-free-100`,
+  `shoofi-will-pay`, `delivery-discount-checkout`.
+- **How coupons use it:** `nameForCheckout`, `nameForStore`, `subNameForStore`, `storeTagName`,
+  `nameForPartner` and `nameForShoofir` hold translation KEYS, and every app passes them through
+  `t()`.
+- **Writers:**
+  - **The panel routes** (`routes/translations.js`; see §7) are for people only.
+  - **`writeOwnedTranslation`** (`services/translations/owned-translations.js`; CORE invariant 24)
+    is for code. It uses the central DB, creates only if the key is absent (`$setOnInsert`
+    upsert), updates only rows of the same owner, and throws `TRANSLATION_KEY_COLLISION`
+    otherwise.
+    - First caller: the coupon-drafts approval (`routes/admin/coupon-drafts.js`
+      `/coupon-drafts/:id/approve`). It writes each custom label as
+      `coupon.<draftId>.<surface>` (surface `checkout|store|store-sub|store-tag`, guarded by
+      `LABEL_KEY_RE` in `services/coupons/coupon-drafts.js`), BEFORE the coupon is created, and
+      a collision answers 409. Partner and driver labels are never generated: they stay
+      `shoofi-will-pay`. Feature doc: shoofi-server `docs/coupon-drafts.md` "Labels and translations".
+  - **Seed scripts** `scripts/seed-*-translations.js` write the central DB directly with a
+    backup file; `scripts/rollback-translations.js` undoes a run.
 ### `images` — auxiliary image library: `{ data:{uri}, type, subType }`.
 ### central `shoofi.stores` — store registry (used by cross-store search & `initDb`).
 
@@ -512,7 +567,14 @@ the cache read.
 - `GET  /api/admin/catalog-lint/summary` — open lint rows per store by severity (`{ totals, stores[] }`), admin token
 - `POST /api/admin/catalog-lint/run` — `{ appName }` for one store, else every store; admin token; returns the run stats
 - Menu spellcheck (`routes/admin/menu-spellcheck.js`; `auth.required` + `checkAdminRole(["master","admin","manager"])`, POSTs in the audit route map): `GET /api/admin/menu-spellcheck/issues?status=open|accepted|dismissed|resolved|stale&appName=&lang=ar|he` → `{ issues (≤2000), truncated, counts, lastRun }`; `POST /api/admin/menu-spellcheck/run [{ appName }]` → `202 { started, runId }` / `409 locked` / `503 no-api-key`; `POST /api/admin/menu-spellcheck/accept { ids, fixes? }` → `{ accepted, stale, failed, outOfStockKept, rows[] }`; `POST /api/admin/menu-spellcheck/dismiss { ids }` → `{ dismissed }` (§7e)
-- `GET  /api/getTranslations`, `POST /api/translations/{update,add,delete}`
+- `GET  /api/getTranslations` → `{ arTranslations, heTranslations }`. It reads the central DB through a header literally named `shoofi` that no client sends, so it is always `shoofi` (§9).
+- `POST /api/translations/{update,add,delete}` — the admin Translations panel (`shoofi-delivery-web` `src/views/admin/translations/TranslationsList.tsx`, body `{ key, ar, he }`, sends `app-name: 'shoofi'`). Every write answers with the whole re-read map.
+  - **These pick the DB from the `app-name` header** (default `shoofi`), not the `shoofi` header the read uses.
+  - **No auth** on any of the four routes, and they are not in the admin audit route map.
+  - `update` is `updateOne({ key }, { $set: { ar, he, updatedAt } })` with no upsert: a missing key is a silent no-op, and only one row of a duplicated key changes.
+  - `add` is `insertOne({ ...req.body, createdAt, updatedAt })` with no existence check.
+  - `delete` is `deleteOne({ key })`.
+  - Code must not call them (CORE invariant 24); use `writeOwnedTranslation`.
 - `POST /api/global-search` — central store name search
 - `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng}, history?, lang?, cart?: { appName, productIds }, onboarded?, conversationId?, surface?, seen?: string[] }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price, originalPrice?, discountPercent?, hasRequiredOptions }, dishType, reason:{ code, params }, confidence }], personalized, suggestionId }` (`routes/for-you.js`, `auth.optional`; `suggestionId` on every reply, CORE invariant 21). Modes `opener` (default), `usual`, `new`, `surprise`, `popular`, and the chat-ordering `drink`, `sweet`, `cross_sell` (§7f); reason codes `usual`, `ordered_before`, `liked_type`, `you_like`, `popular`, `match`. Only a customer `app-type` (`shoofi-shopping` or none) personalises; without a customer, a visitor's taste profile is read by the `device-id` header (CORE invariant 18). `cart` goes through `sanitizeCart` (a string `appName` ≤ 100 chars, ≤ 50 `productIds`); `onboarded` counts only when `=== true`. `forPerson` — an id from the profile's `people` (`[A-Za-z0-9_-]{1,40}`, else ignored, never a 400) — answers for that person: their `avoid` replaces the customer's, the customer's taste is not used, their tagged dishes first (`personMode`, reason `for_person` `{ name, count }`), then popular; `replyCode` `for_person` / `for_person_new` (none of theirs open). An id not on the profile → the customer's own reply; the served log carries `forPerson` (CORE invariant 18). `seen` — the card `id`s this chat already showed, newest first — goes through `sanitizeSeen` (strings ≤ 120 chars, deduplicated, the newest 40; anything else ignored, never a 400): `popular`, `surprise`, `new`, `drink`, `sweet`, `cross_sell` then answer from the dishes not shown yet (the same mode on the unseen candidates) and are topped up with the normal reply's other cards only when fewer than 2 unseen cards survive `applyLiveMenu` + `dropAtServe`; `usual`, the opener and typed text ignore it (CORE invariant 23). Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
 - `GET  /api/ai-helper/cuisines?lat=&lng=` — `{ cuisines: [{ key, label_ar, label_he, img, storeCount }] }` (`routes/ai-helper.js` → `ai-helper-service.js` `getCuisines`, `auth.optional`): the onboarding's cuisine tiles (§7f). `400` without a valid location; any other failure `200 { cuisines: [] }`. The other AI-helper routes — `GET`/`PUT /api/ai-helper/profile`, `POST /api/ai-helper/merge`, `GET /api/ai-helper/facts` — are the profile's side (`docs/ai-helper.md`; ownership and merge: customers domain).
@@ -1003,6 +1065,11 @@ Each item below was reviewed with the product owner. Respect these verdicts.
 - **BY DESIGN — do NOT change:** `translations.js` reads a header literally
   named `shoofi` because **translations are global/platform-wide by design**, not
   per-store. This is intentional; leave it. (Do not "fix" it to `app-name`.)
+  _Note (2026-10-26, not a verdict change):_ only the READ uses that header. The three panel
+  WRITE routes pick the DB from `app-name` (default `shoofi`). The admin panel sends
+  `app-name: 'shoofi'`, so it lands correctly, but any other caller can write into a store DB
+  where nobody reads. Code writes go through `writeOwnedTranslation`, which is pinned to the
+  central DB (CORE invariant 24).
 - **FACT (not a bug) — `supportedCategoryIds` are strings**, compared via
   `{$toString:'$_id'}` (`menu.js`). Don't switch to ObjectId comparison
   without a data migration.

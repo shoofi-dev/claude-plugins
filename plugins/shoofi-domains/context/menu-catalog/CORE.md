@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@1870b2ff (feat/for-you-taste-redis-cache) / 2026-10-19
+last-verified: shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -11,7 +11,8 @@ Products, categories, menu assembly, options/extras, availability & stock, catal
 
 ## Scope
 Server: `routes/menu.js`, `routes/product.js`, `routes/category.js`, the catalog slice of
-`routes/store.js`, `routes/translations.js`, `routes/global-search.js`, `utils/menu-cache.js`,
+`routes/store.js`, `routes/translations.js`, `services/translations/owned-translations.js` (rows
+written by code — invariant 24), `routes/global-search.js`, `utils/menu-cache.js`,
 `utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`,
 `utils/general-category-order.js` (tile order),
 `utils/catalog-lint.js` (the extras lint rules), `services/catalog/catalog-lint.js` (the
@@ -667,6 +668,33 @@ boundary and say so in the PR.
     (`routes/promotion.js`) clear BOTH cache keys (invariant 2). Nothing fires at `endDate`: a
     stale badge can sit up to 5 min, but every quote and order creation re-checks. Promotions
     live in the STORE db (they reference that store's product/category ids).
+
+24. **CODE THAT WRITES A TRANSLATION ROW GOES THROUGH `writeOwnedTranslation` — NEVER THE PANEL
+    ROUTES, NEVER A SHARED KEY** (`services/translations/owned-translations.js`; reference §2
+    `translations`). `shoofi.translations` is one flat key space read by all three apps, so an
+    overwrite of `free-delivery` changes that label everywhere at once.
+    - **Never call or copy `POST /api/translations/{add,update}` from code.** They pick the DB from
+      the `app-name` header (a store's app-name writes where nobody reads), `add` inserts a second
+      row for an existing key without checking, `update` has no upsert and touches one row of a
+      duplicated key, and none of the four routes has auth.
+    - **`writeOwnedTranslation(shoofiDb, { key, ar, he, owner: { type, id } })`** writes the central
+      `shoofi` DB only. It creates with `$setOnInsert` (upsert on `key`), and a later write
+      `$set`s only rows whose `owner.type`/`owner.id` match. A key someone else holds throws
+      `TRANSLATION_KEY_COLLISION` (the coupon-drafts approval answers 409). It never overwrites.
+      Rows carry `seededBy: 'owned-translations'` and `owner`.
+    - **Generated keys get their own namespace, built from an id and checked by a regex before
+      any write.** Coupon labels: `coupon.<draftId>.<surface>`, with surface
+      `checkout|store|store-sub|store-tag`, enforced by `LABEL_KEY_RE` in
+      `services/coupons/coupon-drafts.js`. Use the id, not a coupon code: codes are typed, editable
+      and reused. Dots are safe; `:` is not, because i18next reads it as a namespace. Keep
+      `{{` and `$t(` out of generated values.
+    - **Write the rows BEFORE the thing that shows them goes live.** A missing key renders as its
+      raw slug in every app. There is no server cache to clear, but the apps fetch translations at
+      boot only, so a session that is already open shows the slug until the app restarts.
+    - There is **no unique index on `key`** (8 duplicate keys locally), so the `$setOnInsert`
+      upsert is not race-proof against a concurrent insert of the same key. Generated keys are
+      per-entity, which keeps that window theoretical. Don't add a unique index without
+      de-duplicating first.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
