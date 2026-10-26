@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -677,8 +677,10 @@ boundary and say so in the PR.
     "מבצעים" (`promotion-store-tag`), never the title, because a store can run several deals at
     once — after a coupon, before the category-discount badge. **The home "حملات"/"מבצעים" row** is a different thing:
     a platform category (`shoofi.categories {isCampaign:true}`) whose membership
-    `lib/campaign-category-sync.js` writes into `shoofi.stores.categoryIds` — an active coupon
-    for the store, OR (`storeHasCampaignTrigger`) a per-store category with `discountPercent>0`
+    `lib/campaign-category-sync.js` writes into `shoofi.stores.categoryIds` — an active PUBLIC
+    coupon for the store (`getActivelyCouponedAppNames` skips `isCustomerSpecific` and
+    `isPurchasedCoupon`: a support compensation for one phone put cacao in everybody's row while
+    its card showed nothing, 2026-10-26), OR (`storeHasCampaignTrigger`) a per-store category with `discountPercent>0`
     / `isCampaign`, OR a promotion matching `buildActiveQuery()` right now. Promotion writes call
     `syncCampaignCategoryForStore`; a deal's start/end edge is picked up by the 10-minute
     reconcile cron (`utils/crons/coupon-campaign-category-cron.js`), and the explore cache is
