@@ -418,6 +418,11 @@
           "desc": "isApproximateLocation is written in exactly one literal, beside isDeliveryOnly: true — it implies delivery-only and never the converse; the point is a town centroid, not an address anybody typed"
         },
         {
+          "file": "routes/delivery/company.js",
+          "regex": "updatedBySource\\s*===\\s*[\"']shoofi_support[\"']",
+          "desc": "the support escape on update-active-status: this exact string is what skips the shift guard, so every admin-web toggle has to send it. Rename it and support silently starts getting SHIFT_NOT_BOOKED in Arabic"
+        },
+        {
           "file": "services/delivery/driver-status-service.js",
           "regex": "async function setDriverActiveStatus",
           "desc": "the deactivation path takes no account of the driver's active deliveries, on purpose - 59% of switch-offs happen while he holds one and it produced 0 orphaned deliveries in 30 days. If a bookDelivery read appears here, somebody has built the alert reference.md 5 says not to"
