@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@9cf91e62 (feat/coupon-drafts) / 2026-10-26",
+  "lastVerified": "shoofi-server@241be1e4 (feat/coupon-drafts) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -377,8 +377,13 @@
         },
         {
           "file": "services/coupons/coupon-drafts.js",
-          "regex": "funding\\.mode === 'shoofi'\\) \\{\\s*[\\r\\n]+\\s*params\\.shoofiDiscount = value;\\s*[\\r\\n]+\\s*params\\.storeDiscount = 0;",
-          "desc": "CORE invariant 13: funding is asked and both split numbers are derived from the coupon's value — never the template's fixed defaults"
+          "regex": "const FUNDING_SHOOFI_PERCENT = \\{ shoofi: 100, store: 0 \\};",
+          "desc": "CORE invariant 13: the 'shoofi' and 'store' funding modes are 100/0 and 0/100 PERCENT splits — never shoofiDiscount/storeDiscount = value, which settlement bills nominally"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "Object\\.assign\\(prefill, \\{\\s*[\\r\\n]+\\s*splitType: 'percentage',\\s*[\\r\\n]+\\s*shoofiPercent,\\s*[\\r\\n]+\\s*storePercent: [^\\n]*100 - shoofiPercent[^\\n]*,\\s*[\\r\\n]+\\s*shoofiDiscount: null,\\s*[\\r\\n]+\\s*storeDiscount: null,\\s*[\\r\\n]+\\s*\\}\\);\\s*[\\r\\n]+[^\\n]*[\\r\\n]+\\s*assertTemplateInvariants\\(prefill, template\\.id\\);",
+          "desc": "CORE invariant 13: drafts' funding is stored as splitType 'percentage' (X / 100−X) with the shekel fields nulled, and the overridden prefill is re-checked by assertTemplateInvariants — apply time resolves the share against the real discount (routes/coupon.js:66-79)"
         },
         {
           "file": "services/coupons/coupon-drafts.js",

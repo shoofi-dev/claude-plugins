@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@9cf91e62 (feat/coupon-drafts) / 2026-10-26
+last-verified: shoofi-server@241be1e4 (feat/coupon-drafts) / 2026-10-26
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -177,7 +177,20 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      `storePercent: 0`), so the gate never fires. Coupon drafts exclude `store_percentage_off`
      for this reason (invariant 13). `splitType: 'percentage'` is also the built-for-purpose
      way to express a varying-fee split — prefer it over `type: 'percentage'` when
-     configuring delivery campaigns.
+     configuring delivery campaigns. **`type: 'fixed_amount'` + `splitType: 'percentage'` is
+     the safe way to give a store a share of a coupon** (verified 2026-10-26). Every reader
+     treats `storeDiscount` as percent points only when `type === 'percentage'`:
+     `stores-export-new` `:1190-1194`, the legacy export `:979-984`, `couponDeliverySplit`
+     (`lib/payments/calc.js:156-161`), `routes/payments/summaries.js:131-135` and
+     `services/exec-dashboard/coupon-funding.js:207`. Prod has 12 such coupons, all auto-applied
+     delivery coupons (ICF86DOX joker 20/80, YNM83RFF 50/50, the vapego coupons 0/100). All
+     333 orders checked carry `storeDiscount = discountAmount × storePercent`, and the sent
+     reports bill exactly that (vapego ₪20/₪28 = the actual fee; joker ₪16; snooshy ₪6.80 on a
+     ₪17 fee). A **shekel** split is billed nominally instead: ₪4/₪16 on a ₪15 fee bills ₪16
+     (Shoofi −₪1), and a store-funded ₪40 ceiling bills ₪40 on a ₪20 fee. Two limits:
+     never combine it with `type: 'percentage'` (the OPEN item above), and never use it on a
+     `full_discount` partial-use coupon, whose breakdown treats the snapshot split as a running
+     budget (`services/coupons/coupon-usage.js:424-425`).
    - **The row pushed at `:1206` carries no items/delivery split** (unlike the
      `full_discount` rows at `:1296`), so `campaignsList` is not splittable for
      `delivery`/`order_items` coupons. `full_discount` is the **only** coupon type with a
@@ -320,11 +333,24 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     pure rules in `services/coupons/coupon-drafts.js`, endpoints in `routes/admin/coupon-drafts.js`).
     `shoofiDiscount`/`storeDiscount` don't change what the customer pays; they ARE the
     settlement (invariant 7), so the draft owns them:
-    - **Funding is a question.** `computeDraftView` blocks until `funding.mode ∈ shoofi | store |
-      split` is answered, then derives both numbers from the coupon's value (`VALUE_FIELD`):
-      `shoofi` → `shoofiDiscount = value, storeDiscount = 0`; `store` → the reverse; `split` →
-      both entered, must sum to the value exactly. The template's fixed defaults (₪10 + ₪10 …)
-      are never used. Templates with no split fields (`delivery_free_personal`,
+    - **Funding is a question, and the answer is always a PERCENT split.** `computeDraftView`
+      blocks until `funding.mode ∈ shoofi | store | split` is answered. Then the prefill
+      becomes `splitType: 'percentage'` with Shoofi 100/0 (`FUNDING_SHOOFI_PERCENT.shoofi`),
+      0/100 (`.store`) or `split` `{shoofiPercent: X}` → X / 100−X. `shoofiDiscount` and
+      `storeDiscount` are null, and `assertTemplateInvariants` is re-run on the overridden
+      prefill. This applies to `delivery_free_over_min`, `delivery_reduced_price`,
+      `delivery_happy_hour` and `store_fixed_off_items` (`needsFunding`). Why percent and not
+      shekels: apply time resolves the percents against the discount actually given
+      (`routes/coupon.js:66-79`, `:357` typed, `:1249` auto-apply), so the store pays its share
+      of the real fee under the ceiling. A shekel split is billed NOMINALLY
+      (`routes/payments/admin.js:1192-1194`), which over-bills whenever the fee is below the
+      ceiling, and that is the usual case (fees seen: 17, 18, 20, 28, 32, 35). It is safe end
+      to end; see the prod evidence at invariant 7. 100/0 is settled the same as the old
+      `shoofiDiscount = value` shape (the store is billed 0 and Shoofi's delivery cost is
+      `total − store`). It is stored as percentage only so there is one shape, and so the order
+      shows Shoofi's real cost. If the model leaves funding open without asking, the route adds
+      the question itself (`FUNDING_QUESTION`, `routes/admin/coupon-drafts.js`). The template's
+      fixed defaults (₪10 + ₪10 …) are never used. Templates with no split fields (`delivery_free_personal`,
       `delivery_free_new_user`, `compensation_full_order`, `referral_reward`) keep the split
       they derive from their own amount.
     - **`SHOOFI_FUNDED_TEMPLATES` = `compensation_items_only`, `gift_voucher`**: always

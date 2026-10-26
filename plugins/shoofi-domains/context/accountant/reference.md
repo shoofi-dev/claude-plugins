@@ -266,8 +266,8 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   and `USE_DEMO`/`API_ENDPOINT`/`DEMO_ENDPOINT`. **No admin UI edits this document** — prod changes are a manual Mongo write.
 - **`shoofi.couponUsages`** — per-source discount rows (store/shoofi × items/delivery).
 - **`shoofi.coupon-drafts`** (`db.couponDrafts`) — support's coupon drafts, central DB only:
-  `status draft → approving → created | discarded`, `templateId`, `params`, `funding{mode, shoofi?,
-  store?}`, `approval{code, fields, at, by, translationKeys}`, `coupon{_id, code, at}`. Holds NO money
+  `status draft → approving → created | discarded`, `templateId`, `params`, `funding{mode, shoofiPercent?}`
+  (always stored on the coupon as `splitType: 'percentage'`, CORE invariant 13), `approval{code, fields, at, by, translationKeys}`, `coupon{_id, code, at}`. Holds NO money
   of its own — the coupon it produces is an ordinary `shoofi.coupons` doc written by
   `POST /api/admin/coupon/create`, and settlement never reads the draft. Schema and lifecycle:
   shoofi-server `docs/coupon-drafts.md`; money rules: CORE invariant 13.
@@ -314,8 +314,8 @@ approves, sends reports, and exports the MASAV Excel. (Full-stack: server comput
    does not. Needs an owner ruling before either path makes one with a store share.
 10. **The #320 template picker's fixed default split** (`services/coupons/coupon-templates.js`
     `SPLIT_FIELDS`) does not follow the amount. Too low → 422 (`COUPON_TEMPLATE_INVARIANT`); too high →
-    silently leaves part of the value unassigned (CORE invariant 13). Drafts derive the split from the
-    value; the plain picker → CouponForm path still has this.
+    silently leaves part of the value unassigned (CORE invariant 13). Drafts replace it with a percent
+    split; the plain picker → CouponForm path still has this.
 
 ## 11. Definition of done
 Inherit `_shared-guardrails.md` §7. For accountant specifically: for ANY change to a payout or
