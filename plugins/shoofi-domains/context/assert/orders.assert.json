@@ -411,6 +411,11 @@
           "file": "utils/coupon-discount.js",
           "regex": "if \\(coupon\\.type === DELIVERY_PRICE_TYPE\\) return computeDeliveryPriceDiscount\\(\\{ coupon, deliveryFee \\}\\);",
           "desc": "CORE invariant 14: computeCouponDiscount dispatches delivery_price to the ONE formula before any other branch - quote, creation guard and amend share it"
+        },
+        {
+          "file": "utils/order-pricing-shadow.js",
+          "regex": "driftDetected",
+          "desc": "CORE invariant 14: creation only OBSERVES a client/server price disagreement (serverPricing), it never rejects one — this is how a coupon lost between the app and the order is found"
         }
       ]
     },
@@ -422,7 +427,9 @@
         "components/checkout/FutureOrderPicker.tsx",
         "hooks/checkout/use-checkout-validate.ts",
         "screens/cart/cart.tsx",
-        "helpers/for-you-attribution.ts"
+        "helpers/for-you-attribution.ts",
+        "stores/coupons/index.ts",
+        "hooks/checkout/use-checkout-submit.ts"
       ],
       "patterns": [
         {
@@ -514,6 +521,16 @@
           "file": "hooks/checkout/use-checkout-submit.ts",
           "regex": "\\.\\.\\.forYouOrderProps\\(order\\?\\.products\\),",
           "desc": "doc CORE (abandonment layers): order_submit_success carries the For-you lines — analytics only, the order payload untouched"
+        },
+        {
+          "file": "stores/coupons/index.ts",
+          "regex": "applySeq",
+          "desc": "CORE invariant 14 (a coupon can be in the price and not on the order): the coupon store drops a stale auto-apply answer, newest request wins, so it cannot diverge from the price the customer is charged"
+        },
+        {
+          "file": "hooks/checkout/use-checkout-submit.ts",
+          "regex": "couponsStore\\.appliedCoupon",
+          "desc": "CORE invariant 14: the submitted coupon comes from couponsStore, NOT from the total the customer sees"
         }
       ]
     },

@@ -292,6 +292,23 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Readers on the order side need no change: the partner invoice, shoofir `order-payment.ts`,
       admin `CardOrder`/`CardTwinOrder` and the app's `order-header` all read `discountAmount`,
       so a delivery coupon prints `shippingPrice − discountAmount` = ₪X.
+    - ⚠️ **A COUPON CAN BE IN THE PRICE AND NOT ON THE ORDER, and the server accepts it.**
+      Two different things decide those: the customer is charged `components/total-price`'s own
+      `discount` state, while `hooks/checkout/use-checkout-submit.ts` sends
+      `couponsStore.appliedCoupon` (`shoofi-app/stores/coupons/index.ts`). Both are written by the
+      same auto-apply call, so they diverge whenever one answer is stale — checkout re-fires
+      `getAndApplyAutoCoupons` on every move of the cart, the fee, the area and the shipping
+      method, and a request sent before the area resolved comes back with NO coupons at all
+      (`routes/coupon.js` drops every `discountType: 'delivery'` coupon from an areaId-less
+      request). The component drops a stale answer; the store did not until `applySeq`
+      (2026-10-27), so the older empty answer cleared `appliedCoupon` while the total kept the
+      discount. **Creation does not catch this**: `utils/order-pricing-shadow.js` only OBSERVES,
+      so the order is stored at the client's total. The fingerprint is
+      `appliedCoupon: null` + `serverPricing.driftDetected: true` + `orderPriceDrift ≈ 0` +
+      `totalDrift > 0`, and **no `couponUsages` row** — so nobody is billed for the discount and
+      the store carries it. Real: `afndena` order `8265-1164`, 2026-10-27, ₪208 charged on a ₪223
+      order; 11 such orders platform-wide in the preceding 30 days (₪195). That query is how you
+      count "discounts we gave away and never recorded"; it is not a pricing-formula bug.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
