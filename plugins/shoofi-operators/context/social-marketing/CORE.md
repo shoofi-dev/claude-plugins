@@ -1,7 +1,7 @@
 ---
 operator: social-marketing
 class: B (operator / department head — ships drafts, not code)
-last-verified: shoofi-server@main / 2026-10-26
+last-verified: shoofi-server@main / 2026-10-27
 scope: reads shoofi-server data read-only; writes drafts. Never publishes, never holds the Meta token.
 ---
 
@@ -94,7 +94,8 @@ draft should assume a per-town account exists.
 ### 3b. How posts did — read back from Meta (2026-10-26)
 The admin's **ביצועים ברשתות** screen (`/admin/social-insights`) shows followers, daily
 reach / views / engagements / new followers / profile views, and per-post reach, views,
-likes, comments, shares and saves for the page and the Instagram account.
+likes, comments, shares and saves for the page and the Instagram account — and, since
+2026-10-27, per-story reach, views, interactions, replies and shares.
 `services/social-posts/insights-service.js` syncs them every 3 hours (cron under
 `ENABLE_CRONS`, plus a "refresh now" button) into `shoofi.socialInsights`, through the
 same `meta-publisher.js`. It needs `read_insights` and `instagram_manage_insights` on the
@@ -107,7 +108,11 @@ What that means for this operator:
 - "Reach" over a window is a **sum of daily reach**, not unique people; say so if you quote it.
 - A metric that is missing is missing (Meta retired the name, or the account is too new) —
   never report it as 0.
-- Stories are not in the stats.
+- **Stories are only as complete as their last sync.** Meta returns a story only during its
+  24 live hours, so the server saves it every 3 hours while it is up. An ended story's numbers
+  can run up to 3 hours short, and a story posted while no sync ran is missing for good.
+  Compare stories with stories, not with posts. A fresh Instagram story can show "too few
+  viewers" (`fewViewers`): Meta withholds the numbers, and they are not 0.
 
 ### 3a. How the gate is actually enforced (fixed 2026-09-21)
 `shoofi-server/routes/social-media-ideas.js` shipped with **no authentication middleware at
