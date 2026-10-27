@@ -150,6 +150,15 @@ formula module, `utils/coupon-discount.js` (`computeCouponDiscount`), used by
 (`utils/order-pricing.js`). Creation re-checks ownership and partial-use balances only
 (`enforceCouponEntitlement`) — **except** for the fixed-delivery-price type.
 
+**What is advertised** — `GET /api/coupons/active` feeds the store-page carousel AND the home
+store-card tag (shoofi-app `couponsStore.activeCoupons`, label `t(storeTagName)`). It lists public,
+auto-apply coupons **running at this hour** (`isWithinActiveHours`, same check as apply and
+auto-apply) and **includes public `isFreeDelivery` campaigns** — only `isForNewUser`,
+customer-specific and purchased coupons are left out. Both were wrong until 2026-10-27: a
+12:00–18:00 coupon was shown all morning while checkout applied the 08:00–12:00 free-delivery one,
+which was never shown at all. The home screen reloads the list on focus. A public coupon needs a
+`storeTagName` or its card tag is an icon with no text; coupon drafts fill it from `nameForStore`.
+
 **Fixed delivery price** — `type: 'delivery_price'`, `discountType: 'delivery'`,
 `deliveryPrice: X` (what the customer pays for delivery), `value` = `maxDiscount` = the cap
 (required, > 0), always `splitType: 'percentage'`, never `allowPartialUse` / `isFreeDelivery`
