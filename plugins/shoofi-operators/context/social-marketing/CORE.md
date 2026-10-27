@@ -86,6 +86,14 @@ draft should assume a per-town account exists.
     picks Facebook / Instagram, schedules a time or publishes now;
   - `utils/crons/social-publish-cron.js` sends due rows every minute through
     `services/social-posts/meta-publisher.js` — the only module that talks to the Graph API.
+  - **or no post at all** (2026-10-26): **פרסום ידני** on the same screen uploads a
+    ready-made video or image (`POST /api/admin/social-publications/media`, 100MB video /
+    8MB image) and creates a row with `source: "manual"`, `postId: null`, already
+    `approved` — the person creating it (same `SOCIAL_ROLES` gate) is the approver. A video
+    post goes out as a Facebook page video + an Instagram **Reel**; a story is ≤ 60s and
+    carries no caption. So not everything on the page came through this operator's drafts,
+    and a manual row has no brief to learn from. It is still a human pressing the button —
+    this operator does not create manual rows.
   An `ad` is refused (it belongs in Ads Manager); Instagram and stories need a rendered image.
   A target that went out is never re-sent, and a send interrupted mid-way is marked failed
   for a person to check rather than retried. None of this changes this operator's job: it
