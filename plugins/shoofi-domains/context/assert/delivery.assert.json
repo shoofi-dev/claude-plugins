@@ -36,6 +36,7 @@
         "scripts/delivery-only-preflight.js",
         "docs/delivery-only-bookings.md",
         "services/delivery/manual-assignment-ranking.js",
+        "services/delivery/assignment-provenance.js",
         "lib/delivery/helpers.js"
       ],
       "symbols": {
@@ -446,6 +447,21 @@
           "file": "services/delivery/manual-assignment-ranking.js",
           "regex": "RANK_REASONS",
           "desc": "the server side of the contract: reason codes the admin web must translate"
+        },
+        {
+          "file": "services/delivery/assignment-provenance.js",
+          "regex": "assignedAt:\\s*1",
+          "desc": "assignedAt (and reassignedAt) ride the provenance projection, which routes/analytics.js spreads into POST /api/analytics/deliveries - so the admin clients ALREADY receive the assignment instant. Drop it here and every 'how long has he not answered' counter silently reads undefined, with no error (CORE invariant 2)"
+        },
+        {
+          "file": "routes/analytics.js",
+          "regex": "\\.\\.\\.ASSIGNMENT_PROVENANCE_PROJECTION",
+          "desc": "the spread is the ONLY route by which assignedAt/reassignedAt reach the delivery list, the live-ops board and the ops dashboard - they are absent from this projection's explicit key list, so reading that list alone concludes wrongly that a server change is needed (CORE invariant 2)"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "unresponsive_driver",
+          "desc": "this alert is {status:\"1\", created:{$lte:now-2min}} with NO driver filter - created sits a median 195s before assignedAt, and an un-dispatched booking also holds status \"1\", so it fires on couriers handed the job seconds ago and on rows nobody has been given. Any new 'he has not accepted' surface must key on now-assignedAt AND isPendingAssignment!==true (CORE invariant 2)"
         }
       ]
     },
