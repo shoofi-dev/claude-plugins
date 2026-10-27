@@ -99,6 +99,24 @@ draft should assume a per-town account exists.
   for a person to check rather than retried. None of this changes this operator's job: it
   still produces drafts and stops at the human gate.
 
+### 3b. How posts did — read back from Meta (2026-10-26)
+The admin's **ביצועים ברשתות** screen (`/admin/social-insights`) shows followers, daily
+reach / views / engagements / new followers / profile views, and per-post reach, views,
+likes, comments, shares and saves for the page and the Instagram account.
+`services/social-posts/insights-service.js` syncs them every 3 hours (cron under
+`ENABLE_CRONS`, plus a "refresh now" button) into `shoofi.socialInsights`, through the
+same `meta-publisher.js`. It needs `read_insights` and `instagram_manage_insights` on the
+token, on top of the publishing permissions.
+
+What that means for this operator:
+- **Read performance from there, don't guess it.** When asked what works, the per-post rows
+  are the evidence — and they include posts made by hand in Business Suite, not only the
+  ones that went through our approval chain (those carry `publicationId`).
+- "Reach" over a window is a **sum of daily reach**, not unique people; say so if you quote it.
+- A metric that is missing is missing (Meta retired the name, or the account is too new) —
+  never report it as 0.
+- Stories are not in the stats.
+
 ### 3a. How the gate is actually enforced (fixed 2026-09-21)
 `shoofi-server/routes/social-media-ideas.js` shipped with **no authentication middleware at
 all** — the paths began `/api/admin/` and that was the whole access control, so anyone who
@@ -171,7 +189,8 @@ reference real product photos we already have.
 
 ## 7. Open questions a human still owns
 1. ~~The publishing path~~ — built 2026-10-01 in `shoofi-server` (§3); the token is that
-   server's env, never here. Still open: the Meta app review / system-user token itself.
+   server's env, never here. The system-user token (with the insights permissions, §3b) was
+   generated 2026-10-26; it belongs in the App Platform app's env, never here.
 2. **Cadence**, once manual runs have been tested.
 3. **Hebrew**, for the 3.7%.
 4. ~~The auth gap in §3a~~ — fixed 2026-09-21; §3a now describes the gate as enforced.
