@@ -232,6 +232,11 @@
           "file": "consts/shared.ts",
           "regex": "CLIENT_FEATURES = '[^']*delivery-price-coupon",
           "desc": "the app bundle declares it can render fixed-delivery-price coupons (x-client-features)"
+        },
+        {
+          "file": "components/total-price/index.tsx",
+          "regex": "couponsStore\\.setAppliedCoupon\\(couponApp\\)",
+          "desc": "TotalPrice is the one writer of the coupon submit sends, in the same step as the total it prices"
         }
       ]
     },
