@@ -196,7 +196,14 @@ queue retries every **15s** (max 10). → **Store/settlement tax invoices are th
   Pay → no card token, just session id; server reads the ZCredit session for the amount.
 - **Coupons**: the app never computes a coupon discount — it shows the server's
   `discountAmount` (auto-apply and manual re-validate in `components/total-price/index.tsx`)
-  and posts it in `appliedCoupon` (`hooks/checkout/use-checkout-submit.ts`). It declares what
+  and posts it in `appliedCoupon` (`hooks/checkout/use-checkout-submit.ts`, read from
+  `couponsStore.appliedCoupon`). **The coupon submit sends is the one the total was priced with**:
+  `couponsStore.getAndApplyAutoCoupons` / `applyCoupon` only quote, and TotalPrice's
+  `commitCoupon` writes its own state and `couponsStore.setAppliedCoupon` together, only from a
+  response its effect has not superseded. Before this, a late, superseded auto-apply answer
+  wrote the store directly, so an order went out at the discounted total with
+  `appliedCoupon: null` (no couponUsages row; 8265-1164, GCP 5194-1334 on 2026-10-27).
+  Checkout also clears a store coupon left from an earlier visit on mount. It declares what
   its bundle can render in `x-client-features` (`consts/shared.ts` `CLIENT_FEATURES`, sent by
   `utils/http-interceptor`); `delivery-price-coupon` unlocks fixed-delivery-price coupons.
   A merged change to that list reaches phones only with `eas update`.

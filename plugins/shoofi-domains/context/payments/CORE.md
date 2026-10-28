@@ -149,6 +149,9 @@ formula module, `utils/coupon-discount.js` (`computeCouponDiscount`), used by
 `/api/coupons/apply`, the auto-apply scorer (`routes/coupon.js`), amend and shadow pricing
 (`utils/order-pricing.js`). Creation re-checks ownership and partial-use balances only
 (`enforceCouponEntitlement`) — **except** for the fixed-delivery-price type.
+Creation does NOT notice a total lower than items + fee − coupon − deals − coins with nothing to
+explain it (shadow pricing records the drift and the order is kept), so the app must send the
+coupon its total took off: TotalPrice is its only writer (reference.md, "Coupons").
 
 **What is advertised** — `GET /api/coupons/active` feeds the store-page carousel AND the home
 store-card tag (shoofi-app `couponsStore.activeCoupons`, label `t(storeTagName)`). It lists public,
