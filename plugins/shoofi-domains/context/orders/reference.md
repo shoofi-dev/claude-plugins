@@ -163,6 +163,13 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 - **`delivery-company.bookDelivery`** keyed by `bookId` = order `orderId`; mirrors
   `DELIVERY_STATUS` (`1` waiting_approve … `3` collected/pickup … `4` delivered).
 - **`shoofi.twinOrderGroups`** links `orders.twinGroup` ↔ group `primary`/`secondary`.
+- **`orders.marketingTouch`** (optional, top level) =
+  `{ kind, placement, itemId, campaignId?, linkType?, at: Date }`: the last marketing
+  tap or push open before checkout, ≤ 24 h old. Written only at insert, by
+  `/api/order/create` and both twin place routes, through `sanitizeMarketingTouch`
+  (`utils/marketing-touch.js`). Absent = not attributed. A twin pair carries the same
+  value on both legs, so count checkouts by `twinGroup.groupId`. Rules and index plan:
+  CORE invariant 15.
 - **Order dates — `datetime` is when it was PLACED, `orderDate` is when it is DUE.** Both are
   client-supplied ISO-8601 **offset strings** (`"2026-08-03T15:00:00+03:00"`, never UTC, never
   a `Date`) built by `moment().format()` in `shoofi-app/stores/cart/index.ts` and stored
@@ -351,6 +358,11 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
   store is the cart's stamp:** checkout passes `storeData: cartStoreData || storeDataStore.storeData`
   and `submitOrder` sends `app-name: order.storeData?.appName` — so whatever stamps an empty
   cart decides the store DB the order lands in (CORE invariant 13).
+  Optional **`marketingTouch`** on the same body (CORE invariant 15). The server accepts it
+  from shoofi-server's `feat/order-marketing-touch` onwards. The app half is a separate
+  PR. It belongs in `submitOrder`, not `getCartData`, because `getCartData` also feeds the
+  legacy `updateOrderAdmin`. On twin checkouts it goes TOP-LEVEL on the `twin-order/place`
+  / `digital-place-pending` JSON body, not inside `primary`/`secondary`.
 - **Payment**: CC is charged **server-side inside `order/create`** (client passes
   `paymentData`; the client-side charge is deprecated). Apple/Google Pay use a ZCredit
   session + `order/save-apple-pay-session` → `update-apple-pay-order-session` →

@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -39,7 +39,9 @@
         "services/coupons/delivery-price-enforcement.js",
         "services/twin-order/twin-delivery-price.js",
         "docs/fixed-delivery-price.md",
-        "test/integration/coupon-delivery-price.js"
+        "test/integration/coupon-delivery-price.js",
+        "utils/marketing-touch.js",
+        "test/integration/order-marketing-touch.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -104,6 +106,12 @@
         ],
         "services/twin-order/twin-delivery-price.js": [
           "enforceTwinSideDeliveryPrice"
+        ],
+        "utils/marketing-touch.js": [
+          "sanitizeMarketingTouch",
+          "MARKETING_TOUCH_MAX_AGE_MS",
+          "MARKETING_TOUCH_FUTURE_SKEW_MS",
+          "MARKETING_TOUCH_MAX_STRING_LENGTH"
         ]
       },
       "patterns": [
@@ -411,6 +419,26 @@
           "file": "utils/coupon-discount.js",
           "regex": "if \\(coupon\\.type === DELIVERY_PRICE_TYPE\\) return computeDeliveryPriceDiscount\\(\\{ coupon, deliveryFee \\}\\);",
           "desc": "CORE invariant 14: computeCouponDiscount dispatches delivery_price to the ONE formula before any other branch - quote, creation guard and amend share it"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const marketingTouch = sanitizeMarketingTouch\\(parsedBodey\\.marketingTouch\\);\\s*delete parsedBodey\\.marketingTouch;[\\s\\S]*?const orderDoc = \\{\\s*\\.\\.\\.parsedBodey,[\\s\\S]*?\\.\\.\\.\\(marketingTouch \\? \\{ marketingTouch \\} : \\{\\}\\),",
+          "desc": "CORE invariant 15: /api/order/create sanitizes marketingTouch and DELETES the raw value before the ...parsedBodey spread, then re-adds only the sanitized one"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "const marketingTouch = sanitizeMarketingTouch\\(body\\.marketingTouch\\);",
+          "desc": "CORE invariant 15: the twin place routes sanitize the TOP-LEVEL body.marketingTouch once and stamp the same value on both legs"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "\\.\\.\\.\\(marketingTouch \\? \\{ marketingTouch \\} : \\{\\}\\),",
+          "desc": "CORE invariant 15: buildSkeletonOrder writes marketingTouch only when present (absent = not attributed)"
+        },
+        {
+          "file": "utils/marketing-touch.js",
+          "regex": "const MARKETING_TOUCH_MAX_STRING_LENGTH = 64;\\s*const MARKETING_TOUCH_MAX_AGE_MS = 24 \\* 60 \\* 60 \\* 1000;\\s*const MARKETING_TOUCH_FUTURE_SKEW_MS = 5 \\* 60 \\* 1000;",
+          "desc": "CORE invariant 15: 64-char string cap, 24h window, 5-minute future skew"
         }
       ]
     },
