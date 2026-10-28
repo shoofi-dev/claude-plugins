@@ -1818,6 +1818,7 @@
         "screens/ai-helper/FamilyScreen.tsx",
         "screens/ai-helper/FamilyStep.tsx",
         "hooks/useOpenStoreAtProduct.ts",
+        "utils/open-store-at-product.ts",
         "screens/menu/components/GeneralCategoriesList.tsx",
         "__tests__/components/general-categories-open-product.test.tsx",
         "helpers/for-you-copy.ts",
@@ -1910,9 +1911,9 @@
           "desc": "doc reference §8: tile-grid stores find a productId through generalCategories[].subCategories[].products — general categories carry no products of their own"
         },
         {
-          "file": "hooks/useOpenStoreAtProduct.ts",
+          "file": "utils/open-store-at-product.ts",
           "regex": "navigate\\(\"menuScreen\"",
-          "desc": "doc reference §8: a For-you card opens menuScreen with productId, never the broken meal route"
+          "desc": "doc reference §8: a For-you card (and a banner / story / push link) opens menuScreen with productId, never the broken meal route"
         },
         {
           "file": "helpers/for-you-copy.ts",

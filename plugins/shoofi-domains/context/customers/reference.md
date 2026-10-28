@@ -305,7 +305,7 @@ neither count toward the cap nor get capped or opt-out filtered. Partner and dri
 skips appear only in the execution result (`execution.skippedOptOut`, `skippedCapped`,
 `pushCap`, `holdoutCount`) and in the list's results column.
 
-**Holdout and the audience record (CORE invariant 12).** Why: prod sent ~66.7k campaign pushes
+**Holdout and the audience record (CORE invariant 13).** Why: prod sent ~66.7k campaign pushes
 to ~18.9k customers in the week to 2026-10-28, and last-touch attribution credits a push with
 orders that would have happened anyway. A holdout gives the baseline.
 - *Sizing (prod, read-only, 2026-10-28):* 216 executed campaigns, all `shoofi-app`; audience
