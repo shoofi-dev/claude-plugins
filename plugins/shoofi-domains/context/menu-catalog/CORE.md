@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -18,7 +18,8 @@ written by code — invariant 24), `routes/global-search.js`, `utils/menu-cache.
 `utils/catalog-lint.js` (the extras lint rules), `services/catalog/catalog-lint.js` (the
 worklist writer + nightly run), `routes/admin/catalog-lint.js`, `utils/crons/catalog-lint-cron.js`,
 the combo-deals trio `utils/combo-validation.js`, `services/menu/combo-snapshots.js`,
-`utils/client-features.js`, and the "For you" suggestions — `services/ordering-intelligence/`
+`utils/client-features.js`, the store launch date / "new" badge `utils/store-launch.js`
+(store-list enrichment only; invariant 25), and the "For you" suggestions — `services/ordering-intelligence/`
 (incl. the server gate `access.js`, the Claude cap `chat-limits.js` and the served log `served-log.js`)
 (the catalog-facing parts are `index-builder.js`, `dish-types.js` and the live re-check in
 `suggest-service.js`; ranking/taste/open-stores ride along), `routes/for-you.js`,
@@ -39,7 +40,7 @@ merge are the customers domain's; the cart the quick add writes into and the def
 checkout are the orders domain's.
 Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/sold-by-weight.md`,
 `docs/menu-import-issues.md` (the worklist — now also documents the `lint` phase),
-`docs/combo-deals.md`, `docs/for-you.md`, `docs/menu-spellcheck.md`, `docs/ai-helper.md`.
+`docs/combo-deals.md`, `docs/store-launch-date.md`, `docs/for-you.md`, `docs/menu-spellcheck.md`, `docs/ai-helper.md`.
 Mostly **server-first**: catalog data is server-owned and clients render it — but if a task
 needs a client change (partner product screens, customer menu display), do it full-stack,
 one PR per repo.
@@ -713,6 +714,30 @@ boundary and say so in the PR.
       upsert is not race-proof against a concurrent insert of the same key. Generated keys are
       per-entity, which keeps that window theoretical. Don't add a unique index without
       de-duplicating first.
+
+25. **A STORE IS "NEW" ONLY BY ITS `launchDate`, AND THE SERVER DECIDES** (`utils/store-launch.js`,
+    `docs/store-launch-date.md`).
+    - **Where it lives.** `launchDate` is on the registry `shoofi.stores[<appName>]`, written by the
+      admin store form ("تاريخ الافتتاح": `store/add`, `store/update/:id`,
+      `create-from-mock` via `newStoreData.launchDate`). That registry is also what every store list
+      reads (`RestaurantAvailabilityService.getAvailableStores`, `POST /api/menu/search`). So,
+      unlike the three-document flags, nothing propagates it to `<appName>.store`. The value is a
+      Date at Israel midnight of the chosen day. `''` clears it, and a request that omits the field keeps it.
+    - **No inference.** No `launchDate` = not new. Never derive it from `createdAt` or the first
+      order: the owner sets it. A future date is not new yet ("coming soon" is `isNew: false` for now).
+    - **The window** is `shoofi.store {id:1}.newStoreWindowDays` (admin Settings → Shoofi →
+      "New Stores", a whole number from 1 to 365, validated on `POST /api/shoofiAdmin/store/update`),
+      default 30. New while `launchDate <= now < launchDate + N` calendar days.
+    - **`store.isNew` is computed per request** on explore v1/v2, `available-stores`, `menu/search`
+      and `store/all-stores`. On explore it is applied to the response **after** the cache read,
+      never stored in the cache. Otherwise a changed N or a passing day would be served stale.
+      Clients never compute it, so the window changes without an app release.
+    - **Listing:** `GET /api/shoofiAdmin/store/all-stores?isNew=true` returns the new stores
+      (visible, non-template), newest first, with `newUntil`. For the marketing agent and the
+      Campaign hub. It has the same callers and no auth, like the plain list.
+    - **The app card** (`screens/stores/components/item.tsx`) shows "جديد"/"חדש"
+      (`store-new-tag` + `defaultValue`, `StoreBadge` variant `new`). At most two badges, in the
+      order offer, new, status. When all three apply, "new" is dropped.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
