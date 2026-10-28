@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28
+last-verified: shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -18,6 +18,14 @@ Accounts, phone+OTP login, tokens & sessions, profiles, addresses, referrals.
 Server: `routes/{auth,customer,customer-referrals,customer-campaigns,customer-feedback,
 shoofi-admin-users}.js`, `utils/{auth-service,admin-auth-service,app-name-helper}.js`,
 `controllers/customerAddressController.js`. Clients: login/OTP/profile in all four apps.
+Also yours: **who a push campaign may reach**: the customer's marketing-push opt-out
+(`routes/customer-marketing-preferences.js`), the frequency cap
+(`services/customer-campaigns/marketing-push-policy.js`), and the campaign send and schedule
+path (`controllers/customerCampaignController.js`, `utils/crons/scheduled-campaigns-cron.js`).
+See invariant 12 and reference §5b. Also the campaign **holdout** and the per-customer
+**audience record** `shoofi.marketingPushAudience` (`services/customer-campaigns/{holdout,
+push-audience}.js`, invariant 13). Measuring lift FROM that record is `orders`' (per-checkout
+order facts); the record itself, and its exactness, is yours.
 **Not yours:** order history content (`orders`), coins/rewards (growth), driver coverage
 fields (`delivery`) — you own the identity record they hang off.
 Also yours: the school-project enrollment (`services/customer/school-project-enrollment.js`)
@@ -183,7 +191,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    `auth.required` only, and a plain customer token passes `auth.required` (invariant 7's
    shared secret): it could search customers, preview audiences and push to all of them. The
    only caller is the admin's קמפייני פוש screen. `master` is named because `checkAdminRole` has
-   no hierarchy. Pinned by `test/integration/marketing-routes-auth.js`, which also covers the
+   no hierarchy. The frequency-cap config (`GET/PUT /push-cap-config`) and
+   `POST /:id/unschedule` sit behind the same `...adminOnly` (2026-10-28). They are declared
+   **before** `/:id`, which would otherwise read `push-cap-config` as a campaign id. Pinned by `test/integration/marketing-routes-auth.js`, which also covers the
    other marketing write paths (ads, stories, notes, `notifications/send*`, coupon campaigns,
    admin coupons) — those files have no domain owner yet.
 11. **Every marketing surface opens ONE `link` shape, and it points at something real.** The
@@ -261,6 +271,78 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
        `...parsedBodey` onto the order, so an extra field lands unsanitized.
    Pinned by `test/integration/marketing-links.js` and `test/integration/marketing-attribution.js`
    (server), `__tests__/services/marketing-events-queue.test.ts` (app).
+
+12. **Marketing pushes: opt-out and frequency cap apply inside `executeCampaign` ONLY, to
+    customer-app audiences ONLY.** Every other push (order status, `feedback_request`,
+    delivery, partner and driver alerts) calls `notificationService.sendNotification`
+    directly. That function knows neither rule, so a customer who turned offers off still hears
+    about their order. Keep it that way: never move either rule into `sendNotification`.
+    - **Opt-out** = `shoofi.customers.marketingPushOptOut: true`. Unset means opted in, which is
+      every customer before 2026-10-28. The customer sets it through
+      `GET/PUT /api/customer/marketing-preferences` (`auth.required`, customer app-type only).
+      The route writes **`req.auth.id`'s own doc, never an id from a header, body or URL**.
+      `routes/notifications.js` reads a client `user-id` header, which is a known IDOR and must
+      not be copied (invariant 7). The router is mounted above `routes/customer.js`, whose
+      catch-all `GET /api/customer/:customerId` would otherwise answer it.
+    - **Cap** = `shoofi.store {id:1}.marketingPushCap {enabled, maxPushes, windowDays}`. It means
+      "at most N campaign pushes per customer per D days". **Off until an admin turns it on**
+      (`DEFAULTS.enabled: false`), and edited from the קמפייני פוש screen. It counts the
+      customer's existing `shoofi.notifications` records **that carry `data.campaignId`** since
+      the cutoff. `sendNotification` writes one record per recipient and only a campaign send
+      sets `data.campaignId`, so transactional records never count. There is no separate send log.
+    - Both are filtered **before** the per-user send loop (`userIds = policy.userIds`), and the
+      result records `execution.skippedOptOut` / `skippedCapped` / `pushCap`.
+    - **A campaign is claimed atomically**: `claimCampaign` is one `findOneAndUpdate` to
+      `in_progress`. It used to read the status and then write. The cron claims only a due
+      `scheduled` campaign. A lost claim throws `code: 'CAMPAIGN_NOT_CLAIMABLE'`, and the cron
+      skips it without marking it failed, because that would overwrite a run that is sending.
+      The admin's `PUT /:id` refuses an `in_progress` campaign (409) for the same reason.
+    - **`scheduling.scheduledDate` is a Date.** A wall-clock string without an offset is read in
+      the campaign's timezone (`Asia/Jerusalem`). The cron queries `$lte: <Date>`, and a stored
+      string never matches it. That is why no scheduled campaign ever sent before 2026-10-28,
+      along with the cron never being started.
+
+13. **A held-out customer gets NOTHING from that campaign, and the audience record says exactly
+    who got what.** `campaign.holdout = { pct }`, 0–50, **default 0 = off** (a campaign saved
+    before 2026-10-28 has no `holdout` and reads as 0). Customer-app audiences only.
+    - **Order:** opt-out, then cap (invariant 12), THEN holdout. `assignHoldout`
+      (`services/customer-campaigns/holdout.js`) draws only from `policy.userIds` (who would
+      really have been sent) and the send loop gets `holdout.treatedIds`. A held-out customer
+      gets no `sendNotification` call at all: no push, no websocket, no `shoofi.notifications`
+      record, so **no cap count**. Never move the holdout ahead of the opt-out or the cap, and
+      never move it into `sendNotification`.
+    - **Deterministic:** `holdoutBucket` = sha256(`campaignId:customerId`), first 8 hex, mod
+      10000; held out when `< pct × 100`. No randomness, no stored state: a retried execution
+      puts everyone in the same group, and another campaign draws a different slice.
+    - **Too small to measure:** fewer than `MIN_AUDIENCE` (200) eligible customers (after
+      opt-out and cap) → no holdout, `execution.holdoutSkippedReason: "audience_below_minimum"`.
+      A partner/driver campaign with a pct records `"not_customer_audience"` and writes no rows.
+    - **The record is a contract the orders domain's lift reporting reads. Keep it exact:**
+      `shoofi.marketingPushAudience` (that exact Mongo name, via `shoofiDb.collection(...)`),
+      one row per (campaign, customer):
+      `{ campaignId: string, customerId: string, group: "treated"|"holdout"|"capped"|"opted_out", at: Date }`.
+      It is an **assignment** record (intention to treat): `treated` = sent to, even if that
+      push then failed for a missing device token; `at` = the run's assignment instant, the same
+      for every row of the run (not each push's send time). Indexes: unique
+      `{campaignId, customerId}`, `{campaignId, group}`, `{customerId, at: -1}`, TTL 400 days on
+      `{at}` (`RETENTION_DAYS`).
+    - **Never in the send's way:** `recordAudience` runs alongside the send loop, in unordered
+      1000-row `bulkWrite` chunks, and **never throws**. A failure is logged and counted
+      (`execution.audienceRecordErrors` / `audienceRecorded` / `audienceRecordError`); the send
+      goes on, once. The indexes are built once per db in the background and **never awaited by
+      a write** (`ensureIndexesOnce`; shoofi-server#306: a write gated on a failing build on a
+      NEW collection was lost).
+    - **A retried execution never doubles a row:** rows are **upserts** on (campaignId,
+      customerId), which is correct even before the unique index finishes building on first
+      deploy. Non-treated groups are `$setOnInsert` (the first run stands); **`treated` wins**
+      (a pipeline update; an existing treated row keeps its first `at`), so no `holdout` row ever
+      belongs to a customer the campaign pushed, even if the pct was edited between runs. Don't
+      "simplify" this to insertMany-and-ignore-duplicates.
+    - **On `execution`:** `holdoutCount`, `holdoutPct` (what was APPLIED, 0 when skipped; the
+      stored `holdout.pct` can be edited afterwards, so analysis reads this one),
+      `holdoutSkippedReason`. `totalUsers` = the treated count (who was sent to).
+    - Edited with the campaign (`POST /`, `PUT /:id`, the same `...adminOnly` roles; 400 outside
+      0–50, never clamped), from the admin form's "קבוצת ביקורת %" field (`HoldoutField.tsx`).
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:

@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -28,6 +28,13 @@
         "routes/ai-helper.js",
         "services/ordering-intelligence/taste-profile.js",
         "docs/ai-helper.md",
+        "controllers/customerCampaignController.js",
+        "services/customer-campaigns/marketing-push-policy.js",
+        "routes/customer-marketing-preferences.js",
+        "utils/crons/scheduled-campaigns-cron.js",
+        "services/customer-campaigns/holdout.js",
+        "services/customer-campaigns/push-audience.js",
+        "models/CustomerCampaign.js",
         "utils/marketing-link.js",
         "routes/marketing-events.js",
         "services/marketing/viewer-key.js",
@@ -36,6 +43,20 @@
         "routes/marketing-performance.js"
       ],
       "symbols": {
+        "services/customer-campaigns/marketing-push-policy.js": [
+          "marketingPushCap",
+          "marketingPushOptOut",
+          "applyMarketingPushPolicy",
+          "getPushCapConfig",
+          "countRecentMarketingPushes",
+          "isCustomerAudience",
+          "optedOutIds",
+          "cappedIds"
+        ],
+        "services/customer-campaigns/holdout.js": ["holdoutBucket", "assignHoldout", "normalizeHoldoutInput", "MIN_AUDIENCE", "audience_below_minimum", "not_customer_audience"],
+        "services/customer-campaigns/push-audience.js": ["marketingPushAudience", "recordAudience", "ensureIndexesOnce", "lostWrites"],
+        "controllers/customerCampaignController.js": ["claimCampaign", "toScheduledDate", "unscheduleCampaign", "CAMPAIGN_NOT_CLAIMABLE", "holdoutCount", "holdoutSkippedReason", "audienceRecordErrors"],
+        "utils/crons/scheduled-campaigns-cron.js": ["runDueCampaigns", "checkScheduledCampaigns", "cron:scheduled-campaigns"],
         "utils/marketing-link.js": ["LINK_TYPES", "LINK_PAGES", "linkFromRequest", "resolveLink", "legacyAdFields", "legacyLink", "withLink"],
         "routes/marketing-events.js": ["sanitizeEvent", "ensureIndexesInBackground", "marketingEvents", "MAX_BATCH"],
         "services/marketing/viewer-key.js": ["deviceViewerKey"],
@@ -93,6 +114,106 @@
         ]
       },
       "patterns": [
+        {
+          "file": "app.js",
+          "regex": "if \\(shouldRunCrons\\) \\{[\\s\\S]*scheduledCampaignsCron\\.startScheduledCampaignsCron\\(app\\.db\\)",
+          "desc": "CORE invariant 12: the scheduled-campaigns cron is started inside the shouldRunCrons block - before 2026-10-28 it was never started, so no scheduled campaign sent"
+        },
+        {
+          "file": "controllers/customerCampaignController.js",
+          "regex": "\\{ status: \\{ \\$nin: NOT_CLAIMABLE \\}, \\.\\.\\.\\(claimFilter \\|\\| \\{\\}\\), _id: getId\\(campaignId\\) \\}",
+          "desc": "CORE invariant 12: a campaign is claimed in ONE findOneAndUpdate - read-then-write let two callers both send it"
+        },
+        {
+          "file": "controllers/customerCampaignController.js",
+          "regex": "applyMarketingPushPolicy\\(db, campaign, usersWithLang\\);[\\s\\S]*?campaignHoldout\\.assignHoldout\\(\\s*String\\(campaignId\\),\\s*policy\\.userIds,[\\s\\S]*?userIds = holdout\\.treatedIds;",
+          "desc": "CORE invariants 12+13: opt-out and cap filter the recipients first, the holdout is drawn only from who they left (policy.userIds), and the send loop gets the treated ids only"
+        },
+        {
+          "file": "services/customer-campaigns/holdout.js",
+          "regex": "\\.update\\(`\\$\\{String\\(campaignId\\)\\}:\\$\\{String\\(customerId\\)\\}`\\)",
+          "desc": "CORE invariant 13: holdout assignment is a hash of campaignId:customerId - deterministic across a retried execution, a different slice per campaign"
+        },
+        {
+          "file": "services/customer-campaigns/holdout.js",
+          "regex": "const PCT_LIMITS = Object\\.freeze\\(\\[0, 50\\]\\);",
+          "desc": "CORE invariant 13: holdout.pct is 0-50"
+        },
+        {
+          "file": "services/customer-campaigns/holdout.js",
+          "regex": "const MIN_AUDIENCE = 200;",
+          "desc": "CORE invariant 13: below 200 eligible customers no holdout is drawn (reason recorded)"
+        },
+        {
+          "file": "services/customer-campaigns/holdout.js",
+          "regex": "if \\(requestedPct === 0\\) return none\\(null\\);",
+          "desc": "CORE invariant 13: pct 0 (the default) holds out nobody - the send is unchanged"
+        },
+        {
+          "file": "services/customer-campaigns/push-audience.js",
+          "regex": "const COLLECTION = \"marketingPushAudience\";",
+          "desc": "CORE invariant 13: the audience record's exact Mongo name - the orders domain's lift reporting reads it"
+        },
+        {
+          "file": "services/customer-campaigns/push-audience.js",
+          "regex": "const RETENTION_DAYS = 400;",
+          "desc": "CORE invariant 13: audience rows are kept 400 days (TTL on at)"
+        },
+        {
+          "file": "services/customer-campaigns/push-audience.js",
+          "regex": "createIndex\\(\\{ campaignId: 1, customerId: 1 \\}, \\{ unique: true",
+          "desc": "CORE invariant 13: one row per (campaign, customer)"
+        },
+        {
+          "file": "services/customer-campaigns/push-audience.js",
+          "regex": "\\$cond: \\[\\{ \\$eq: \\[\"\\$group\", GROUPS\\.TREATED\\] \\}, \"\\$at\", at\\]",
+          "desc": "CORE invariant 13: treated wins on a retried run and keeps its first at - no holdout row for a customer the campaign pushed"
+        },
+        {
+          "file": "services/customer-campaigns/push-audience.js",
+          "regex": "update: \\{ \\$setOnInsert: \\{ group, at \\} \\}, upsert: true",
+          "desc": "CORE invariant 13: non-treated groups are upserted with $setOnInsert - a retried run never doubles a row"
+        },
+        {
+          "file": "services/customer-campaigns/push-audience.js",
+          "regex": "\\n    ensureIndexesOnce\\(shoofiDb\\);\\n",
+          "desc": "CORE invariant 13: the audience write never awaits the index build (shoofi-server#306)"
+        },
+        {
+          "file": "controllers/customerCampaignController.js",
+          "regex": "audienceWrite = pushAudience\\.recordAudience\\(db, String\\(campaignId\\), \\{",
+          "desc": "CORE invariant 13: the audience record is started before the send loop and awaited only after it"
+        },
+        {
+          "file": "controllers/customerCampaignController.js",
+          "regex": "moment\\.tz\\(value, timezone \\|\\| 'Asia/Jerusalem'\\)\\.toDate\\(\\)",
+          "desc": "CORE invariant 12: a wall-clock schedule is read in the campaign timezone and stored as a Date - the cron's $lte: Date never matches a string"
+        },
+        {
+          "file": "utils/crons/scheduled-campaigns-cron.js",
+          "regex": "error\\.code === 'CAMPAIGN_NOT_CLAIMABLE'",
+          "desc": "CORE invariant 12: a lost claim is skipped, never marked failed over a run that is sending"
+        },
+        {
+          "file": "services/customer-campaigns/marketing-push-policy.js",
+          "regex": "\\{ createdAt: \\{ \\$gte: since \\}, \"data\\.campaignId\": \\{ \\$exists: true \\} \\}",
+          "desc": "CORE invariant 12: only campaign records (data.campaignId) count toward the cap - transactional pushes never do; one window scan, notifications has only the _id index in prod"
+        },
+        {
+          "file": "services/customer-campaigns/marketing-push-policy.js",
+          "regex": "const DEFAULTS = Object\\.freeze\\(\\{ enabled: false",
+          "desc": "CORE invariant 12: the cap is off until an admin turns it on"
+        },
+        {
+          "file": "routes/customer-marketing-preferences.js",
+          "regex": "customers\\.updateOne\\(\\s*\\{ _id: getId\\(req\\.auth\\.id\\) \\}",
+          "desc": "CORE invariant 12: the opt-out writes the caller's own doc from req.auth.id - never a user-id header (the routes/notifications.js IDOR)"
+        },
+        {
+          "file": "routes/customer-campaigns.js",
+          "regex": "router\\.put\\('/push-cap-config', \\.\\.\\.adminOnly",
+          "desc": "CORE invariant 10: the cap config write is owner-tier admin only"
+        },
         {
           "file": "routes/customer-campaigns.js",
           "regex": "const CAMPAIGN_ROLES = \\[\"master\", \"admin\", \"manager\"\\]",
@@ -292,7 +413,7 @@
       ]
     },
     "shoofi-app": {
-      "files": ["utils/http-interceptor/index.ts", "hooks/use-notifications.ts", "utils/marketing-link.ts", "services/marketing-events.ts"],
+      "files": ["utils/http-interceptor/index.ts", "hooks/use-notifications.ts", "utils/marketing-link.ts", "services/marketing-events.ts", "components/profile/MarketingPushToggle.tsx"],
       "patterns": [
         {"file": "services/marketing-events.ts", "regex": "const QUEUE_KEY = \"@marketing_event_queue\";", "desc": "CORE invariant 11: the event queue is mirrored to AsyncStorage (survives a kill)"},
         {"file": "services/marketing-events.ts", "regex": "export const ORDER_FLUSH_TIMEOUT_MS = 1500;", "desc": "CORE invariant 11: an order waits at most 1.5s for the queue"},
@@ -305,6 +426,11 @@
           "file": "utils/marketing-link.ts",
           "regex": "return openStoreAtProduct\\(navigate, \\{ appName: link\\.appName \\}, link\\.productId\\)",
           "desc": "CORE invariant 11: store opens go through the twin-guarded opener"
+        },
+        {
+          "file": "components/profile/MarketingPushToggle.tsx",
+          "regex": "const PATH = \"customer/marketing-preferences\";",
+          "desc": "the profile's offers switch calls the customer's own preferences route, sending only the boolean"
         },
         {
           "file": "utils/http-interceptor/index.ts",
@@ -326,13 +452,32 @@
     "shoofi-delivery-web": {
       "files": [
         "src/contexts/AdminAuthContext.tsx",
-        "src/utils/http-interceptor/index.ts"
+        "src/utils/http-interceptor/index.ts",
+        "src/utils/jerusalem-time.ts",
+        "src/views/admin/customer-campaigns/PushCapSettings.tsx",
+        "src/views/admin/customer-campaigns/HoldoutField.tsx",
+        "src/views/admin/customer-campaigns/CustomerCampaignsList.tsx"
       ],
       "patterns": [
+        {
+          "file": "src/utils/jerusalem-time.ts",
+          "regex": "export const SCHEDULE_TIMEZONE = 'Asia/Jerusalem';",
+          "desc": "campaign schedule times are shown in Israel time whatever the browser zone"
+        },
         {
           "file": "src/utils/http-interceptor/index.ts",
           "regex": "Bearer",
           "desc": "admin uses Bearer (RN apps use 'Token')"
+        },
+        {
+          "file": "src/views/admin/customer-campaigns/HoldoutField.tsx",
+          "regex": "export const HOLDOUT_PCT_LIMITS: \\[number, number\\] = \\[0, 50\\];",
+          "desc": "CORE invariant 12: the form refuses a holdout pct the server would 400"
+        },
+        {
+          "file": "src/views/admin/customer-campaigns/CustomerCampaignsList.tsx",
+          "regex": "קבוצת ביקורת: \\{campaign\\.execution\\.holdoutCount\\}",
+          "desc": "CORE invariant 12: the list shows holdoutCount in the results column"
         }
       ]
     }
