@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-serverc49 (fix/marketing-routes-auth) / 2026-10-28
+last-verified: shoofi-server@df71e52c (fix/marketing-routes-auth) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---

@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-serverc49 (fix/marketing-routes-auth) / 2026-10-28",
+  "lastVerified": "shoofi-server@df71e52c (fix/marketing-routes-auth) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [

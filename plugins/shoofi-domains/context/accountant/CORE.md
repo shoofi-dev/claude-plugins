@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-serverc49 (fix/marketing-routes-auth) / 2026-10-28
+last-verified: shoofi-server@df71e52c (fix/marketing-routes-auth) / 2026-10-28
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
