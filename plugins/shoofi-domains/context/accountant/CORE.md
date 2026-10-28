@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-serverc49 (fix/marketing-routes-auth) / 2026-10-28
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -375,12 +375,16 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       (targeting **top-level** JSON strings; numbers as strings so `"0"` survives the route's
       truthiness checks; `createdBy` = the approver). The admin web posts them to the
       **unchanged** `POST /api/admin/coupon/create`; `routes/coupon.js` is untouched and every
-      create check applies. `settleApproval` (on every read and on `confirm`) marks an
+      create check applies. That route is gated (2026-10-28): create / update / delete /
+      generate-code take `COUPON_WRITE_ROLES` = master | admin | manager — the same tier as
+      `APPROVE_ROLES`, so an approver can always post it — and the admin reads (list, by-code,
+      a customer's active coupons) take any dashboard role. Before that the whole
+      `/api/admin/coupon*` surface had **no auth at all**. `settleApproval` (on every read and on `confirm`) marks an
       `approving` draft `created` once its reserved code exists in `shoofi.coupons`, so one
       draft can't create two coupons. Any edit reopens the draft.
     - **Central `shoofi` DB only** (`shoofiDbOf = req.app.db.shoofi`): drafts, code reservation,
       translations, settle. The create route itself still picks its DB from the `app-name`
-      header with no fallback (`routes/coupon.js:1450-1451`); the admin web's interceptor
+      header with no fallback (`routes/coupon.js:1480-1481`); the admin web's interceptor
       defaults it to `shoofi`. A coupon written anywhere else is invisible to apply
       (`routes/coupon.js:178`) and to settlement (`routes/payments/admin.js:1049`).
     - **The #320 default-split trap is handled in drafts but STILL LIVE in the plain picker**

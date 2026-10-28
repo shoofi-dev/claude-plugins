@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-serverc49 (fix/marketing-routes-auth) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -177,6 +177,15 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
      logs in again starts with no taste profile. The For-you quality collections need nothing
      there: the event copy (`forYouEvents`) carries no customer id, the reviews (`forYouReviews`)
      only a one-way hash, and golden cases none (menu-catalog CORE invariant 22).
+10. **Push campaigns are owner-tier admin only.** Every `routes/customer-campaigns.js` route
+   carries `...adminOnly` = `[auth.required, checkAdminRole(CAMPAIGN_ROLES)]`, with
+   `CAMPAIGN_ROLES = ["master", "admin", "manager"]` (2026-10-28). Before that they were
+   `auth.required` only, and a plain customer token passes `auth.required` (invariant 7's
+   shared secret): it could search customers, preview audiences and push to all of them. The
+   only caller is the admin's קמפייני פוש screen. `master` is named because `checkAdminRole` has
+   no hierarchy. Pinned by `test/integration/marketing-routes-auth.js`, which also covers the
+   other marketing write paths (ads, stories, notes, `notifications/send*`, coupon campaigns,
+   admin coupons) — those files have no domain owner yet.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
