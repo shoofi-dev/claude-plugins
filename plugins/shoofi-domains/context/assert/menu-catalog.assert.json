@@ -1,10 +1,12 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
         "routes/menu.js",
+        "utils/store-launch.js",
+        "docs/store-launch-date.md",
         "routes/product.js",
         "routes/category.js",
         "routes/store.js",
@@ -352,6 +354,15 @@
         "services/menu/promotions.js": [
           "applyMenuPromotions",
           "storeCardPromotion"
+        ],
+        "utils/store-launch.js": [
+          "DEFAULT_NEW_STORE_WINDOW_DAYS",
+          "parseLaunchDate",
+          "launchState",
+          "withIsNew",
+          "newStoresQuery",
+          "getNewStoreWindowDays",
+          "validateNewStoreWindowDays"
         ]
       },
       "patterns": [
@@ -384,6 +395,36 @@
           "file": "routes/shoofi-admin.js",
           "regex": "futureOrderEnabled,\\s*activePromotion\\s*};",
           "desc": "doc CORE invariant 18: explore v2 storesMap carries activePromotion"
+        },
+        {
+          "file": "utils/store-launch.js",
+          "regex": "const DEFAULT_NEW_STORE_WINDOW_DAYS = 30;",
+          "desc": "doc CORE invariant 25: a store is new for 30 days unless Settings says otherwise"
+        },
+        {
+          "file": "utils/store-launch.js",
+          "regex": "isNew: t >= start\\.getTime\\(\\) && t < until\\.getTime\\(\\)",
+          "desc": "doc CORE invariant 25: new while launchDate <= now < launchDate + N; a future date is not new"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "launchDate: launch\\.absent \\? \\(store\\.launchDate \\|\\| null\\) : launch\\.value",
+          "desc": "doc CORE invariant 25: the store form writes launchDate on shoofi.stores; an omitted field keeps it"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "storesMap: withIsNewMap\\(cachedData\\.storesMap\\)",
+          "desc": "doc CORE invariant 25: explore v2 applies isNew after the cache read, never into the cache"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "if \\(req\\.query\\.isNew === 'true'\\)",
+          "desc": "doc CORE invariant 25 / reference §7: all-stores?isNew=true lists the new stores"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "storeLaunch\\.withIsNew\\(",
+          "desc": "doc CORE invariant 25: menu search carries isNew"
         },
         {
           "file": "services/translations/owned-translations.js",
@@ -1814,6 +1855,8 @@
     },
     "shoofi-app": {
       "files": [
+        "screens/stores/components/item.tsx",
+        "components/store-badge/index.tsx",
         "helpers/family.ts",
         "screens/ai-helper/FamilyScreen.tsx",
         "screens/ai-helper/FamilyStep.tsx",
@@ -1904,6 +1947,21 @@
         ]
       },
       "patterns": [
+        {
+          "file": "screens/stores/components/item.tsx",
+          "regex": "t\\(\"store-new-tag\", \\{",
+          "desc": "doc CORE invariant 25: the store card's new badge, with a defaultValue (translations come from the DB)"
+        },
+        {
+          "file": "screens/stores/components/item.tsx",
+          "regex": "if \\(newBadge && out\\.length < 2\\)",
+          "desc": "doc CORE invariant 25: at most two badges; new is dropped when offer and status both show"
+        },
+        {
+          "file": "components/store-badge/index.tsx",
+          "regex": "new: \\{ bg: themeStyle\\.BADGE_NEW_BG",
+          "desc": "doc CORE invariant 25: StoreBadge has a new variant"
+        },
         {
           "file": "screens/menu/components/GeneralCategoriesList.tsx",
           "regex": "cat\\.subCategories",
@@ -2478,6 +2536,7 @@
     },
     "shoofi-delivery-web": {
       "files": [
+        "src/views/admin/stores/StoreForm.tsx",
         "src/views/admin/dish-types/DishTypes.tsx",
         "src/apis/admin/dish-taxonomy.ts",
         "src/views/admin/ai-usage/AiUsage.tsx",
@@ -2490,6 +2549,16 @@
       ],
       "symbols": {},
       "patterns": [
+        {
+          "file": "src/views/admin/stores/StoreForm.tsx",
+          "regex": "name=\"launchDate\"",
+          "desc": "doc CORE invariant 25: the store form's تاريخ الافتتاح field"
+        },
+        {
+          "file": "src/views/admin/settings/ShoofiSettings.tsx",
+          "regex": "newStoreWindowDays: 30,",
+          "desc": "doc CORE invariant 25: the new-store window under Settings → Shoofi, default 30"
+        },
         {
           "file": "src/apis/admin/dish-taxonomy.ts",
           "regex": "/admin/dish-taxonomy",
