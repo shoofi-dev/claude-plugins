@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@df71e52c (fix/marketing-routes-auth) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -83,6 +83,16 @@
         ]
       },
       "patterns": [
+        {
+          "file": "routes/customer-campaigns.js",
+          "regex": "const CAMPAIGN_ROLES = \\[\"master\", \"admin\", \"manager\"\\]",
+          "desc": "CORE invariant 10: push campaigns are owner-tier admin only"
+        },
+        {
+          "file": "routes/customer-campaigns.js",
+          "regex": "const adminOnly = \\[auth\\.required, checkAdminRole\\(CAMPAIGN_ROLES\\)\\]",
+          "desc": "CORE invariant 10: auth.required alone passes a customer token \u2014 checkAdminRole is the half that keeps one out"
+        },
         {
           "file": "routes/ai-helper.js",
           "regex": "people: body\\.people,\\n\\s+family: body\\.family",

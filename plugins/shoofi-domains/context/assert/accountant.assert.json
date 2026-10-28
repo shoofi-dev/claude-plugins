@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@df71e52c (fix/marketing-routes-auth) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -148,6 +148,16 @@
         ]
       },
       "patterns": [
+        {
+          "file": "routes/coupon.js",
+          "regex": "const COUPON_WRITE_ROLES = \\['master', 'admin', 'manager'\\]",
+          "desc": "CORE (coupon drafts): the admin coupon writes take the same tier as APPROVE_ROLES, so an approver can always post the create"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "router\\.post\\('/api/admin/coupon/create', \\.\\.\\.couponWriters,",
+          "desc": "the admin coupon create is gated \u2014 it had no auth at all before 2026-10-28"
+        },
         {
           "file": "routes/payments/admin-reports.js",
           "regex": "totalForTransfer\\s*=\\s*creditCardRevenue",
