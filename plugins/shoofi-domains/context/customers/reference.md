@@ -261,7 +261,8 @@ invariants 10 and 11 hold the rules. This section has the depth.
 
 | Route | Auth | What |
 |---|---|---|
-| `POST /api/customer-campaigns/:id/execute` | `...adminOnly` | claim → audience → opt-out + cap filter → send loop → `completed` |
+| `POST /api/customer-campaigns/:id/execute` | `...adminOnly` | claim → audience → opt-out + cap filter → holdout → audience record (alongside) + send loop → `completed` |
+| `POST /api/customer-campaigns`, `PUT /:id` | `...adminOnly` | `holdout: { pct }` validated 0–50 (`normalizeHoldoutInput`), 400 outside, never clamped |
 | `POST /api/customer-campaigns/:id/schedule` | `...adminOnly` | future-date check, then `status: 'scheduled'` + Date `scheduledDate` (never from `in_progress`/`completed`) |
 | `POST /api/customer-campaigns/:id/unschedule` | `...adminOnly` | `scheduled` → `draft`, atomically; 400 once the cron has claimed it |
 | `PUT /api/customer-campaigns/:id` | `...adminOnly` | 409 while `in_progress` (the form saves its whole state, status included) |
@@ -302,7 +303,36 @@ neither count toward the cap nor get capped or opt-out filtered. Partner and dri
 
 **Preview ≠ reach.** `audience/preview` and `audience/users` still count the raw audience. The
 skips appear only in the execution result (`execution.skippedOptOut`, `skippedCapped`,
-`pushCap`) and in the list's results column.
+`pushCap`, `holdoutCount`) and in the list's results column.
+
+**Holdout and the audience record (CORE invariant 12).** Why: prod sent ~66.7k campaign pushes
+to ~18.9k customers in the week to 2026-10-28, and last-touch attribution credits a push with
+orders that would have happened anyway. A holdout gives the baseline.
+- *Sizing (prod, read-only, 2026-10-28):* 216 executed campaigns, all `shoofi-app`; audience
+  median 14.9k, p10 4.3k, max 18.9k; 176 `all`, 40 `all` + city area, 7 `selected`, 4 `rules`.
+  The only campaigns under 2000 were 7 manual sends of < 50, hence `MIN_AUDIENCE = 200`: a 5%
+  holdout of the smallest real campaign (4.3k) is still ~215 customers.
+- *Assignment* is `assignHoldout(campaignId, policy.userIds, campaign, isCustomerAudience)` →
+  `{treatedIds, holdoutIds, pct, requestedPct, skippedReason}`. `applyMarketingPushPolicy` also
+  returns `optedOutIds` / `cappedIds` (the counts are their lengths), which become the
+  `opted_out` / `capped` rows.
+- *The write* is `recordAudience(shoofiDb, campaignId, {treated, holdout, capped, optedOut}, at)`
+  → `{rows, errors, error}`; started before the send loop, awaited after it (and in the
+  failure path), so it neither delays nor can fail the send. A duplicate-key write error is not
+  counted as lost (`lostWrites`); any other row error is, and a chunk-level error (network)
+  counts the whole chunk.
+- *Retries:* the only re-execution path is a `failed` campaign (claimable again; an
+  `in_progress` one stuck by a crash is not, see Run length). The second run re-sends to
+  everyone eligible. That is #335's behaviour, not changed here, and the cap counts the first
+  run's pushes. Row outcome: unchanged groups stay; capped/holdout → treated if this run pushed
+  them; treated stays treated with its first `at`.
+- *Storage:* ~67k rows a week, ~3.8M at the 400-day TTL steady state. No row is deleted with a
+  customer account (it holds two ids, a group and a date; the soft-deleted customer doc and the
+  campaign's `shoofi.notifications` records stay too). The TTL is what removes rows.
+- *Admin:* "קבוצת ביקורת %" on the campaign form (shoofi-delivery-web
+  `views/admin/customer-campaigns/HoldoutField.tsx`, `parseHoldoutPct` mirrors the 0–50 rule),
+  and `קבוצת ביקורת: N` / `ללא קבוצת ביקורת (קהל קטן)` / audience-record errors in the list's
+  results column.
 
 ## 5a. AI-helper taste profile — owner, merge, lifecycle (`shoofi.tasteProfiles`)
 The customer app's floating persona **شوفي / שופי** runs a short taste onboarding and keeps

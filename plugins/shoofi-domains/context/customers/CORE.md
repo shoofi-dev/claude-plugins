@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28
+last-verified: shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -22,7 +22,10 @@ Also yours: **who a push campaign may reach**: the customer's marketing-push opt
 (`routes/customer-marketing-preferences.js`), the frequency cap
 (`services/customer-campaigns/marketing-push-policy.js`), and the campaign send and schedule
 path (`controllers/customerCampaignController.js`, `utils/crons/scheduled-campaigns-cron.js`).
-See invariant 11 and reference §5b.
+See invariant 11 and reference §5b. Also the campaign **holdout** and the per-customer
+**audience record** `shoofi.marketingPushAudience` (`services/customer-campaigns/{holdout,
+push-audience}.js`, invariant 12). Measuring lift FROM that record is `orders`' (per-checkout
+order facts); the record itself, and its exactness, is yours.
 **Not yours:** order history content (`orders`), coins/rewards (growth), driver coverage
 fields (`delivery`) — you own the identity record they hang off.
 Also yours: the school-project enrollment (`services/customer/school-project-enrollment.js`)
@@ -223,6 +226,48 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       the campaign's timezone (`Asia/Jerusalem`). The cron queries `$lte: <Date>`, and a stored
       string never matches it. That is why no scheduled campaign ever sent before 2026-10-28,
       along with the cron never being started.
+
+12. **A held-out customer gets NOTHING from that campaign, and the audience record says exactly
+    who got what.** `campaign.holdout = { pct }`, 0–50, **default 0 = off** (a campaign saved
+    before 2026-10-28 has no `holdout` and reads as 0). Customer-app audiences only.
+    - **Order:** opt-out, then cap (invariant 11), THEN holdout. `assignHoldout`
+      (`services/customer-campaigns/holdout.js`) draws only from `policy.userIds` (who would
+      really have been sent) and the send loop gets `holdout.treatedIds`. A held-out customer
+      gets no `sendNotification` call at all: no push, no websocket, no `shoofi.notifications`
+      record, so **no cap count**. Never move the holdout ahead of the opt-out or the cap, and
+      never move it into `sendNotification`.
+    - **Deterministic:** `holdoutBucket` = sha256(`campaignId:customerId`), first 8 hex, mod
+      10000; held out when `< pct × 100`. No randomness, no stored state: a retried execution
+      puts everyone in the same group, and another campaign draws a different slice.
+    - **Too small to measure:** fewer than `MIN_AUDIENCE` (200) eligible customers (after
+      opt-out and cap) → no holdout, `execution.holdoutSkippedReason: "audience_below_minimum"`.
+      A partner/driver campaign with a pct records `"not_customer_audience"` and writes no rows.
+    - **The record is a contract the orders domain's lift reporting reads. Keep it exact:**
+      `shoofi.marketingPushAudience` (that exact Mongo name, via `shoofiDb.collection(...)`),
+      one row per (campaign, customer):
+      `{ campaignId: string, customerId: string, group: "treated"|"holdout"|"capped"|"opted_out", at: Date }`.
+      It is an **assignment** record (intention to treat): `treated` = sent to, even if that
+      push then failed for a missing device token; `at` = the run's assignment instant, the same
+      for every row of the run (not each push's send time). Indexes: unique
+      `{campaignId, customerId}`, `{campaignId, group}`, `{customerId, at: -1}`, TTL 400 days on
+      `{at}` (`RETENTION_DAYS`).
+    - **Never in the send's way:** `recordAudience` runs alongside the send loop, in unordered
+      1000-row `bulkWrite` chunks, and **never throws**. A failure is logged and counted
+      (`execution.audienceRecordErrors` / `audienceRecorded` / `audienceRecordError`); the send
+      goes on, once. The indexes are built once per db in the background and **never awaited by
+      a write** (`ensureIndexesOnce`; shoofi-server#306: a write gated on a failing build on a
+      NEW collection was lost).
+    - **A retried execution never doubles a row:** rows are **upserts** on (campaignId,
+      customerId), which is correct even before the unique index finishes building on first
+      deploy. Non-treated groups are `$setOnInsert` (the first run stands); **`treated` wins**
+      (a pipeline update; an existing treated row keeps its first `at`), so no `holdout` row ever
+      belongs to a customer the campaign pushed, even if the pct was edited between runs. Don't
+      "simplify" this to insertMany-and-ignore-duplicates.
+    - **On `execution`:** `holdoutCount`, `holdoutPct` (what was APPLIED, 0 when skipped; the
+      stored `holdout.pct` can be edited afterwards, so analysis reads this one),
+      `holdoutSkippedReason`. `totalUsers` = the treated count (who was sent to).
+    - Edited with the campaign (`POST /`, `PUT /:id`, the same `...adminOnly` roles; 400 outside
+      0–50, never clamped), from the admin form's "קבוצת ביקורת %" field (`HoldoutField.tsx`).
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
