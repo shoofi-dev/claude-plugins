@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -19,7 +19,8 @@ Server: `routes/order.js`, `routes/twin-order.js`, `routes/order-fraud-*.js`,
 `routes/admin/order-monitoring.js`, `services/twin-order/*`, `utils/order-stock.js`,
 `utils/order-pricing.js` + `utils/order-pricing-shadow.js`, `routes/order-amend.js`,
 `services/coupons/delivery-price-enforcement.js` + `services/twin-order/twin-delivery-price.js`
-(the order-side guard for fixed-delivery-price coupons, invariant 14), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
+(the order-side guard for fixed-delivery-price coupons, invariant 14), `utils/marketing-touch.js`
+(order-side marketing attribution, invariant 15), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
 (shoofir), monitoring/twin-admin (delivery-web).
 
 **Not yours:** payment internals (`payments`), settlement/payouts (`accountant`), driver
@@ -292,6 +293,41 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Readers on the order side need no change: the partner invoice, shoofir `order-payment.ts`,
       admin `CardOrder`/`CardTwinOrder` and the app's `order-header` all read `discountAmount`,
       so a delivery coupon prints `shippingPrice − discountAmount` = ₪X.
+
+15. **`order.marketingTouch` IS ATTRIBUTION ONLY, SANITIZED AT THE DOOR, AND NEVER FAILS AN ORDER.**
+    The customer's last banner / story / popup / note tap or push open (≤ 24 h old), optional on
+    the create body: `{ kind: tap|push_open, placement: banner|story|popup|note|push, itemId,
+    campaignId?, linkType?: none|store|product|deal|coupon|page, at }`, stored as
+    `marketingTouch` with `at` a **Date**. One sanitizer, `sanitizeMarketingTouch`
+    (`utils/marketing-touch.js`): pure, sync, never throws, never rejects.
+    - **Whitelist, not pass-through.** `/api/order/create` spreads `...parsedBodey` onto the
+      order, so the route sanitizes and then **`delete`s the raw `parsedBodey.marketingTouch`**
+      before `const orderDoc = {` (the `commentToCourier` pattern). Drop that delete and any
+      client JSON lands on the order verbatim.
+    - **Drop rules.** Bad `kind`/`placement`/`itemId`/`at`, `push_open` without `push` (or
+      the reverse), `at` unparseable, > 5 min in the future, or > 24 h old → no field at all.
+      Bad `campaignId`/`linkType` → only that key goes. Strings are trimmed and must be
+      ≤ 64 chars. An over-long id counts as invalid; it is not truncated. **Absent = not
+      attributed**, so `$exists` is meaningful.
+    - **Twin:** `/place` and `/digital-place-pending` read the TOP-LEVEL `body.marketingTouch`,
+      sanitize it ONCE and pass the same value to all four `buildSkeletonOrder` legs. Both
+      orders carry it beside `twinGroup.groupId`. A report counting checkouts must collapse
+      a pair by `twinGroup.groupId`. A report counting store orders or revenue keeps both.
+    - **Survives every payment path because it is written only at insert.** The Apple Pay
+      repoint (`update-apple-pay-order-session`), `finalizeApplePayOrder`, the CC/HYP
+      branches and twin `/pay` all `$set` named fields and never rebuild the document. A
+      status-`"0"` row carries a touch too, so attribution reports filter on status like
+      every revenue reader. The one whole-body writer, the legacy `POST /api/order/update/all`
+      (`$set: { ...parsedBodey }`), throws `ReferenceError: offsetHours is not defined` before
+      it writes (verified 2026-10-28), so today it cannot overwrite the touch. Whoever revives
+      it must `delete parsedBodey.marketingTouch` first.
+    - **Not** in the `customers.orders[]` snapshot (recipe step 2). No index yet: the
+      reporting query does not exist. When it does, add a **partial** index
+      (`partialFilterExpression: { marketingTouch: { $exists: true } }`) on
+      `marketingTouch.campaignId` / `.itemId` + `.at` in `DatabaseInitializationService`, fired
+      un-awaited. Never add it on the create path (an awaited index build dropped writes once).
+    - Server tests: `test/integration/order-marketing-touch.js`. The client half (shoofi-app
+      remembers the touch and posts it) is a separate PR.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
