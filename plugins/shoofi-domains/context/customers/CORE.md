@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@df71e52c (fix/marketing-routes-auth) / 2026-10-28
+last-verified: shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -186,6 +186,30 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    no hierarchy. Pinned by `test/integration/marketing-routes-auth.js`, which also covers the
    other marketing write paths (ads, stories, notes, `notifications/send*`, coupon campaigns,
    admin coupons) — those files have no domain owner yet.
+11. **Every marketing surface opens ONE `link` shape, and it points at something real.** The
+   home banner (ads), stories and launch popups, the home note banner and push campaigns carry
+   `link` = `none | store{appName} | product{appName,productId} | deal{appName,promotionId} |
+   coupon{couponId, appName?} | page{page ∈ LINK_PAGES}` (`utils/marketing-link.js`, 2026-10-28).
+   - Writes go through `linkFromRequest` → `resolveLink`, which 400s a coupon / deal / product /
+     store that doesn't exist. Marketing promotes existing offers only (Sari, 2026-10-28); never
+     add a "create the coupon from here" path. A coupon scoped to exactly one store gets that
+     `appName` filled in (the app opens the store; otherwise "my coupons").
+   - Older app builds never read `link`: writers keep an ad's `appName`/`pageName`
+     (`legacyAdFields`) and a story's `target` (`targetForLink`) in step, and reads fill `link` in
+     for items saved before it (`withLink`). An admin form that sends no `link` must not flatten a
+     saved one (`unchangedOrLegacyLink`). An announcement (`storeAppName: "shoofi-stories"`) has
+     no menu, so its legacy default is `none`, never `store`.
+   - A push campaign's `link` rides in the push `data` next to `campaignId`; the customer app's
+     push-tap router (`hooks/use-notifications.ts` → `utils/marketing-link.ts`) opens it, store
+     opens via `openStoreAtProduct` (twin-order guard).
+   - Views / taps / push opens go to `POST /api/marketing/events` (`routes/marketing-events.js`):
+     `auth.optional`, the customer comes from the token (never the body, and never an admin
+     token), guests by `device-id`; `sanitizeEvent` drops junk, future (>5 min) and >7-day-old
+     events; batches cap at 50; it always answers 200. `marketingEvents` has a 180-day TTL and its
+     indexes are requested in the background, never awaited on the write. Results:
+     `GET /api/admin/marketing/results` (every dashboard role). Which orders a tap led to is
+     `order.marketingTouch` (orders CORE), not a join from here.
+   Pinned by `test/integration/marketing-links.js`.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
