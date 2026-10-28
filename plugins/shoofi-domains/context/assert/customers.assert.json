@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -29,11 +29,17 @@
         "services/ordering-intelligence/taste-profile.js",
         "docs/ai-helper.md",
         "utils/marketing-link.js",
-        "routes/marketing-events.js"
+        "routes/marketing-events.js",
+        "services/marketing/viewer-key.js",
+        "services/marketing/daily-stats.js",
+        "services/marketing/performance.js",
+        "routes/marketing-performance.js"
       ],
       "symbols": {
         "utils/marketing-link.js": ["LINK_TYPES", "LINK_PAGES", "linkFromRequest", "resolveLink", "legacyAdFields", "legacyLink", "withLink"],
         "routes/marketing-events.js": ["sanitizeEvent", "ensureIndexesInBackground", "marketingEvents", "MAX_BATCH"],
+        "services/marketing/viewer-key.js": ["deviceViewerKey"],
+        "services/marketing/performance.js": ["getPerformance", "holdoutLift", "listOrderFacts", "pushCampaignsFor", "itemNames"],
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
         "utils/auth-service.js": ["generateJWT", "toAuthJSON"],
         "utils/app-name-helper.js": ["getCustomerAppName"],
@@ -276,12 +282,20 @@
           "file": "routes/marketing-events.js",
           "regex": "router\\.post\\(\"/api/marketing/events\", auth\\.optional",
           "desc": "CORE invariant 11: events are open to guests, customer from the token"
-        }
+        },
+        {"file": "services/marketing/performance.js", "regex": "\\{ \\$or: or, appType: \\{ \\$in: \\[null, \"shoofi-app\"\\] \\}, \"channels\\.push\": \\{ \\$ne: false \\} \\}", "desc": "CORE invariant 11: /performance lists every customer-app push campaign started in the range (or requested), even with no events"},
+        {"file": "services/marketing/performance.js", "regex": "item\\.funnel\\.openRate = sent \\? ratio\\(item\\.funnel\\.pushOpens, sent\\) : null;", "desc": "CORE invariant 11: push items expose pushSent and openRate = pushOpens / pushSent"},
+        {"file": "routes/marketing-events.js", "regex": "\\.\\.\\.\\(impersonated \\? \\{ impersonated: true \\} : \\{\\}\\),", "desc": "CORE invariant 11: events from an imp token are stored flagged, and the touch lookup / rollup skip them"},
+        {"file": "services/database/DatabaseInitializationService.js", "regex": "db\\.marketingEvents = db\\.collection\\('marketingEvents'\\);", "desc": "CORE invariant 11: the events handle is registered - without it every event write fails silently (accepted: 0)"},
+        {"file": "routes/marketing-events.js", "regex": "viewerKey: customerId \\|\\| deviceViewerKey\\(deviceId\\),", "desc": "CORE invariant 11: guests are keyed by the SAME helper the order facts look them up with"},
+        {"file": "services/marketing/viewer-key.js", "regex": "const ID_MAX = 64;", "desc": "CORE invariant 11: device ids are truncated to 64 on both the write and the lookup"}
       ]
     },
     "shoofi-app": {
-      "files": ["utils/http-interceptor/index.ts", "hooks/use-notifications.ts", "utils/marketing-link.ts"],
+      "files": ["utils/http-interceptor/index.ts", "hooks/use-notifications.ts", "utils/marketing-link.ts", "services/marketing-events.ts"],
       "patterns": [
+        {"file": "services/marketing-events.ts", "regex": "const QUEUE_KEY = \"@marketing_event_queue\";", "desc": "CORE invariant 11: the event queue is mirrored to AsyncStorage (survives a kill)"},
+        {"file": "services/marketing-events.ts", "regex": "export const ORDER_FLUSH_TIMEOUT_MS = 1500;", "desc": "CORE invariant 11: an order waits at most 1.5s for the queue"},
         {
           "file": "hooks/use-notifications.ts",
           "regex": "openPushCampaign\\(response\\)",
