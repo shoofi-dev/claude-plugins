@@ -223,12 +223,34 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
        truncated to 64 characters: the app's `@storage_deviceId` runs longer than that. It is
        the `device-id` HEADER, never `orders.deviceId`. So a guest's taps
        (`viewerKey: "device:<id>"`) are credited after they log in.
-     - An event from an impersonation token is stored with `impersonated: true`; facts and
-       rollups skip it.
+     - **Impersonation.** An event posted with an `imp: true` token (master-minted "open as
+       customer") is still stored, with `impersonated: true` and the customer's `viewerKey`.
+       The touch lookup never uses it (`impersonated: { $ne: true }`) and the daily funnel
+       skips it. A checkout placed under such a token is recorded with `isImpersonated` +
+       `excludeFromReports`. `GET /api/admin/marketing/results` still counts impersonated
+       events, so it doesn't match the rollup there.
+     - A touch counts for an order only if it happened before the order (orders CORE
+       invariant 16, the touch-precedence rule).
      - `shoofi.marketingDailyStats` (per Israel date × placement × itemId, kept forever)
        holds funnel + orders under last/first/any. Reports:
        `GET /api/admin/marketing/{performance, order-facts, daily}` (the same roles as
        results; a fact never holds a phone or a name).
+     - **`/performance` lists push campaigns even with no events.** With `placement=push` or
+       no placement, it includes every customer-app push campaign (`customer-campaigns`,
+       `appType` absent or `shoofi-app`, `channels.push` not false) whose
+       `execution.startedAt` is in `[from, to]`, plus every requested itemId that is one.
+       Each gets funnel zeros, attributed orders and the holdout lift (`pushCampaignsFor`,
+       `services/marketing/performance.js`). A push nobody opened still has a lift, and for
+       a push the lift is THE number. Partner/driver campaigns are not customer pushes.
+     - Push items carry `funnel.pushSent` (`execution.totalUsers`, the treated group once a
+       holdout runs, else the treated audience count), `funnel.openRate`
+       (= `pushOpens / pushSent`) and a `campaign` block. Every item carries a
+       server-resolved `name`: ad / note `titleHE` (else `titleAR`), story/popup
+       "<store> · <caption>" ("שופי" for an announcement), or the campaign name.
+     - `funnel.tapperDays` (and the rollup's `tappers`) = distinct people per day who tapped
+       OR opened. A push item only ever has `push_open` (the route enforces
+       `push_open ⇔ push`), so for a push it means openers. This matches `tappers` in
+       `/results`. `viewerDays` is a sum of daily distinct viewers, not distinct people.
    - **The app's queue survives a kill and is flushed before every order.**
      - `shoofi-app/services/marketing-events.ts` mirrors the queue to AsyncStorage
        (`@marketing_event_queue`, ≤200 events, 7-day age-out, taps first, one retry).

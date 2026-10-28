@@ -113,6 +113,9 @@
           "enforceTwinSideDeliveryPrice"
         ],
         "services/marketing/order-facts.js": [
+          "touchPrecedesCheckout",
+          "validTouches",
+          "recordCheckoutFactResult",
           "scheduleOrderFact",
           "recordCheckoutFact",
           "normalizeOrderStatus",
@@ -462,7 +465,11 @@
         {"file": "services/marketing/order-facts.js", "regex": "const CANCELLED_CODES = \\[\"4\", \"7\", \"8\", \"9\", \"-3\", \"cancelled\"\\];", "desc": "CORE invariant 16: the twin services' '-3' and 'cancelled' count as cancelled in the facts"},
         {"file": "services/marketing/order-facts.js", "regex": "res\\.once\\(\"finish\", fire\\);\\s*res\\.once\\(\"close\", fire\\);", "desc": "CORE invariant 16: the fact is built after the response, never on the order path"},
         {"file": "services/marketing/order-facts.js", "regex": "return `order:\\$\\{appName\\}:\\$\\{String\\(orderObjectId\\)\\}`;", "desc": "CORE invariant 16: deterministic fact _id (idempotent upserts; twin = twin:<groupId>)"},
-        {"file": "utils/crons/marketing-attribution-cron.js", "regex": "const RECONCILE_SCHEDULE = \"\\*/15 \\* \\* \\* \\*\";", "desc": "CORE invariant 16: the reconcile cron (the guarantee) runs every 15 minutes"}
+        {"file": "utils/crons/marketing-attribution-cron.js", "regex": "const RECONCILE_SCHEDULE = \"\\*/15 \\* \\* \\* \\*\";", "desc": "CORE invariant 16: the reconcile cron (the guarantee) runs every 15 minutes"},
+        {"file": "services/marketing/order-facts.js", "regex": "\\$or: \\[\\{ createdAt: \\{ \\$lt: new Date\\(created\\) \\} \\}, \\{ at: \\{ \\$lt: new Date\\(created\\) \\} \\}\\],", "desc": "CORE invariant 16: the event lookup only takes touches that happened before the checkout (received before, or tapped before) - a residual filter on the {viewerKey, kind, at} scan"},
+        {"file": "services/marketing/order-facts.js", "regex": "function touchPrecedesCheckout\\(t, createdAt\\) \\{[\\s\\S]{0,400}?if \\(t\\.source === \"client\"\\) return true;[\\s\\S]{0,300}?if \\(at < created\\) return true;[\\s\\S]{0,200}?return Number\\.isFinite\\(received\\) && received < created;", "desc": "CORE invariant 16: the touch-precedence rule - client touches always, else tapped before, else received before; no forward skew"},
+        {"file": "services/marketing/reconcile.js", "regex": "const healed = facts\\.validTouches\\(fact\\.touches, fact\\.createdAt\\);", "desc": "CORE invariant 16: reconcile re-applies the rule to stored touches (heals facts credited with a later tap)"},
+        {"file": "services/marketing/reconcile.js", "regex": "const \\{ inserted \\} = await facts\\.recordCheckoutFactResult\\(", "desc": "CORE invariant 16: backfill counts only real inserts (upsertedCount)"}
       ]
     },
     "shoofi-app": {

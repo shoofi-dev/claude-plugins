@@ -371,9 +371,30 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
 
       Don't add a hook on a transition path for this. Completion is written on several paths
       (invariant 1), and the cron already sees all of them.
+    - **A touch counts only if it happened BEFORE the checkout** (`touchPrecedesCheckout`,
+      `services/marketing/order-facts.js`):
+      - received by the server (`marketingEvents.createdAt`) before the checkout → counts,
+        whatever its client `at` (a device clock can run ahead);
+      - received after it (a late flush) → counts only if its client `at` is strictly before
+        the checkout, with no forward skew;
+      - the order's own `marketingTouch` always counts (it rode on the order body).
+
+      Server touches store `receivedAt` so the rule can be re-applied to a stored fact. It is
+      applied at checkout, in the one-time late refresh, when reconcile re-checks stored
+      touches (drops failures, recomputes `attribution`, stamps `reconcile.touchesHealedAt`,
+      re-judges `touchReused`), in `computeTouchReused` (an earlier checkout only "used" a
+      touch that preceded it) and in the nightly `refreshTouchReused`. Without it, the late
+      refresh credited a tap made after an order to that order and every earlier one, and
+      flipped the next real order to `touchReused` (found in local e2e, 2026-10-28). The
+      event lookup stays index-backed: the `at` range on `{viewerKey, kind, at}` is the scan
+      bound, and the received-before / tapped-before `$or` is a residual filter. Never drop
+      the `$or`, and never widen the `at` bound beyond `created + 5 min` (the ingest route's
+      own skew).
     - **Every checkout is recorded**, attributed or not: that is the baseline. Test phones
       (`config/test-phones.js`), impersonation (an `imp` token) and mock stores are recorded
       with `excludeFromReports: true`.
+    - Backfill's logged `created` counts only real inserts (`recordCheckoutFactResult` →
+      `upsertedCount`), so a racing second instance reports 0.
     - Tests: `test/integration/marketing-attribution.js`. It drives the real create and twin
       routers on mongodb-memory-server.
 
