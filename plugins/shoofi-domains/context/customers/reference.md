@@ -16,6 +16,9 @@ Also the **identity slice of the AI-helper taste profile** (§5a): owner resolut
 `services/ordering-intelligence/taste-profile.js` (`ownerFromRequest`, `deviceIdFromRequest`,
 `mergeDeviceIntoCustomer`) and `routes/ai-helper.js`. The rest of `ordering-intelligence/` —
 facts, avoid filtering, how a profile ranks suggestions — is menu-catalog's.
+Also **who a push campaign reaches** (§5b): `controllers/customerCampaignController.js`,
+`services/customer-campaigns/marketing-push-policy.js`, `routes/customer-marketing-preferences.js`,
+`utils/crons/scheduled-campaigns-cron.js`.
 **Not yours:** order history *content* (orders), coins/growth rewards (growth), driver
 coverage fields (delivery) — you own the identity record they hang off.
 
@@ -74,7 +77,8 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
   (`{name,street,city,cityId,location{Point},isDefault,…}`), **`orders[]` snapshot**,
   referral (`referralCode`, `referral{clickId,inviterCustomerId,…}`), flags
   (`isBlocked`, `isDeleted`+`deletedAt`, `cashRestricted`), location (`cityId`, `cityAreaId`),
-  `schoolProject{…}`. **No `tokenExpiry` field** — expiry lives only inside the JWT.
+  `schoolProject{…}`, marketing (`marketingPushOptOut` + `marketingPushOptOutUpdatedAt`; unset
+  = opted in, §5b). **No `tokenExpiry` field** — expiry lives only inside the JWT.
 - **`schoolProject{schoolId, classId, isActive, studentIds[]}`** (school-project / "مدارس"
   customers; all ids are strings). `isActive` alone puts the customer app into school mode
   (schools category, pickup-only cart, student card at checkout); the card / student picker
@@ -250,6 +254,56 @@ one device ends that identity's sessions on **all** its stores and devices, and 
 token mirrored across the sibling docs above dies with it — the sweep is what keeps the
 mirror from outliving the logout.
 
+## 5b. Push campaigns — who a send reaches, scheduling, the cap (`shoofi.customer-campaigns`)
+The admin's קמפייני פוש screen (shoofi-delivery-web `views/admin/customer-campaigns/`) creates
+campaigns, and `executeCampaign` sends them, one `sendNotification` per recipient. CORE
+invariants 10 and 11 hold the rules. This section has the depth.
+
+| Route | Auth | What |
+|---|---|---|
+| `POST /api/customer-campaigns/:id/execute` | `...adminOnly` | claim → audience → opt-out + cap filter → send loop → `completed` |
+| `POST /api/customer-campaigns/:id/schedule` | `...adminOnly` | future-date check, then `status: 'scheduled'` + Date `scheduledDate` (never from `in_progress`/`completed`) |
+| `POST /api/customer-campaigns/:id/unschedule` | `...adminOnly` | `scheduled` → `draft`, atomically; 400 once the cron has claimed it |
+| `PUT /api/customer-campaigns/:id` | `...adminOnly` | 409 while `in_progress` (the form saves its whole state, status included) |
+| `GET/PUT /api/customer-campaigns/push-cap-config` | `...adminOnly` | the cap; PUT validates (`LIMITS` maxPushes 1–50, windowDays 1–60, integers), no upsert, `updatedBy` from `req.auth.id` |
+| `GET/PUT /api/customer/marketing-preferences` | `auth.required`, customer app-type only | the customer's own `marketingPushOptOut` (boolean only) |
+
+**Scheduling, end to end.** In the admin form, status "פעיל" plus scheduling "מתוזמן" saves
+the campaign and then calls `/:id/schedule`. Only that call sets `status: 'scheduled'`, and
+before 2026-10-28 the admin never called it. The datetime-local value is sent as typed
+(`"2026-10-28T21:30"`, Israel wall clock) and `toScheduledDate` reads it with
+`moment.tz(value, 'Asia/Jerusalem')`. An ISO instant (what older clients sent, and what prod
+stores: 4 `scheduled`-type campaigns, all strings like `"2026-10-27T20:01:00.000Z"`) is kept as
+that instant. The cron (`*/5`, started in `app.js`'s `shouldRunCrons` block) takes the Redis
+lock `cron:scheduled-campaigns` for 4 minutes, finds `status: 'scheduled'` with
+`scheduledDate <= now`, and calls `executeCampaign` with that same filter as its claim. The
+lock only stops two instances scanning at once. The claim is what prevents a double send, and
+it still holds after the lock expires mid-run.
+
+**Run length.** An all-customers campaign runs about 50 minutes (sequential sends to ~18.9k
+customers, prod 2026-10-27), so it routinely outlives the lock. A deploy or crash mid-run
+leaves the campaign `in_progress` for good, partly sent. Prod had 11 such campaigns on
+2026-10-28, May–August 2026 plus one from 2025-10. Nothing resets them, and they can't be
+re-executed. That is an observation, not a reviewed verdict, so ask before acting on it.
+
+**The cap's count.** `countRecentMarketingPushes` makes ONE streamed scan:
+`{createdAt >= cutoff, "data.campaignId": {$exists: true}}` with projection `recipientId`,
+counted in memory against the audience set. `shoofi.notifications` has **only the `_id` index
+in prod** (2026-10-28). The indexes in shoofi-server
+`utils/migrations/create-notifications-collection.js` were never applied, so a per-customer
+query would be a collection scan per customer. Prod volume: ~2.65M campaign records all-time,
+~67k in a week. A failed count fails the campaign (`status: 'failed'`), so it never sends
+uncapped.
+
+**What counts as marketing.** Only `customer-campaigns` sends. The admin's raw
+`/api/notifications/send*` and the coupon-campaign sends do not set `data.campaignId`: they
+neither count toward the cap nor get capped or opt-out filtered. Partner and driver campaigns
+(`appType` `shoofi-partner` / `shoofi-shoofir`) skip both rules (`isCustomerAudience`).
+
+**Preview ≠ reach.** `audience/preview` and `audience/users` still count the raw audience. The
+skips appear only in the execution result (`execution.skippedOptOut`, `skippedCapped`,
+`pushCap`) and in the list's results column.
+
 ## 5a. AI-helper taste profile — owner, merge, lifecycle (`shoofi.tasteProfiles`)
 The customer app's floating persona **شوفي / שופי** runs a short taste onboarding and keeps
 the answers server-side (design: shoofi-server `docs/ai-helper.md`). This domain owns **whose**
@@ -361,6 +415,10 @@ stories and app-logs, and the owner key of a visitor's taste profile (§5a). Sto
 `stores/auth` (login/logout/deleteAccount; `logOut` and `deleteAccount` also call
 `aiHelperStore.clear()`), `stores/user-details` (`customer/details`), `stores/address`,
 `stores/ai-helper` (the taste-profile copy, §5a).
+Profile → **"إشعارات العروض / התראות על מבצעים"** switch (`components/profile/MarketingPushToggle.tsx`,
+logged-in only): `GET/PUT customer/marketing-preferences` with `silent: true`. Hidden until the
+server answers, and reverts on a failed save. ON = receives campaigns. Its copy carries ar/he
+`defaultValue`s, because translations come from the DB.
 
 ### C2. shoofi-partner (store owner) — `app-type: shoofi-partner`
 **Same phone+OTP flow** (not admin creds). The partner-specific mechanism is
@@ -382,6 +440,10 @@ change. Token in `localStorage['@storage_userToken']` + `adminUser`, sent as
 **refresh-token flow** in the interceptor (guarded against loops) → retry, else logout+redirect.
 Roles/permissions: `contexts/AdminAuthContext`, `ProtectedRoute`, `RoleBasedAccess`,
 `RestrictedRoleGuard` (e.g. `accountant` limited to invoice screens).
+Push campaigns (§5b): `views/admin/customer-campaigns/` has the list with the
+`PushCapSettings` panel, skip counts, the scheduled time and cancel-schedule. The form sends
+the schedule as an Israel wall-clock string and shows stored instants through
+`utils/jerusalem-time.ts`. It used to show them back in UTC, 2–3 hours off.
 
 ## 7. Known status (human-confirmed) — do NOT act without an explicit task
 All four items below were reviewed with the owner and are **KNOWN / accepted for now**.

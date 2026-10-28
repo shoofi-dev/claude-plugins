@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@df71e52c (fix/marketing-routes-auth) / 2026-10-28
+last-verified: shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -18,6 +18,11 @@ Accounts, phone+OTP login, tokens & sessions, profiles, addresses, referrals.
 Server: `routes/{auth,customer,customer-referrals,customer-campaigns,customer-feedback,
 shoofi-admin-users}.js`, `utils/{auth-service,admin-auth-service,app-name-helper}.js`,
 `controllers/customerAddressController.js`. Clients: login/OTP/profile in all four apps.
+Also yours: **who a push campaign may reach**: the customer's marketing-push opt-out
+(`routes/customer-marketing-preferences.js`), the frequency cap
+(`services/customer-campaigns/marketing-push-policy.js`), and the campaign send and schedule
+path (`controllers/customerCampaignController.js`, `utils/crons/scheduled-campaigns-cron.js`).
+See invariant 11 and reference §5b.
 **Not yours:** order history content (`orders`), coins/rewards (growth), driver coverage
 fields (`delivery`) — you own the identity record they hang off.
 Also yours: the school-project enrollment (`services/customer/school-project-enrollment.js`)
@@ -183,9 +188,41 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    `auth.required` only, and a plain customer token passes `auth.required` (invariant 7's
    shared secret): it could search customers, preview audiences and push to all of them. The
    only caller is the admin's קמפייני פוש screen. `master` is named because `checkAdminRole` has
-   no hierarchy. Pinned by `test/integration/marketing-routes-auth.js`, which also covers the
+   no hierarchy. The frequency-cap config (`GET/PUT /push-cap-config`) and
+   `POST /:id/unschedule` sit behind the same `...adminOnly` (2026-10-28). They are declared
+   **before** `/:id`, which would otherwise read `push-cap-config` as a campaign id. Pinned by `test/integration/marketing-routes-auth.js`, which also covers the
    other marketing write paths (ads, stories, notes, `notifications/send*`, coupon campaigns,
    admin coupons) — those files have no domain owner yet.
+
+11. **Marketing pushes: opt-out and frequency cap apply inside `executeCampaign` ONLY, to
+    customer-app audiences ONLY.** Every other push (order status, `feedback_request`,
+    delivery, partner and driver alerts) calls `notificationService.sendNotification`
+    directly. That function knows neither rule, so a customer who turned offers off still hears
+    about their order. Keep it that way: never move either rule into `sendNotification`.
+    - **Opt-out** = `shoofi.customers.marketingPushOptOut: true`. Unset means opted in, which is
+      every customer before 2026-10-28. The customer sets it through
+      `GET/PUT /api/customer/marketing-preferences` (`auth.required`, customer app-type only).
+      The route writes **`req.auth.id`'s own doc, never an id from a header, body or URL**.
+      `routes/notifications.js` reads a client `user-id` header, which is a known IDOR and must
+      not be copied (invariant 7). The router is mounted above `routes/customer.js`, whose
+      catch-all `GET /api/customer/:customerId` would otherwise answer it.
+    - **Cap** = `shoofi.store {id:1}.marketingPushCap {enabled, maxPushes, windowDays}`. It means
+      "at most N campaign pushes per customer per D days". **Off until an admin turns it on**
+      (`DEFAULTS.enabled: false`), and edited from the קמפייני פוש screen. It counts the
+      customer's existing `shoofi.notifications` records **that carry `data.campaignId`** since
+      the cutoff. `sendNotification` writes one record per recipient and only a campaign send
+      sets `data.campaignId`, so transactional records never count. There is no separate send log.
+    - Both are filtered **before** the per-user send loop (`userIds = policy.userIds`), and the
+      result records `execution.skippedOptOut` / `skippedCapped` / `pushCap`.
+    - **A campaign is claimed atomically**: `claimCampaign` is one `findOneAndUpdate` to
+      `in_progress`. It used to read the status and then write. The cron claims only a due
+      `scheduled` campaign. A lost claim throws `code: 'CAMPAIGN_NOT_CLAIMABLE'`, and the cron
+      skips it without marking it failed, because that would overwrite a run that is sending.
+      The admin's `PUT /:id` refuses an `in_progress` campaign (409) for the same reason.
+    - **`scheduling.scheduledDate` is a Date.** A wall-clock string without an offset is read in
+      the campaign's timezone (`Asia/Jerusalem`). The cron queries `$lte: <Date>`, and a stored
+      string never matches it. That is why no scheduled campaign ever sent before 2026-10-28,
+      along with the cron never being started.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:

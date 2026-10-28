@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@df71e52c (fix/marketing-routes-auth) / 2026-10-28",
+  "lastVerified": "shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -27,9 +27,23 @@
         "utils/crons/school-registrations-sync-cron.js",
         "routes/ai-helper.js",
         "services/ordering-intelligence/taste-profile.js",
-        "docs/ai-helper.md"
+        "docs/ai-helper.md",
+        "controllers/customerCampaignController.js",
+        "services/customer-campaigns/marketing-push-policy.js",
+        "routes/customer-marketing-preferences.js",
+        "utils/crons/scheduled-campaigns-cron.js"
       ],
       "symbols": {
+        "services/customer-campaigns/marketing-push-policy.js": [
+          "marketingPushCap",
+          "marketingPushOptOut",
+          "applyMarketingPushPolicy",
+          "getPushCapConfig",
+          "countRecentMarketingPushes",
+          "isCustomerAudience"
+        ],
+        "controllers/customerCampaignController.js": ["claimCampaign", "toScheduledDate", "unscheduleCampaign", "CAMPAIGN_NOT_CLAIMABLE"],
+        "utils/crons/scheduled-campaigns-cron.js": ["runDueCampaigns", "checkScheduledCampaigns", "cron:scheduled-campaigns"],
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
         "utils/auth-service.js": ["generateJWT", "toAuthJSON"],
         "utils/app-name-helper.js": ["getCustomerAppName"],
@@ -83,6 +97,51 @@
         ]
       },
       "patterns": [
+        {
+          "file": "app.js",
+          "regex": "if \\(shouldRunCrons\\) \\{[\\s\\S]*scheduledCampaignsCron\\.startScheduledCampaignsCron\\(app\\.db\\)",
+          "desc": "CORE invariant 11: the scheduled-campaigns cron is started inside the shouldRunCrons block - before 2026-10-28 it was never started, so no scheduled campaign sent"
+        },
+        {
+          "file": "controllers/customerCampaignController.js",
+          "regex": "\\{ status: \\{ \\$nin: NOT_CLAIMABLE \\}, \\.\\.\\.\\(claimFilter \\|\\| \\{\\}\\), _id: getId\\(campaignId\\) \\}",
+          "desc": "CORE invariant 11: a campaign is claimed in ONE findOneAndUpdate - read-then-write let two callers both send it"
+        },
+        {
+          "file": "controllers/customerCampaignController.js",
+          "regex": "applyMarketingPushPolicy\\(db, campaign, usersWithLang\\);\\s*userIds = policy\\.userIds;",
+          "desc": "CORE invariant 11: opt-out and cap filter the recipients before the per-user send loop"
+        },
+        {
+          "file": "controllers/customerCampaignController.js",
+          "regex": "moment\\.tz\\(value, timezone \\|\\| 'Asia/Jerusalem'\\)\\.toDate\\(\\)",
+          "desc": "CORE invariant 11: a wall-clock schedule is read in the campaign timezone and stored as a Date - the cron's $lte: Date never matches a string"
+        },
+        {
+          "file": "utils/crons/scheduled-campaigns-cron.js",
+          "regex": "error\\.code === 'CAMPAIGN_NOT_CLAIMABLE'",
+          "desc": "CORE invariant 11: a lost claim is skipped, never marked failed over a run that is sending"
+        },
+        {
+          "file": "services/customer-campaigns/marketing-push-policy.js",
+          "regex": "\\{ createdAt: \\{ \\$gte: since \\}, \"data\\.campaignId\": \\{ \\$exists: true \\} \\}",
+          "desc": "CORE invariant 11: only campaign records (data.campaignId) count toward the cap - transactional pushes never do; one window scan, notifications has only the _id index in prod"
+        },
+        {
+          "file": "services/customer-campaigns/marketing-push-policy.js",
+          "regex": "const DEFAULTS = Object\\.freeze\\(\\{ enabled: false",
+          "desc": "CORE invariant 11: the cap is off until an admin turns it on"
+        },
+        {
+          "file": "routes/customer-marketing-preferences.js",
+          "regex": "customers\\.updateOne\\(\\s*\\{ _id: getId\\(req\\.auth\\.id\\) \\}",
+          "desc": "CORE invariant 11: the opt-out writes the caller's own doc from req.auth.id - never a user-id header (the routes/notifications.js IDOR)"
+        },
+        {
+          "file": "routes/customer-campaigns.js",
+          "regex": "router\\.put\\('/push-cap-config', \\.\\.\\.adminOnly",
+          "desc": "CORE invariant 10: the cap config write is owner-tier admin only"
+        },
         {
           "file": "routes/customer-campaigns.js",
           "regex": "const CAMPAIGN_ROLES = \\[\"master\", \"admin\", \"manager\"\\]",
@@ -251,8 +310,13 @@
       ]
     },
     "shoofi-app": {
-      "files": ["utils/http-interceptor/index.ts"],
+      "files": ["utils/http-interceptor/index.ts", "components/profile/MarketingPushToggle.tsx"],
       "patterns": [
+        {
+          "file": "components/profile/MarketingPushToggle.tsx",
+          "regex": "const PATH = \"customer/marketing-preferences\";",
+          "desc": "the profile's offers switch calls the customer's own preferences route, sending only the boolean"
+        },
         {
           "file": "utils/http-interceptor/index.ts",
           "regex": "\"Token \" \\+ token",
@@ -273,9 +337,16 @@
     "shoofi-delivery-web": {
       "files": [
         "src/contexts/AdminAuthContext.tsx",
-        "src/utils/http-interceptor/index.ts"
+        "src/utils/http-interceptor/index.ts",
+        "src/utils/jerusalem-time.ts",
+        "src/views/admin/customer-campaigns/PushCapSettings.tsx"
       ],
       "patterns": [
+        {
+          "file": "src/utils/jerusalem-time.ts",
+          "regex": "export const SCHEDULE_TIMEZONE = 'Asia/Jerusalem';",
+          "desc": "campaign schedule times are shown in Israel time whatever the browser zone"
+        },
         {
           "file": "src/utils/http-interceptor/index.ts",
           "regex": "Bearer",
