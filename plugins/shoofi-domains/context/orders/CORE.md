@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -20,7 +20,9 @@ Server: `routes/order.js`, `routes/twin-order.js`, `routes/order-fraud-*.js`,
 `utils/order-pricing.js` + `utils/order-pricing-shadow.js`, `routes/order-amend.js`,
 `services/coupons/delivery-price-enforcement.js` + `services/twin-order/twin-delivery-price.js`
 (the order-side guard for fixed-delivery-price coupons, invariant 14), `utils/marketing-touch.js`
-(order-side marketing attribution, invariant 15), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
+(order-side marketing attribution, invariant 15), `services/marketing/order-facts.js` +
+`services/marketing/reconcile.js` (one marketing fact per checkout, kept true by a cron —
+invariant 16), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
 (shoofir), monitoring/twin-admin (delivery-web).
 
 **Not yours:** payment internals (`payments`), settlement/payouts (`accountant`), driver
@@ -321,13 +323,59 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       (`$set: { ...parsedBodey }`), throws `ReferenceError: offsetHours is not defined` before
       it writes (verified 2026-10-28), so today it cannot overwrite the touch. Whoever revives
       it must `delete parsedBodey.marketingTouch` first.
-    - **Not** in the `customers.orders[]` snapshot (recipe step 2). No index yet: the
-      reporting query does not exist. When it does, add a **partial** index
-      (`partialFilterExpression: { marketingTouch: { $exists: true } }`) on
-      `marketingTouch.campaignId` / `.itemId` + `.at` in `DatabaseInitializationService`, fired
-      un-awaited. Never add it on the create path (an awaited index build dropped writes once).
+    - **Not** in the `customers.orders[]` snapshot (recipe step 2). **No index on it, on
+      purpose:** nothing reports off `order.marketingTouch` directly. It is the FALLBACK input
+      of the order facts (invariant 16), read once per checkout by `_id`. A report reads
+      `shoofi.marketingOrderFacts`, never a cross-store scan of this field.
     - Server tests: `test/integration/order-marketing-touch.js`. The client half (shoofi-app
-      remembers the touch and posts it) is a separate PR.
+      remembers the touch and posts it) is `services/marketing-events.ts`
+      `prepareMarketingForOrder` (customers CORE invariant 11).
+
+16. **ONE MARKETING FACT PER CHECKOUT, BUILT AFTER THE RESPONSE, KEPT TRUE BY A CRON**
+    (`shoofi.marketingOrderFacts`, shoofi-server `docs/marketing-attribution.md`).
+    - **The hook is the only order-path change, and it does nothing on the path.** The three
+      insert sites call `scheduleOrderFact(req, res, ref)`: `/api/order/create` right after
+      `db.orders.insertOne(orderDoc)`, and twin `/place` and `/digital-place-pending` right
+      after `attachOrders`. It is synchronous, does no I/O, never throws and is **never
+      awaited**. It reads the `device-id` header and `req.auth.imp`, then registers
+      `res.once("finish"|"close")`. The fact is built in `setImmediate` after the response. So
+      a card charged in the same request is recorded at its paid status, and nothing the hook
+      does can hold or fail the order (invariant 6). Never `await` it, never move it before
+      the insert, and never let it read the request body.
+    - **Twin = one fact** (`_id: "twin:<groupId>"`, both legs in `orders[]` with `role`). A
+      single order is `"order:<appName>:<orderObjectId>"`. The deterministic `_id` and
+      idempotent upserts make a cron double-run, a retried request and a backfill race
+      converge. Never give a fact a generated `_id`.
+    - **Status is mapped, never trusted raw** (`normalizeOrderStatus`):
+      - `"0"` → `pending_payment` (< 24h) or `payment_failed`.
+      - `1,6,13,14,15` → placed; `2,3,10,11,12` → completed; `5` → rejected.
+      - `4,7,8,9,-3,"cancelled"` → cancelled. `"-3"` and `"cancelled"` are twin-service writes.
+        They are in NO constant and in no `CANCELLED_STATUSES` list, so a report that copies
+        `utils/customer-orders.js` misses a cancelled twin side.
+      - `"cancelled"` + `cancelReason: twin_place_failed` → payment_failed.
+      - A twin takes its best leg's status.
+
+      A change to `ORDER_STATUS` must be mirrored in `services/marketing/order-facts.js`.
+    - **Final amounts, not create-time ones.** `amounts.net` is the live legs'
+      `total − paymentAuth.refundedAmount`. Amend rewrites `total` and J5 capture takes the
+      amended total, so `total` is final. A cancelled twin side contributes 0. `initialTotal`
+      keeps the create-time figure. Never project `ccPaymentRefData` into a fact.
+    - **The cron is the guarantee; there are no status-transition hooks.**
+      `utils/crons/marketing-attribution-cron.js` runs:
+      - every 15 min: facts with `reconcile.nextAt ≤ now` re-read their legs (one `_id $in`
+        per store);
+      - at :00/:30: a 48h `_id`-range backfill (insert-only) creates facts for orders the hook
+        missed;
+      - hourly: the rollup of today and yesterday;
+      - 04:50 Israel: a re-read of every fact of the last 7 days.
+
+      Don't add a hook on a transition path for this. Completion is written on several paths
+      (invariant 1), and the cron already sees all of them.
+    - **Every checkout is recorded**, attributed or not: that is the baseline. Test phones
+      (`config/test-phones.js`), impersonation (an `imp` token) and mock stores are recorded
+      with `excludeFromReports: true`.
+    - Tests: `test/integration/marketing-attribution.js`. It drives the real create and twin
+      routers on mongodb-memory-server.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

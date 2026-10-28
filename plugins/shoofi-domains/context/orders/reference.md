@@ -168,8 +168,13 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   tap or push open before checkout, ≤ 24 h old. Written only at insert, by
   `/api/order/create` and both twin place routes, through `sanitizeMarketingTouch`
   (`utils/marketing-touch.js`). Absent = not attributed. A twin pair carries the same
-  value on both legs, so count checkouts by `twinGroup.groupId`. Rules and index plan:
-  CORE invariant 15.
+  value on both legs, so count checkouts by `twinGroup.groupId`. Rules: CORE invariant 15.
+  Not indexed, and nothing reports off it: it is the fallback input of the order facts.
+- **`shoofi.marketingOrderFacts`** — one document per CHECKOUT (twin collapsed,
+  `_id: "twin:<groupId>"`, else `"order:<appName>:<orderObjectId>"`). It holds the touches
+  (server events + this fallback), the normalised status and the final amounts, and the
+  reconcile cron keeps it true. Written after the response by `scheduleOrderFact`. Full shape:
+  shoofi-server `docs/marketing-attribution.md`; rules: CORE invariant 16.
 - **Order dates — `datetime` is when it was PLACED, `orderDate` is when it is DUE.** Both are
   client-supplied ISO-8601 **offset strings** (`"2026-08-03T15:00:00+03:00"`, never UTC, never
   a `Date`) built by `moment().format()` in `shoofi-app/stores/cart/index.ts` and stored
@@ -359,8 +364,10 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
   and `submitOrder` sends `app-name: order.storeData?.appName` — so whatever stamps an empty
   cart decides the store DB the order lands in (CORE invariant 13).
   Optional **`marketingTouch`** on the same body (CORE invariant 15). The server accepts it
-  from shoofi-server's `feat/order-marketing-touch` onwards. The app half is a separate
-  PR. It belongs in `submitOrder`, not `getCartData`, because `getCartData` also feeds the
+  from shoofi-server's `feat/order-marketing-touch` onwards. `submitOrder` gets it from
+  `prepareMarketingForOrder()` (`services/marketing-events.ts`), which first sends the
+  queued taps (≤1.5s, never throws) so the server can credit the order from its own events.
+  It belongs in `submitOrder`, not `getCartData`, because `getCartData` also feeds the
   legacy `updateOrderAdmin`. On twin checkouts it goes TOP-LEVEL on the `twin-order/place`
   / `digital-place-pending` JSON body, not inside `primary`/`secondary`.
 - **Payment**: CC is charged **server-side inside `order/create`** (client passes

@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28
+last-verified: shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -207,9 +207,38 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
      token), guests by `device-id`; `sanitizeEvent` drops junk, future (>5 min) and >7-day-old
      events; batches cap at 50; it always answers 200. `marketingEvents` has a 180-day TTL and its
      indexes are requested in the background, never awaited on the write. Results:
-     `GET /api/admin/marketing/results` (every dashboard role). Which orders a tap led to is
-     `order.marketingTouch` (orders CORE), not a join from here.
-   Pinned by `test/integration/marketing-links.js`.
+     `GET /api/admin/marketing/results` (every dashboard role).
+   - **The handle must be registered.** `db.marketingEvents = db.collection('marketingEvents')`
+     in `DatabaseInitializationService`. The route catches everything and answers
+     `accepted: 0`, so a missing registration drops EVERY event silently. It shipped that way
+     in #333; the tests' Proxy handle hid it.
+   - **Events → facts → rollups** (shoofi-server `docs/marketing-attribution.md`).
+     - Which orders a tap led to is the SERVER's join. After each checkout,
+       `services/marketing/order-facts.js` reads this customer's AND this device's
+       `tap`/`push_open` events from the 7 days before it into one fact per checkout
+       (orders CORE invariant 16). `order.marketingTouch` is only the fallback for an event
+       that never arrived.
+     - The device key is `deviceViewerKey(header)` (`services/marketing/viewer-key.js`). The
+       events route writes `viewerKey` with it and the facts look guests up with it, both
+       truncated to 64 characters: the app's `@storage_deviceId` runs longer than that. It is
+       the `device-id` HEADER, never `orders.deviceId`. So a guest's taps
+       (`viewerKey: "device:<id>"`) are credited after they log in.
+     - An event from an impersonation token is stored with `impersonated: true`; facts and
+       rollups skip it.
+     - `shoofi.marketingDailyStats` (per Israel date × placement × itemId, kept forever)
+       holds funnel + orders under last/first/any. Reports:
+       `GET /api/admin/marketing/{performance, order-facts, daily}` (the same roles as
+       results; a fact never holds a phone or a name).
+   - **The app's queue survives a kill and is flushed before every order.**
+     - `shoofi-app/services/marketing-events.ts` mirrors the queue to AsyncStorage
+       (`@marketing_event_queue`, ≤200 events, 7-day age-out, taps first, one retry).
+     - All three submits (`stores/cart` `submitOrder`, `stores/twin-order` place,
+       `screens/checkout` digital-place-pending) call `prepareMarketingForOrder()`. It gives
+       the queue ≤1.5s, never throws, then returns the touch for the body.
+     - Never send anything beyond `marketingTouch` on `/api/order/create`: the route spreads
+       `...parsedBodey` onto the order, so an extra field lands unsanitized.
+   Pinned by `test/integration/marketing-links.js` and `test/integration/marketing-attribution.js`
+   (server), `__tests__/services/marketing-events-queue.test.ts` (app).
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:

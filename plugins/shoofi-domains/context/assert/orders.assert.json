@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -41,7 +41,12 @@
         "docs/fixed-delivery-price.md",
         "test/integration/coupon-delivery-price.js",
         "utils/marketing-touch.js",
-        "test/integration/order-marketing-touch.js"
+        "test/integration/order-marketing-touch.js",
+        "services/marketing/order-facts.js",
+        "services/marketing/reconcile.js",
+        "utils/crons/marketing-attribution-cron.js",
+        "docs/marketing-attribution.md",
+        "test/integration/marketing-attribution.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -106,6 +111,18 @@
         ],
         "services/twin-order/twin-delivery-price.js": [
           "enforceTwinSideDeliveryPrice"
+        ],
+        "services/marketing/order-facts.js": [
+          "scheduleOrderFact",
+          "recordCheckoutFact",
+          "normalizeOrderStatus",
+          "statusPatch",
+          "LEG_PROJECTION"
+        ],
+        "services/marketing/reconcile.js": [
+          "reconcileDueFacts",
+          "reconcileRecentFacts",
+          "backfillMissingFacts"
         ],
         "utils/marketing-touch.js": [
           "sanitizeMarketingTouch",
@@ -439,7 +456,13 @@
           "file": "utils/marketing-touch.js",
           "regex": "const MARKETING_TOUCH_MAX_STRING_LENGTH = 64;\\s*const MARKETING_TOUCH_MAX_AGE_MS = 24 \\* 60 \\* 60 \\* 1000;\\s*const MARKETING_TOUCH_FUTURE_SKEW_MS = 5 \\* 60 \\* 1000;",
           "desc": "CORE invariant 15: 64-char string cap, 24h window, 5-minute future skew"
-        }
+        },
+        {"file": "routes/order.js", "regex": "const newDoc = await db\\.orders\\.insertOne\\(orderDoc\\);\\s*orderId = newDoc\\.insertedId;[\\s\\S]{0,600}?\\n      scheduleOrderFact\\(req, res, \\{ appName, orderObjectId: orderId \\}\\);", "desc": "CORE invariant 16: the create path schedules the marketing fact right AFTER the insert, un-awaited (it only registers res finish/close)"},
+        {"file": "routes/twin-order.js", "regex": "await twinGroupService\\.attachOrders\\([\\s\\S]{0,400}?scheduleOrderFact\\(req, res, \\{\\s*twinGroupId: group\\.groupId,", "desc": "CORE invariant 16: both twin place routes schedule ONE fact for the checkout after both legs are attached"},
+        {"file": "services/marketing/order-facts.js", "regex": "const CANCELLED_CODES = \\[\"4\", \"7\", \"8\", \"9\", \"-3\", \"cancelled\"\\];", "desc": "CORE invariant 16: the twin services' '-3' and 'cancelled' count as cancelled in the facts"},
+        {"file": "services/marketing/order-facts.js", "regex": "res\\.once\\(\"finish\", fire\\);\\s*res\\.once\\(\"close\", fire\\);", "desc": "CORE invariant 16: the fact is built after the response, never on the order path"},
+        {"file": "services/marketing/order-facts.js", "regex": "return `order:\\$\\{appName\\}:\\$\\{String\\(orderObjectId\\)\\}`;", "desc": "CORE invariant 16: deterministic fact _id (idempotent upserts; twin = twin:<groupId>)"},
+        {"file": "utils/crons/marketing-attribution-cron.js", "regex": "const RECONCILE_SCHEDULE = \"\\*/15 \\* \\* \\* \\*\";", "desc": "CORE invariant 16: the reconcile cron (the guarantee) runs every 15 minutes"}
       ]
     },
     "shoofi-app": {
@@ -450,9 +473,12 @@
         "components/checkout/FutureOrderPicker.tsx",
         "hooks/checkout/use-checkout-validate.ts",
         "screens/cart/cart.tsx",
-        "helpers/for-you-attribution.ts"
+        "helpers/for-you-attribution.ts",
+        "services/marketing-events.ts"
       ],
       "patterns": [
+        {"file": "stores/cart/index.ts", "regex": "const marketingTouch = await prepareMarketingForOrder\\(\\);", "desc": "CORE invariant 15/16: submitOrder sends the queued taps (<=1.5s, never throws) before reading the touch for the body"},
+        {"file": "screens/checkout/index.tsx", "regex": "const marketingTouch = await prepareMarketingForOrder\\(\\);", "desc": "CORE invariant 16: digital-place-pending flushes the queue first"},
         {
           "file": "hooks/checkout/use-checkout-validate.ts",
           "regex": "checkout_validation_failed",
