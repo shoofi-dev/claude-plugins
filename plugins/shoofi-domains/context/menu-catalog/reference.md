@@ -1016,7 +1016,9 @@ note? }`, `POST …/review/run`.
   Shoofi employees only until the last is on; the mic is on-device speech-to-text in
   `hooks/useVoiceInput.ts`, shown only when the binary has the native module, and its transcript
   is sent as the same `text`); a card tap navigates to
-  `menuScreen` with `productId` (`hooks/useOpenStoreAtProduct.ts`), and the menu list opens the
+  `menuScreen` with `productId` (`utils/open-store-at-product.ts`, wrapped by the
+  `hooks/useOpenStoreAtProduct.ts` hook; marketing links — banner, story, push — use the same
+  function), and the menu list opens the
   sheet by matching `products[]._id`: `AllCategoriesList` searches `categoryList[].products`;
   for tile-grid stores (`store.hasGeneralCategories`) `GeneralCategoriesList` receives the
   general categories, which carry NO `products` of their own, so it searches

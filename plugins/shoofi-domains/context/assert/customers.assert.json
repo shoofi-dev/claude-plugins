@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -31,7 +31,13 @@
         "controllers/customerCampaignController.js",
         "services/customer-campaigns/marketing-push-policy.js",
         "routes/customer-marketing-preferences.js",
-        "utils/crons/scheduled-campaigns-cron.js"
+        "utils/crons/scheduled-campaigns-cron.js",
+        "utils/marketing-link.js",
+        "routes/marketing-events.js",
+        "services/marketing/viewer-key.js",
+        "services/marketing/daily-stats.js",
+        "services/marketing/performance.js",
+        "routes/marketing-performance.js"
       ],
       "symbols": {
         "services/customer-campaigns/marketing-push-policy.js": [
@@ -44,6 +50,10 @@
         ],
         "controllers/customerCampaignController.js": ["claimCampaign", "toScheduledDate", "unscheduleCampaign", "CAMPAIGN_NOT_CLAIMABLE"],
         "utils/crons/scheduled-campaigns-cron.js": ["runDueCampaigns", "checkScheduledCampaigns", "cron:scheduled-campaigns"],
+        "utils/marketing-link.js": ["LINK_TYPES", "LINK_PAGES", "linkFromRequest", "resolveLink", "legacyAdFields", "legacyLink", "withLink"],
+        "routes/marketing-events.js": ["sanitizeEvent", "ensureIndexesInBackground", "marketingEvents", "MAX_BATCH"],
+        "services/marketing/viewer-key.js": ["deviceViewerKey"],
+        "services/marketing/performance.js": ["getPerformance", "holdoutLift", "listOrderFacts", "pushCampaignsFor", "itemNames"],
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
         "utils/auth-service.js": ["generateJWT", "toAuthJSON"],
         "utils/app-name-helper.js": ["getCustomerAppName"],
@@ -100,42 +110,42 @@
         {
           "file": "app.js",
           "regex": "if \\(shouldRunCrons\\) \\{[\\s\\S]*scheduledCampaignsCron\\.startScheduledCampaignsCron\\(app\\.db\\)",
-          "desc": "CORE invariant 11: the scheduled-campaigns cron is started inside the shouldRunCrons block - before 2026-10-28 it was never started, so no scheduled campaign sent"
+          "desc": "CORE invariant 12: the scheduled-campaigns cron is started inside the shouldRunCrons block - before 2026-10-28 it was never started, so no scheduled campaign sent"
         },
         {
           "file": "controllers/customerCampaignController.js",
           "regex": "\\{ status: \\{ \\$nin: NOT_CLAIMABLE \\}, \\.\\.\\.\\(claimFilter \\|\\| \\{\\}\\), _id: getId\\(campaignId\\) \\}",
-          "desc": "CORE invariant 11: a campaign is claimed in ONE findOneAndUpdate - read-then-write let two callers both send it"
+          "desc": "CORE invariant 12: a campaign is claimed in ONE findOneAndUpdate - read-then-write let two callers both send it"
         },
         {
           "file": "controllers/customerCampaignController.js",
           "regex": "applyMarketingPushPolicy\\(db, campaign, usersWithLang\\);\\s*userIds = policy\\.userIds;",
-          "desc": "CORE invariant 11: opt-out and cap filter the recipients before the per-user send loop"
+          "desc": "CORE invariant 12: opt-out and cap filter the recipients before the per-user send loop"
         },
         {
           "file": "controllers/customerCampaignController.js",
           "regex": "moment\\.tz\\(value, timezone \\|\\| 'Asia/Jerusalem'\\)\\.toDate\\(\\)",
-          "desc": "CORE invariant 11: a wall-clock schedule is read in the campaign timezone and stored as a Date - the cron's $lte: Date never matches a string"
+          "desc": "CORE invariant 12: a wall-clock schedule is read in the campaign timezone and stored as a Date - the cron's $lte: Date never matches a string"
         },
         {
           "file": "utils/crons/scheduled-campaigns-cron.js",
           "regex": "error\\.code === 'CAMPAIGN_NOT_CLAIMABLE'",
-          "desc": "CORE invariant 11: a lost claim is skipped, never marked failed over a run that is sending"
+          "desc": "CORE invariant 12: a lost claim is skipped, never marked failed over a run that is sending"
         },
         {
           "file": "services/customer-campaigns/marketing-push-policy.js",
           "regex": "\\{ createdAt: \\{ \\$gte: since \\}, \"data\\.campaignId\": \\{ \\$exists: true \\} \\}",
-          "desc": "CORE invariant 11: only campaign records (data.campaignId) count toward the cap - transactional pushes never do; one window scan, notifications has only the _id index in prod"
+          "desc": "CORE invariant 12: only campaign records (data.campaignId) count toward the cap - transactional pushes never do; one window scan, notifications has only the _id index in prod"
         },
         {
           "file": "services/customer-campaigns/marketing-push-policy.js",
           "regex": "const DEFAULTS = Object\\.freeze\\(\\{ enabled: false",
-          "desc": "CORE invariant 11: the cap is off until an admin turns it on"
+          "desc": "CORE invariant 12: the cap is off until an admin turns it on"
         },
         {
           "file": "routes/customer-marketing-preferences.js",
           "regex": "customers\\.updateOne\\(\\s*\\{ _id: getId\\(req\\.auth\\.id\\) \\}",
-          "desc": "CORE invariant 11: the opt-out writes the caller's own doc from req.auth.id - never a user-id header (the routes/notifications.js IDOR)"
+          "desc": "CORE invariant 12: the opt-out writes the caller's own doc from req.auth.id - never a user-id header (the routes/notifications.js IDOR)"
         },
         {
           "file": "routes/customer-campaigns.js",
@@ -306,12 +316,55 @@
           "file": "routes/customer.js",
           "regex": "res\\.status\\(200\\)\\.json\\(\\{ data: \"deleted success\" \\}\\);[\\s\\S]{0,400}if \\(collection === \"customers\" && customerDB === req\\.app\\.db\\[\"shoofi\"\\]\\)[\\s\\S]{0,300}deleteCustomerProfile\\(shoofiDb, String\\(id\\)\\)[\\s\\S]{0,200}deleteCustomerServed\\(shoofiDb, String\\(id\\)\\)",
           "desc": "doc CORE invariant 9: POST /api/customer/delete removes the customer's taste profile and For-you served audit AFTER the reply, customer-app branch only, never failing the delete"
-        }
+        },
+        {
+          "file": "utils/marketing-link.js",
+          "regex": "const LINK_TYPES = \\[\"none\", \"store\", \"product\", \"deal\", \"coupon\", \"page\"\\]",
+          "desc": "CORE invariant 11: the one link shape"
+        },
+        {
+          "file": "utils/marketing-link.js",
+          "regex": "if \\(!coupon\\) throw new LinkError\\(\"coupon not found\"\\)",
+          "desc": "CORE invariant 11: a coupon link must point at an existing coupon"
+        },
+        {
+          "file": "routes/stories.js",
+          "regex": "storeAppName === \"shoofi-stories\"\\) return \\{ type: \"none\", productId: null \\}",
+          "desc": "CORE invariant 11: an announcement's legacy target is none"
+        },
+        {
+          "file": "controllers/customerCampaignController.js",
+          "regex": "link: campaign\\.link \\|\\| \\{ type: 'none' \\}",
+          "desc": "CORE invariant 11: a push campaign's link rides in the push data"
+        },
+        {
+          "file": "routes/marketing-events.js",
+          "regex": "router\\.post\\(\"/api/marketing/events\", auth\\.optional",
+          "desc": "CORE invariant 11: events are open to guests, customer from the token"
+        },
+        {"file": "services/marketing/performance.js", "regex": "\\{ \\$or: or, appType: \\{ \\$in: \\[null, \"shoofi-app\"\\] \\}, \"channels\\.push\": \\{ \\$ne: false \\} \\}", "desc": "CORE invariant 11: /performance lists every customer-app push campaign started in the range (or requested), even with no events"},
+        {"file": "services/marketing/performance.js", "regex": "item\\.funnel\\.openRate = sent \\? ratio\\(item\\.funnel\\.pushOpens, sent\\) : null;", "desc": "CORE invariant 11: push items expose pushSent and openRate = pushOpens / pushSent"},
+        {"file": "routes/marketing-events.js", "regex": "\\.\\.\\.\\(impersonated \\? \\{ impersonated: true \\} : \\{\\}\\),", "desc": "CORE invariant 11: events from an imp token are stored flagged, and the touch lookup / rollup skip them"},
+        {"file": "services/database/DatabaseInitializationService.js", "regex": "db\\.marketingEvents = db\\.collection\\('marketingEvents'\\);", "desc": "CORE invariant 11: the events handle is registered - without it every event write fails silently (accepted: 0)"},
+        {"file": "routes/marketing-events.js", "regex": "viewerKey: customerId \\|\\| deviceViewerKey\\(deviceId\\),", "desc": "CORE invariant 11: guests are keyed by the SAME helper the order facts look them up with"},
+        {"file": "services/marketing/viewer-key.js", "regex": "const ID_MAX = 64;", "desc": "CORE invariant 11: device ids are truncated to 64 on both the write and the lookup"}
       ]
     },
     "shoofi-app": {
-      "files": ["utils/http-interceptor/index.ts", "components/profile/MarketingPushToggle.tsx"],
+      "files": ["utils/http-interceptor/index.ts", "hooks/use-notifications.ts", "utils/marketing-link.ts", "services/marketing-events.ts", "components/profile/MarketingPushToggle.tsx"],
       "patterns": [
+        {"file": "services/marketing-events.ts", "regex": "const QUEUE_KEY = \"@marketing_event_queue\";", "desc": "CORE invariant 11: the event queue is mirrored to AsyncStorage (survives a kill)"},
+        {"file": "services/marketing-events.ts", "regex": "export const ORDER_FLUSH_TIMEOUT_MS = 1500;", "desc": "CORE invariant 11: an order waits at most 1.5s for the queue"},
+        {
+          "file": "hooks/use-notifications.ts",
+          "regex": "openPushCampaign\\(response\\)",
+          "desc": "CORE invariant 11: a tapped push campaign is routed on its link"
+        },
+        {
+          "file": "utils/marketing-link.ts",
+          "regex": "return openStoreAtProduct\\(navigate, \\{ appName: link\\.appName \\}, link\\.productId\\)",
+          "desc": "CORE invariant 11: store opens go through the twin-guarded opener"
+        },
         {
           "file": "components/profile/MarketingPushToggle.tsx",
           "regex": "const PATH = \"customer/marketing-preferences\";",
