@@ -368,6 +368,8 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
         missed;
       - hourly: the rollup of today and yesterday;
       - 04:50 Israel: a re-read of every fact of the last 7 days.
+      - hourly at :20: each push campaign's before/after impact, once its window has closed
+        (customers CORE invariant 11; reads store orders by `_id` range, writes no fact).
 
       Don't add a hook on a transition path for this. Completion is written on several paths
       (invariant 1), and the cron already sees all of them.

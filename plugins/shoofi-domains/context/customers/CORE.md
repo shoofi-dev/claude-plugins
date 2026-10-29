@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -261,6 +261,23 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
        OR opened. A push item only ever has `push_open` (the route enforces
        `push_open ⇔ push`), so for a push it means openers. This matches `tappers` in
        `/results`. `viewerDays` is a sum of daily distinct viewers, not distinct people.
+     - **Every push gets a before/after impact, once** (`services/marketing/campaign-impact.js`,
+       `shoofi.marketingCampaignImpact`, `_id` = campaignId). The marketing cron (hourly at
+       :20) computes it when the 24h window has closed plus 2h, up to 4 per run, newest first,
+       back 180 days. It counts the recipients' placed/completed checkouts (twin = one, any
+       store) in the 24h after `execution.startedAt`, against the same 24h one to four weeks
+       earlier. `noiseBand = max(2·sd, 2·√mean)`. `verdict` is up/down only past it, and
+       `too_small` under 200 recipients or a usual of < 5 orders.
+       - Recipients are the audience's `treated` rows, else `shoofi.notifications` by
+         `data.campaignId`. That collection has no index on `data.campaignId` in prod (5.3M rows), so the query
+         MUST be bounded by an `_id` time range around the run.
+       - It cannot tell the push from the day or an overlapping push (`overlaps` names them).
+         With a holdout, the holdout lift is the causal number.
+       - A run with any unreadable store DB writes nothing and retries.
+       - Served as `impact` on `/performance` push items and by
+         `GET /api/admin/marketing/campaign-impact` (same roles; the admin's
+         "השפעת קמפייני פוש" card). Not on `/api/analytics/growth/*`: those routes have no
+         auth.
    - **The app's queue survives a kill and is flushed before every order.**
      - `shoofi-app/services/marketing-events.ts` mirrors the queue to AsyncStorage
        (`@marketing_event_queue`, ≤200 events, 7-day age-out, taps first, one retry).
