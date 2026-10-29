@@ -447,8 +447,23 @@
         },
         {
           "file": "test/integration/product-admin-auth.js",
-          "regex": "const KNOWN_UNGATED = new Set\\(\\[\\n  \"POST /api/admin/images/upload\",[^\\n]*\\n  \"POST /api/images\",[^\\n]*\\n\\]\\);",
-          "desc": "doc CORE invariant 26: the only product-router routes still without auth; any other ungated route fails the test"
+          "regex": "\\[\"post\", \"/api/admin/images/upload\", OWN\\],\\n  \\[\"post\", \"/api/images\", OWN\\],",
+          "desc": "doc CORE invariant 26 / reference §7: the two image routes are admin|own store in the test matrix"
+        },
+        {
+          "file": "test/integration/product-admin-auth.js",
+          "regex": "filter\\(\\(r\\) => r\\.handles\\[0\\] !== auth\\.required\\)",
+          "desc": "doc CORE invariant 26: every route in routes/product.js runs auth.required first, no exception list"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "\"/api/admin/images/upload\",\\n  \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,\\n  upload\\.array",
+          "desc": "doc CORE invariant 26 / reference §7: image upload is admin|own store, gated before multer"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/images\", \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,",
+          "desc": "doc CORE invariant 26 / reference §7: the image list is admin|own store"
         },
         {
           "file": "routes/shoofi-admin.js",

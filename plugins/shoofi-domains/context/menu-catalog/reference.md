@@ -566,7 +566,7 @@ the cache read.
 - `POST /api/admin/product/insert | update | delete` **[admin|own store]** — product CRUD (partial update). Insert/update run the combo validation chain (`400 COMBO_INVALID`); delete is `409 PRODUCT_REFERENCED_BY_COMBO` when a combo still points at a requested product (CORE invariant 10).
 - `POST /api/admin/product/update/{isInStore,quantity,isHidden,isInStore/byCategory,activeTastes}` **[admin|own store]** — availability/stock/visibility
 - `POST /api/admin/product/update/order` **[admin|own store]** (the partner's products-order screen); `POST /api/admin/product/{update/order-per-category,bulk-reorder,reset-order/:cat,migrate-orders}` and `GET /api/admin/product/{order/:cat,orders}` **[admin]** — ordering
-- `GET  /api/admin/product/extras` **[admin|own store]**, `GET /api/admin/product/:id` **[admin]**, `GET /api/admin/product/import-index` **[admin]**, `POST /api/admin/images/upload` (**no auth**, outside this change)
+- `GET  /api/admin/product/extras` **[admin|own store]**, `GET /api/admin/product/:id` **[admin]**, `GET /api/admin/product/import-index` **[admin]**, `POST /api/admin/images/upload` **[admin|own store]** (gated before multer), `POST /api/images` **[admin|own store]** (the image list by `type`)
 - `POST /api/product/create-from-mock` (`400 COMBO_NOT_CLONEABLE` for a combo template), `GET /api/product/mock-store/:appName`, `POST /api/product/update-barcode`, all **[admin]**
 - `GET/POST/DELETE /api/store-category/*` — regular subcategory CRUD (in `store.js`)
 - `GET/POST/DELETE /api/category/general/*` — general category CRUD

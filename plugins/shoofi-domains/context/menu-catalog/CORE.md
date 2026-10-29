@@ -740,9 +740,9 @@ boundary and say so in the PR.
       order offer, new, status. When all three apply, "new" is dropped.
 
 26. **EVERY PRODUCT ROUTE CARRIES ITS GATE ON THE ROUTE; A PARTNER WRITES ONLY ITS OWN STORE**
-    (`services/catalog/product-access.js`, reference §7 / §8). Until 2026-10-30, 21 routes in
+    (`services/catalog/product-access.js`, reference §7 / §8). Until 2026-10-30, 23 routes in
     `routes/product.js` had no auth. Given only a store's `app-name`, anyone could insert, edit,
-    hide, re-stock, re-order or delete that store's products.
+    hide, re-stock, re-order or delete that store's products, or upload images into it.
     - **`PRODUCT_ADMIN`** is `auth.required` + `checkAdminRole(DASHBOARD_ROLES)` (from
       `utils/analytics-access.js`), so any dashboard role, `viewer` and `accountant` included.
       It is for the routes only the admin web calls. Prod's audit log has product adds, updates
@@ -750,17 +750,21 @@ boundary and say so in the PR.
     - **`PRODUCT_ADMIN_OR_OWN_STORE`** is a dashboard role, OR `app-type: shoofi-partner` whose
       token's `shoofi.storeUsers` doc has `appName === req.headers['app-name']`. It is for the
       routes the partner app calls: `insert`, `update`, `delete`,
-      `update/{isInStore,isInStore/byCategory,quantity,isHidden,activeTastes,order}`, `GET extras`.
+      `update/{isInStore,isInStore/byCategory,quantity,isHidden,activeTastes,order}`, `GET extras`,
+      `POST /api/admin/images/upload`, `POST /api/images`. The two image routes and `GET extras`
+      have no live caller (a commented-out menu item, unrendered components), but the partner's
+      `stores/menu/index.ts` still calls them. Prod had 0 `images` docs across all 262 store DBs
+      on 2026-10-30.
       One partner token is one store (`switch-store` re-mints it; the master-login token is
       minted onto that store's doc), so another store's `app-name` is a 403. The handlers keep
       reading `app-name`, which the gate has just proven to be the token's store.
     - **Never put a role-only gate on an own-store route.** Partner tokens carry no `roles`, and
       the 403 is silent in the app. Grep shoofi-partner (`stores/menu/index.ts`) before moving a
       route between the two lists.
-    - A new route in `routes/product.js` must take one of the two.
-      `test/integration/product-admin-auth.js` fails for any route there without `auth.required`.
-      The exceptions are its `KNOWN_UNGATED`: `POST /api/admin/images/upload` and
-      `POST /api/images`, which are still open and outside this change.
+    - A new route in `routes/product.js` must take one of the two. Every route there is gated;
+      `test/integration/product-admin-auth.js` fails for a route without `auth.required` first, or
+      one missing from its `IN_SCOPE` list (the two bulk-price routes keep their own
+      `BULK_PRICE_ROLES` and are listed apart).
     - The gate changes nothing about the menu cache. Each route clears exactly the keys it
       cleared before. Six still clear only the regular key, not `_schoolProject`, which breaks
       invariant 2 and predates the gate: `update/activeTastes`, `update/order`,
