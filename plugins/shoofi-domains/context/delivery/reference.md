@@ -354,7 +354,11 @@ AsyncStorage offline-retry queue. **Availability/active**: `delivery/driver/avai
 company (`profile.role === 'admin'`, `screens/delivery-driver/index.tsx`) gets `isAdmin`
 passed into `OrderCard`, which renders the assigned-driver row + `DriverReassignModal` →
 `POST delivery/admin/:adminId/order/:orderId/reassign`. This is the **only** mobile surface
-that picks a driver. Twin pairs collapse into `TwinOrderCard` (`groupTwinPairs`, unless
+that picks a driver. The same admin manages its own fleet in `screens/delivery-driver/manage-drivers.tsx`
+(`delivery/admin/:adminId/{drivers, driver/add, driver/update/:driverId, driver/:driverId}`), and
+`payments.tsx` reads `delivery/admin/:adminId/drivers` for its driver picker. All five send
+`adminId = userDetails.customerId`, which is the token's own id. The server requires exactly that
+(`companyAdminSelf`, CORE invariant 19): another id in the URL is a 403. Twin pairs collapse into `TwinOrderCard` (`groupTwinPairs`, unless
 `twinAssignmentMode === 'split'`), so anything admin-only must be wired into BOTH cards or
 it silently does not exist for twins.
 **Delivery-only:** `components/delivery-driver/OrderCard.tsx` renders a `طلب يدوي` badge on its
@@ -366,7 +370,15 @@ no order.
 
 ### C2. shoofi-delivery-web — ADMIN (delivery control + area config)
 `app-type: shoofi-admin`. **Management**: `apis/admin/delivery/*` → `delivery/admin/{assign,
-reassign,cancel,drivers,orders,alerts}`; boards `DeliveryMonitor`, `DeliveryListAnalytics`,
+reassign,cancel,drivers,orders,alerts}` (plus `driver-shifts/*` reading `delivery/admin/drivers`, and
+the area tools in `apis/admin/delivery/driver-availability-monitor.ts` →
+`delivery/admin/{driver-availability-monitor[/mock-test], city/quick-add, area/quick-add,
+city/:cityId/companies-preview, stores/sync-supported-cities/{preview,apply},
+cityarea/:id/missing-connections, areas/bulk-create}` and `store-availability-alerts[/run]`).
+It is the only caller of those 18 routes, and the server takes any `DASHBOARD_ROLES` token on them
+(`deliveryDashboardAdmin`, CORE invariant 19). The web never calls the `/:adminId/` company-admin routes.
+`POST delivery/admin/order/cancel` has **no client at all** on main (only the root script
+`test-delivery-status-notifications.js`); the web cancels through `delivery/admin/cancel`; boards `DeliveryMonitor`, `DeliveryListAnalytics`,
 `OpsDashboard`. **Live driver map**: `GET delivery/drivers/locations` + WS
 (`views/admin/driver-locations/DriverLocationsMap.tsx`); its pins and the restaurant↔customer
 colour pairing (`getOrderColor(bookId)`, a hash into a fixed 15-slot palette) live in
