@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -10,7 +10,7 @@ reference: ./reference.md   # data model, endpoint tables, flows, options/extras
 Products, categories, menu assembly, options/extras, availability & stock, catalog i18n.
 
 ## Scope
-Server: `routes/menu.js`, `routes/product.js`, `routes/category.js`, the catalog slice of
+Server: `routes/menu.js`, `routes/product.js` (and its gate `services/catalog/product-access.js`), `routes/category.js`, the catalog slice of
 `routes/store.js`, `routes/translations.js`, `services/translations/owned-translations.js` (rows
 written by code — invariant 24), `routes/global-search.js`, `utils/menu-cache.js`,
 `utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`,
@@ -738,6 +738,33 @@ boundary and say so in the PR.
     - **The app card** (`screens/stores/components/item.tsx`) shows "جديد"/"חדש"
       (`store-new-tag` + `defaultValue`, `StoreBadge` variant `new`). At most two badges, in the
       order offer, new, status. When all three apply, "new" is dropped.
+
+26. **EVERY PRODUCT ROUTE CARRIES ITS GATE ON THE ROUTE; A PARTNER WRITES ONLY ITS OWN STORE**
+    (`services/catalog/product-access.js`, reference §7 / §8). Until 2026-10-30, 21 routes in
+    `routes/product.js` had no auth. Given only a store's `app-name`, anyone could insert, edit,
+    hide, re-stock, re-order or delete that store's products.
+    - **`PRODUCT_ADMIN`** is `auth.required` + `checkAdminRole(DASHBOARD_ROLES)` (from
+      `utils/analytics-access.js`), so any dashboard role, `viewer` and `accountant` included.
+      It is for the routes only the admin web calls. Prod's audit log has product adds, updates
+      and deletes by viewer-only accounts, so a narrower list locks out real menu editors.
+    - **`PRODUCT_ADMIN_OR_OWN_STORE`** is a dashboard role, OR `app-type: shoofi-partner` whose
+      token's `shoofi.storeUsers` doc has `appName === req.headers['app-name']`. It is for the
+      routes the partner app calls: `insert`, `update`, `delete`,
+      `update/{isInStore,isInStore/byCategory,quantity,isHidden,activeTastes,order}`, `GET extras`.
+      One partner token is one store (`switch-store` re-mints it; the master-login token is
+      minted onto that store's doc), so another store's `app-name` is a 403. The handlers keep
+      reading `app-name`, which the gate has just proven to be the token's store.
+    - **Never put a role-only gate on an own-store route.** Partner tokens carry no `roles`, and
+      the 403 is silent in the app. Grep shoofi-partner (`stores/menu/index.ts`) before moving a
+      route between the two lists.
+    - A new route in `routes/product.js` must take one of the two.
+      `test/integration/product-admin-auth.js` fails for any route there without `auth.required`.
+      The exceptions are its `KNOWN_UNGATED`: `POST /api/admin/images/upload` and
+      `POST /api/images`, which are still open and outside this change.
+    - The gate changes nothing about the menu cache. Each route clears exactly the keys it
+      cleared before. Six still clear only the regular key, not `_schoolProject`, which breaks
+      invariant 2 and predates the gate: `update/activeTastes`, `update/order`,
+      `update/order-per-category`, `bulk-reorder`, `reset-order/:categoryId`, `migrate-orders`.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
