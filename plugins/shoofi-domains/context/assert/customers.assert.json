@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -197,7 +197,7 @@
         {
           "file": "services/customer-campaigns/marketing-push-policy.js",
           "regex": "\\{ createdAt: \\{ \\$gte: since \\}, \"data\\.campaignId\": \\{ \\$exists: true \\} \\}",
-          "desc": "CORE invariant 12: only campaign records (data.campaignId) count toward the cap - transactional pushes never do; one window scan, notifications has only the _id index in prod"
+          "desc": "CORE invariant 12: only campaign records (data.campaignId) count toward the cap - transactional pushes never do; one window pass, and the $exists predicate is what lets the partial campaign_createdAt_partial index serve it"
         },
         {
           "file": "services/customer-campaigns/marketing-push-policy.js",
@@ -224,6 +224,11 @@
           "regex": "const adminOnly = \\[auth\\.required, checkAdminRole\\(CAMPAIGN_ROLES\\)\\]",
           "desc": "CORE invariant 10: auth.required alone passes a customer token \u2014 checkAdminRole is the half that keeps one out"
         },
+        {"file": "utils/analytics-access.js", "regex": "const ANALYTICS_ROLES = \\[\"master\", \"admin\"\\];", "desc": "reference C4: the admin analytics screens are master/admin only"},
+        {"file": "utils/analytics-access.js", "regex": "const adminAnalytics = \\[auth\\.required, checkAdminRole\\(ANALYTICS_ROLES\\)\\];", "desc": "reference C4: /api/analytics/* needs an admin token AND a role (auth.required alone passes a customer token)"},
+        {"file": "routes/analytics.js", "regex": "router\\.post\\(\"/api/analytics/deliveries\", \\.\\.\\.dashboardAnalytics,", "desc": "reference C4: the live-ops / support board takes every dashboard role, viewer included"},
+        {"file": "routes/growth-analytics.js", "regex": "router\\.post\\(\"/api/analytics/growth/run-weekly-brief\", \\.\\.\\.adminAnalytics,", "desc": "reference C4: the paid AI weekly brief is admin-only (it was callable with no token)"},
+        {"file": "services/customer-campaigns/marketing-push-policy.js", "regex": "partialFilterExpression: \\{ \"data\\.campaignId\": \\{ \\$exists: true \\} \\},", "desc": "reference 5b: the cap's count is served by a partial createdAt index over campaign records"},
         {
           "file": "routes/ai-helper.js",
           "regex": "people: body\\.people,\\n\\s+family: body\\.family",

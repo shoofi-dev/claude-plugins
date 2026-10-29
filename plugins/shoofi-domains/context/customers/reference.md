@@ -289,11 +289,16 @@ re-executed. That is an observation, not a reviewed verdict, so ask before actin
 
 **The cap's count.** `countRecentMarketingPushes` makes ONE streamed scan:
 `{createdAt >= cutoff, "data.campaignId": {$exists: true}}` with projection `recipientId`,
-counted in memory against the audience set. `shoofi.notifications` has **only the `_id` index
-in prod** (2026-10-28). The indexes in shoofi-server
+counted in memory against the audience set. It is served by a **partial index**,
+`campaign_createdAt_partial` = `{createdAt: 1}` over `{"data.campaignId": {$exists: true}}`
+(`CAMPAIGN_CREATED_AT_INDEX`), built in the background once per process by
+`ensureNotificationIndexOnce` and never awaited, so the first run after a deploy may still scan.
+Keep the `$exists` predicate in the query, or the planner can't use a partial index. Before
+2026-10-29 `shoofi.notifications` had **only the `_id` index in prod** (5.3M rows), and every
+campaign run read all of it. The other indexes in shoofi-server
 `utils/migrations/create-notifications-collection.js` were never applied, so a per-customer
-query would be a collection scan per customer. Prod volume: ~2.65M campaign records all-time,
-~67k in a week. A failed count fails the campaign (`status: 'failed'`), so it never sends
+query (`recipientId`, e.g. `/api/notifications/stats`) is still a collection scan per call.
+Prod volume: ~2.65M campaign records all-time, ~67k in a week. A failed count fails the campaign (`status: 'failed'`), so it never sends
 uncapped.
 
 **What counts as marketing.** Only `customer-campaigns` sends. The admin's raw
@@ -470,6 +475,20 @@ change. Token in `localStorage['@storage_userToken']` + `adminUser`, sent as
 **refresh-token flow** in the interceptor (guarded against loops) → retry, else logout+redirect.
 Roles/permissions: `contexts/AdminAuthContext`, `ProtectedRoute`, `RoleBasedAccess`,
 `RestrictedRoleGuard` (e.g. `accountant` limited to invoice screens).
+**`/api/analytics/*` is admin-token only** (shoofi-server `utils/analytics-access.js`,
+2026-10-29). Before that, all 43 routes in `routes/analytics.js`, `growth-analytics.js` and
+`weekly-status.js` answered with no token. That included revenue, coupons, customer
+locations, order details, a snapshot backfill and the paid AI weekly brief.
+- Every route carries `...adminAnalytics` = `["master", "admin"]`, matching the sidebar's
+  `["admin"]` on those screens.
+- `GET /api/analytics/order/:orderId` and `POST /api/analytics/deliveries` carry
+  `...dashboardAnalytics`, i.e. every dashboard role, viewer included. Live-ops, the ops
+  dashboard and the order modal read them, and prod has viewer-only staff.
+- No mobile app calls any of them. A new analytics route needs one of the two gates;
+  `test/integration/analytics-routes-auth.js` fails on a route without one.
+- `weekly-status/marketing-spend` was deleted. It read an unregistered
+  `weeklyKpiManualInputs` handle and 400'd on every call. CAC is the `acquisition-spend`
+  ledger (unit economics).
 Push campaigns (§5b): `views/admin/customer-campaigns/` has the list with the
 `PushCapSettings` panel, skip counts, the scheduled time and cancel-schedule. The form sends
 the schedule as an Israel wall-clock string and shows stored instants through
