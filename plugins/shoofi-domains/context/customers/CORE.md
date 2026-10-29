@@ -269,7 +269,7 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
        earlier. `noiseBand = max(2·sd, 2·√mean)`. `verdict` is up/down only past it, and
        `too_small` under 200 recipients or a usual of < 5 orders.
        - Recipients are the audience's `treated` rows, else `shoofi.notifications` by
-         `data.campaignId`. That collection has only `_id` in prod (5.3M rows), so the query
+         `data.campaignId`. That collection has no index on `data.campaignId` in prod (5.3M rows), so the query
          MUST be bounded by an `_id` time range around the run.
        - It cannot tell the push from the day or an overlapping push (`overlaps` names them).
          With a holdout, the holdout lift is the causal number.
