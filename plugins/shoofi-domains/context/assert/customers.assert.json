@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -40,7 +40,8 @@
         "services/marketing/viewer-key.js",
         "services/marketing/daily-stats.js",
         "services/marketing/performance.js",
-        "routes/marketing-performance.js"
+        "routes/marketing-performance.js",
+        "services/marketing/campaign-impact.js"
       ],
       "symbols": {
         "services/customer-campaigns/marketing-push-policy.js": [
@@ -60,7 +61,8 @@
         "utils/marketing-link.js": ["LINK_TYPES", "LINK_PAGES", "linkFromRequest", "resolveLink", "legacyAdFields", "legacyLink", "withLink"],
         "routes/marketing-events.js": ["sanitizeEvent", "ensureIndexesInBackground", "marketingEvents", "MAX_BATCH"],
         "services/marketing/viewer-key.js": ["deviceViewerKey"],
-        "services/marketing/performance.js": ["getPerformance", "holdoutLift", "listOrderFacts", "pushCampaignsFor", "itemNames"],
+        "services/marketing/performance.js": ["getPerformance", "holdoutLift", "listOrderFacts", "pushCampaignsFor", "itemNames", "listCampaignImpact"],
+        "services/marketing/campaign-impact.js": ["marketingCampaignImpact", "computeCampaignImpact", "computeDueImpacts", "recipientsOf", "impactsFor", "judge", "METHOD_VERSION"],
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
         "utils/auth-service.js": ["generateJWT", "toAuthJSON"],
         "utils/app-name-helper.js": ["getCustomerAppName"],
@@ -409,7 +411,12 @@
         {"file": "routes/marketing-events.js", "regex": "\\.\\.\\.\\(impersonated \\? \\{ impersonated: true \\} : \\{\\}\\),", "desc": "CORE invariant 11: events from an imp token are stored flagged, and the touch lookup / rollup skip them"},
         {"file": "services/database/DatabaseInitializationService.js", "regex": "db\\.marketingEvents = db\\.collection\\('marketingEvents'\\);", "desc": "CORE invariant 11: the events handle is registered - without it every event write fails silently (accepted: 0)"},
         {"file": "routes/marketing-events.js", "regex": "viewerKey: customerId \\|\\| deviceViewerKey\\(deviceId\\),", "desc": "CORE invariant 11: guests are keyed by the SAME helper the order facts look them up with"},
-        {"file": "services/marketing/viewer-key.js", "regex": "const ID_MAX = 64;", "desc": "CORE invariant 11: device ids are truncated to 64 on both the write and the lookup"}
+        {"file": "services/marketing/viewer-key.js", "regex": "const ID_MAX = 64;", "desc": "CORE invariant 11: device ids are truncated to 64 on both the write and the lookup"},
+        {"file": "services/marketing/campaign-impact.js", "regex": "_id: \\{ \\$gte: oidAt\\(start - NOTIFICATION_PAD_MS\\), \\$lt: oidAt\\(end \\+ NOTIFICATION_PAD_MS\\) \\},", "desc": "CORE invariant 11: the notifications recipient lookup is bounded by an _id time range (that collection has only _id in prod)"},
+        {"file": "services/marketing/campaign-impact.js", "regex": "const noiseBand = Math\\.max\\(2 \\* sd, 2 \\* Math\\.sqrt\\(mean\\)\\);", "desc": "CORE invariant 11: campaign impact noise band = max(2 sd of the four baseline weeks, 2 sqrt(mean))"},
+        {"file": "services/marketing/campaign-impact.js", "regex": "if \\(afterRead\\.unavailable\\.length\\) return \\{ skipped: \"stores_unavailable\"", "desc": "CORE invariant 11: an unreadable store DB means nothing is written; the next run retries"},
+        {"file": "routes/marketing-performance.js", "regex": "\"/api/admin/marketing/campaign-impact\",\\n  auth\\.required,\\n  checkAdminRole\\(RESULTS_ROLES\\),", "desc": "CORE invariant 11: campaign impact is served behind the dashboard roles, never on the open /api/analytics/growth routes"},
+        {"file": "services/database/DatabaseInitializationService.js", "regex": "db\\.marketingCampaignImpact = db\\.collection\\('marketingCampaignImpact'\\);", "desc": "CORE invariant 11: the campaign impact handle is registered"}
       ]
     },
     "shoofi-app": {
