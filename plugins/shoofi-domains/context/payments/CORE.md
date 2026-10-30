@@ -129,6 +129,12 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
      viewer, accountant and the other dashboard roles get 403. They never worked before, so
      the narrower list took nothing away from anyone.
    - The webhook also keeps its body `INVOICE_WEBHOOK_SECRET` check. No provider calls it.
+   - **Only a numeric docId may reach the Gmail fetch** (`isFetchableInvoiceDocId`):
+     retry and webhook answer 400 otherwise, and process-all skips (`skippedNonNumericDocId`).
+     HYP orders under manual invoicing carry `docId: "EZ"` (2,894 stuck at `pending` in prod,
+     2026-08-10..09-22). Their documents are in `invoices[]`, not Gmail. A fetch for `"EZ"`
+     would search `subject:EZ`, publish an arbitrary customer's mail at the public key
+     `invoices/doc-EZ.pdf` and mark one arbitrary order completed.
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.

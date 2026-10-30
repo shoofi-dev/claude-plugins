@@ -114,6 +114,11 @@
         },
         {
           "file": "routes/admin.js",
+          "regex": "const isFetchableInvoiceDocId = \\(docId\\) => /\\^\\\\d\\+\\$/\\.test",
+          "desc": "CORE invariant 11: only a numeric docId may reach the Gmail fetch (HYP manual-invoice orders carry docId \"EZ\")"
+        },
+        {
+          "file": "routes/admin.js",
           "regex": "secret !== process\\.env\\.INVOICE_WEBHOOK_SECRET",
           "desc": "reference §5: the webhook still checks its body secret behind the admin guard"
         },
