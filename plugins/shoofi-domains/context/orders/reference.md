@@ -461,8 +461,51 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   the partner caps the **second store's** prep window (`TWIN_SECONDARY_EARLY_MAX_MIN=10`).
   No twin endpoint is called — twin timing is server-computed.
 - **Realtime**: WS `?appType=shoofi-partner`; handles `order_status_updated`,
-  `unviewed_orders_updated`, `future_order_*`, `print_*` (NOT `menu_refresh`). Printing =
-  a `PRINT_NOT_PRINTED` event → batched invoice-image capture/print loop (`App.tsx`).
+  `unviewed_orders_updated`, `future_order_*` (NOT `menu_refresh`). The `print_order` /
+  `print_not_printed` frames still arrive (the server sends `print_not_printed` when
+  `/api/order/printed` sets `status:false`), but their `App.tsx` handlers are commented out.
+  **Nothing prints from a websocket frame.**
+- **Auto-print** (CORE invariant 17). Printing is a `PRINT_NOT_PRINTED` DeviceEventEmitter
+  event → `printNotPrinted` → `forLoop` in `App.tsx`. A tablet prints only if its store user
+  has the `all` AND `print` roles (`userDetailsStore.isAdmin` is a literal `indexOf`, so
+  `roles:["all"]` alone never prints). Every such tablet prints on its own.
+  - **Triggers**: accept (`screens/admin/order/new-orders/list`, the explicit approved
+    order, gated on the approve promise); the row's print button
+    (`screens/admin/order/list`: explicit order, then a bookkeeping
+    `updateOrderPrinted(id, false)`); school-orders screens. An explicit order skips the
+    fetch, the debounce and every filter.
+  - **The sweep**: after a batch with no failure, and on a non-explicit trigger, the tablet
+    posts `admin/orders` with `isNotPrinted:true`, `ordersDate: moment().format()`,
+    `statusList: autoPrintSweepStatuses()` = `1,2,3,6` (+ forced `14`/`15`). It drops orders
+    over the attempt cap and queues 3 at a time. `utils/print-batch.ts` stops a repeat
+    within one sweep (10 re-entries, same-batch detection). `utils/print-attempts.ts` stops
+    it across sweeps (`MAX_AUTO_PRINT_ATTEMPTS = 2` per order per app session; counted when
+    the print fails, the capture fails or the mark call fails; cleared on a successful mark).
+    **Server side**: without `ordersDate`, `admin/orders` applies no date window at all, and
+    `isNotPrinted` only adds `isPrinted:false` (`isViewd:true` is always required). Before
+    2026-10-29 the sweep sent no date and statuses `1,2,3,4,5,6,10,11,12`, so one unmarkable
+    order came back on every sweep on every day.
+  - **Business day**: the server picks the window with `getBusinessDayBoundaries` from
+    wall-clock now. For "today" that is the current business day, including the overnight
+    tail. One known gap: on a store with normal (non-overnight) hours, an order whose
+    `orderDate` falls after midnight but before the next opening is outside the sweep. Its
+    accept-time explicit print is unaffected.
+  - **Driver result** (`helpers/printer/index.ts` `printImagesWithOutcome`): `"printed" |
+    "unconfirmed" | "failed"` (`utils/print-outcome.ts`). Only Epson can be `"unconfirmed"`:
+    `sendData`'s `CODE_ERR_TIMEOUT`, message `"Print timeout occurred."`, which comes after
+    the data reached the printer. `printCopyWithRetry` retries only `"failed"` (2 attempts per
+    copy); `outcomeCountsAsPrinted` marks `"printed"` and `"unconfirmed"`. The native
+    timeout is `sendDataTimeoutMs`: 10s + 6ms per printed dot-line at 510 dots wide, clamped
+    to 30–60s, and the ceiling when the PNG size is unreadable. The JS ceiling is that + 15s.
+    `testPrint` (boolean) is kept as `!== "failed"`. Urovo/Sunmi map their boolean to
+    printed/failed.
+  - **Capture**: `getInvoiceSP` returns one slot per queued order (or distribution group),
+    `null` where capture failed (`utils/print-queue.ts` `captureAlignedToQueue`). The loop
+    pairs `orderInvoicesPS[i]` with `queue[i]` and never prints or marks a `null` slot.
+  - **Diagnosing a loop**: `<store>.client-error` rows with `error.source:
+    "printer-testPrint"` (and `error.outcome` since 2026-10-29). `customerId` there is the
+    `shoofi.store-users` `_id` of the tablet's user. Then the store's
+    `isPrinted:false, isViewd:true` orders, which are exactly what the sweep can return.
 - **The loud new-order alarm has ONE source, and an id ledger decides whether it rings.**
   `schedulePushNotification` (`utils/notification/index.ts`, `sound: 'store.wav'`) *is* the
   alarm, and its only live callers are the two in `hooks/use-notifications.ts` — the 30s poll

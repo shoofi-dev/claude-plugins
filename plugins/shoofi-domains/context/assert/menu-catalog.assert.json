@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -25,6 +25,8 @@
         "scripts/fix-empty-extra-option-ids.js",
         "docs/sold-by-weight.md",
         "services/catalog/import-index.js",
+        "services/catalog/product-access.js",
+        "test/integration/product-admin-auth.js",
         "utils/order-pricing.js",
         "routes/admin/menu-import-issues.js",
         "docs/menu-import-issues.md",
@@ -107,7 +109,14 @@
           "menuCache",
           "normalizeWeightExtraPrice",
           "soldByWeight",
-          "supportedCategoryIds"
+          "supportedCategoryIds",
+          "PRODUCT_ADMIN_OR_OWN_STORE"
+        ],
+        "services/catalog/product-access.js": [
+          "PRODUCT_ADMIN",
+          "PRODUCT_ADMIN_OR_OWN_STORE",
+          "ownStoreGate",
+          "DASHBOARD_ROLES"
         ],
         "routes/menu.js": [
           "outOfStockExtras",
@@ -366,6 +375,96 @@
         ]
       },
       "patterns": [
+        {
+          "file": "services/catalog/product-access.js",
+          "regex": "const PRODUCT_ADMIN = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",
+          "desc": "doc CORE invariant 26: dashboard-only product routes take any dashboard role (viewer and accountant included)"
+        },
+        {
+          "file": "services/catalog/product-access.js",
+          "regex": "const PRODUCT_ADMIN_OR_OWN_STORE = \\[auth\\.required, ownStoreGate\\];",
+          "desc": "doc CORE invariant 26: the partner-callable product routes run auth.required, then the own-store gate"
+        },
+        {
+          "file": "services/catalog/product-access.js",
+          "regex": "if \\(hasAnyRole\\(req\\.auth, DASHBOARD_ROLES\\)\\) \\{",
+          "desc": "doc CORE invariant 26: any dashboard role passes the own-store gate for any store"
+        },
+        {
+          "file": "services/catalog/product-access.js",
+          "regex": "if \\(req\\.headers\\[\"app-type\"\\] !== PARTNER_APP_TYPE \\|\\| !req\\.auth \\|\\| !req\\.auth\\.id\\) return null;[\\s\\S]{0,200}storeUsers\\.findOne\\(\\{ _id: getId\\(req\\.auth\\.id\\) \\}\\)",
+          "desc": "doc CORE invariant 26 / reference §8: a partner's store is its token's storeUsers doc, never the body"
+        },
+        {
+          "file": "services/catalog/product-access.js",
+          "regex": "if \\(ownAppName && req\\.headers\\[\"app-name\"\\] === ownAppName\\) \\{",
+          "desc": "doc CORE invariant 26: a partner passes only when app-name IS its own store"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "\"/api/admin/product/insert\",\\n  \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,\\n  upload\\.array",
+          "desc": "doc CORE invariant 26 / reference §7: insert is admin|own store, gated before multer"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "\"/api/admin/product/update\",\\n  \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,\\n  upload\\.array",
+          "desc": "doc CORE invariant 26 / reference §7: update is admin|own store, gated before multer"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/admin/product/delete\", \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,",
+          "desc": "doc CORE invariant 26 / reference §7: delete is admin|own store"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/admin/product/update/isInStore\", \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,",
+          "desc": "doc CORE invariant 26 / reference §8: the partner's stock toggle is admin|own store"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/admin/product/update/quantity\", \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,",
+          "desc": "doc CORE invariant 26 / reference §8: the partner's quantity edit is admin|own store"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/admin/product/update/order\", \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,",
+          "desc": "doc CORE invariant 26 / reference §7: the partner's products-order screen keeps update/order"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.get\\(\"/api/admin/product/:id\", \\.\\.\\.PRODUCT_ADMIN,",
+          "desc": "doc CORE invariant 26 / reference §7: GET product by id is admin-only"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/admin/product/migrate-orders\", \\.\\.\\.PRODUCT_ADMIN,",
+          "desc": "doc CORE invariant 26 / reference §7: the ordering migrations are admin-only"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/product/create-from-mock\", \\.\\.\\.PRODUCT_ADMIN,",
+          "desc": "doc CORE invariant 26 / reference §7: cloning a template product is admin-only"
+        },
+        {
+          "file": "test/integration/product-admin-auth.js",
+          "regex": "\\[\"post\", \"/api/admin/images/upload\", OWN\\],\\n  \\[\"post\", \"/api/images\", OWN\\],",
+          "desc": "doc CORE invariant 26 / reference §7: the two image routes are admin|own store in the test matrix"
+        },
+        {
+          "file": "test/integration/product-admin-auth.js",
+          "regex": "filter\\(\\(r\\) => r\\.handles\\[0\\] !== auth\\.required\\)",
+          "desc": "doc CORE invariant 26: every route in routes/product.js runs auth.required first, no exception list"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "\"/api/admin/images/upload\",\\n  \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,\\n  upload\\.array",
+          "desc": "doc CORE invariant 26 / reference §7: image upload is admin|own store, gated before multer"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/images\", \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,",
+          "desc": "doc CORE invariant 26 / reference §7: the image list is admin|own store"
+        },
         {
           "file": "routes/shoofi-admin.js",
           "regex": "activePromotion = await storeCardPromotion\\(storeDb\\)",
