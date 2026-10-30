@@ -377,6 +377,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       customer, every storeUser (394) and 0 drivers carry `isAdmin`. The handler stores only
       `{phone, created}`. Never let it copy more of the body: the body must not be able to give
       an account a role or a flag.
+      It also refuses a non-string `phone` (400) and looks the existing customer up by the
+      sanitized value: an object such as `{"$ne": null}` used to answer with an arbitrary
+      customer's phone, name and id, and every partner token passes this gate.
     - `DASHBOARD_ADMIN` on `/api/admin/teacher/*` (no caller, no `teachers` data in prod).
     - **Open on purpose:** `GET /api/admin/school-settings` (the customer cart; the values are
       already public on `GET /api/store/get/shoofi`) and `GET /api/admin/check-order-time-valid`.
