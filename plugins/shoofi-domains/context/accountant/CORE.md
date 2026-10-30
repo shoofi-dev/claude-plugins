@@ -586,8 +586,8 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 - **Awareness — a report PDF on Spaces is published, not protected.** All **8**
   `PutObjectCommand` call sites in this repo pass `ACL: "public-read"`, with no exception:
   `routes/payments/admin-reports.js:239` (store settlement), `routes/driver-reports.js:687`
-  (courier settlement), `utils/invoice-mail.js:155` (the customer invoice PDF),
-  `backfill-invoices.js:205` (the bulk variant — one run republishes every historical
+  (courier settlement), `utils/invoice-mail.js:123` (the customer invoice PDF),
+  `backfill-invoices.js:193` (the bulk variant — one run republishes every historical
   invoice), `utils/images-service.js:36`, `utils/image-variants.js:127`,
   `routes/product.js:113` and `services/social-posts/render-service.js:204`. Counting by
   grep overshoots: `routes/payments.js:14`, `routes/payments/admin.js:14` and
@@ -611,7 +611,7 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
   inserted in a single loop in a single process, so they share those bytes and differ only
   by a consecutive counter: **one leaked report id exposes that whole batch's ids by
   arithmetic** — i.e. every store's settlement for that month. Worst case in the repo is not
-  the report key at all but `utils/invoice-mail.js:153`, `invoices/doc-<providerDocId>.pdf`,
+  the report key at all but `utils/invoice-mail.js:121`, `invoices/doc-<providerDocId>.pdf`,
   where the id is a short sequential provider number.
 - **Awareness — you cannot un-send those links, so design around them.** This is a
   **property, not a bug to fix opportunistically**: `pdfUrl` is stored on the report doc
