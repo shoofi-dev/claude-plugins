@@ -581,6 +581,16 @@
           "desc": "CORE invariant 16: the admin-only compensation routes name master explicitly (checkAdminRole has no hierarchy)"
         },
         {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "router\\.post\\(\"/api/payments/admin/reports/generate\", auth\\.required, async",
+          "desc": "CORE invariant 16: reports/generate has no role gate of its own, so COMPENSATION_ADMIN_ROLES is what decides who can generate a store report"
+        },
+        {
+          "file": "utils/analytics-access.js",
+          "regex": "const DASHBOARD_ROLES = \\[\"master\", \"admin\", \"manager\", \"senior\", \"operator\", \"viewer\", \"editor\", \"accountant\"\\];",
+          "desc": "CORE invariant 16: accountant is a dashboard role, so it reaches reports/generate and then fails on the admin-only compensation self-call"
+        },
+        {
           "file": "services/compensations/access.js",
           "regex": "const ORDER_CARD_ROLES = \\[\"master\", \"admin\", \"manager\", \"senior\", \"operator\", \"viewer\", \"editor\"\\];",
           "desc": "CORE invariant 16: the order card's compensation calls keep every dashboard role incl. viewer (support files compensations from order cards)"
