@@ -348,7 +348,13 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
 (background, requires "always" permission), both POST `delivery/driver/location`, with an
 AsyncStorage offline-retry queue. **Availability/active**: `delivery/driver/availability`
 + `.../update-active-status`. **Shifts**: `services/driverShiftService.ts` → `/driver-shift-manager/*`.
-**Assignment**: arrives via push/WS (not polling); lifecycle actions POST `delivery/driver/order/*`.
+**Assignment**: arrives via push/WS (not polling); lifecycle actions POST `delivery/driver/order/*`
+(`approve`/`waiting-in-store`/`start`/`complete`/`cancel`, from `screens/delivery-driver/index.tsx`
+and `notifications.tsx`) with `driverId = userDetails.customerId`. The server takes the driver from
+the token: a different body `driverId` is a 403, and a delivery not assigned to it is a 404 (CORE
+invariant 19). The order list is `POST delivery/list {customerId}` (own id; a company admin of an
+`isControlledByAdmin` company gets its company's rows). Order details are `GET delivery/order/:id`,
+for the driver's own deliveries and, for a company admin, its company's.
 `DELIVERY_STATUS` copy = `1..4` (`consts/shared.ts`). Key: `stores/delivery-driver/index.ts`,
 `screens/delivery-driver/*`, `hooks/{useDriverLocationTracking,use-websocket}.ts`.
 **Company-admin dispatch lives HERE, not in partner:** an admin of an `isControlledByAdmin`
@@ -381,6 +387,10 @@ city/:cityId/companies-preview, stores/sync-supported-cities/{preview,apply},
 cityarea/:id/missing-connections, areas/bulk-create}` and `store-availability-alerts[/run]`).
 It is the only caller of those 18 routes, and the server takes any `DASHBOARD_ROLES` token on them
 (`deliveryDashboardAdmin`, CORE invariant 19). The web never calls the `/:adminId/` company-admin routes.
+The legacy pages `/delivery-list`, `/delivery-order`, `/add-customer` and `/employe-payments` (unprotected
+routes in `src/index.tsx`) are the only callers of `delivery/{update, book, create-customer,
+employe-list, employe-payments}`, now dashboard-token only. `views/admin/driver-routes` posts
+`delivery/list` for any driver, and the order card reads `delivery/order/:id`.
 `POST delivery/admin/order/cancel` has **no client at all** on main (only the root script
 `test-delivery-status-notifications.js`); the web cancels through `delivery/admin/cancel`; boards `DeliveryMonitor`, `DeliveryListAnalytics`,
 `OpsDashboard`. **Live driver map**: `GET delivery/drivers/locations` + WS

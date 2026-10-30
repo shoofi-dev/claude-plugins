@@ -37,7 +37,8 @@
         "docs/delivery-only-bookings.md",
         "services/delivery/manual-assignment-ranking.js",
         "lib/delivery/helpers.js",
-        "services/delivery/admin-access.js"
+        "services/delivery/admin-access.js",
+        "services/delivery/response-redaction.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -567,6 +568,76 @@
           "file": "lib/delivery/helpers.js",
           "regex": "const \\{ hyp, accounting, credentials, \\.\\.\\.safeCompany \\} = company;",
           "desc": "redactDeliveryCredentials strips the company's HYP keys, bank account and credentials, on company and on driver.company (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "String\\(claimed\\) !== String\\(tokenId\\)[\\s\\S]{0,260}req\\.body\\[field\\] = String\\(tokenId\\)",
+          "desc": "the driver loop refuses a body driverId that is not the token's, then OVERWRITES it with the token id, so each handler's driver._id = driverId filter is the ownership check (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "const driverSelfAction = \\[auth\\.required, driverSelfInBody\\(\"driverId\"\\)\\]",
+          "desc": "the five lifecycle actions take a shoofir token only, no dashboard bypass (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "const driverListAccess = \\[auth\\.required, driverSelfInBody\\(\"customerId\", \\{ dashboard: true \\}\\)\\]",
+          "desc": "delivery/list: a dashboard role lists any driver, a driver only its own customerId (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "router\\.post\\(\"/api/delivery/driver/order/approve\", \\.\\.\\.driverSelfAction, async",
+          "desc": "approve takes the driver from the token (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "router\\.post\\(\"/api/delivery/driver/order/complete\", \\.\\.\\.driverSelfAction, async",
+          "desc": "complete takes the driver from the token (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "if \\(!completeResult \\|\\| completeResult\\.matchedCount === 0\\) \\{\\s*return res\\.status\\(404\\)",
+          "desc": "a complete that matched no delivery of this driver stops before the flow event and the customer push (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "router\\.post\\(\"/api/delivery/list\", \\.\\.\\.driverListAccess, async",
+          "desc": "the driver's order list is gated (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "const appName = req\\.deliveryScope \\? req\\.deliveryScope\\.appName : req\\.headers\\[\"app-name\"\\]",
+          "desc": "a store token books for its OWN store, whatever app-name says (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*router\\.(?:get|post|delete|put|patch)\\(\"[^\"]*\", async)",
+          "desc": "NO route in routes/delivery/orders.js goes straight to its handler without a gate (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "router\\.get\\(\"/api/delivery/order/:id\", \\.\\.\\.deliveryOwnerOrDashboard, async",
+          "desc": "GET order/:id is gated per owner (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "res\\.status\\(200\\)\\.json\\(redactDeliveryCredentials\\(attachAssignmentProvenance\\(order\\)\\)\\)",
+          "desc": "GET order/:id never hands out the driver's session token or the company's HYP key (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery.js",
+          "regex": "router\\.use\\(\"/api/delivery\", redactDeliveryResponses\\);\\s*\\n\\s*router\\.use\\(require\\(\"\\./delivery/orders\"\\)\\)",
+          "desc": "the response redaction is path-scoped and installed BEFORE every delivery router (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/response-redaction.js",
+          "regex": "const PERSON_SECRET_KEYS = \\[\"token\", \"authCode\", \"notificationToken\"\\]",
+          "desc": "no /api/delivery response carries a person's session token, OTP or push token (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/response-redaction.js",
+          "regex": "key === \"company\" && \\(isPerson \\|\\| isDelivery\\)",
+          "desc": "company secrets are removed only where a company is EMBEDDED in a delivery or a person; a company doc on its own keeps hyp/accounting for the admin web (CORE invariant 19)"
         }
       ]
     },
