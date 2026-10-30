@@ -432,12 +432,23 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       once), and is ignored on a live item. **A push keeps its plan in its own `scheduling`**
       (immediate | scheduled + `scheduledDate`), mirrored to `approval.when`; a scheduled push
       needs a future time on create and on every edit before it is sent.
-    - **One timing for many:** `POST /api/admin/marketing/drafts/plan` `{items: [{channel, id}],
-      publishWhen, publishAt}` (≤ 100) sets one plan on each DRAFT (`setPlan`, atomic on the
-      draft state; a push gets it as `scheduling`, and nothing is armed). A bad time is a 400
-      for all, and nothing is written. Published items are skipped (`NOT_DRAFT`), and results
-      are per item. Approval stays per item (the admin's bulk approve loops it). Audited
-      `set_marketing_drafts_timing`.
+    - **Marketing items** (owner 2026-10-30, "a marketing item and its channels";
+      `services/marketing/items.js`, `routes/marketing-items.js`). `shoofi.marketingItems`
+      `{subject, link, title, plan, createdBy, …}` is one thing being marketed; each channel
+      points at it with `marketingItemId` (no list on the item, no index).
+      - The item's `plan` is the channels' default timing; `approval.ownPlan: true` = the
+        channel overrides it. `PUT /api/admin/marketing/items/:id/plan` moves the following
+        draft/scheduled channels (an armed push only to a future time). A plan from a
+        following channel's form without `ownPlan` IS the item's timing.
+      - A channel created without `marketingItemId` gets a one-channel item
+        (`attachOnCreate`): approval is always per item. Joining after the item's time
+        passed = "now".
+      - `POST …/items/:id/approve` approves every draft channel; if any scheduled time has
+        passed, nothing is approved (409 `PUBLISH_AT_PAST`). A channel added after the item
+        went out waits for its own approval (state `partial`); on the item's timing a passed
+        time then means now (`lateAsNowFor`), an override's is refused.
+      - `/revert` = every published channel (a sent push stays). `DELETE` only with no
+        channels left (`HAS_CHANNELS`). Audited `*_marketing_item*`.
     - **Create = draft**, whoever creates it. A new push is `status: "draft"` even if the form
       said send-now, so nothing is sent on create any more. Editing a published item saves
       directly (as a coupon does after approval). A push `in_progress`/`completed` can't be
