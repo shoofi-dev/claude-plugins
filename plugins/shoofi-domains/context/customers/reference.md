@@ -59,6 +59,20 @@ for **orders** (joined via `order.appName`).
 Nothing else rides on verification. The AI-helper taste-profile merge is a **separate client
 call after `updateUserToken`** (§5a) — `validateAuthCode` does not know it exists.
 
+**`POST /api/customer/admin-create`** inserts `{phone, created}` into `shoofi.customers`
+(via `getCustomerAppName`) and sends no code. For a phone that already exists, it returns that
+customer's id, name, `isAdmin` and `isBlocked`.
+- Callers: the three RN login screens, which call it in place of `customer/create` when
+  `userDetailsStore.isAdmin()` is true. That is the monolith's "store admin orders for a
+  customer" branch. The login screen opens only when `!authStore.isLoggedIn()`, so in practice it
+  fires only from a stale `isAdmin` with no session. The partner's `deleteAccount` leaves that
+  state, and the flow is already stuck there, because no code is sent. The admin web does not
+  call it.
+- Prod on 2026-10-30 had no customer doc in the last year that holds only `{_id, phone,
+  created}`, which is what this route writes.
+- Gate (CORE invariant 14): `ADMIN_CREATE` takes a dashboard role, OR a mobile token whose
+  own record (routed by `app-type`) has `isAdmin`.
+
 ## 3. Admin auth (separate system)
 `utils/admin-auth-service.js` + `routes/shoofi-admin-users.js`: `shoofiAdminUsers` with
 **bcrypt password** (cost 10), `roles[]` (`master|admin|manager|operator|viewer|editor`),
@@ -167,24 +181,45 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
     everywhere else.**
     - Server: the registration routes take `SCHOOL_SECTION_ROLES` = master/admin/manager/viewer;
       the sync-settings **write** takes master/admin/manager only (`SYNC_SETTINGS_WRITE_ROLES`).
-    - The older school routes have **no auth at all** today (known, parked — do not "fix" in
-      passing): `GET/POST /api/admin/schools`, `PUT/DELETE /api/admin/schools/:id`,
-      `GET/POST /api/admin/schools/:schoolId/classes`, `PUT/DELETE …/classes/:classId`,
-      `GET/POST /api/admin/school-settings` (hours **and** the #271 payment-methods deny-list),
-      `POST /api/customer/{school-students, add-student, create-school-project-batch,
-      delete-school-project-customer, delete-all-school-project-students,
-      toggle-school-project-active}`, `POST /api/payments/admin/school-students`; plus the
-      customer-app reads `GET /api/customer/schools`, `POST /api/customer/{school-classes,
-      get-students-by-ids}` and `GET /api/admin/check-order-time-valid`.
-      A viewer therefore already reaches them; nothing gates them by role.
+    - **The older school routes take the same list since 2026-10-30.** Before that they had
+      no auth at all. The guard is `SCHOOL_ADMIN` from shoofi-server
+      `services/customer/admin-access.js`, placed on each route. It covers:
+      - `GET/POST /api/admin/schools`, `PUT/DELETE /api/admin/schools/:id`,
+        `GET/POST /api/admin/schools/:schoolId/classes`, `PUT/DELETE …/classes/:classId`;
+      - `POST /api/admin/school-settings` (hours **and** the #271 payment-methods deny-list);
+      - `GET /api/customer/schools`, `POST /api/customer/{school-classes, school-students,
+        add-student, create-school-project-batch, delete-school-project-customer,
+        delete-all-school-project-students, toggle-school-project-active}`.
+
+      `POST /api/payments/admin/school-students` is gated by shoofi-server#352.
+    - Only the admin web calls those routes. Its interceptor sends `Bearer` + `app-type:
+      shoofi-admin` and overwrites the `shoofi-shopping` that the add-student and upload calls
+      set. `customer/schools` and `customer/school-classes` have had no caller since the admin
+      web moved to `/api/admin/schools` (delivery-web 8221ddf). No customer-app build ever
+      called them.
+    - The list is a copy of the registration router's, because that router opens Redis when
+      required. `test/integration/school-admin-auth.js` fails if the two drift. A token that is
+      only `accountant`, `senior`, `operator` or `editor` is refused. Prod has one
+      accountant-only account, and the sidebar never showed it the section.
+    - **Still open, on purpose:** two customer-app reads. `GET /api/admin/school-settings` is
+      read by the cart, and the same values are already public on `GET /api/store/get/shoofi`.
+      The other is `GET /api/admin/check-order-time-valid`.
+    - **Still open, not decided:** `POST /api/customer/get-students-by-ids`. School mode calls
+      it with the customer's token, and it returns name and phone for any student id it is
+      given. Scoping it to the caller's own `schoolProject.studentIds` is a separate change.
+    - The teacher routes (`/api/admin/teacher/{create,get-list}`, `routes/teacher.js`) take
+      every dashboard role (`DASHBOARD_ADMIN`). Nothing calls them, and prod has no `teachers`
+      collection.
     - Client (delivery-web): the sidebar is the only role gate (`components/Sidebar/menu-access.ts`:
       `SCHOOLS_MENU_ITEMS` carry admin/manager/viewer); routes are not role-guarded except the
       accountant redirect. School settings are read-only for a viewer in the UI
-      (`canEditSchoolSettings`) — client-side only for the hours / payment methods.
+      (`canEditSchoolSettings`) — client-side only for the hours / payment methods: the
+      server's `POST /api/admin/school-settings` takes the whole section list, viewer included.
     - Audit: school writes are in the admin-audit map (`category: "schools"`), including the
       student routes in `routes/customer.js` (names, phones and the uploaded list omitted). The
-      actor is the admin token's claims as **decoded, not verified** by the audit middleware —
-      on the unauthenticated routes it is only as trustworthy as the caller.
+      actor is the admin token's claims as **decoded, not verified** by the audit middleware.
+      Since 2026-10-30 these routes also run `auth.required`, so a forged token is refused
+      before the write; the audit row alone still proves nothing.
     - Roles are a free-form array on `shoofi.shoofiAdminUsers.roles`; the UI's list is
       admin/manager/senior/operator/viewer/editor/accountant (+ `master`, DB-only). There is no
       server-side canonical list. `checkAdminRole` is an OR with no hierarchy.

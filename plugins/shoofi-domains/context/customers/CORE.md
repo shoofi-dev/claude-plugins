@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -360,6 +360,28 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       `holdoutSkippedReason`. `totalUsers` = the treated count (who was sent to).
     - Edited with the campaign (`POST /`, `PUT /:id`, the same `...adminOnly` roles; 400 outside
       0–50, never clamped), from the admin form's "קבוצת ביקורת %" field (`HoldoutField.tsx`).
+
+14. **The school-project routes, the teacher routes and `admin-create` are gated on each route**
+    (2026-10-30, `services/customer/admin-access.js`). Before that none had auth: anyone could
+    create a customer by phone, upload a class list that creates customers, delete every student
+    of a school, or create teachers.
+    - **`SCHOOL_ADMIN`** = `auth.required` + `SCHOOL_SECTION_ROLES` (master/admin/manager/viewer,
+      the admin web's schools sidebar) on `/api/admin/schools*`, `POST /api/admin/school-settings`
+      and the `/api/customer/` school and student routes (reference §4). Only the admin web calls
+      them. The list copies `routes/admin/school-registrations.js`, which can't be required there
+      because it opens Redis. A test fails if the two lists drift.
+    - **`ADMIN_CREATE`** on `POST /api/customer/admin-create` takes a dashboard role, OR a mobile
+      token whose own record (looked up by `app-type`, as in `routes/auth.js`) has `isAdmin`. The
+      three RN login screens call it in place of `customer/create` when `userDetailsStore.isAdmin()`
+      is true. Their tokens carry no roles, so **never make this gate role-only.** In prod, 1
+      customer, every storeUser (394) and 0 drivers carry `isAdmin`. The handler stores only
+      `{phone, created}`. Never let it copy more of the body: the body must not be able to give
+      an account a role or a flag.
+    - `DASHBOARD_ADMIN` on `/api/admin/teacher/*` (no caller, no `teachers` data in prod).
+    - **Open on purpose:** `GET /api/admin/school-settings` (the customer cart; the values are
+      already public on `GET /api/store/get/shoofi`) and `GET /api/admin/check-order-time-valid`.
+      **Still unscoped:** `POST /api/customer/get-students-by-ids`.
+    Pinned by shoofi-server `test/integration/school-admin-auth.js`.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
