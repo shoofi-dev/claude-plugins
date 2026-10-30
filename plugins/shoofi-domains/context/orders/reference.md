@@ -466,10 +466,19 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
 - **Twin**: read-only from the order payload (`order.twinGroup`, `twinPeerInfo.orderDate`);
   the partner caps the **second store's** prep window (`TWIN_SECONDARY_EARLY_MAX_MIN=10`).
   No twin endpoint is called — twin timing is server-computed.
-- **Gates (CORE invariant 18)**: `admin/not-viewd`, `admin/not-printed` (defined in
-  `stores/orders`, never called) and the `calander` writes (`stores/calander`, behind the
-  dashboard's commented-out calendar item) take `ORDERS_DASHBOARD_OR_STORE_MEMBER`, so the
-  phone must own the `app-name` store. `admin/all/not-viewd` is still `auth.required` only.
+- **Gates (CORE invariant 18)**: everything the partner reads from the order admin takes
+  `ORDERS_DASHBOARD_OR_STORE_MEMBER`, so the phone must own the `app-name` store:
+  - the live feed `admin/all/not-viewd` (and `admin/not-viewd`);
+  - `admin/orders` (the list and the print sweep);
+  - `admin/school-project-orders-for-print`, `future-orders-ready`, `get-custom-delivery`;
+  - `admin/not-printed` (defined in `stores/orders`, never called);
+  - the `calander` writes (`stores/calander`, behind the dashboard's commented-out calendar
+    item).
+
+  The partner always sends `@storage_storeDB` as the header, and that is the token's store or
+  one of its phone's memberships. Even mid-`switchStore` (store first, token second) it passes.
+  `admin/my-stores/new-orders-count` (`utils/cross-store-alerts`) stays `auth.required`: it is
+  token-scoped and ignores the header.
   **Any 401 signs the store out** (`utils/http-interceptor` → `OPEN_GENERAL_SERVER_ERROR_DIALOG`
   `isSignOut: true` → `resetAppState` + restart), so a partner-polled route must never 401 a
   logged-in terminal.
@@ -573,8 +582,9 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   `admin/twin-order-config` (GET/POST), `delivery/admin/{cancel,assign,reassign,drivers,orders}`,
   `order/admin/future-orders-count` (the sidebar badge; `app-name: shoofi` counts every store),
   `order/admin/coupon-orders` (`AppliedCoupons`, `generate-stores-summaries`),
-  `shoofiAdmin/external-order-providers` (`StoreForm`). Those three take `ORDERS_DASHBOARD`
-  (any `DASHBOARD_ROLES` seat, CORE invariant 18).
+  `order/statistics/new-orders/:page` (`HeaderStats`), `shoofiAdmin/external-order-providers`
+  (`StoreForm`). These, plus `order/admin/all-orders`, take `ORDERS_DASHBOARD` (any
+  `DASHBOARD_ROLES` seat, CORE invariant 18).
 - **Refunds**: `order/addRefund` is **NOT** used here — admin refunds surface via twin
   `degrade`/`cancel` (`refundOwed`/`refundBreakdown`) and `shoofiAdmin/compensations/*`.
 - **Twin admin**: full lifecycle control (degrade / undo / cancel / assign single|split)
