@@ -1754,7 +1754,7 @@
         },
         {
           "file": "routes/for-you.js",
-          "regex": "return res\\.status\\(200\\)\\.json\\(\\{ \\.\\.\\.result, suggestionId \\}\\);",
+          "regex": "return res\\.status\\(200\\)\\.json\\(\\{ \\.\\.\\.result,[^;]*suggestionId \\}\\);",
           "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — every reply carries its suggestionId"
         },
         {
