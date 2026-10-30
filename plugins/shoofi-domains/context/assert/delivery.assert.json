@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@a7d1d1c2 / 2026-10-30 (CORE invariant 19, assignment-decisions); rest shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-assign-when-fleet-at-capacity / 2026-10-30 (CORE invariants 19-20); rest shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -78,12 +78,22 @@
           "currentPickupInstantOf",
           "scoreBreakdown",
           "createPendingDelivery",
-          "appliedCoupon"
+          "appliedCoupon",
+          "capacityOverflowAllowance",
+          "capacityOverflowMinCapacity",
+          "allowCapacityOverflow"
         ],
         "services/delivery/driver-load.js": [
           "ACTIVE_ORDER_STATUSES",
           "UNCOLLECTED_ORDER_STATUSES",
-          "byConcurrencyTierThenScore"
+          "byConcurrencyTierThenScore",
+          "driverHasCapacity",
+          "driverHasOverflowCapacity",
+          "selectCapacityOverflow",
+          "getCapacityOverflowAllowance",
+          "getCapacityOverflowMinCapacity",
+          "DEFAULT_CAPACITY_OVERFLOW_ALLOWANCE",
+          "DEFAULT_CAPACITY_OVERFLOW_MIN_CAPACITY"
         ],
         "services/delivery/book-delivery.js": [
           "originalBookId",
@@ -131,7 +141,10 @@
           "switchedOffCount",
           "consideredCount",
           "companyCount",
-          "newTrace"
+          "newTrace",
+          "capacityOverflowUsed",
+          "capacityOverflowCount",
+          "capacityOverflowAllowance"
         ]
       },
       "patterns": [
@@ -469,6 +482,21 @@
           "file": "services/delivery/assignment-decision-log.js",
           "regex": "\\$inc:\\s*\\{\\s*attempts:\\s*1\\s*\\}",
           "desc": "attempts is incremented per dispatch attempt and firstAt/lastAt bracket them — the number ops actually wants (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "if \\(!\\(capacity > 0\\)\\) return false",
+          "desc": "CORE invariant 20(c): the guard that stops a switched-off courier (capacity 0, 112 of 258 records) passing the overflow predicate as 0 < 0 + 1. Remove it and half the fleet becomes dispatchable."
+        },
+        {
+          "file": "services/delivery/driver-load.js",
+          "regex": "getDriverCapacity\\(driver\\) === topCapacity",
+          "desc": "CORE invariant 20(d): the overflow pool narrows to the HIGHEST stored limit before ranking. Without it byConcurrencyTierThenScore sorts equal-load candidates by maxOrdersByAdmin ascending and the smallest limit wins — the 2026-10-07 regression."
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "allowCapacityOverflow: !isSingleMode",
+          "desc": "CORE invariant 20: a twin in single mode is never overflowed — the peer mirror is a blind $set with no capacity check, so one overflowed choice gives the same courier both legs and doubles the bound."
         }
       ]
     },

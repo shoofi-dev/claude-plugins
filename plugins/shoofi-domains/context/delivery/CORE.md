@@ -422,6 +422,59 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     100 companies cover the zone and 146 couriers sit in them, but one had `isActive: true`.
     So read this collection before the board: the live-ops row shows "ממתין להקצאה" and the
     scheduled time, and nothing about *why*, which is the whole question.
+    ⚠️ **Since the bounded overflow (invariant 20) that equality no longer implies
+    `outcome: no_candidates`.** It held on 209 of 209 rows between 2026-10-07 and
+    2026-10-30; now the same equality also appears on an `assigned` row carrying
+    `trace.capacityOverflowUsed: true`. Anything sizing fleet shortage from it must
+    exclude those, or it reports a shortage as solved when it was absorbed.
+20. **When the WHOLE eligible fleet is at its own limits the delivery is still assigned —
+    bounded, logged, and only on that branch.** Asked for by operations 2026-10-30 ("leaving
+    a delivery in the air is very bad"); re-opens, deliberately and narrowly, the fallback
+    `747078dc` removed on 2026-10-07. Read that commit before touching this: the thing it
+    killed was `if (!available.length) available = everybody`, which discarded every
+    per-driver limit wholesale and let a courier pinned at 1 reach **5** — 839 of 5,509
+    assignments went over an admin-set limit. Four properties make the new one a different
+    animal, and each has a test that goes red without it
+    (`test/integration/driver-capacity-hard-limit.js` §6, `driver-assignable.js`):
+    **(a) it is a separate predicate.** `driverHasCapacity` keeps its exact meaning and is
+    still the hard ceiling on every ordinary dispatch; `driverHasOverflowCapacity` /
+    `selectCapacityOverflow` (`services/delivery/driver-load.js`) are reachable only from
+    the two engines' explicit last-resort branch. Implementing this by loosening
+    `driverHasCapacity` would weaken the real rule to make the feature fit.
+    **(b) it is bounded per courier AND across ticks** — `held < capacity + allowance`
+    (default 1), so a courier capped at 2 reaches 3 and on the next tick fails `3 < 3`.
+    **(c) it never reaches the population the ceiling exists for.** A **switched-off**
+    courier (blank/0/negative cap = capacity `0`, 112 of 258 records) is excluded by an
+    explicit `capacity > 0` guard — the naive form reads `0 < 0 + 1` as true and would
+    dispatch to half the fleet — and `capacityOverflowMinCapacity` (default **2**) means a
+    courier an admin pinned at **1** is never overflowed at all. A dispatcher may still
+    assign to him by hand; that is a person's decision and stays one.
+    **(d) `selectCapacityOverflow` narrows to the HIGHEST stored limit before ranking, and
+    that is load-bearing.** Every survivor on this branch holds exactly `capacity`, so
+    `byConcurrencyTierThenScore`'s middle key (fewest `activeOrderCount`) is sorting by
+    `maxOrdersByAdmin` **ascending** — the smallest limit would win every time, i.e. straight
+    back to the original complaint. Narrowing first makes that key a no-op and leaves the
+    score to decide. Raising a courier to 3 or 4 is how ops *nominates* him to absorb load,
+    so the overflow lands on whoever was designated.
+    Two more things it must not do, both pinned: a **twin in single mode is never
+    overflowed** (the peer mirror is a blind `$set` with no capacity check, so one overflowed
+    choice hands the same courier both legs — `capacity + 2`, bound doubled), and the
+    overflow pool still passes `driverAcceptsStore`, which runs *after* the capacity filter —
+    so the substitution sits before it, not at the `return []`.
+    `capacityOverflowAllowance: 0` is the rollback and must stay a storable value (`??`,
+    never `||`, and `>= 0` in the reader — `||` would read the kill switch as "unset" and
+    turn the feature on). Visible on `trace.capacityOverflowUsed` / `capacityOverflowCount` /
+    `capacityOverflowAllowance`, per candidate and on `chosen`, in `summariseConfig`, on
+    `assignmentMetadata.capacityOverflowUsed` and as a `console.warn` naming the courier.
+    ⚠️ **Never reuse the old `trace.capacityFallbackUsed` name** — pre-2026-10-07 rows carry
+    it and it meant the unbounded thing.
+    ⚠️ The sizing argument, because it is the part that will be re-litigated: of the 209
+    deliveries that hit `all_drivers_at_capacity` in the 23 days after `747078dc`, **194
+    (92.8%) were auto-assigned on a later tick** (median wait 2.3 min, p90 6.2, max 14.3) and
+    the other **15 were assigned by hand and all 15 delivered**. Nothing was ever stranded.
+    So this buys back ~15 manual interventions a month and a ~2.3-minute median delay on ~2%
+    of deliveries — worth having, and not the "deliveries left in the air" the request
+    described. Judge any future change to it against that, not against the phrasing.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
