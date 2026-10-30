@@ -485,6 +485,26 @@ body (test: "a client cannot set owner or inferred"). `inferred` is written only
   the account's profile across logout: it belongs to the account.
 - **Deletion:** `POST /api/customer/delete` leaves the `tasteProfiles` doc in place — §7 item 10.
 
+## 5c. Marketing content generation (`routes/marketing-generate.js`, CORE invariant 16)
+
+| Endpoint | Gate | Notes |
+|---|---|---|
+| `POST /api/admin/marketing/generate` | master / admin / manager | `{subject:{kind,id,appName?}, channel, what: copy\|image, tone?}`. copy → 200 `{variants, rejected, limits}`; image (banner / story only) → 202 the job. 400 bad channel, 404 no subject, 409 not promotable, 422 nothing passed the guard, 429 budget, 503 no AI backend |
+| `GET /api/admin/marketing/generate/:jobId` | same | `status` queued → generating → rendering → ready / failed (`errorCode`: `no_renderer`, `no_valid_copy`, `no_ai`); `copy`; `images[{id, lang ar\|he\|all, aspectRatio, status, url}]`. Reaps stale jobs and renders on read |
+| `GET /api/admin/marketing/generate/:jobId/images/:imageId` | same | the bytes of a rendered image, fetched server-side from our CDN only (the CDN sends no CORS) |
+
+Data: `shoofi.marketingGenerations` `{what: "image", channel, subject, facts:{lines,name}, status,
+copy, brief, assets[{id, lang, aspectRatio, status pending\|queued\|rendering\|rendered\|failed,
+prompt, references, imageUrl, imageKey, renderBridgeId, renderClaimedAt, generationId}],
+rejected, backend, error, errorCode, createdBy, createdAt}`; TTL 30 days on `createdAt`. Images:
+`marketing-generate/<jobId>/<assetId>-<lang>-<ts>.<ext>` on the Spaces CDN.
+
+Admin client: `shoofi-delivery-web` `src/apis/admin/marketing-generate.ts`,
+`src/views/admin/marketing/components/ContentStep.tsx` (the step), `content.ts` (what the form
+gets), `use-prefill-image.ts` (the banner / story forms attach the image). The prefill's
+`copy` keys: `title_*` = push / note / banner title, `body_*` = push / note body, banner
+description, story caption.
+
 ## 6. Referrals (`routes/customer-referrals.js`)
 8-char code (ambiguity-free alphabet) + TinyURL short link with `/r/:code` fallback. Config on
 `shoofi.store {id:1}.referralConfig` (reward amounts, `minFriendOrderAmount`, validity,
