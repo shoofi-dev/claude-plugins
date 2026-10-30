@@ -206,7 +206,9 @@
         "utils/app-name-helper.js",
         "controllers/customerAddressController.js",
         "routes/ai-helper.js",
-        "services/ordering-intelligence/taste-profile.js"
+        "services/ordering-intelligence/taste-profile.js",
+        "services/customer/",
+        "routes/teacher.js"
       ],
       "shoofi-app": [
         "screens/login",
