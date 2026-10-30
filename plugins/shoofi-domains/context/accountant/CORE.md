@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -603,19 +603,32 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       `companyId`, exactly the checks behind `companyAdminSelf`. Caller: shoofir
       `screens/delivery-driver/payments.tsx` (`driver/details` with the admin's picked driver).
       A missing `driverId` still falls to the handler's 400. **Never a role-only gate** (#281).
-    - **Dashboard only, any dashboard role** (`settlementDashboard`, aliased `reportsDashboard`
-      in the route files): `GET /api/payments/delivery-companies`, every
-      `/api/payments/admin/reports*` route (14, `generate` included),
-      `POST /api/driver-reports/admin/generate` + every `/api/driver-reports/admin/reports*`
-      route (10), and `GET /api/hyp/admin/reports/:reportId/invoice-pdf`. Until 2026-10-30 the
-      report routes were `auth.required` only, so a customer token could generate, approve,
-      send, delete or invoice a settlement. No mobile app calls any of them; none is on
-      `utils/restricted-admin-routes.js` (no double gate); the accountant keeps both reports
-      lists (`accountant` is a dashboard role). Prod 2026-10-30: every store/driver report's
-      `generatedBy`/`approvedBy` is an admin-dashboard user (live or since deleted).
-    Still `auth.required` only (any token): the `accountant-file-number` PUTs (both),
-    `payments/admin/greeninvoice/{businesses,customers}`, and every other `/api/hyp/admin/*`
-    route — `create-invoice`, `cancel-invoice`, `send-invoice`, `config/switch` included.
+    - **Dashboard only, any dashboard role** (`settlementDashboard`; aliased `reportsDashboard`
+      in `admin-reports.js` and `driver-reports.js`): `GET /api/payments/delivery-companies`,
+      every `/api/payments/admin/reports*` route (14, `generate` included), **every**
+      `/api/driver-reports` route (11: `generate`, `reports*`, the company
+      `accountant-file-number` PUT), the store `accountant-file-number` PUT,
+      `payments/admin/greeninvoice/{businesses,customers}`, and **every `/api/hyp/admin/*` route
+      that is not on `utils/restricted-admin-routes.js`** (30: store and courier tax invoices —
+      create, create-store/company, cancel, reset, send, invoice-pdf —, `config` and
+      `config/switch` (the active invoice provider), and the per-store / per-company HYP
+      `status`, `create-account`, `oauth-url`, `distributor-user`, `sync-bank-account`,
+      `business-data`, `send-tax-url`, `disconnect`). Until 2026-10-30 every one of them was
+      `auth.required` only, so a customer token could generate, approve, send, delete or invoice
+      a settlement, switch the invoice provider or disconnect a store's HYP account. Callers: the
+      admin web only — no mobile app, no server HTTP self-call, no cron. None is on the restricted
+      list (no double gate); the 16 `hyp/admin` routes that ARE (bulk, `send-oauth-link`,
+      `update-email`) keep its MASTER_ONLY guard. The accountant keeps his screens (`accountant`
+      is a dashboard role). `routes/hyp.js` (do-not-touch) changed only in its import and route
+      lines. Prod 2026-10-30: every store/driver report's `generatedBy`/`approvedBy` is an
+      admin-dashboard user (live or since deleted). **Not narrowed, on purpose:** `config/switch`
+      and the two `disconnect`s stay on the dashboard gate — the admin audit log never records
+      them (the audit middleware skips unmapped routes, and no `hyp` route is mapped), so there is
+      no evidence which roles used them. Narrowing them to `["master","admin"]` is a
+      recommendation that needs the requester's ruling first.
+    **Rule:** a route under `/api/hyp/admin`, `/api/driver-reports` or `admin-reports.js`'s
+    `/api/payments/admin` is either on this gate or on the restricted list, never login-only —
+    the test walks the three routers.
     Tests: shoofi-server `test/integration/settlement-admin-auth.js` and
     `test/integration/earnings-reports-admin-auth.js`.
 
