@@ -129,14 +129,14 @@ Prod on 2026-10-30, across 188 store DBs: 41,351 `completed`, 4,122 `none`,
 **2,916 `pending`** (newest 2026-09-22) and 12 `failed`. `docId` is a number on most orders.
 Flagged with no verdict: whether those pending orders should be re-queued.
 
-**Admin routes** (`routes/admin.js`, CORE invariant 11). Every one is
-`auth.required` + `checkAdminRole(DASHBOARD_ROLES)`, and no client calls any of them.
-| Route | What it does |
-|---|---|
-| `GET /api/admin/invoices/pending` | the size of this process's in-memory queue (one instance; prod runs two) |
-| `POST /api/admin/invoices/retry` `{docId}` | queues one `docId` |
-| `POST /api/admin/invoices/process-all` | queues every `invoiceStatus:"pending"` order in the **`app-name` header's** DB (one store, `shoofi` when absent) |
-| `POST /api/admin/invoices/webhook` `{docId, secret}` | fetches now, falls back to the queue. Also needs `secret === INVOICE_WEBHOOK_SECRET`, which is not in `.env.production` (the DO app spec was not checked). No provider calls it. |
+**Admin routes** (`routes/admin.js`, CORE invariant 11). Every one is `auth.required` plus a
+role check, and no client calls any of them.
+| Route | Roles | What it does |
+|---|---|---|
+| `GET /api/admin/invoices/pending` | `DASHBOARD_ROLES` | the size of this process's in-memory queue (one instance; prod runs two) |
+| `POST /api/admin/invoices/retry` `{docId}` | master, admin | queues one `docId` |
+| `POST /api/admin/invoices/process-all` | master, admin | queues every `invoiceStatus:"pending"` order in the **`app-name` header's** DB (one store, `shoofi` when absent) |
+| `POST /api/admin/invoices/webhook` `{docId, secret}` | master, admin | fetches now, falls back to the queue. Also needs `secret === INVOICE_WEBHOOK_SECRET`, which is not in `.env.production` (the DO app spec was not checked). No provider calls it. |
 
 The queue keeps the whole `req` and reads only `req.app.db` and the `app-name` header from
 it. It makes no HTTP call that carries request headers. `retry` puts `docId` into the Gmail
