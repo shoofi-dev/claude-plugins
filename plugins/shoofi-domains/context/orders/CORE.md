@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -428,6 +428,40 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     never drop the sweep's date or cap. A stuck order is diagnosed from
     `<store>.client-error` `source: "printer-testPrint"` rows (they now carry `outcome`),
     plus the store's only `isPrinted:false, isViewd:true` orders.
+
+18. **THE STORE-CALENDAR AND ORDER-ADMIN READS ARE GATED PER AUDIENCE, AND THE PARTNER GATE IS
+    STORE MEMBERSHIP, NOT "THE TOKEN'S OWN STORE"** (shoofi-server `services/orders/admin-access.js`).
+    Until 2026-10-30, anyone who sent a store's `app-name` could close its hours, or read its
+    unaccepted orders with the customers' names and phones. Each route declares its gate itself:
+    - **`ORDERS_DASHBOARD_OR_STORE_MEMBER`** = `auth.required` + `storeMemberGate`. A
+      `DASHBOARD_ROLES` admin token passes for any store. A `shoofi-partner` token passes when
+      its own `storeUsers` doc (`req.auth.id`) has `appName` = the `app-name` header, or when
+      another `storeUsers` doc with the same phone is on that store. That second test is the one
+      `POST /api/customer/switch-store` makes before minting a token. Used on
+      `GET /api/order/admin/{not-viewd,not-printed}` and the four
+      `POST /api/admin/calander/{disable/hour/insert,disable/hour/insert/multi,enable/hour,enable/hour/multi}`.
+    - **Why not exact match** (the #346 `ownStoreGate`): `not-viewd` is a new-order feed.
+      `authStore.switchStore` (shoofi-partner) persists the new store name BEFORE the new
+      token, so a poll in between carries store B with A's token. A 403 is silent in the
+      app, and it blanks the store's new orders.
+    - **`ORDERS_DASHBOARD`** = `auth.required` + `checkAdminRole(DASHBOARD_ROLES)`, on
+      `GET /api/order/admin/future-orders-count`, `POST /api/order/admin/coupon-orders` and
+      `GET /api/shoofiAdmin/external-order-providers`. Only the admin web calls them.
+    - **Public by decision:** `GET /api/admin/calander/disabled/hours/:date` (the time pickers;
+      projected to `{_id, date, hour}`) and `GET /api/admin/check-order-time-valid` (the customer
+      cart on submit, maybe logged out; returns only the school ordering window). Neither returns
+      an order. Gating them would 401 a logged-out customer.
+    - **Who really calls `not-viewd`:** almost nobody, in steady state. All 394 prod `storeUsers`
+      docs (2026-10-30) carry `isAdmin: true` + `roles: ["all"]`, so once user details load the
+      partner polls **`admin/all/not-viewd`** instead (`isAdmin(ROLES.all)`, `stores/orders`).
+      `not-viewd` is reached by a store user without `all` (`POST /api/customer/store-users/:appName`
+      defaults `roles: []`) and by the new-orders screen before details load. Both send a token.
+    - ⚠️ **A 401 signs the partner out.** Its interceptor treats any 401 as sign-out
+      (`resetAppState`, then a restart). A gate on a partner-polled route must never 401 a
+      logged-in terminal. Pinned by `test/integration/orders-admin-auth.js`.
+    - **Not closed here (open):** `GET /api/order/admin/all/not-viewd` (the partner's real feed)
+      is `auth.required` only, so any valid token reads any store's pending orders, customer
+      tokens included. The same `storeMemberGate` would fit it.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

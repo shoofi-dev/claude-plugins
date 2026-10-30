@@ -354,6 +354,10 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
   the bundle that can render combo deals — without it the server strips combos from the menu
   (menu-catalog reference §6b). `helpers/combo-pricing.ts` is the client copy of
   `calculateComboExtrasPrice` (CORE invariant 11).
+- **Public pre-checkout reads** (CORE invariant 18): `admin/check-order-time-valid` (the cart's
+  `isOrderTimeValid` on submit, maybe logged out) and `admin/calander/disabled/hours/:date` (the
+  `pick-time` dialog, not reachable from the cart on main: `onPickTime` is defined, never bound).
+  Both stay unauthenticated on purpose and return no order.
 - **Order creation** = **`POST order/create` as multipart/form-data** (`body` = JSON
   cart payload + `img` files), built by `stores/cart/index.ts` (`getCartData` →
   `produtsAdapter`) via `hooks/checkout/use-checkout-submit.ts` from
@@ -449,7 +453,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
 - **API client**: axios (`utils/http-interceptor/index.ts`), token `@storage_userToken`
   as `"Token …"`, `app-type: shoofi-partner`, `app-name` = `@storage_storeDB` (per-call overridable).
 - **Endpoints** (`stores/orders/index.tsx`, controller `order/`): `admin/orders` (list),
-  `admin/not-viewd` (incoming feed), **`update/viewd` = ACCEPT** (→ `6→1`, future `14→1`,
+  `admin/all/not-viewd` (incoming feed, when `isAdmin(ROLES.all)`, which is every prod store
+  user: 394/394 carry `roles: ["all"]` on 2026-10-30), `admin/not-viewd` (the same feed for a
+  store user without `all`, and before user details load), **`update/viewd` = ACCEPT** (→ `6→1`, future `14→1`,
   sends `readyMinutes` — not persisted, §2), `update` (forward/back status + note), `update-item-collected`,
   `start-preparing` / `update-start-preparing`, `update-delay`, `printed`,
   `book-delivery`, `*-custom-delivery`, `addRefund`, `future-orders-ready`, `drive-in-arrival-confirm`.
@@ -460,6 +466,13 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
 - **Twin**: read-only from the order payload (`order.twinGroup`, `twinPeerInfo.orderDate`);
   the partner caps the **second store's** prep window (`TWIN_SECONDARY_EARLY_MAX_MIN=10`).
   No twin endpoint is called — twin timing is server-computed.
+- **Gates (CORE invariant 18)**: `admin/not-viewd`, `admin/not-printed` (defined in
+  `stores/orders`, never called) and the `calander` writes (`stores/calander`, behind the
+  dashboard's commented-out calendar item) take `ORDERS_DASHBOARD_OR_STORE_MEMBER`, so the
+  phone must own the `app-name` store. `admin/all/not-viewd` is still `auth.required` only.
+  **Any 401 signs the store out** (`utils/http-interceptor` → `OPEN_GENERAL_SERVER_ERROR_DIALOG`
+  `isSignOut: true` → `resetAppState` + restart), so a partner-polled route must never 401 a
+  logged-in terminal.
 - **Realtime**: WS `?appType=shoofi-partner`; handles `order_status_updated`,
   `unviewed_orders_updated`, `future_order_*` (NOT `menu_refresh`). The `print_order` /
   `print_not_printed` frames still arrive (the server sends `print_not_printed` when
@@ -557,7 +570,11 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   (open-as store/driver/customer, **master-only**), `admin/order-monitoring/summary/{orderNumber}`
   (timeline; every `admin/order-monitoring/*` route is `auth.required` +
   `checkAdminRole` with ALL admin roles — customer tokens 403, no token 401), `twin-order/admin/{group/:id/full, degrade, undo-degrade, cancel, assign-driver}`,
-  `admin/twin-order-config` (GET/POST), `delivery/admin/{cancel,assign,reassign,drivers,orders}`.
+  `admin/twin-order-config` (GET/POST), `delivery/admin/{cancel,assign,reassign,drivers,orders}`,
+  `order/admin/future-orders-count` (the sidebar badge; `app-name: shoofi` counts every store),
+  `order/admin/coupon-orders` (`AppliedCoupons`, `generate-stores-summaries`),
+  `shoofiAdmin/external-order-providers` (`StoreForm`). Those three take `ORDERS_DASHBOARD`
+  (any `DASHBOARD_ROLES` seat, CORE invariant 18).
 - **Refunds**: `order/addRefund` is **NOT** used here — admin refunds surface via twin
   `degrade`/`cancel` (`refundOwed`/`refundBreakdown`) and `shoofiAdmin/compensations/*`.
 - **Twin admin**: full lifecycle control (degrade / undo / cancel / assign single|split)
