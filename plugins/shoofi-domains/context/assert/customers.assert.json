@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -279,6 +279,14 @@
         {"file": "routes/shoofi-admin.js", "regex": "router\\.post\\(\"/api/admin/school-settings\", \\.\\.\\.SCHOOL_ADMIN,", "desc": "reference 4: the school hours / payment-methods write is SCHOOL_ADMIN"},
         {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/admin/school-settings\", async", "desc": "reference 4: the school-settings read stays public (the customer cart reads it)"},
         {"file": "routes/teacher.js", "regex": "router\\.post\\(\"/api/admin/teacher/create\", \\.\\.\\.DASHBOARD_ADMIN,", "desc": "reference 4: the teacher routes take a dashboard role"},
+        {"file": "routes/customer.js", "regex": "const isCode = \\(value\\) => value !== null && value !== undefined && value !== \"\";\\n\\s+if \\(\\n\\s+\\(isCode\\(customer\\.authCode\\) && isCode\\(customerObj\\.authCode\\) && customer\\.authCode == customerObj\\.authCode\\) \\|\\|", "desc": "CORE invariant 15: the OTP login compares only when both the stored and the sent code are present (null == undefined let a bare phone log in)"},
+        {"file": "routes/customer.js", "regex": "const \\{ authCode: _sentCode, \\.\\.\\.newCustomerReply \\} = customerObj;\\n\\s+res\\.status\\(200\\)\\.json\\(newCustomerReply\\);", "desc": "CORE invariant 15: POST /create never echoes the code it just sent"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\(\"/api/customer/search-customer\", auth\\.required, checkAdminRole\\(CUSTOMER_ADMIN_ROLES\\),", "desc": "CORE invariant 15: customer search (returns the pending OTP) is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "authCode: mayReadPendingCode && customer\\.authCode", "desc": "CORE invariant 15: the pending OTP is included only for a dashboard-role caller"},
+        {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/:customerId', auth\\.required, checkAdminRole\\(CUSTOMER_ADMIN_ROLES\\),", "desc": "reference 5: customer by id is dashboard-only, own id included"},
+        {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/:customerId/status', auth\\.required, checkAdminRole\\(CUSTOMER_ADMIN_ROLES\\),", "desc": "reference 5: customer badges are dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/:customerId/whatsapp-summary', auth\\.required, checkAdminRole\\(CUSTOMER_ADMIN_ROLES\\),", "desc": "reference 5: the respond.io conversation summary is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\('/api/customer/:customerId/update-address-to-current-location', auth\\.required, checkAdminRole\\(CUSTOMER_ADMIN_ROLES\\),", "desc": "reference 5: support's address fix (writes order, customer and booking) is dashboard-only"},
         {
           "file": "routes/auth.js",
           "regex": "app-type",

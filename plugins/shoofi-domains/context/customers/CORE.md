@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -385,6 +385,28 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       already public on `GET /api/store/get/shoofi`) and `GET /api/admin/check-order-time-valid`.
       **Still unscoped:** `POST /api/customer/get-students-by-ids`.
     Pinned by shoofi-server `test/integration/school-admin-auth.js`.
+15. **The OTP login needs a real code, and the pending code is shown to staff only**
+    (shoofi-server `fix/customer-search-auth`, 2026-10-30).
+    - **`validateAuthCode` compares only when BOTH the stored and the sent code are present**
+      (`isCode`: not null, undefined or ""). A successful login stores `authCode: null`
+      (the v3 driver writes `undefined` as null), and `null == undefined` is true. Until this
+      fix, a request carrying only a phone logged into any customer, partner or driver account
+      and overwrote the owner's session. Never compare a possibly-empty code with bare `==`.
+      This is not the planned hardening (expiry, attempts, lockout). That is still open.
+    - **`POST /create` never echoes the code it just sent.** It used to, for a new phone, so
+      anyone could register a number they don't own.
+    - **`search-customer` is dashboard-only**, and `status.authCode` (the pending OTP, shown to
+      support on purpose) is included only for a dashboard role (`mayReadPendingCode`). Never
+      `token`. OTPs never expire, so a readable code is a login. The RN apps' legacy screens
+      are refused: they have mapped an object as an array since 2025-06 and never worked. Fix
+      that screen and give it a code-free answer before opening the route to a mobile token.
+    - **`GET /:customerId`, `/status`, `/whatsapp-summary` and
+      `POST /:customerId/update-address-to-current-location` are dashboard-only.** Their only
+      caller is the admin web, so a customer token is refused even for its own id.
+    - Flagged for a human: the Known-status `search-customer` line and its place in the
+      "to handle later" list describe the state before this change.
+    Pinned by shoofi-server `test/integration/customer-search-admin-auth.js` and
+    `test/integration/otp-verify-requires-code.js`.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
