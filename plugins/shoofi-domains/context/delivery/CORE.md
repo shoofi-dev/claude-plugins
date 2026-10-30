@@ -423,6 +423,38 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
       `roles`, so it would 403 every company admin silently (shoofir reacts only to 401). A
       new route under the prefix must join one of the two groups, or
       `test/integration/delivery-admin-auth.js` fails.
+    - **The six routes in `routes/delivery/admin.js` OUTSIDE the prefix** were open too, until
+      2026-10-30. Anyone could read any delivery, mark it delivered, or cancel it as the store.
+      Each is now gated in the same module, for the callers it really has:
+      `GET delivery/book/:bookId` takes `...deliveryOwnerOrDashboard`, which is any dashboard
+      role or a mobile token on its OWN delivery. Its callers are the customer app's ETA poll and
+      the legacy order-timer in partner and shoofir. `GET delivery/order/:orderId/driver` (the
+      partner's order cards and delivery-only list) and `POST delivery/store/order/cancel` (no
+      client; 0 rows ever have `cancelledBy: "store"`) take `...storeOwnerOrDashboard`.
+      `GET delivery/driver/:driverId/orders` and `POST delivery/order/status/update` are admin-web
+      only, and so is `POST delivery/orders/batch`, which has no caller at all. Those three take
+      `...deliveryDashboardAdmin`. All 1,197 prod status-update flow events carry
+      `updatedBy: "shoofi_support"`, and no server code calls the route over HTTP.
+      **Drivers never use `order/status/update`.** They move a status through
+      `/api/delivery/driver/order/*` (`routes/delivery/orders.js`).
+    - **Ownership comes from the token, never from the URL or body.** Customer means
+      `order.customerId` (a **string**) equals the token id. Partner means `appName` equals the
+      token's `storeUsers.appName`. Driver means `driver._id` (an **ObjectId**) equals the token
+      id, and a company admin also gets `company._id` equal to its **string** `companyId`.
+      Both shapes are matched. The gate leaves the filter on `req.deliveryScope`, and the handler
+      ANDs it into its own query (`withDeliveryScope`), so another owner's delivery reads as
+      **404**, not 403. On `book/:bookId` this also returns the caller's own row when two stores
+      share a `bookId`; the unscoped lookup returns the newest one from any store.
+    - **A raw `bookDelivery` doc carries live secrets.** Booking snapshots the whole driver and
+      company records. On 2026-10-30, 4,971 of the last 5,000 rows held `driver.token`, which
+      was the driver's CURRENT session on 500/500 checked, and 4,767 held `company.hyp.api_key`.
+      `redactDeliveryCredentials` (`lib/delivery/helpers.js`) strips `driver.{token, authCode,
+      notificationToken}` and `{company, driver.company}.{hyp, accounting, credentials}`. Run it
+      on any route that hands out a raw delivery doc. `book/:bookId` and `orders/batch` now do.
+      `GET /api/delivery/order/:id` (`routes/delivery/driver.js`) does not, and it is still
+      unauthenticated.
+      `test/integration/delivery-mobile-admin-auth.js` fails if any route in
+      `routes/delivery/admin.js` reaches its handler without `auth.required` plus a gate.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
