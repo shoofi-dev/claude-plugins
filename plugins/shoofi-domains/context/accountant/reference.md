@@ -316,6 +316,9 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   `bankAccount{bank,branch,accountNumber,companyId,
   businessType('exempt'|'licensed')}`, `billingContacts[]`, `contract{commissionTiers[],
   coinsCommissionPercent, monthlyPayments[], onetimePayments[]}`, `store.hyp{ua_uuid,api_key,access_token,status}`.
+  Who may write it: `POST /api/store/update` takes `accounting` (and `hyp`, `coinsSettings`) only from a
+  dashboard token. A partner token's write is cut to its store-management toggles (menu-catalog CORE
+  invariant 28). The billing-contacts screen saves through that route with the admin's own token.
 - **`shoofi.amazonconfigs`** — `{app:"greeninvoice"|"hyp"|"invoiceProvider"|"amazon"}` (provider creds/switch; never print).
   `{app:"hyp"}` also carries `CUSTOMER_DOC_UA_UUID` (customer-document sub-account; empty = don't send)
   and `USE_DEMO`/`API_ENDPOINT`/`DEMO_ENDPOINT`. **No admin UI edits this document** — prod changes are a manual Mongo write.

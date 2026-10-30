@@ -118,6 +118,28 @@ this per-store doc, NOT central `shoofi.stores`**), `hasGeneralCategories`,
 `mockStoreAppName`, `outOfStockExtras` (surfaced in the menu response),
 plus open/visibility flags.
 
+**Who writes it: `POST /api/store/update`** (CORE invariant 28, `services/catalog/store-update-access.js`).
+`$set` of each top-level key received (`req.body.data || req.body`, `_id` = the target), so a key
+left out keeps its stored value; a nested object (`coinsSettings`, `accounting`) is replaced whole.
+- **Dashboard** (`DASHBOARD_ROLES`, `Bearer` + `app-type: shoofi-admin`): any store, any key. Admin-web
+  callers: `views/admin/stores/StoreData.tsx`, `views/admin/accounting/{BankAccountDetails,ContractDetails}.tsx`
+  (both re-post the whole `GET /api/store/get/:appName` document), `apis/delivery/update-store.ts`
+  (`{ isStoreClose, _id }`, default `app-name: shoofi`). Server: the billing-contacts self-call
+  (`PUT /api/shoofiAdmin/stores/:storeId/billing-contacts`, forwards the admin's token).
+- **Partner** (`Token` + `app-type: shoofi-partner`, own store only): `PARTNER_STORE_FIELDS`, i.e.
+  `isStoreClose isOpen isBusy openHours creditcard_support cash_support takeaway_support
+  delivery_support isOrderLaterSupport drive_in_support invoicePrintCount ramadanSettings`.
+  The partner app posts `{ data: <its whole storeData> }` from `screens/admin/store-managment`
+  `onSave` and the header open/close/busy toggles. That copy is `POST /api/store`'s answer:
+  the stored keys minus `SENSITIVE_STORE_FIELDS`, plus `workingHours`, `isDeliveryOpen`,
+  `isTwoPhaseCaptureActive`, `isPartnerOrderAmendActive`, `isDeliveryOnlyActive`,
+  `walletPaymentProvider`, `googlePay*`, computed on every read and read from storage by
+  nothing. With no `coinsSettings` stored it carries the app's `defaultCoinsSettings`
+  (`enabled: false`); the coins toggle has been commented out of the screen since 2026-05-27.
+- `invoicePrintCount` missing or invalid in the request is written as `1`, for any caller.
+- `isStockManagment === true` in the write runs the stock backfill (§5), so only a dashboard save
+  can run it.
+
 ⚠️ **`hasGeneralCategories` lives in TWO documents and they drift.** `GET /api/menu`
 reads it from this per-store `store {id:1}` doc (`routes/menu.js`), but the admin
 store form writes it to central `shoofi.stores`
@@ -499,7 +521,8 @@ Three interacting product fields — keep them consistent:
 **human-confirmed, applies to ALL products, no exceptions:**
 `quantity <= 0  ⟺  { isInStore:false, outOfStockByQuantity:true }`.
 Enforced at: product edit (`product.js`), set-quantity
-(`product.js`), enable-stock backfill (`store.js`), and the
+(`product.js`), enable-stock backfill (`store.js`, dashboard saves only: a partner
+write cannot carry `isStockManagment`), and the
 order lifecycle via `utils/order-stock.js` (`decrementOrderStock` /
 `restoreOrderStock` — idempotent via `stockDecremented`/`stockRestored`; restore
 only re-enables products that were `outOfStockByQuantity`, never un-hides manual
@@ -569,6 +592,7 @@ the cache read.
 - `GET  /api/admin/product/extras` **[admin|own store]**, `GET /api/admin/product/:id` **[admin]**, `GET /api/admin/product/import-index` **[admin]**, `POST /api/admin/images/upload` **[admin|own store]** (gated before multer), `POST /api/images` **[admin|own store]** (the image list by `type`)
 - `POST /api/product/create-from-mock` (`400 COMBO_NOT_CLONEABLE` for a combo template), `GET /api/product/mock-store/:appName`, `POST /api/product/update-barcode`, all **[admin]**
 - `GET/POST/DELETE /api/store-category/*` — regular subcategory CRUD (in `store.js`)
+- `POST /api/store/update` — save the per-store `store` document (`$set` per key). `auth.required` + `storeUpdateGate`: any dashboard role, any key; a partner token for its own `app-name` only, cut to `PARTNER_STORE_FIELDS`; customer/driver 403, no token 401. Answers `200 { message: "Successfully saved" }` either way (§2 `store`, CORE invariant 28).
 - `GET/POST/DELETE /api/category/general/*` — general category CRUD
 - `POST /api/admin/menu-import-issues` — record one import run's issues (whole run, one call)
 - `GET  /api/admin/menu-import-issues?status=open|resolved|all[&runId=]` — the store's worklist

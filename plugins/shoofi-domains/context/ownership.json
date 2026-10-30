@@ -78,7 +78,8 @@
         "services/promotions/",
         "utils/promotion-discount.js",
         "services/twin-order/twin-promotions.js",
-        "services/twin-order/twin-delivery-price.js"
+        "services/twin-order/twin-delivery-price.js",
+        "routes/coins.js"
       ],
       "shoofi-app": [
         "screens/checkout",

@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 19); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -46,7 +46,9 @@
         "services/marketing/reconcile.js",
         "utils/crons/marketing-attribution-cron.js",
         "docs/marketing-attribution.md",
-        "test/integration/marketing-attribution.js"
+        "test/integration/marketing-attribution.js",
+        "routes/coins.js",
+        "test/integration/coins-admin-auth.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -474,7 +476,17 @@
         {"file": "services/marketing/order-facts.js", "regex": "\\$or: \\[\\{ createdAt: \\{ \\$lt: new Date\\(created\\) \\} \\}, \\{ at: \\{ \\$lt: new Date\\(created\\) \\} \\}\\],", "desc": "CORE invariant 16: the event lookup only takes touches that happened before the checkout (received before, or tapped before) - a residual filter on the {viewerKey, kind, at} scan"},
         {"file": "services/marketing/order-facts.js", "regex": "function touchPrecedesCheckout\\(t, createdAt\\) \\{[\\s\\S]{0,400}?if \\(t\\.source === \"client\"\\) return true;[\\s\\S]{0,300}?if \\(at < created\\) return true;[\\s\\S]{0,200}?return Number\\.isFinite\\(received\\) && received < created;", "desc": "CORE invariant 16: the touch-precedence rule - client touches always, else tapped before, else received before; no forward skew"},
         {"file": "services/marketing/reconcile.js", "regex": "const healed = facts\\.validTouches\\(fact\\.touches, fact\\.createdAt\\);", "desc": "CORE invariant 16: reconcile re-applies the rule to stored touches (heals facts credited with a later tap)"},
-        {"file": "services/marketing/reconcile.js", "regex": "const \\{ inserted \\} = await facts\\.recordCheckoutFactResult\\(", "desc": "CORE invariant 16: backfill counts only real inserts (upsertedCount)"}
+        {"file": "services/marketing/reconcile.js", "regex": "const \\{ inserted \\} = await facts\\.recordCheckoutFactResult\\(", "desc": "CORE invariant 16: backfill counts only real inserts (upsertedCount)"},
+        {"file": "routes/coins.js", "regex": "const COINS_ADMIN_ROLES = DASHBOARD_ROLES;\\s*const COINS_ADMIN = \\[auth\\.required, checkAdminRole\\(COINS_ADMIN_ROLES\\)\\];", "desc": "CORE invariant 19: the coins admin gate is auth.required + every dashboard role (auth.required alone passes customer tokens)"},
+        {"file": "routes/coins.js", "regex": "const COINS_EXPIRE_ROLES = \\[\"master\"\\];\\s*const COINS_EXPIRE_ADMIN = \\[auth\\.required, checkAdminRole\\(COINS_EXPIRE_ROLES\\)\\];", "desc": "CORE invariant 19: the expiry sweep gate is master-only (the only code that permanently deletes coins; no caller)"},
+        {"file": "routes/coins.js", "regex": "router\\.post\\(\"/api/admin/coins/expire\", \\.\\.\\.COINS_EXPIRE_ADMIN,", "desc": "CORE invariant 19: the expiry sweep's only trigger is master-only"},
+        {"file": "services/audit/admin-audit-routes.js", "regex": "pattern: '/api/admin/coins/expire', method: 'POST', action: 'expire_coins'", "desc": "CORE invariant 19: a coin expiry run records its actor in the admin audit log"},
+        {"file": "routes/coins.js", "regex": "router\\.get\\(\"/api/admin/coins/customer/:customerId\", \\.\\.\\.COINS_ADMIN,", "desc": "CORE invariant 19: a customer's coin wallet is dashboard-only"},
+        {"file": "routes/coins.js", "regex": "\"/api/admin/coins/customer/:customerId/earned\",\\s*\\.\\.\\.COINS_ADMIN,", "desc": "CORE invariant 19: the customer modal's coins tab is dashboard-only"},
+        {"file": "routes/coins.js", "regex": "router\\.get\\(\"/api/admin/coins/store/:storeAppName/stats\", \\.\\.\\.COINS_ADMIN,", "desc": "CORE invariant 19: a store's coin totals are dashboard-only"},
+        {"file": "routes/shoofi-admin.js", "regex": "const \\{ DASHBOARD_ROLES: COINS_SETTINGS_ROLES \\} = require\\(\"\\.\\./utils/analytics-access\"\\);\\s*const COINS_SETTINGS_ADMIN = \\[coinsSettingsAuth\\.required, coinsSettingsRoleCheck\\(COINS_SETTINGS_ROLES\\)\\];", "desc": "CORE invariant 19: the coin-settings gate is auth.required + every dashboard role, built inside the Coins Settings block"},
+        {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/admin/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,[\\s\\S]*?router\\.post\\(\"/api/admin/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,", "desc": "CORE invariant 19: reading and flipping the platform-wide coins switch is dashboard-only"},
+        {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/admin/store/:appName/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,[\\s\\S]*?router\\.post\\(\"/api/admin/store/:appName/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,", "desc": "CORE invariant 19: a store's earn rate / coin value is dashboard-only (no mobile caller; the partner toggle is commented out)"}
       ]
     },
     "shoofi-app": {
