@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -311,7 +311,7 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       result records `execution.skippedOptOut` / `skippedCapped` / `pushCap`.
     - **A campaign is claimed atomically**: `claimCampaign` is one `findOneAndUpdate` to
       `in_progress`. It used to read the status and then write. The cron claims only a due
-      `scheduled` campaign. A lost claim throws `code: 'CAMPAIGN_NOT_CLAIMABLE'`, and the cron
+      `scheduled` campaign that is approved (invariant 17). A lost claim throws `code: 'CAMPAIGN_NOT_CLAIMABLE'`, and the cron
       skips it without marking it failed, because that would overwrite a run that is sending.
       The admin's `PUT /:id` refuses an `in_progress` campaign (409) for the same reason.
     - **`scheduling.scheduledDate` is a Date.** A wall-clock string without an offset is read in
@@ -407,6 +407,75 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       "to handle later" list describe the state before this change.
     Pinned by shoofi-server `test/integration/customer-search-admin-auth.js` and
     `test/integration/otp-verify-requires-code.js`.
+
+17. **No marketing item reaches a customer until a manager or master approves it, and an item
+    saved before approvals existed counts as approved** (owner's decision 2026-10-30;
+    shoofi-server `services/marketing/approval.js`, `feat/marketing-approval`). It covers home
+    banners (`shoofi.ads`), stories and launch popups (`shoofi.stories`; a popup is a
+    `shoofi-stories` story), the home note banner (`shoofi.notes`) and push campaigns
+    (`shoofi["customer-campaigns"]`, handle `customerCampaigns`).
+    - **One record per doc, written by the server only:** `approval: {status:
+      pending|approved|rejected, requestedBy, requestedAt, decidedBy, decidedAt, note,
+      contentHash}`. The ids come from `req.auth.id` (invariant 7), never the body. A body's
+      `approval` / `approval.*` key is dropped, and the push PUT goes through
+      `withoutApprovalKeys`. Never let a create or update copy it from the request.
+    - **Create = `pending`**, whoever creates it, master and manager included. One-click
+      self-approval is allowed and recorded (`decidedBy === requestedBy`).
+    - **Edit.** A change to a customer-visible field re-queues the item to `pending`
+      (`CHANNELS[channel].fields`):
+      - banner: text, the three images, dates, link + legacy `appName`/`pageName`, `cityAreas`;
+      - story/popup: store, media, thumbnail, caption, link/`target`, `publishedAt`/`expiresAt`,
+        `cityAreas`;
+      - note: text, dates, link, `cityAreas`, `appName` ("shoofi" = none);
+      - push: title/body AR+HE, link, `targetAudience`, `cityAreaId`, `appType`, `appName`,
+        `channels`, `scheduling.type`/`scheduledDate`.
+
+      Dates are compared as instants. Toggling `isActive`, reordering, deleting, a campaign's
+      `name` or `holdout`, and a no-op re-save do not re-queue. A re-queued campaign that was
+      `scheduled` is disarmed to `active`, and is re-armed only after approval.
+    - **Grandfathering:** no `approval` field, or `approval: null`, counts as approved
+      (`approvedQuery()` = `$or: [{approval: null}, {"approval.status": "approved"}]`). In prod
+      on 2026-10-30, none of the 78 ads, 148 stories, 6 notes or 227 campaigns had the field. So
+      the 5 live banners, 86 live stories and 4 live popups stayed live at deploy, and no legacy
+      campaign could still be claimed (216 completed, 11 in_progress). An invisible edit leaves
+      a grandfathered doc without the field.
+    - **Customer reads filter on approval and strip the record** (`publicItem`). An approved or
+      grandfathered item comes back in exactly its old shape. The reads and their callers:
+      - `GET /ads/valid`: shoofi-app explore, shoofi-partner legacy explore;
+      - `GET /ads/list`: shoofi-shoofir legacy explore. The admin list passes
+        `includePending=true`; `activeOnly=false` is unfiltered;
+      - `GET /api/stories/valid` and `/announcements`: shoofi-app;
+      - `GET /api/notes/valid`: shoofi-app home + note-banner;
+      - `GET /api/notes/latest`: no app caller on main.
+
+      The admin reads (`/ads/by-date-range`, `/:id`, `/api/stories/list`, `/api/notes/list`,
+      `GET /api/customer-campaigns`) return the record.
+    - **Push is never sent or armed unless approved**, on four paths:
+      - `createCampaign` skips its immediate send;
+      - `claimCampaign` and `scheduleCampaign` AND `approvedQuery()` into their atomic filter,
+        throw `CAMPAIGN_NOT_APPROVED`, and their routes answer 409;
+      - the cron's `dueFilter` carries it, and a not-approved claim is skipped, never marked
+        failed.
+
+      Approving never sends. The opt-out, cap and holdout (invariants 12–13) are unchanged.
+    - **Approvers are master and manager only:** `routes/marketing-approval.js`,
+      `APPROVAL_ROLES = ["master","manager"]`. There's no hierarchy, so admin is NOT an
+      approver, though it still creates and edits as before (invariant 10).
+      - `GET /api/admin/marketing/approval/pending` returns one normalized row per item
+        (`services/marketing/approval-queue.js`).
+      - `POST /api/admin/marketing/approval/:channel/:id` takes `{decision, note, contentHash}`;
+        a reject needs a note. The write matches the pending record and its `contentHash`, so
+        an edit that lands while the approver looks is a 409 `CHANGED`.
+      - Audited as `decide_marketing_approval`.
+    - **Not covered (owner to decide):** coupon-to-phones sends and raw
+      `POST /api/notifications/send*`.
+
+    Admin web: `src/utils/marketing-approval.ts` (the same grandfathering and approver rules),
+    the אישורי שיווק queue at `/admin/marketing/approvals`, chips on every channel list and
+    form, and push send/schedule locked until approved. Pinned by shoofi-server
+    `test/integration/marketing-approval.js` (grandfathered shape, hiding, re-queue, push send /
+    cron refusal, 8-role matrix, audit), plus delivery-web `MarketingApprovals.test.tsx` and
+    `approval-gating.test.tsx`.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
