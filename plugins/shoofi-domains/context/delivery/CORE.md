@@ -146,6 +146,26 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
    fake lag (≈5 min on a 10-minute order) that is pure window arithmetic. Measure
    `assignedAt − max(assignDriverAt, created)`. All three are offset strings — parse to
    instants; and an admin reassign (`routes/delivery/driver.js`) overwrites `assignedAt`.
+   **Measuring how long a courier has not ANSWERED is a different clock again, and
+   `created` is not a proxy for it.** The wait that matters is `now − assignedAt` while
+   `status === "1"` and `isPendingAssignment !== true`; `created` is the partner-accept
+   instant and sits a **median 195 s** before `assignedAt` (4,063 bookings, 13–27 Oct 2026;
+   p90 674 s, 54% over two minutes). So both existing `created`-based definitions —
+   `routes/delivery/admin.js` `unresponsive_driver` (`{status:"1", created:{$lte:now−2min}}`)
+   and `shoofi-delivery-web/src/shared/opsDashboardUtils.ts` `classifyDeliveryTimings`
+   (`isOldPending` / `isLateApproval`) — fire on a courier who was handed the job seconds
+   ago, and neither filters out un-dispatched rows, so both also count every
+   waiting-for-assignment booking as an unresponsive courier. `assignedAt` is present on
+   4,063 of 4,090 bookings (exactly **one** carries a driver without it) and comes in two
+   types — 3,913 offset strings, 150 BSON Dates — so parse, never string-compare.
+   It does **reach the admin clients**: `assignedAt` and `reassignedAt` are in
+   `ASSIGNMENT_PROVENANCE_PROJECTION` (`services/delivery/assignment-provenance.js`), which
+   `routes/analytics.js` spreads into the `POST /api/analytics/deliveries` whitelist — they
+   are absent from that route's explicit key list, so reading the list alone concludes,
+   wrongly, that a server change is needed to surface the wait.
+   The wait is **predictive, not cosmetic**: of bookings whose courier took over 90 s to
+   accept, 49.0% were delivered after `expectedDeliveryAt` against a 28.9% baseline for the
+   rest (57.5% past 5 minutes) — same window, `completedAt` vs `expectedDeliveryAt`.
 3. **Never write `customers.isActive` directly** — always `setDriverActiveStatus`
    (`services/delivery/driver-status-service.js`), which writes `driverStatusHistory` in
    lock-step and pushes a websocket update. Direct writes create phantom history.
