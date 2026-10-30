@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -25,7 +25,9 @@ it RUNS the two report engines over any range; never re-derive money there), and
 Hashavshevet export `services/accountant-export/` + `utils/hashavshevet-movein.js` (reference §7b —
 its amounts are EZcount's per-line rounding, never `round2(totalOutcomes)`). Coupon **funding** set by the
 support team's coupon drafts (`services/coupons/coupon-drafts.js`, `routes/admin/coupon-drafts.js`,
-invariant 13) — the coupon itself is still written by `routes/coupon.js` (not yours). Client: the
+invariant 13) — the coupon itself is still written by `routes/coupon.js` (not yours). Who may call
+the settlement/payout routes that had no auth until 2026-10-30: `services/payments/settlement-access.js`
+(invariant 16). Client: the
 reports/payout screens and `views/admin/financial-overview/` in `shoofi-delivery-web`.
 **🔒 CLAUDE.md do-not-touch overlap:** `routes/hyp.js`, `utils/hyp.js`,
 `utils/invoice-provider.js`, `lib/payments/`. You depend on `routes/order.js` for order
@@ -556,6 +558,44 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       `deliveryCompany._id` = the driver's company (driver report). An item for anyone else is
       403. `payingParty` is still the caller's choice, and the approving admin reviews it.
     - Pinned in `test/integration/compensations-auth.js`.
+17. **The settlement and payout routes are gated in their own route lines, by audience — and the
+    store report's self-call carries the generating admin's token.** Until 2026-10-30 eight of them
+    had no `auth.required`: anyone could add or delete a driver bonus (`drivers-bonuses` is summed
+    straight into the courier settlement as `totalBonuses`, `routes/driver-reports.js`) and read
+    every store's revenue and every driver's earnings. `services/payments/settlement-access.js`:
+    - **Dashboard only, any dashboard role** (`settlementDashboard` = `auth.required` +
+      `checkAdminRole(DASHBOARD_ROLES)`): the four `/api/shoofiAdmin/driver-bonuses*` routes
+      (`routes/shoofi-admin.js`), `POST /api/payments/admin/stores-export-new` and
+      `POST /api/payments/admin/school-students` (`routes/payments/admin.js`).
+      `GET /api/coupons/admin/usage` takes `routes/coupon.js`'s own `couponReaders` (the same
+      roles). The admin web is their only client caller; **shoofir calls no bonus route** — a
+      driver's bonuses reach him through the courier report, which reads Mongo directly. This
+      closes them to the internet and narrows no staff role; a narrower write set for bonuses
+      (master/admin/manager, the sidebar's `["admin","manager"]` + master) is a recommendation,
+      not shipped.
+    - **`POST /api/payments/admin/drivers/summary` is the DRIVER app's route, not the
+      dashboard's.** Its only caller is shoofir's payments screen
+      (`screens/delivery-driver/payments.tsx`) for a delivery-company admin (`role: "admin"` on
+      its `delivery-company.customers` doc). Gate `companyAdminSelf`: a `shoofi-shoofir` token,
+      and the admin is **the token's own id** (`tokenUserId`) — a body `adminId` that differs is
+      a 403, so the body can no longer pick whose company is read. The handler keeps its
+      `role: "admin"`, `isControlledByAdmin` and same-company-driver checks. An admin-dashboard
+      token is refused (it has no company). **Never a role gate here:** mobile tokens carry no
+      roles, and #281 (2026-10-08) blanked every driver's payments screen that way.
+    - **The store report reads `stores-export-new` over HTTP** (`generateStoreReportData`, from
+      `reports/generate` and the financial overview). The POST forwards the incoming request's
+      `authorization` + `app-type` (`selfCallHeaders`), and a **401/403 throws**
+      (`throwIfSelfCallRefused`): a recorded `generation_error` on `reports/generate`, a flagged
+      store on the overview. Before, every failed fetch left `paymentData = null` and the report
+      was saved on ₪0 card revenue — the store paid nothing, silently. **Every other fetch error
+      is still swallowed** (the `suspectZeroOrderReports` counter in
+      `services/exec-dashboard/billing-metrics.js` still describes that path). Do not widen the
+      throw without a decision; do not drop the header forwarding, or every report fails.
+    Not covered (still open): `POST /api/payments/{partner/summary,partner/daily-orders,
+    partner/details,driver/summary,driver/details}` and `GET /api/payments/delivery-companies`
+    have no `auth.required`; `reports/generate` and the other `/admin/reports*` routes are
+    `auth.required` only (any token, no role). Tests: shoofi-server
+    `test/integration/settlement-admin-auth.js`.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
