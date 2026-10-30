@@ -434,11 +434,15 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     their admin routes. Until then seven of these eight had no auth: anyone could read any
     customer's coin wallet, switch coins off platform-wide, set a store's `earnPercent` /
     `coinValue` (free money for customers), or run the expiry sweep.
-    - **One gate, all eight:** `auth.required` + `checkAdminRole(DASHBOARD_ROLES)`
-      (`utils/analytics-access.js`, so `viewer` and `accountant` pass). In `routes/coins.js` it
-      is `COINS_ADMIN` on `POST /api/admin/coins/expire`,
+    - **Seven on the dashboard gate, the sweep master-only.** `auth.required` +
+      `checkAdminRole(DASHBOARD_ROLES)` (`utils/analytics-access.js`, so `viewer` and
+      `accountant` pass) on seven routes. In `routes/coins.js` it is `COINS_ADMIN` on
       `GET /api/admin/coins/customer/:customerId[/earned]` and
-      `GET /api/admin/coins/store/:storeAppName/stats`. In `routes/shoofi-admin.js` it is
+      `GET /api/admin/coins/store/:storeAppName/stats`. `POST /api/admin/coins/expire` is
+      `COINS_EXPIRE_ADMIN` = `checkAdminRole(["master"])`: it is the only code that permanently
+      deletes coins, nobody calls it, and prod had no sweep rows, so narrowing it took access
+      from no one. A run is audited as `expire_coins` (`services/audit/admin-audit-routes.js`).
+      In `routes/shoofi-admin.js` it is
       `COINS_SETTINGS_ADMIN`, built inside the Coins Settings block from locally named requires,
       on `GET|POST /api/admin/coins-settings` and `GET|POST /api/admin/store/:appName/coins-settings`.
       Not in `utils/restricted-admin-routes.js`.
@@ -458,8 +462,8 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       exist carry an `orderId`: they are `refundCoins` clawing back coins earned on a cancelled
       order, not the sweep.
     - Tests: `test/integration/coins-admin-auth.js` (static gate check on every route plus every
-      `/api/admin/*` route in `routes/coins.js`, 401/403 matrix, every dashboard role, refused
-      writes write nothing).
+      `/api/admin/*` route in `routes/coins.js`, 401/403 matrix, every dashboard role on seven
+      routes, master-only on expire, the audit entry, refused writes write nothing).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

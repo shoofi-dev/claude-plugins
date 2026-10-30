@@ -308,8 +308,9 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   customer/:customerId/earned, store/:storeAppName/stats}` in `routes/coins.js` (`COINS_ADMIN`) and
   `/api/admin/coins-settings` + `/api/admin/store/:appName/coins-settings` (GET and POST) in the
   Coins Settings block of `routes/shoofi-admin.js` (`COINS_SETTINGS_ADMIN`). All eight are
-  `auth.required` + `checkAdminRole(DASHBOARD_ROLES)`, so no token is 401 and customer, partner and
-  driver tokens are 403. The customer routes `/api/coins/*` are `auth.required` and read the
+  `auth.required` + a role check, so no token is 401 and customer, partner and driver tokens are
+  403. Seven take `DASHBOARD_ROLES`; `expire` is master-only (`COINS_EXPIRE_ADMIN`) and audited
+  as `expire_coins`. The customer routes `/api/coins/*` are `auth.required` and read the
   customer from the token. Store `coinsSettings` is also written by the ungated
   `POST /api/store/update`.
 
@@ -566,7 +567,8 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   (timeline; every `admin/order-monitoring/*` route is `auth.required` +
   `checkAdminRole` with ALL admin roles — customer tokens 403, no token 401), `twin-order/admin/{group/:id/full, degrade, undo-degrade, cancel, assign-driver}`,
   `admin/twin-order-config` (GET/POST), `delivery/admin/{cancel,assign,reassign,drivers,orders}`,
-  and the coins admin routes (CORE invariant 19, every dashboard role):
+  and the coins admin routes (CORE invariant 19, every dashboard role; `admin/coins/expire` is
+  master-only):
   `admin/coins-settings` (GET/POST, `src/views/admin/settings/ShoofiSettings.tsx`, the platform
   on/off switch), `admin/store/{appName}/coins-settings` (GET/POST, `src/views/admin/stores/StoreForm.tsx`)
   and `admin/coins/customer/{id}/earned` (`src/apis/admin/customers/customer-details.ts`, the
