@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -32,7 +32,8 @@
         "services/coupons/coupon-funder.js",
         "utils/coupon-discount.js",
         "services/coupons/delivery-price-enforcement.js",
-        "services/compensations/access.js"
+        "services/compensations/access.js",
+        "services/payments/settlement-access.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -157,6 +158,14 @@
           "ADMIN_ONLY_ITEM_FIELDS",
           "partnerOwnsOrder",
           "driverOwnsDelivery"
+        ],
+        "services/payments/settlement-access.js": [
+          "settlementDashboard",
+          "ownCompanyAdminGate",
+          "companyAdminSelf",
+          "tokenUserId",
+          "selfCallHeaders",
+          "throwIfSelfCallRefused"
         ]
       },
       "patterns": [
@@ -649,6 +658,71 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "if \\(status === 401 \\|\\| status === 403\\) \\{\\s*throw new Error",
           "desc": "CORE invariant 10/16: a refused compensation fetch FAILS the report instead of settling it with ₪0 compensations"
+        },
+        {
+          "file": "services/payments/settlement-access.js",
+          "regex": "const settlementDashboard = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",
+          "desc": "CORE invariant 17: the settlement dashboard gate is auth.required + any dashboard role"
+        },
+        {
+          "file": "services/payments/settlement-access.js",
+          "regex": "const companyAdminSelf = \\[auth\\.required, ownCompanyAdminGate\\];",
+          "desc": "CORE invariant 17: drivers/summary takes a shoofir token, never a role gate (mobile tokens carry no roles)"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.post\\(\"/api/shoofiAdmin/driver-bonuses/add\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: creating a driver bonus (it feeds totalBonuses) needs a dashboard token"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.get\\(\"/api/shoofiAdmin/driver-bonuses\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: the bonus list is dashboard-only"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.get\\(\"/api/shoofiAdmin/driver-bonuses/driver/:driverId\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: one driver's bonuses are dashboard-only (shoofir does not call it)"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.delete\\(\"/api/shoofiAdmin/driver-bonuses/:id\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: deleting a driver bonus needs a dashboard token"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "router\\.post\\(\"/api/payments/admin/drivers/summary\", \\.\\.\\.companyAdminSelf,",
+          "desc": "CORE invariant 17: drivers/summary is the shoofir company admin's own route"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "const adminId = tokenUserId\\(req\\);",
+          "desc": "CORE invariant 17: drivers/summary takes the company admin from the token, never the body"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "router\\.post\\(\"/api/payments/admin/stores-export-new\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: the store revenue engine is dashboard-only"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "router\\.post\\(\"/api/payments/admin/school-students\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: the school student payments report is dashboard-only"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "router\\.get\\('/api/coupons/admin/usage', \\.\\.\\.couponReaders,",
+          "desc": "CORE invariant 17: coupon usage totals take the coupon readers' roles (= the dashboard roles)"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "/api/payments/admin/stores-export-new`, paymentRequestData, selfCallHeaders\\(req\\)\\)",
+          "desc": "CORE invariant 17: the store report's revenue self-call forwards the generating admin's token"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "throwIfSelfCallRefused\\(error, 'store payment data \\(stores-export-new\\)'\\);",
+          "desc": "CORE invariant 17: a refused revenue self-call fails the report instead of settling it on 0 card revenue"
         }
       ]
     }
