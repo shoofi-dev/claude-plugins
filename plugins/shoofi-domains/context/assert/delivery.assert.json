@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@a7d1d1c2 / 2026-10-30 (CORE invariant 19, assignment-decisions); rest shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -36,7 +36,8 @@
         "scripts/delivery-only-preflight.js",
         "docs/delivery-only-bookings.md",
         "services/delivery/manual-assignment-ranking.js",
-        "lib/delivery/helpers.js"
+        "lib/delivery/helpers.js",
+        "services/delivery/assignment-decision-log.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -119,6 +120,18 @@
           "/api/delivery/delivery-only/book",
           "/api/delivery/delivery-only/list",
           "isDeliveryOnly"
+        ],
+        "services/delivery/assignment-decision-log.js": [
+          "OUTCOMES",
+          "REASONS",
+          "ALL_DRIVERS_AT_CAPACITY",
+          "NO_CANDIDATES",
+          "eligibleDriverCount",
+          "atCapacityCount",
+          "switchedOffCount",
+          "consideredCount",
+          "companyCount",
+          "newTrace"
         ]
       },
       "patterns": [
@@ -446,6 +459,16 @@
           "file": "services/delivery/manual-assignment-ranking.js",
           "regex": "RANK_REASONS",
           "desc": "the server side of the contract: reason codes the admin web must translate"
+        },
+        {
+          "file": "services/delivery/assignment-decision-log.js",
+          "regex": "originalBookId:\\s*String\\(originalBookId\\),\\s*engine,\\s*outcome,\\s*reasonCode",
+          "desc": "the decision row is UPSERTED on (originalBookId, engine, outcome, reasonCode) — consecutive identical failures coalesce into one document; CORE invariant 19 depends on that key, and counting rows instead of reading attempts under-reports dispatch pressure"
+        },
+        {
+          "file": "services/delivery/assignment-decision-log.js",
+          "regex": "\\$inc:\\s*\\{\\s*attempts:\\s*1\\s*\\}",
+          "desc": "attempts is incremented per dispatch attempt and firstAt/lastAt bracket them — the number ops actually wants (CORE invariant 19)"
         }
       ]
     },

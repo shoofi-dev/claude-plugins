@@ -401,6 +401,27 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `isDeliveryOnly: true` (`routes/delivery/orders.js`), so it **implies** delivery-only and
     never the converse — a map drawing that point as a doorstep is stating a town centroid
     nobody typed.
+19. **"Why has this delivery not been assigned?" is ONE query, and the row is coalesced.**
+    `delivery-company.assignment-decisions` upserts on
+    `(originalBookId, engine, outcome, reasonCode)` and `$inc`s `attempts` with
+    `firstAt`/`lastAt` (`services/delivery/assignment-decision-log.js`), so the 60s sweeper
+    failing the same way nine times in a row is **one document reading `attempts: 9`**, not
+    nine documents — counting rows under-reports dispatch pressure by that factor, and a
+    booking that later succeeds has **two** rows (the failing one, then `outcome: "assigned"`),
+    whose `lastAt`→`createdAt` gap is the real wait. `outcome` is `OUTCOMES`
+    (`assigned|mirrored|deferred|no_candidates|lost_race|error`) and on a `no_candidates` the
+    `reasonCode` is `REASONS` — ordered as the engines apply the filters, so the code names
+    the stage the delivery reached: `no_area_match` → `no_company_covers_area` →
+    `no_eligible_driver` → `all_drivers_switched_off` / `no_driver_accepts_store` /
+    `all_drivers_at_capacity` / `all_drivers_blocked`. `trace` carries the funnel that proves
+    it: `companyCount` → `eligibleDriverCount` (company+area coverage AND `isActive`) →
+    `switchedOffCount` / `staleLocationCount` / `atCapacityCount` → `consideredCount`.
+    **`atCapacityCount === eligibleDriverCount` is the supply shortage**, and it is the common
+    one: a real Kfar Qasem booking on 2026-10-30 sat `no_candidates` /
+    `all_drivers_at_capacity` for 8 ticks on `companyCount: 96, eligibleDriverCount: 1` —
+    100 companies cover the zone and 146 couriers sit in them, but one had `isActive: true`.
+    So read this collection before the board: the live-ops row shows "ממתין להקצאה" and the
+    scheduled time, and nothing about *why*, which is the whole question.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
