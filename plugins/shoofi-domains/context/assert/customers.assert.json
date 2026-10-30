@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing approval); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: draft -> approve now/schedule); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -61,14 +61,14 @@
         ],
         "services/customer-campaigns/holdout.js": ["holdoutBucket", "assignHoldout", "normalizeHoldoutInput", "MIN_AUDIENCE", "audience_below_minimum", "not_customer_audience"],
         "services/customer-campaigns/push-audience.js": ["marketingPushAudience", "recordAudience", "ensureIndexesOnce", "lostWrites"],
-        "controllers/customerCampaignController.js": ["claimCampaign", "toScheduledDate", "unscheduleCampaign", "CAMPAIGN_NOT_CLAIMABLE", "holdoutCount", "holdoutSkippedReason", "audienceRecordErrors", "CAMPAIGN_NOT_APPROVED", "withoutApprovalKeys"],
+        "controllers/customerCampaignController.js": ["claimCampaign", "toScheduledDate", "unscheduleCampaign", "CAMPAIGN_NOT_CLAIMABLE", "holdoutCount", "holdoutSkippedReason", "audienceRecordErrors", "CAMPAIGN_IS_DRAFT", "withoutApprovalKeys", "approveCampaign", "revertCampaign"],
         "utils/crons/scheduled-campaigns-cron.js": ["runDueCampaigns", "checkScheduledCampaigns", "cron:scheduled-campaigns"],
         "utils/marketing-link.js": ["LINK_TYPES", "LINK_PAGES", "linkFromRequest", "resolveLink", "legacyAdFields", "legacyLink", "withLink"],
         "routes/marketing-events.js": ["sanitizeEvent", "ensureIndexesInBackground", "marketingEvents", "MAX_BATCH"],
         "services/marketing/viewer-key.js": ["deviceViewerKey"],
         "services/marketing/performance.js": ["getPerformance", "holdoutLift", "listOrderFacts", "pushCampaignsFor", "itemNames", "listCampaignImpact"],
-        "services/marketing/approval.js": ["approvedQuery", "publicItem", "approvalForCreate", "approvalForUpdate", "contentHash", "decide", "isApproved", "withApproval", "NOT_PENDING", "CHANGED", "NOTE_REQUIRED"],
-        "services/marketing/approval-queue.js": ["listPending", "linkLabel"],
+        "services/marketing/approval.js": ["visibleQuery", "publishedQuery", "publicItem", "draftRecord", "isPublished", "stateOf", "parsePublishAt", "approve", "revert", "NOT_DRAFT", "ALREADY_DRAFT", "NOT_REVERTIBLE", "PUBLISH_AT_PAST"],
+        "services/marketing/approval-queue.js": ["listDrafts", "linkLabel"],
         "services/marketing/campaign-impact.js": ["marketingCampaignImpact", "computeCampaignImpact", "computeDueImpacts", "recipientsOf", "impactsFor", "judge", "METHOD_VERSION"],
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
         "utils/auth-service.js": ["generateJWT", "toAuthJSON"],
@@ -453,20 +453,23 @@
         {"file": "services/marketing/campaign-impact.js", "regex": "if \\(afterRead\\.unavailable\\.length\\) return \\{ skipped: \"stores_unavailable\"", "desc": "CORE invariant 11: an unreadable store DB means nothing is written; the next run retries"},
         {"file": "routes/marketing-performance.js", "regex": "\"/api/admin/marketing/campaign-impact\",\\n  auth\\.required,\\n  checkAdminRole\\(RESULTS_ROLES\\),", "desc": "CORE invariant 11: campaign impact is served behind the dashboard roles - wider than the master/admin analytics gate - never on an /api/analytics/growth route"},
         {"file": "services/database/DatabaseInitializationService.js", "regex": "db\\.marketingCampaignImpact = db\\.collection\\('marketingCampaignImpact'\\);", "desc": "CORE invariant 11: the campaign impact handle is registered"},
-        {"file": "services/marketing/approval.js", "regex": "return \\{ \\$or: \\[\\{ approval: null \\}, \\{ \"approval\\.status\": \"approved\" \\}\\] \\};", "desc": "CORE invariant 17: grandfathering - no approval field (or null) counts as approved, so every item live at deploy stays live"},
-        {"file": "services/marketing/approval.js", "regex": "\\{ _id, \"approval\\.status\": \"pending\", \"approval\\.contentHash\": approval\\.contentHash \\}", "desc": "CORE invariant 17: a decision matches the pending record AND the content hash that was queued - a concurrent edit makes it a 409, never a silent approve"},
-        {"file": "services/marketing/approval.js", "regex": "if \\(status === \"rejected\" && !cleanNote\\) throw new ApprovalError\\(400,", "desc": "CORE invariant 17: a rejection needs a note"},
-        {"file": "routes/marketing-approval.js", "regex": "const APPROVAL_ROLES = \\[\"master\", \"manager\"\\];\\nconst approvers = \\[auth\\.required, checkAdminRole\\(APPROVAL_ROLES\\)\\];", "desc": "CORE invariant 17: approvers are master and manager only (no hierarchy: admin is not one)"},
-        {"file": "routes/ads.js", "regex": "\\$and: \\[timeQuery, locationQuery, approval\\.approvedQuery\\(\\)\\]", "desc": "CORE invariant 17: /ads/valid serves approved (or grandfathered) banners only"},
-        {"file": "routes/ads.js", "regex": "const forCustomers = \\(ad\\) => approval\\.publicItem\\(withLink\\(\"ad\"\\)\\(ad\\)\\);", "desc": "CORE invariant 17: customer banner reads strip the approval record - the old shape exactly"},
-        {"file": "routes/stories.js", "regex": "cityAreasClause,\\n              approval\\.approvedQuery\\(\\),", "desc": "CORE invariant 17: the launch popup feed serves approved popups only"},
-        {"file": "routes/stories.js", "regex": "\\.\\.\\.\\(cityAreasClause \\? \\[cityAreasClause\\] : \\[\\]\\),\\n        approval\\.approvedQuery\\(\\),", "desc": "CORE invariant 17: the story bar serves approved stories only"},
-        {"file": "routes/notes.js", "regex": "appNameQuery,\\n        approval\\.approvedQuery\\(\\)", "desc": "CORE invariant 17: /notes/valid and /latest serve approved notes only"},
-        {"file": "controllers/customerCampaignController.js", "regex": "\\{ \\$and: \\[\\{ status: \\{ \\$nin: NOT_CLAIMABLE \\}, \\.\\.\\.\\(claimFilter \\|\\| \\{\\}\\), _id: getId\\(campaignId\\) \\}, approval\\.approvedQuery\\(\\)\\] \\}", "desc": "CORE invariant 17: the atomic claim refuses a campaign that is not approved"},
-        {"file": "controllers/customerCampaignController.js", "regex": "campaign\\.status === 'active' &&\\n      approval\\.isApproved\\(campaign\\)", "desc": "CORE invariant 17: send-now on create is held - a new campaign is pending"},
-        {"file": "controllers/customerCampaignController.js", "regex": "if \\(\\(safeUpdates\\.status \\|\\| existing\\.status\\) === 'scheduled'\\) safeUpdates\\.status = 'active';", "desc": "CORE invariant 17: a re-queued armed campaign is disarmed"},
-        {"file": "utils/crons/scheduled-campaigns-cron.js", "regex": "'scheduling\\.scheduledDate': \\{ \\$lte: now \\},\\n  \\.\\.\\.approvedQuery\\(\\)", "desc": "CORE invariant 17: the scheduled-campaigns cron picks approved campaigns only"},
-        {"file": "services/audit/admin-audit-routes.js", "regex": "pattern: '/api/admin/marketing/approval/:channel/:id', method: 'POST', action: 'decide_marketing_approval'", "desc": "CORE invariant 17: every approve/reject is in the admin audit log"}
+        {"file": "services/marketing/approval.js", "regex": "\\{\\ approval:\\ null\\ \\},\\n\\ \\ \\ \\ \\ \\ \\{\\ \"approval\\.status\":\\ STATUS\\.PUBLISHED,\\ \"approval\\.publishAt\":\\ null\\ \\},\\n\\ \\ \\ \\ \\ \\ \\{\\ \"approval\\.status\":\\ STATUS\\.PUBLISHED,\\ \"approval\\.publishAt\":\\ \\{\\ \\$lte:\\ now\\ \\}\\ \\},", "desc": "CORE invariant 17: customers see an item with no record (grandfathered) or a published one whose publish time has come - drafts and not-yet-due schedules stay hidden"},
+        {"file": "services/marketing/approval.js", "regex": "\\{\\ _id:\\ item\\._id,\\ \"approval\\.status\":\\ STATUS\\.DRAFT\\ \\},", "desc": "CORE invariant 17: approve is atomic on the draft state - a double click publishes once"},
+        {"file": "services/marketing/approval.js", "regex": "status:\\ STATUS\\.DRAFT,\\n\\ \\ \\ \\ createdBy:\\ actorId\\(req\\),", "desc": "CORE invariant 17: every new item is a draft, creator from the token"},
+        {"file": "routes/marketing-approval.js", "regex": "const\\ DRAFT_ROLES\\ =\\ \\[\"master\",\\ \"admin\",\\ \"manager\"\\];\\nconst\\ APPROVE_ROLES\\ =\\ \\[\"master\",\\ \"admin\",\\ \"manager\"\\];", "desc": "CORE invariant 17: the roles mirror coupon drafts - whoever creates may approve (master named: no hierarchy)"},
+        {"file": "routes/ads.js", "regex": "\\$and:\\ \\[timeQuery,\\ locationQuery,\\ approval\\.visibleQuery\\(\\)\\]", "desc": "CORE invariant 17: /ads/valid serves published, due (or grandfathered) banners only"},
+        {"file": "routes/ads.js", "regex": "const\\ forCustomers\\ =\\ \\(ad\\)\\ =>\\ approval\\.publicItem\\(withLink\\(\"ad\"\\)\\(ad\\)\\);", "desc": "CORE invariant 17: customer banner reads strip the record - the old shape exactly"},
+        {"file": "routes/stories.js", "regex": "cityAreasClause,\\n\\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ \\ approval\\.visibleQuery\\(\\),", "desc": "CORE invariant 17: the launch popup feed serves published, due popups only"},
+        {"file": "routes/stories.js", "regex": "\\.\\.\\.\\(cityAreasClause\\ \\?\\ \\[cityAreasClause\\]\\ :\\ \\[\\]\\),\\n\\ \\ \\ \\ \\ \\ \\ \\ approval\\.visibleQuery\\(\\),", "desc": "CORE invariant 17: the story bar serves published, due stories only"},
+        {"file": "routes/notes.js", "regex": "appNameQuery,\\n\\ \\ \\ \\ \\ \\ \\ \\ approval\\.visibleQuery\\(\\)", "desc": "CORE invariant 17: /notes/valid and /latest serve published, due notes only - the note's own dates are still ignored, so this is what holds a scheduled note back"},
+        {"file": "controllers/customerCampaignController.js", "regex": "\\{\\ \\$and:\\ \\[\\{\\ status:\\ \\{\\ \\$nin:\\ NOT_CLAIMABLE\\ \\},\\ \\.\\.\\.\\(claimFilter\\ \\|\\|\\ \\{\\}\\),\\ _id:\\ getId\\(campaignId\\)\\ \\},\\ approval\\.publishedQuery\\(\\)\\]\\ \\}", "desc": "CORE invariant 17: the atomic claim refuses a draft campaign"},
+        {"file": "controllers/customerCampaignController.js", "regex": "campaign\\.status\\ =\\ 'draft';\\n\\ \\ \\ \\ campaign\\.approval\\ =\\ approval\\.draftRecord\\(req\\);", "desc": "CORE invariant 17: a new campaign is a draft - send-now on create no longer sends"},
+        {"file": "controllers/customerCampaignController.js", "regex": "\\{\\ _id,\\ 'approval\\.status':\\ approval\\.STATUS\\.DRAFT,\\ status:\\ \\{\\ \\$nin:\\ NOT_CLAIMABLE\\ \\}\\ \\},", "desc": "CORE invariant 17: approving a push is atomic on the draft state, so it is sent or armed once"},
+        {"file": "controllers/customerCampaignController.js", "regex": "\\{\\ status:\\ \\{\\ \\$nin:\\ DRAFT_STATUSES_SENT\\ \\},\\ 'execution\\.startedAt':\\ null\\ \\},\\n\\ \\ \\ \\ \\ \\ \\{\\ status:\\ 'draft'\\ \\}", "desc": "CORE invariant 17: a push goes back to draft only before any send, and is disarmed in the same write"},
+        {"file": "controllers/customerCampaignController.js", "regex": "if\\ \\(options\\.refuseInProgress\\)\\ delete\\ safeUpdates\\.status;", "desc": "CORE invariant 17: the admin's PUT never sets the status (nor approval: withoutApprovalKeys)"},
+        {"file": "utils/crons/scheduled-campaigns-cron.js", "regex": "'scheduling\\.scheduledDate':\\ \\{\\ \\$lte:\\ now\\ \\},\\n\\ \\ \\.\\.\\.publishedQuery\\(\\)", "desc": "CORE invariant 17: the scheduled-campaigns cron picks published campaigns only"},
+        {"file": "services/audit/admin-audit-routes.js", "regex": "pattern:\\ '/api/admin/marketing/drafts/:channel/:id/approve',\\ method:\\ 'POST',\\ action:\\ 'approve_marketing_draft'", "desc": "CORE invariant 17: every approve is in the admin audit log"},
+        {"file": "services/audit/admin-audit-routes.js", "regex": "pattern:\\ '/api/admin/marketing/drafts/:channel/:id/revert',\\ method:\\ 'POST',\\ action:\\ 'revert_marketing_to_draft'", "desc": "CORE invariant 17: every back-to-draft is in the admin audit log"}
       ]
     },
     "shoofi-app": {
@@ -515,7 +518,8 @@
         "src/views/admin/customer-campaigns/HoldoutField.tsx",
         "src/views/admin/customer-campaigns/CustomerCampaignsList.tsx",
         "src/utils/marketing-approval.ts",
-        "src/views/admin/marketing-approvals/MarketingApprovals.tsx"
+        "src/views/admin/marketing-drafts/MarketingDrafts.tsx",
+        "src/components/admin/ApproveDialog.tsx"
       ],
       "patterns": [
         {
@@ -538,26 +542,10 @@
           "regex": "קבוצת ביקורת: \\{campaign\\.execution\\.holdoutCount\\}",
           "desc": "CORE invariant 12: the list shows holdoutCount in the results column"
         },
-        {
-          "file": "src/utils/marketing-approval.ts",
-          "regex": "export const APPROVER_ROLES = \\[\"master\", \"manager\"\\];",
-          "desc": "CORE invariant 17: the admin's approver rule matches the server's APPROVAL_ROLES"
-        },
-        {
-          "file": "src/utils/marketing-approval.ts",
-          "regex": "return approval == null \\|\\| approval\\.status === \"approved\";",
-          "desc": "CORE invariant 17: grandfathered (no record) counts as approved on the admin side too"
-        },
-        {
-          "file": "src/views/admin/marketing-approvals/MarketingApprovals.tsx",
-          "regex": "contentHash: item\\.approval\\.contentHash,",
-          "desc": "CORE invariant 17: a decision carries the hash of the content the approver saw"
-        },
-        {
-          "file": "src/views/admin/ads/AdsList.tsx",
-          "regex": "includePending=true",
-          "desc": "CORE invariant 17: the admin banner list asks for pending ads, which /ads/list hides from customers"
-        }
+        {"file": "src/utils/marketing-approval.ts", "regex": "export\\ const\\ DRAFT_ROLES\\ =\\ \\[\"master\",\\ \"admin\",\\ \"manager\"\\];", "desc": "CORE invariant 17: the admin's draft/approve roles match the server's DRAFT_ROLES / APPROVE_ROLES"},
+        {"file": "src/utils/marketing-approval.ts", "regex": "if\\ \\(approval\\ ==\\ null\\)\\ return\\ doc\\ \\&\\&\\ doc\\.status\\ ===\\ \"scheduled\"\\ \\?\\ \"scheduled\"\\ :\\ \"live\";", "desc": "CORE invariant 17: no record = grandfathered = published on the admin side too"},
+        {"file": "src/components/admin/ApproveDialog.tsx", "regex": "publishAt\\ =\\ fromJerusalemInputValue\\(local\\);", "desc": "CORE invariant 17: a scheduled publish is picked in Israel time and sent as an instant, whatever the browser's zone"},
+        {"file": "src/views/admin/ads/AdsList.tsx", "regex": "includePending=true", "desc": "CORE invariant 17: the admin banner list asks for drafts too, which /ads/list hides from customers"}
       ]
     }
   }

@@ -311,7 +311,7 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       result records `execution.skippedOptOut` / `skippedCapped` / `pushCap`.
     - **A campaign is claimed atomically**: `claimCampaign` is one `findOneAndUpdate` to
       `in_progress`. It used to read the status and then write. The cron claims only a due
-      `scheduled` campaign that is approved (invariant 17). A lost claim throws `code: 'CAMPAIGN_NOT_CLAIMABLE'`, and the cron
+      `scheduled` campaign that is published (invariant 17). A lost claim throws `code: 'CAMPAIGN_NOT_CLAIMABLE'`, and the cron
       skips it without marking it failed, because that would overwrite a run that is sending.
       The admin's `PUT /:id` refuses an `in_progress` campaign (409) for the same reason.
     - **`scheduling.scheduledDate` is a Date.** A wall-clock string without an offset is read in
@@ -408,74 +408,71 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
     Pinned by shoofi-server `test/integration/customer-search-admin-auth.js` and
     `test/integration/otp-verify-requires-code.js`.
 
-17. **No marketing item reaches a customer until a manager or master approves it, and an item
-    saved before approvals existed counts as approved** (owner's decision 2026-10-30;
-    shoofi-server `services/marketing/approval.js`, `feat/marketing-approval`). It covers home
-    banners (`shoofi.ads`), stories and launch popups (`shoofi.stories`; a popup is a
-    `shoofi-stories` story), the home note banner (`shoofi.notes`) and push campaigns
+17. **Every in-app marketing item is a draft until someone approves it; approving publishes
+    it now or at a set time; an item saved before drafts existed is published** (owner's
+    decision 2026-10-30, "draft then approve, like the coupons prompt"; shoofi-server
+    `services/marketing/approval.js`, `feat/marketing-approval`). It covers home banners
+    (`shoofi.ads`), stories and launch popups (`shoofi.stories`; a popup is a `shoofi-stories`
+    story), the home note banner (`shoofi.notes`) and push campaigns
     (`shoofi["customer-campaigns"]`, handle `customerCampaigns`).
-    - **One record per doc, written by the server only:** `approval: {status:
-      pending|approved|rejected, requestedBy, requestedAt, decidedBy, decidedAt, note,
-      contentHash}`. The ids come from `req.auth.id` (invariant 7), never the body. A body's
-      `approval` / `approval.*` key is dropped, and the push PUT goes through
-      `withoutApprovalKeys`. Never let a create or update copy it from the request.
-    - **Create = `pending`**, whoever creates it, master and manager included. One-click
-      self-approval is allowed and recorded (`decidedBy === requestedBy`).
-    - **Edit.** A change to a customer-visible field re-queues the item to `pending`
-      (`CHANNELS[channel].fields`):
-      - banner: text, the three images, dates, link + legacy `appName`/`pageName`, `cityAreas`;
-      - story/popup: store, media, thumbnail, caption, link/`target`, `publishedAt`/`expiresAt`,
-        `cityAreas`;
-      - note: text, dates, link, `cityAreas`, `appName` ("shoofi" = none);
-      - push: title/body AR+HE, link, `targetAudience`, `cityAreaId`, `appType`, `appName`,
-        `channels`, `scheduling.type`/`scheduledDate`.
-
-      Dates are compared as instants. Toggling `isActive`, reordering, deleting, a campaign's
-      `name` or `holdout`, and a no-op re-save do not re-queue. A re-queued campaign that was
-      `scheduled` is disarmed to `active`, and is re-armed only after approval.
-    - **Grandfathering:** no `approval` field, or `approval: null`, counts as approved
-      (`approvedQuery()` = `$or: [{approval: null}, {"approval.status": "approved"}]`). In prod
-      on 2026-10-30, none of the 78 ads, 148 stories, 6 notes or 227 campaigns had the field. So
-      the 5 live banners, 86 live stories and 4 live popups stayed live at deploy, and no legacy
-      campaign could still be claimed (216 completed, 11 in_progress). An invisible edit leaves
-      a grandfathered doc without the field.
-    - **Customer reads filter on approval and strip the record** (`publicItem`). An approved or
-      grandfathered item comes back in exactly its old shape. The reads and their callers:
+    - **One record per doc, written by the server only:** `approval: {status: draft|published,
+      createdBy, createdAt, approvedBy, approvedAt, publishAt, revertedBy, revertedAt}`. The ids
+      come from `req.auth.id` (invariant 7). The ads, stories and notes writers copy named
+      fields only. The campaign create drops `approval`, and the PUT drops `approval`,
+      `approval.*` and `status` (`withoutApprovalKeys`). Never let a create or update copy the
+      record or the status from a request.
+    - **Create = draft**, whoever creates it. A new push is `status: "draft"` even if the form
+      said send-now, so nothing is sent on create any more. Editing a published item saves
+      directly (as a coupon does after approval). A push `in_progress`/`completed` can't be
+      edited (409), and an armed one keeps a future send time (400).
+    - **Approve** = `POST /api/admin/marketing/drafts/:channel/:id/approve` with `{when:
+      now|schedule, publishAt}`. A schedule must be future and within a year. The write is atomic
+      on `approval.status: "draft"`, so a double click publishes or sends once.
+      - Banner/story/popup/note: `publishAt` = now or the scheduled instant. **The schedule lives
+        on the record**, so every customer read adds the same `visibleQuery(now)`: no record, or
+        published with `publishAt` null or ≤ now. Each channel's own `startDate` / `publishedAt`
+        and end dates keep their old meaning. A note's reads ignore its dates, so a scheduled
+        note is held back by this clause alone.
+      - Push: "now" runs the existing `executeCampaign` (invariants 12–13 unchanged). "schedule"
+        sets `scheduling` and runs the existing `scheduleCampaign` and cron, and it goes back to
+        draft if arming fails.
+    - **Back to draft** = `POST …/:channel/:id/revert`. Customers stop seeing it on their next
+      read, and a grandfathered item can be reverted too. A push reverts only while nothing was
+      sent (not `in_progress`/`completed` and `execution.startedAt` unset). That check is in the
+      atomic filter, and the push is disarmed to `status: "draft"` in the same write. **Delete**
+      is each channel's existing `DELETE` route.
+    - **Grandfathering:** a doc with no `approval` (or `approval: null`) is published. In prod on
+      2026-10-30, none of the 78 ads, 148 stories, 6 notes or 227 campaigns had the field. So the
+      5 live banners, 86 live stories and 4 live popups stayed live, and no legacy campaign could
+      still be claimed (216 completed, 11 in_progress).
+    - **Customer reads filter with `visibleQuery()` and strip the record** (`publicItem`), so a
+      published or grandfathered item keeps exactly its old shape. The reads and their callers:
       - `GET /ads/valid`: shoofi-app explore, shoofi-partner legacy explore;
       - `GET /ads/list`: shoofi-shoofir legacy explore. The admin list passes
         `includePending=true`; `activeOnly=false` is unfiltered;
       - `GET /api/stories/valid` and `/announcements`: shoofi-app;
-      - `GET /api/notes/valid`: shoofi-app home + note-banner;
+      - `GET /api/notes/valid`: shoofi-app home and note-banner;
       - `GET /api/notes/latest`: no app caller on main.
 
-      The admin reads (`/ads/by-date-range`, `/:id`, `/api/stories/list`, `/api/notes/list`,
-      `GET /api/customer-campaigns`) return the record.
-    - **Push is never sent or armed unless approved**, on four paths:
-      - `createCampaign` skips its immediate send;
-      - `claimCampaign` and `scheduleCampaign` AND `approvedQuery()` into their atomic filter,
-        throw `CAMPAIGN_NOT_APPROVED`, and their routes answer 409;
-      - the cron's `dueFilter` carries it, and a not-approved claim is skipped, never marked
-        failed.
-
-      Approving never sends. The opt-out, cap and holdout (invariants 12–13) are unchanged.
-    - **Approvers are master and manager only:** `routes/marketing-approval.js`,
-      `APPROVAL_ROLES = ["master","manager"]`. There's no hierarchy, so admin is NOT an
-      approver, though it still creates and edits as before (invariant 10).
-      - `GET /api/admin/marketing/approval/pending` returns one normalized row per item
-        (`services/marketing/approval-queue.js`).
-      - `POST /api/admin/marketing/approval/:channel/:id` takes `{decision, note, contentHash}`;
-        a reject needs a note. The write matches the pending record and its `contentHash`, so
-        an edit that lands while the approver looks is a 409 `CHANGED`.
-      - Audited as `decide_marketing_approval`.
+      Admin reads return the record.
+    - **Push send paths need `publishedQuery()`.** `claimCampaign` and `scheduleCampaign` carry
+      it in their atomic filter and throw `CAMPAIGN_IS_DRAFT` (409 on `/:id/execute` and
+      `/:id/schedule`). The cron's `dueFilter` carries it too, and it skips a draft claim without
+      marking it failed.
+    - **Roles mirror coupon drafts:** `DRAFT_ROLES = APPROVE_ROLES = ["master","admin","manager"]`
+      (`routes/marketing-approval.js`), the same roles that create (invariant 10). There's no
+      separate approver and no reject. `GET /api/admin/marketing/drafts` lists every draft in
+      one row shape (`services/marketing/approval-queue.js`). Audited as
+      `approve_marketing_draft` and `revert_marketing_to_draft`.
     - **Not covered (owner to decide):** coupon-to-phones sends and raw
       `POST /api/notifications/send*`.
 
-    Admin web: `src/utils/marketing-approval.ts` (the same grandfathering and approver rules),
-    the אישורי שיווק queue at `/admin/marketing/approvals`, chips on every channel list and
-    form, and push send/schedule locked until approved. Pinned by shoofi-server
-    `test/integration/marketing-approval.js` (grandfathered shape, hiding, re-queue, push send /
-    cron refusal, 8-role matrix, audit), plus delivery-web `MarketingApprovals.test.tsx` and
-    `approval-gating.test.tsx`.
+    Admin web: `src/utils/marketing-approval.ts` holds the same grandfathering and states. There
+    is the טיוטות שיווק list at `/admin/marketing/drafts`, an approve dialog (פרסם עכשיו /
+    תזמן) on every channel, and chips plus אשר / החזר לטיוטה / מחק on every list and form. Pinned
+    by shoofi-server `test/integration/marketing-approval.js`: grandfathered shape, drafts
+    hidden, publish now, scheduled hidden-then-shown on every channel, push now/schedule/revert,
+    the body can't set the state, the 8-role matrix and audit.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
