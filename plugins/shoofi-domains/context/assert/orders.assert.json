@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -135,6 +135,11 @@
         ]
       },
       "patterns": [
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(req\\.body\\.isNotPrinted\\) \\{\\s*filterBy\\.isPrinted = false;",
+          "desc": "doc reference C3 Auto-print: isNotPrinted only adds isPrinted:false. The date window is built only `if (ordersDate)`, so a sweep that sends no date has no window at all; the partner sweep must send ordersDate"
+        },
         {
           "file": "consts/consts.js",
           "regex": "ORDER_STATUS",
@@ -584,7 +589,14 @@
         "stores/orders/index.tsx",
         "hooks/use-notifications.ts",
         "stores/new-order-alerts/index.ts",
-        "utils/notification/index.ts"
+        "utils/notification/index.ts",
+        "App.tsx",
+        "helpers/printer/print.ts",
+        "helpers/printer/index.ts",
+        "utils/print-outcome.ts",
+        "utils/print-attempts.ts",
+        "utils/print-queue.ts",
+        "utils/print-batch.ts"
       ],
       "symbols": {
         "utils/notification/index.ts": [
@@ -595,6 +607,25 @@
           "takeNewOrders",
           "takeNewOrdersOnRefresh",
           "seedSeen"
+        ],
+        "utils/print-outcome.ts": [
+          "classifyPrintError",
+          "sendDataTimeoutMs",
+          "sendDataWrapperTimeoutMs",
+          "printCopyWithRetry",
+          "outcomeCountsAsPrinted"
+        ],
+        "utils/print-attempts.ts": [
+          "autoPrintSweepStatuses",
+          "ordersUnderPrintAttemptCap",
+          "recordUnprintedAttempt",
+          "clearPrintAttempts"
+        ],
+        "utils/print-queue.ts": [
+          "captureAlignedToQueue"
+        ],
+        "helpers/printer/index.ts": [
+          "printImagesWithOutcome"
         ]
       },
       "patterns": [
@@ -622,6 +653,76 @@
           "file": "hooks/use-notifications.ts",
           "regex": "addNotificationReceivedListener\\([\\s\\S]{0,80}?fetchUnviewedOrdersCount\\(\\)",
           "desc": "STABILITY PIN, not a regression detector - green both before and after shoofi-partner#22, which did not introduce it. Every notification the device receives while the app runs (including the server's store.wav creation push) runs the badge refresh. This is the ONLY reason that path sees a new order ~30s before the poll, which is the whole premise of the two assertions above and of the C3 warning; drop this wiring and the doc's explanation stops being true"
+        },
+        {
+          "file": "helpers/printer/print.ts",
+          "regex": "printer\\.sendData\\(nativeTimeout\\)",
+          "desc": "doc CORE invariant 17: sendData gets the height-scaled timeout. A bare sendData() falls back to the library's 5000ms, which is what timed out on super-abu-shaqra 6370-3519 (2026-10-28)"
+        },
+        {
+          "file": "helpers/printer/print.ts",
+          "regex": "const timeoutDuration = sendDataWrapperTimeoutMs\\(nativeTimeout\\);",
+          "desc": "doc CORE invariant 17: our JS ceiling sits ABOVE the native timeout, so Epson reports its own result first"
+        },
+        {
+          "file": "utils/print-outcome.ts",
+          "regex": "export const EPSON_PRINT_TIMEOUT_MESSAGE = \"Print timeout occurred\\.\";",
+          "desc": "doc CORE invariant 17: the exact library message for CODE_ERR_TIMEOUT. If the library rewords it, the unconfirmed path silently becomes a failure again"
+        },
+        {
+          "file": "utils/print-outcome.ts",
+          "regex": "if \\(fromSendData && error\\.message === EPSON_PRINT_TIMEOUT_MESSAGE\\) return \"unconfirmed\";",
+          "desc": "doc CORE invariant 17: only Epson's sendData completion timeout is unconfirmed; every other error stays a failure"
+        },
+        {
+          "file": "utils/print-outcome.ts",
+          "regex": "outcome === \"printed\" \\|\\| outcome === \"unconfirmed\";",
+          "desc": "doc CORE invariant 17: an unconfirmed send is marked printed. Treating it as a failure is the loop"
+        },
+        {
+          "file": "utils/print-outcome.ts",
+          "regex": "if \\(outcome !== \"failed\"\\) return outcome;",
+          "desc": "doc CORE invariant 17: printCopyWithRetry never retries an unconfirmed send (the retry printed a second ticket)"
+        },
+        {
+          "file": "utils/print-outcome.ts",
+          "regex": "export const SEND_DATA_TIMEOUT_FLOOR_MS = 30000;",
+          "desc": "doc reference C3 Auto-print: 30s floor on the native sendData timeout"
+        },
+        {
+          "file": "utils/print-outcome.ts",
+          "regex": "export const SEND_DATA_TIMEOUT_CEILING_MS = 60000;",
+          "desc": "doc reference C3 Auto-print: 60s ceiling (the print lock is held for the whole wait)"
+        },
+        {
+          "file": "utils/print-attempts.ts",
+          "regex": "export const MAX_AUTO_PRINT_ATTEMPTS = 2;",
+          "desc": "doc CORE invariant 17: per-order, per-session cap on sweep attempts that did not get the order marked"
+        },
+        {
+          "file": "utils/print-attempts.ts",
+          "regex": "ORDER_STATUS\\.IN_PROGRESS,\\s*ORDER_STATUS\\.COMPLETED,\\s*ORDER_STATUS\\.WAITING_FOR_DRIVER,\\s*ORDER_STATUS\\.PENDING,\\s*\\];",
+          "desc": "doc CORE invariant 17: the sweep's statuses are 1,2,3,6 only, never cancelled/rejected/left-the-store"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "ordersUnderPrintAttemptCap\\(\\s*await ordersStore\\.getOrders\\(\\s*true,\\s*autoPrintSweepStatuses\\(forceStatuses\\),\\s*moment\\(\\)\\.format\\(\\),\\s*true,",
+          "desc": "doc CORE invariant 17: the first sweep (printNotPrinted) sends the business day and filters by the attempt cap"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "ordersUnderPrintAttemptCap\\(\\s*await ordersStore\\.getOrders\\(\\s*true,\\s*autoPrintSweepStatuses\\(printContext\\.forceStatuses\\),\\s*moment\\(\\)\\.format\\(\\),\\s*true,",
+          "desc": "doc CORE invariant 17: the post-batch sweep (forLoop) is bounded the same way"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "const images = await captureAlignedToQueue\\(queue,",
+          "desc": "doc CORE invariant 17: one capture slot per queued order, so image i prints and marks queue[i]"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "await printCopy\\(\\s*orderImage,",
+          "desc": "doc CORE invariant 17: the regular print loop goes through the outcome-aware printCopy (no retry on unconfirmed)"
         }
       ]
     }

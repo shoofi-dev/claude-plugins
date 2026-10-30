@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -399,6 +399,35 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `upsertedCount`), so a racing second instance reports 0.
     - Tests: `test/integration/marketing-attribution.js`. It drives the real create and twin
       routers on mongodb-memory-server.
+
+17. **PARTNER AUTO-PRINT: A SENT TICKET IS A PRINTED TICKET, AND THE NOT-PRINTED SWEEP IS
+    BOUNDED** (shoofi-partner, `App.tsx` + `helpers/printer/print.ts` + `utils/print-{outcome,
+    attempts,queue,batch}.ts`; reference C3 "Auto-print"). `isPrinted` is the ONLY "already
+    printed" signal. The tablet sets it through `POST /api/order/printed` (`auth.required`,
+    no role gate) after a ticket prints. After every successful batch, the tablet asks
+    `admin/orders` for `isNotPrinted` orders and prints those too (the "sweep").
+    Three rules, each one a fix for a loop seen in prod (super-abu-shaqra, 2026-10-28, order
+    6370-3519 printed over and over):
+    - **Epson's completion timeout is "unconfirmed", never a failure.** `"Print timeout
+      occurred."` (`CODE_ERR_TIMEOUT` from `sendData`) arrives AFTER the data reached the
+      printer, so the paper comes out. It is not retried, and the order IS marked printed.
+      `sendData` gets a height-scaled timeout (30s floor, 60s ceiling, `sendDataTimeoutMs`).
+      The old library default was 5000ms, shorter than a long ticket takes over Bluetooth.
+      Real failures (connect, paper, buffer, our own JS ceiling) stay `"failed"`: they are
+      retried once and not marked.
+    - **The sweep sends `ordersDate` (the current business day).** Without it the server
+      applies NO date window (`routes/order.js` builds one only `if (ordersDate)`). The sweep
+      sends `AUTO_PRINT_SWEEP_STATUSES` = `1,2,3,6` (+ forced `14`/`15`), never cancelled,
+      rejected or already-left-the-store statuses. It also skips an order after
+      `MAX_AUTO_PRINT_ATTEMPTS` (2) attempts this app session that did not get it marked.
+      Explicit prints (accept, the row's print button) are never filtered or capped.
+    - **Image i belongs to queue[i].** A failed capture keeps a `null` slot
+      (`captureAlignedToQueue`) and is not printed. Skipping it used to shift later images
+      onto the wrong order and mark an unprinted one printed.
+    So: never make a print path's success depend on Epson's completion callback alone, and
+    never drop the sweep's date or cap. A stuck order is diagnosed from
+    `<store>.client-error` `source: "printer-testPrint"` rows (they now carry `outcome`),
+    plus the store's only `isPrinted:false, isViewd:true` orders.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
