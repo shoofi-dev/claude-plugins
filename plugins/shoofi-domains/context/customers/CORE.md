@@ -408,36 +408,50 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
     Pinned by shoofi-server `test/integration/customer-search-admin-auth.js` and
     `test/integration/otp-verify-requires-code.js`.
 
-17. **Every in-app marketing item is a draft until someone approves it; approving publishes
-    it now or at a set time; an item saved before drafts existed is published** (owner's
-    decision 2026-10-30, "draft then approve, like the coupons prompt"; shoofi-server
+17. **Every in-app marketing item is a draft until someone approves it; the draft itself says
+    when it goes out (פרסם עכשיו or תזמן), and approving only approves and then follows that;
+    an item saved before drafts existed is published** (owner's decisions 2026-10-30, "draft
+    then approve, like the coupons prompt" and "the publish-now / schedule is defined in the
+    draft, approve only marks it approved"; shoofi-server
     `services/marketing/approval.js`, `feat/marketing-approval`). It covers home banners
     (`shoofi.ads`), stories and launch popups (`shoofi.stories`; a popup is a `shoofi-stories`
     story), the home note banner (`shoofi.notes`) and push campaigns
     (`shoofi["customer-campaigns"]`, handle `customerCampaigns`).
     - **One record per doc, written by the server only:** `approval: {status: draft|published,
-      createdBy, createdAt, approvedBy, approvedAt, publishAt, revertedBy, revertedAt}`. The ids
-      come from `req.auth.id` (invariant 7). The ads, stories and notes writers copy named
-      fields only. The campaign create drops `approval`, and the PUT drops `approval`,
-      `approval.*` and `status` (`withoutApprovalKeys`). Never let a create or update copy the
-      record or the status from a request.
+      when: now|schedule, createdBy, createdAt, approvedBy, approvedAt, publishAt, revertedBy,
+      revertedAt}`. The ids come from `req.auth.id` (invariant 7). The ads, stories and notes
+      writers copy named fields only, and their edits never `$set` the record whole (an
+      approval landing mid-edit would be undone): they move only the plan (`planSet`). The
+      campaign create drops `approval`, and the PUT drops `approval`, `approval.*` and `status`
+      (`withoutApprovalKeys`). Never let a create or update copy the record or the status from
+      a request.
+    - **The plan is the draft's.** Banner/story/popup/note forms send `publishWhen: now|schedule`
+      and `publishAt` on add and update (`planFromBody`); none sent (an older admin build) =
+      "now". A schedule must be future and within a year, checked **on save** (400). An edit
+      applies a new plan to a draft, moves a scheduled item to its new time ("now" = live at
+      once), and is ignored on a live item. **A push keeps its plan in its own `scheduling`**
+      (immediate | scheduled + `scheduledDate`), mirrored to `approval.when`; a scheduled push
+      needs a future time on create and on every edit before it is sent.
     - **Create = draft**, whoever creates it. A new push is `status: "draft"` even if the form
       said send-now, so nothing is sent on create any more. Editing a published item saves
       directly (as a coupon does after approval). A push `in_progress`/`completed` can't be
       edited (409), and an armed one keeps a future send time (400).
-    - **Approve** = `POST /api/admin/marketing/drafts/:channel/:id/approve` with `{when:
-      now|schedule, publishAt}`. A schedule must be future and within a year. The write is atomic
-      on `approval.status: "draft"`, so a double click publishes or sends once.
-      - Banner/story/popup/note: `publishAt` = now or the scheduled instant. **The schedule lives
+    - **Approve** = `POST /api/admin/marketing/drafts/:channel/:id/approve` with **no body** (any
+      timing sent is ignored). "now" publishes at the click, "schedule" at the draft's time; **a
+      scheduled time that has passed is refused** (409 `PUBLISH_AT_PAST`, `publishTimeOf`) until
+      the draft gets a new one, so nothing goes out late. The write is atomic on
+      `approval.status: "draft"` AND the plan the approver read, so a double click publishes or
+      sends once and an edit in between is a 409.
+      - Banner/story/popup/note: `publishAt` = the click or the draft's instant. **The schedule lives
         on the record**, so every customer read adds the same `visibleQuery(now)`: no record, or
         published with `publishAt` null or ≤ now. Each channel's own `startDate` / `publishedAt`
         and end dates keep their old meaning. A note's reads ignore its dates, so a scheduled
         note is held back by this clause alone.
-      - Push: "now" runs the existing `executeCampaign` (invariants 12–13 unchanged). "schedule"
-        sets `scheduling` and runs the existing `scheduleCampaign` and cron, and it goes back to
-        draft if arming fails.
+      - Push: an immediate draft runs the existing `executeCampaign` (invariants 12–13
+        unchanged); a scheduled one runs the existing `scheduleCampaign` and cron for its
+        `scheduledDate`, and goes back to draft if arming fails.
     - **Back to draft** = `POST …/:channel/:id/revert`. Customers stop seeing it on their next
-      read, and a grandfathered item can be reverted too. A push reverts only while nothing was
+      read, the draft keeps its plan, and a grandfathered item can be reverted too. A push reverts only while nothing was
       sent (not `in_progress`/`completed` and `execution.startedAt` unset). That check is in the
       atomic filter, and the push is disarmed to `status: "draft"` in the same write. **Delete**
       is each channel's existing `DELETE` route.
@@ -462,17 +476,19 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
     - **Roles mirror coupon drafts:** `DRAFT_ROLES = APPROVE_ROLES = ["master","admin","manager"]`
       (`routes/marketing-approval.js`), the same roles that create (invariant 10). There's no
       separate approver and no reject. `GET /api/admin/marketing/drafts` lists every draft in
-      one row shape (`services/marketing/approval-queue.js`). Audited as
+      one row shape, its `plan` included (`services/marketing/approval-queue.js`). Audited as
       `approve_marketing_draft` and `revert_marketing_to_draft`.
     - **Not covered (owner to decide):** coupon-to-phones sends and raw
       `POST /api/notifications/send*`.
 
     Admin web: `src/utils/marketing-approval.ts` holds the same grandfathering and states. There
-    is the טיוטות שיווק list at `/admin/marketing/drafts`, an approve dialog (פרסם עכשיו /
-    תזמן) on every channel, and chips plus אשר / החזר לטיוטה / מחק on every list and form. Pinned
-    by shoofi-server `test/integration/marketing-approval.js`: grandfathered shape, drafts
-    hidden, publish now, scheduled hidden-then-shown on every channel, push now/schedule/revert,
-    the body can't set the state, the 8-role matrix and audit.
+    is the טיוטות שיווק list at `/admin/marketing/drafts`, a פרסם עכשיו / תזמן choice in every
+    channel's form, an approve confirmation that says what will happen, and chips plus אשר /
+    החזר לטיוטה / מחק on every list and form. Pinned by shoofi-server
+    `test/integration/marketing-approval.js`: grandfathered shape, drafts hidden, publish now,
+    a draft-scheduled item hidden-then-shown on every channel, a passed time refused, the plan
+    checked atomically, push immediate/scheduled/revert, the body can't set the state, the
+    8-role matrix and audit.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
