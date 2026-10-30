@@ -467,8 +467,43 @@
         },
         {
           "file": "services/catalog/public-store.js",
-          "regex": "const PRIVATE_STORE_FIELDS = \\[\"accounting\"\\];",
-          "desc": "doc CORE invariant 27 / reference §2: a public store card never carries the registry's accounting"
+          "regex": "const PRIVATE_STORE_FIELDS = Object\\.freeze\\(\\[\"accounting\", \"hyp\", \"credentials\", \"fraudConfig\"\\]\\);",
+          "desc": "doc CORE invariant 27 / reference §2: a public store card never carries accounting, hyp, credentials or fraudConfig"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "deliveryCompanies: \\(storeData\\.deliveryCompanies \\|\\| \\[\\]\\)\\.map\\(\\(dc\\) =>\\n\\s*dc && dc\\.company \\? \\{ \\.\\.\\.dc, company: toPublicStore\\(dc\\.company\\) \\} : dc",
+          "desc": "doc CORE invariant 27: available-stores strips each delivery company too (they carry HYP OAuth tokens and bank details)"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "\\.\\.\\.toPublicStore\\(storeData\\.store\\),\\n\\s*hasDiscounts,",
+          "desc": "doc CORE invariant 27: available-stores sends a public store card"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "\\{ \\.\\.\\.toPublicStore\\(entry\\.store\\), hasDiscounts, maxDiscountPercent, activePromotion \\}",
+          "desc": "doc CORE invariant 27: menu search sends a public store card"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "res\\.json\\(\\{ enabled: true, config, stores: eligible\\.map\\(toPublicStore\\) \\}\\);",
+          "desc": "doc CORE invariant 27: twin eligible-stores strips the cards only after eligibility read businessType"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "cards: withPublicStores\\(result\\.cards\\)",
+          "desc": "doc CORE invariant 27: every For-you card's store is public"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "router\\.get\\(\"/api/store/get/:appName\\?\", \\.\\.\\.CATALOG_ADMIN, async",
+          "desc": "doc CORE invariant 27 / reference §7: the whole store document (payment credentials included) is admin-only"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "const storeDb = await getOrInitializeDb\\(store\\.appName, req\\.app\\.db\\);\\n\\s*const currentStore = await storeDb\\.store\\.findOne\\(\\{\\}\\);",
+          "desc": "doc CORE invariant 27: billing-contacts reads the store document directly, never over HTTP (a stripped copy written back would wipe accounting)"
         },
         {
           "file": "routes/category.js",
@@ -1802,7 +1837,7 @@
         },
         {
           "file": "routes/for-you.js",
-          "regex": "return res\\.status\\(200\\)\\.json\\(\\{ \\.\\.\\.result, suggestionId \\}\\);",
+          "regex": "return res\\.status\\(200\\)\\.json\\(\\{ \\.\\.\\.result, (cards: withPublicStores\\(result\\.cards\\), )?suggestionId \\}\\);",
           "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — every reply carries its suggestionId"
         },
         {

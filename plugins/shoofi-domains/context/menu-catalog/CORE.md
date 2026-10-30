@@ -772,8 +772,8 @@ boundary and say so in the PR.
       invariant 2 and predates the gate: `update/activeTastes`, `update/order`,
       `update/order-per-category`, `bulk-reorder`, `reset-order/:categoryId`, `migrate-orders`.
 
-27. **CATEGORY AND EXPLORE ADMIN ROUTES ARE DASHBOARD-ONLY. THE HOME'S READS STAY PUBLIC AND SEND
-    NO `accounting`** (`services/catalog/category-access.js`, `services/catalog/public-store.js`,
+27. **CATEGORY AND EXPLORE ADMIN ROUTES ARE DASHBOARD-ONLY. THE HOME'S READS STAY PUBLIC, AND NO
+    PUBLIC STORE LIST SENDS A STORE'S SECRETS** (`services/catalog/category-access.js`, `services/catalog/public-store.js`,
     reference §2 / §7 / §8). Until 2026-10-30 none of these routes had auth. With only an
     `app-name`, anyone could add, rename, re-discount, re-order or delete any store's categories
     and tiles, edit or delete the platform categories, or wipe the explore cache.
@@ -794,20 +794,38 @@ boundary and say so in the PR.
       (the home). v1 is the same data and stays public for older binaries; it has no caller on
       main. The GET form of `category/list` returns the same documents as the public POST. It is
       gated only because nothing but the admin web calls it.
-    - **A public store card never carries `accounting`.** The explore reads spread the whole
+    - **A public store card carries no secrets.** The customer-facing store lists spread the whole
       `shoofi.stores` doc into each card. On prod (2026-10-30) 22 visible stores carry
       `accounting.bankAccount` (bank, branch, account number, company id) and
-      `accounting.contract` (commission tiers). `toPublicStore` drops it at response time, on
-      cache hits and fresh builds. It does not happen in `getAvailableStores`, because the
-      twin-order flow reads `accounting.bankAccount.businessType` from it on the server. Any public
-      read that returns a registry doc must go through `toPublicStore`. Two still don't:
-      `POST /api/shoofiAdmin/available-stores` and `POST /api/menu/search`.
+      `accounting.contract` (commission tiers). `toPublicStore` drops `PRIVATE_STORE_FIELDS`
+      (`accounting`, `hyp`, `credentials`, `fraudConfig`, the secret half of `routes/store.js`
+      `SENSITIVE_STORE_FIELDS`) at the route response, on explore v1/v2 (cache hits and fresh
+      builds), `POST /api/shoofiAdmin/available-stores`, `POST /api/menu/search`,
+      `POST /api/twin-order/eligible-stores` and every `POST /api/for-you/suggest` card's `store`.
+      `available-stores` also strips each `deliveryCompanies[].company`: on prod 138
+      `delivery-company.store` docs carry `hyp` OAuth tokens (`access_token`, `refresh_token`,
+      `api_key`) and 180 carry `accounting`, and the apps read only the company's `price` and
+      `eta`. The stripping never happens in `getAvailableStores`, because twin eligibility
+      (`isVatExempt`) reads `accounting.bankAccount.businessType` from its result in-process. So
+      `eligible-stores` strips after `filterEligibleStores`. The explore cache (Redis) still holds
+      the raw docs, and For you reads it, so a card is safe only once its route has stripped it.
+      Any new public read that returns a store or company doc must go through `toPublicStore`.
+    - **`GET /api/store/get/:appName` is `CATALOG_ADMIN`.** It returns the whole per-store
+      document: `hyp` payment credentials, `accounting`, `fraudConfig.appSecret`. It had no auth.
+      Only the admin web calls it, and its accounting, store-data and settings screens read those
+      fields, so it is gated rather than stripped. Never call it from the server over HTTP. The
+      billing-contacts GET and PUT (`routes/shoofi-admin.js`) read `db.store` directly. Before,
+      they called it with no token, and a copy without `accounting` written back by the PUT would
+      wipe the bank details and contract. `POST /api/store` needs nothing new: non-admin callers
+      get `sanitizeStoreForPublic`, and the partner's echoed save is cut to `PARTNER_STORE_FIELDS`
+      (shoofi-server #354).
     - `GET /api/admin/categories/:page?` is still open. delivery-web
       `src/apis/admin/category/get-categories.ts` (used by `StoreForm.tsx`) calls it with plain
       `axios` and no token. Switch that to `axiosInstance` before gating it.
     - `test/integration/catalog-admin-auth.js` fails for any route under these prefixes with no
-      decided audience, for a gated route without `auth.required` first, and for an explore card
-      that carries `accounting`. The legacy expressCart `GET /category/:cat/:pageNum?` is removed.
+      decided audience, for a gated route without `auth.required` first, and for any public store
+      list above whose body holds one of the four keys or their values. It also checks that twin
+      eligibility still drops a store of the other VAT status. The legacy expressCart `GET /category/:cat/:pageNum?` is removed.
       It searched the dead lunr `productsIndex` and never answered.
 
 ## Catalog text — what you are actually searching
