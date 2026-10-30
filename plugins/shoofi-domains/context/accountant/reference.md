@@ -36,7 +36,7 @@ before touching any settlement math.
 **Generate**: `POST /api/payments/admin/reports/generate`  — per store (or all
 `business_visible` stores). Every `/api/payments/admin/reports*` route, the `accountant-file-number` PUTs, the two
 `greeninvoice` reads and every `/api/driver-reports` route take `settlementDashboard` (any
-dashboard role; aliased `reportsDashboard`), not `auth.required` alone (CORE invariant 16). Pre-generate **guards** (all skip on failure):
+dashboard role; aliased `reportsDashboard`), not `auth.required` alone (CORE invariant 17). Pre-generate **guards** (all skip on failure):
 1. exact-duplicate (same store+day-range) ; 2. **overlap vs reports of ANY status**
 (`checkOverlappingReports` — a sent report blocks too; CORE invariant 5); 3. **orders-closed** ( —
 no store `orders` in `{"1","6"}` in range; reads the store-DB `orders` collection, which HAS
@@ -207,7 +207,7 @@ royal-asado and crunchy-toost (₪4,111.92 owed, sent August reports) once they 
 
 ## 5. Store ↔ Shoofi tax invoices — `routes/hyp.js` / `utils/{hyp,greeninvoice,invoice-provider}.js`
 Provider = `amazonconfigs {app:"invoiceProvider"}.active` (`greeninvoice` default | `hyp`).
-**Who may call `/api/hyp/admin/*`** (CORE invariant 16): every route not on
+**Who may call `/api/hyp/admin/*`** (CORE invariant 17): every route not on
 `utils/restricted-admin-routes.js` takes `settlementDashboard` (any dashboard role) on its own
 line — invoices, `config/switch`, the per-store/per-company HYP account routes; the 16 bulk /
 `send-oauth-link` / `update-email` routes are MASTER_ONLY via that list. The switch writes no

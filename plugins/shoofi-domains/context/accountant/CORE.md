@@ -27,7 +27,7 @@ its amounts are EZcount's per-line rounding, never `round2(totalOutcomes)`). Cou
 support team's coupon drafts (`services/coupons/coupon-drafts.js`, `routes/admin/coupon-drafts.js`,
 invariant 13) — the coupon itself is still written by `routes/coupon.js` (not yours). Who may call
 the settlement/payout routes that had no auth until 2026-10-30: `services/payments/settlement-access.js`
-and, for the partner/driver earnings reads, `services/payments/earnings-access.js` (invariant 16). Client: the
+and, for the partner/driver earnings reads, `services/payments/earnings-access.js` (invariant 17). Client: the
 reports/payout screens and `views/admin/financial-overview/` in `shoofi-delivery-web`.
 **🔒 CLAUDE.md do-not-touch overlap:** `routes/hyp.js`, `utils/hyp.js`,
 `utils/invoice-provider.js`, `lib/payments/`. You depend on `routes/order.js` for order
