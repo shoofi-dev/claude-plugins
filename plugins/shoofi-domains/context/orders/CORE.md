@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -22,7 +22,8 @@ Server: `routes/order.js`, `routes/twin-order.js`, `routes/order-fraud-*.js`,
 (the order-side guard for fixed-delivery-price coupons, invariant 14), `utils/marketing-touch.js`
 (order-side marketing attribution, invariant 15), `services/marketing/order-facts.js` +
 `services/marketing/reconcile.js` (one marketing fact per checkout, kept true by a cron —
-invariant 16), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
+invariant 16), who may call the coins admin routes (`routes/coins.js` `/api/admin/coins/*` and the
+Coins Settings block of `routes/shoofi-admin.js`, invariant 19), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
 (shoofir), monitoring/twin-admin (delivery-web).
 
 **Not yours:** payment internals (`payments`), settlement/payouts (`accountant`), driver
@@ -428,7 +429,6 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     never drop the sweep's date or cap. A stuck order is diagnosed from
     `<store>.client-error` `source: "printer-testPrint"` rows (they now carry `outcome`),
     plus the store's only `isPrinted:false, isViewd:true` orders.
-
 18. **THE STORE-CALENDAR AND ORDER-ADMIN READS ARE GATED PER AUDIENCE, AND THE PARTNER GATE IS
     STORE MEMBERSHIP, NOT "THE TOKEN'S OWN STORE"** (shoofi-server `services/orders/admin-access.js`).
     Until 2026-10-30, anyone who sent a store's `app-name` could close its hours, or read its
@@ -485,6 +485,42 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `update-item-collected`, `book-delivery`, `book-custom-delivery`, `update-custom-delivery`,
       `drive-in-arrival(-confirm)`, `update/all`). These are status transitions, so any change
       is high-risk. Ungated money paths `addRefund` and `updateCCPayment` belong to payments.
+
+19. **THE COINS ADMIN ROUTES ARE DASHBOARD-ONLY, GATED ON THE ROUTE ITSELF.** Coins have no
+    domain of their own; orders owns their order-side wiring and, since 2026-10-30, who may call
+    their admin routes. Until then seven of these eight had no auth: anyone could read any
+    customer's coin wallet, switch coins off platform-wide, set a store's `earnPercent` /
+    `coinValue` (free money for customers), or run the expiry sweep.
+    - **Seven on the dashboard gate, the sweep master-only.** `auth.required` +
+      `checkAdminRole(DASHBOARD_ROLES)` (`utils/analytics-access.js`, so `viewer` and
+      `accountant` pass) on seven routes. In `routes/coins.js` it is `COINS_ADMIN` on
+      `GET /api/admin/coins/customer/:customerId[/earned]` and
+      `GET /api/admin/coins/store/:storeAppName/stats`. `POST /api/admin/coins/expire` is
+      `COINS_EXPIRE_ADMIN` = `checkAdminRole(["master"])`: it is the only code that permanently
+      deletes coins, nobody calls it, and prod had no sweep rows, so narrowing it took access
+      from no one. A run is audited as `expire_coins` (`services/audit/admin-audit-routes.js`).
+      In `routes/shoofi-admin.js` it is
+      `COINS_SETTINGS_ADMIN`, built inside the Coins Settings block from locally named requires,
+      on `GET|POST /api/admin/coins-settings` and `GET|POST /api/admin/store/:appName/coins-settings`.
+      Not in `utils/restricted-admin-routes.js`.
+    - **No mobile caller, so no per-audience branch.** The admin web is the only client
+      (`ShoofiSettings.tsx`, `StoreForm.tsx`, `customer-details.ts`). The customer app reads
+      `store.coinsSettings` from store data and never calls these routes. The partner app's coins
+      toggle is commented out in `screens/admin/store-managment`, so a partner token gets 403
+      even for its own store. A mobile app that needs one of these later gets a per-audience
+      check (guardrails §3a), never a role-only gate: mobile tokens carry no `roles`.
+    - **The settings are still writable another way.** `POST /api/store/update` (`routes/store.js`)
+      `$set`s the posted store document with no auth, so a store's `coinsSettings` can be written
+      there without the clamps of the coins-settings route. The partner app round-trips the
+      field through it on every store save. That route is not orders' and is not gated yet.
+    - **Expiry stays unscheduled on purpose.** Expiry is computed on read (`coin-buckets.js`);
+      `expireCoins` is the only code that permanently deletes coins and this route is its only
+      trigger. Prod had 0 sweep-written `expire` rows on 2026-10-30. The `expire` rows that do
+      exist carry an `orderId`: they are `refundCoins` clawing back coins earned on a cancelled
+      order, not the sweep.
+    - Tests: `test/integration/coins-admin-auth.js` (static gate check on every route plus every
+      `/api/admin/*` route in `routes/coins.js`, 401/403 matrix, every dashboard role on seven
+      routes, master-only on expire, the audit entry, refused writes write nothing).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

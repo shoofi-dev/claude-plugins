@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -48,7 +48,9 @@
         "docs/marketing-attribution.md",
         "test/integration/marketing-attribution.js",
         "services/orders/admin-access.js",
-        "test/integration/orders-admin-auth.js"
+        "test/integration/orders-admin-auth.js",
+        "routes/coins.js",
+        "test/integration/coins-admin-auth.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -506,7 +508,17 @@
         {"file": "routes/order.js", "regex": "router\\.post\\(\"/api/order/byDate\", \\.\\.\\.ORDERS_DASHBOARD, async", "desc": "CORE invariant 18: byDate (no caller) - dashboard only"},
         {"file": "routes/order.js", "regex": "router\\.post\\(\"/api/order/statistics/new-orders/:page\\?\", \\.\\.\\.ORDERS_DASHBOARD, async", "desc": "CORE invariant 18: statistics/new-orders (admin web HeaderStats) - dashboard only"},
         {"file": "routes/order.js", "regex": "\"/api/order/admin/my-stores/new-orders-count\",\\s*auth\\.required,\\s*async \\(req, res\\) => \\{[\\s\\S]{0,200}?const me = await shoofiDB\\.storeUsers\\.findOne\\(\\{ _id: getId\\(req\\.auth\\.id\\) \\}\\);", "desc": "CORE invariant 18: the ONE login-only admin route - token-scoped (phone -> storeUsers), ignores app-name, counts only"},
-        {"file": "test/integration/orders-admin-auth.js", "regex": "test\\(\"no /api/order/admin/\\* route is login-only or ungated\"", "desc": "CORE invariant 18: the static check that fails for any login-only /api/order/admin route"}
+        {"file": "test/integration/orders-admin-auth.js", "regex": "test\\(\"no /api/order/admin/\\* route is login-only or ungated\"", "desc": "CORE invariant 18: the static check that fails for any login-only /api/order/admin route"},
+        {"file": "routes/coins.js", "regex": "const COINS_ADMIN_ROLES = DASHBOARD_ROLES;\\s*const COINS_ADMIN = \\[auth\\.required, checkAdminRole\\(COINS_ADMIN_ROLES\\)\\];", "desc": "CORE invariant 19: the coins admin gate is auth.required + every dashboard role (auth.required alone passes customer tokens)"},
+        {"file": "routes/coins.js", "regex": "const COINS_EXPIRE_ROLES = \\[\"master\"\\];\\s*const COINS_EXPIRE_ADMIN = \\[auth\\.required, checkAdminRole\\(COINS_EXPIRE_ROLES\\)\\];", "desc": "CORE invariant 19: the expiry sweep gate is master-only (the only code that permanently deletes coins; no caller)"},
+        {"file": "routes/coins.js", "regex": "router\\.post\\(\"/api/admin/coins/expire\", \\.\\.\\.COINS_EXPIRE_ADMIN,", "desc": "CORE invariant 19: the expiry sweep's only trigger is master-only"},
+        {"file": "services/audit/admin-audit-routes.js", "regex": "pattern: '/api/admin/coins/expire', method: 'POST', action: 'expire_coins'", "desc": "CORE invariant 19: a coin expiry run records its actor in the admin audit log"},
+        {"file": "routes/coins.js", "regex": "router\\.get\\(\"/api/admin/coins/customer/:customerId\", \\.\\.\\.COINS_ADMIN,", "desc": "CORE invariant 19: a customer's coin wallet is dashboard-only"},
+        {"file": "routes/coins.js", "regex": "\"/api/admin/coins/customer/:customerId/earned\",\\s*\\.\\.\\.COINS_ADMIN,", "desc": "CORE invariant 19: the customer modal's coins tab is dashboard-only"},
+        {"file": "routes/coins.js", "regex": "router\\.get\\(\"/api/admin/coins/store/:storeAppName/stats\", \\.\\.\\.COINS_ADMIN,", "desc": "CORE invariant 19: a store's coin totals are dashboard-only"},
+        {"file": "routes/shoofi-admin.js", "regex": "const \\{ DASHBOARD_ROLES: COINS_SETTINGS_ROLES \\} = require\\(\"\\.\\./utils/analytics-access\"\\);\\s*const COINS_SETTINGS_ADMIN = \\[coinsSettingsAuth\\.required, coinsSettingsRoleCheck\\(COINS_SETTINGS_ROLES\\)\\];", "desc": "CORE invariant 19: the coin-settings gate is auth.required + every dashboard role, built inside the Coins Settings block"},
+        {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/admin/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,[\\s\\S]*?router\\.post\\(\"/api/admin/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,", "desc": "CORE invariant 19: reading and flipping the platform-wide coins switch is dashboard-only"},
+        {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/admin/store/:appName/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,[\\s\\S]*?router\\.post\\(\"/api/admin/store/:appName/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,", "desc": "CORE invariant 19: a store's earn rate / coin value is dashboard-only (no mobile caller; the partner toggle is commented out)"}
       ]
     },
     "shoofi-app": {
