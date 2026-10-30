@@ -432,6 +432,12 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       once), and is ignored on a live item. **A push keeps its plan in its own `scheduling`**
       (immediate | scheduled + `scheduledDate`), mirrored to `approval.when`; a scheduled push
       needs a future time on create and on every edit before it is sent.
+    - **One timing for many:** `POST /api/admin/marketing/drafts/plan` `{items: [{channel, id}],
+      publishWhen, publishAt}` (≤ 100) sets one plan on each DRAFT (`setPlan`, atomic on the
+      draft state; a push gets it as `scheduling`, and nothing is armed). A bad time is a 400
+      for all, and nothing is written. Published items are skipped (`NOT_DRAFT`), and results
+      are per item. Approval stays per item (the admin's bulk approve loops it). Audited
+      `set_marketing_drafts_timing`.
     - **Create = draft**, whoever creates it. A new push is `status: "draft"` even if the form
       said send-now, so nothing is sent on create any more. Editing a published item saves
       directly (as a coupon does after approval). A push `in_progress`/`completed` can't be
