@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -33,7 +33,8 @@
         "utils/coupon-discount.js",
         "services/coupons/delivery-price-enforcement.js",
         "services/compensations/access.js",
-        "services/payments/settlement-access.js"
+        "services/payments/settlement-access.js",
+        "services/payments/earnings-access.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -166,6 +167,12 @@
           "tokenUserId",
           "selfCallHeaders",
           "throwIfSelfCallRefused"
+        ],
+        "services/payments/earnings-access.js": [
+          "partnerEarningsAccess",
+          "driverEarningsAccess",
+          "ownStoreEarningsGate",
+          "ownDriverEarningsGate"
         ]
       },
       "patterns": [
@@ -723,6 +730,166 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "throwIfSelfCallRefused\\(error, 'store payment data \\(stores-export-new\\)'\\);",
           "desc": "CORE invariant 17: a refused revenue self-call fails the report instead of settling it on 0 card revenue"
+        },
+        {
+          "file": "services/payments/earnings-access.js",
+          "regex": "const partnerEarningsAccess = \\[auth\\.required, ownStoreEarningsGate\\];",
+          "desc": "CORE invariant 17: partner earnings = auth.required + a dashboard role or the partner's own store"
+        },
+        {
+          "file": "services/payments/earnings-access.js",
+          "regex": "if \\(ownAppName && req\\.headers\\[\"app-name\"\\] === ownAppName\\) return next\\(\\);",
+          "desc": "CORE invariant 17: a partner token passes only when app-name is its own storeUsers.appName"
+        },
+        {
+          "file": "services/payments/earnings-access.js",
+          "regex": "const driverEarningsAccess = \\[auth\\.required, ownDriverEarningsGate\\];",
+          "desc": "CORE invariant 17: driver earnings = auth.required + a dashboard role, the driver himself or his company admin — never a role-only gate"
+        },
+        {
+          "file": "services/payments/earnings-access.js",
+          "regex": "if \\(String\\(driverId\\) === tokenUserId\\(req\\)\\) return next\\(\\);",
+          "desc": "CORE invariant 17: a driver reads his own earnings by the token id, never a body-chosen driver"
+        },
+        {
+          "file": "services/payments/earnings-access.js",
+          "regex": "if \\(!company \\|\\| !company\\.isControlledByAdmin\\) return false;",
+          "desc": "CORE invariant 17: a company admin reads its drivers only under the same rules as admin/drivers/summary"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "router\\.post\\(\"/api/payments/partner/summary\", \\.\\.\\.partnerEarningsAccess,",
+          "desc": "CORE invariant 17: partner/summary is the partner's own store (or the dashboard)"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "router\\.post\\(\"/api/payments/partner/daily-orders\", \\.\\.\\.partnerEarningsAccess,",
+          "desc": "CORE invariant 17: partner/daily-orders is the partner's own store (or the dashboard)"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "router\\.post\\(\"/api/payments/partner/details\", \\.\\.\\.partnerEarningsAccess,",
+          "desc": "CORE invariant 17: partner/details is the partner's own store (or the dashboard)"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "router\\.post\\(\"/api/payments/driver/summary\", \\.\\.\\.driverEarningsAccess,",
+          "desc": "CORE invariant 17: driver/summary is the driver's own (shoofir) or any driver (dashboard)"
+        },
+        {
+          "file": "routes/payments/summaries.js",
+          "regex": "router\\.post\\(\"/api/payments/driver/details\", \\.\\.\\.driverEarningsAccess,",
+          "desc": "CORE invariant 17: driver/details is the driver's own, his company admin's, or the dashboard's"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "router\\.get\\(\"/api/payments/delivery-companies\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: the delivery-companies list is dashboard-only"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "router\\.post\\(\"/api/payments/admin/reports/generate\", \\.\\.\\.reportsDashboard,",
+          "desc": "CORE invariant 17: generating a store settlement needs a dashboard role, not just any token"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "router\\.post\\(\"/api/payments/admin/reports/:reportId/send\", \\.\\.\\.reportsDashboard,",
+          "desc": "CORE invariant 17: sending a store settlement needs a dashboard role"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "router\\.delete\\(\"/api/payments/admin/reports/:reportId\", \\.\\.\\.reportsDashboard,",
+          "desc": "CORE invariant 17: deleting a store settlement needs a dashboard role"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "router\\.post\\(\"/api/payments/admin/reports/:reportId/create-invoice\", \\.\\.\\.reportsDashboard,",
+          "desc": "CORE invariant 17: invoicing a store settlement needs a dashboard role"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "router\\.post\\(\"/api/driver-reports/admin/generate\", \\.\\.\\.reportsDashboard,",
+          "desc": "CORE invariant 17: generating a courier settlement needs a dashboard role"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "router\\.post\\(\"/api/driver-reports/admin/reports/:reportId/send\", \\.\\.\\.reportsDashboard,",
+          "desc": "CORE invariant 17: sending a courier settlement needs a dashboard role"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "router\\.delete\\(\"/api/driver-reports/admin/reports/:reportId\", \\.\\.\\.reportsDashboard,",
+          "desc": "CORE invariant 17: deleting a courier settlement needs a dashboard role"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.get\\(\"/api/hyp/admin/reports/:reportId/invoice-pdf\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: a store report's HYP invoice PDF link needs a dashboard role"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.post\\(\"/api/hyp/admin/config/switch\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: switching the active invoice provider needs a dashboard role (not narrowed: no actor evidence)"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.post\\(\"/api/hyp/admin/reports/:reportId/create-invoice\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: issuing the Shoofi to store HYP invoice needs a dashboard role"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.post\\(\"/api/hyp/admin/reports/:reportId/create-store-invoice\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: issuing the store to Shoofi invoice (store's own api_key) needs a dashboard role"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.post\\(\"/api/hyp/admin/reports/:reportId/cancel-invoice\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: cancelling a store settlement invoice needs a dashboard role"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.post\\(\"/api/hyp/admin/reports/:reportId/send-invoice\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: sending a store settlement invoice needs a dashboard role"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.post\\(\"/api/hyp/admin/stores/:storeId/disconnect\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: disconnecting a store's HYP account needs a dashboard role (not narrowed: no actor evidence)"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.post\\(\"/api/hyp/admin/delivery-companies/:companyId/disconnect\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: disconnecting a company's HYP account needs a dashboard role"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.post\\(\"/api/hyp/admin/driver-reports/:reportId/create-company-invoice\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: issuing a courier company invoice needs a dashboard role"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.post\\(\"/api/hyp/admin/driver-reports/:reportId/cancel-company-invoice\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariant 17: cancelling a courier company invoice needs a dashboard role"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "router\\.put\\(\"/api/payments/admin/stores/:storeId/accountant-file-number\", \\.\\.\\.reportsDashboard,",
+          "desc": "CORE invariant 17: a store's accountant file number (feeds the Hashavshevet export) needs a dashboard role"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "router\\.put\\(\"/api/driver-reports/admin/companies/:companyId/accountant-file-number\", \\.\\.\\.reportsDashboard,",
+          "desc": "CORE invariant 17: a company's accountant file number needs a dashboard role"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "router\\.get\\(\"/api/payments/admin/greeninvoice/businesses\", \\.\\.\\.reportsDashboard,",
+          "desc": "CORE invariant 17: the GreenInvoice business list needs a dashboard role"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "router\\.get\\(\"/api/payments/admin/greeninvoice/customers\", \\.\\.\\.reportsDashboard,",
+          "desc": "CORE invariant 17: the GreenInvoice customer list needs a dashboard role"
         }
       ]
     }
