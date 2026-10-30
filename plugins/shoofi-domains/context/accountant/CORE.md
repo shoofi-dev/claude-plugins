@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -27,7 +27,7 @@ its amounts are EZcount's per-line rounding, never `round2(totalOutcomes)`). Cou
 support team's coupon drafts (`services/coupons/coupon-drafts.js`, `routes/admin/coupon-drafts.js`,
 invariant 13) — the coupon itself is still written by `routes/coupon.js` (not yours). Who may call
 the settlement/payout routes that had no auth until 2026-10-30: `services/payments/settlement-access.js`
-(invariant 16). Client: the
+and, for the partner/driver earnings reads, `services/payments/earnings-access.js` (invariant 16). Client: the
 reports/payout screens and `views/admin/financial-overview/` in `shoofi-delivery-web`.
 **🔒 CLAUDE.md do-not-touch overlap:** `routes/hyp.js`, `utils/hyp.js`,
 `utils/invoice-provider.js`, `lib/payments/`. You depend on `routes/order.js` for order
@@ -591,11 +591,33 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       is still swallowed** (the `suspectZeroOrderReports` counter in
       `services/exec-dashboard/billing-metrics.js` still describes that path). Do not widen the
       throw without a decision; do not drop the header forwarding, or every report fails.
-    Not covered (still open): `POST /api/payments/{partner/summary,partner/daily-orders,
-    partner/details,driver/summary,driver/details}` and `GET /api/payments/delivery-companies`
-    have no `auth.required`; `reports/generate` and the other `/admin/reports*` routes are
-    `auth.required` only (any token, no role). Tests: shoofi-server
-    `test/integration/settlement-admin-auth.js`.
+    - **Earnings reads — identity from the token** (`services/payments/earnings-access.js`,
+      no auth at all until 2026-10-30). `partner/{summary,daily-orders,details}`
+      (`partnerEarningsAccess`): a dashboard role, or a `shoofi-partner` token whose own
+      `storeUsers` doc's `appName` IS the `app-name` header — the handlers pick the store DB from
+      that header, so the gate is what stops a partner reading another store. Caller:
+      shoofi-partner `screens/admin/payments` (summary, daily-orders); nothing calls `details`.
+      `driver/{summary,details}` (`driverEarningsAccess`): a dashboard role (the admin תשלומי נהגים
+      screen reads any driver); a `shoofi-shoofir` token whose id IS the body `driverId`; or that
+      driver's delivery-company admin — `role: "admin"`, company `isControlledByAdmin`, same
+      `companyId`, exactly the checks behind `companyAdminSelf`. Caller: shoofir
+      `screens/delivery-driver/payments.tsx` (`driver/details` with the admin's picked driver).
+      A missing `driverId` still falls to the handler's 400. **Never a role-only gate** (#281).
+    - **Dashboard only, any dashboard role** (`settlementDashboard`, aliased `reportsDashboard`
+      in the route files): `GET /api/payments/delivery-companies`, every
+      `/api/payments/admin/reports*` route (14, `generate` included),
+      `POST /api/driver-reports/admin/generate` + every `/api/driver-reports/admin/reports*`
+      route (10), and `GET /api/hyp/admin/reports/:reportId/invoice-pdf`. Until 2026-10-30 the
+      report routes were `auth.required` only, so a customer token could generate, approve,
+      send, delete or invoice a settlement. No mobile app calls any of them; none is on
+      `utils/restricted-admin-routes.js` (no double gate); the accountant keeps both reports
+      lists (`accountant` is a dashboard role). Prod 2026-10-30: every store/driver report's
+      `generatedBy`/`approvedBy` is an admin-dashboard user (live or since deleted).
+    Still `auth.required` only (any token): the `accountant-file-number` PUTs (both),
+    `payments/admin/greeninvoice/{businesses,customers}`, and every other `/api/hyp/admin/*`
+    route — `create-invoice`, `cancel-invoice`, `send-invoice`, `config/switch` included.
+    Tests: shoofi-server `test/integration/settlement-admin-auth.js` and
+    `test/integration/earnings-reports-admin-auth.js`.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
