@@ -78,6 +78,51 @@
       },
       "patterns": [
         {
+          "file": "routes/admin.js",
+          "regex": "const invoiceQueueAdmins = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",
+          "desc": "CORE invariant 11: GET invoices/pending takes any dashboard role"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "const INVOICE_QUEUE_WRITE_ROLES = \\[\"master\", \"admin\"\\];",
+          "desc": "CORE invariant 11: the invoice queue writes (Gmail searches, public-read uploads) are owners only"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "const invoiceQueueWriters = \\[auth\\.required, checkAdminRole\\(INVOICE_QUEUE_WRITE_ROLES\\)\\];",
+          "desc": "CORE invariant 11: the write guard is auth.required + the owners-only role list"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "router\\.get\\(\"/api/admin/invoices/pending\", \\.\\.\\.invoiceQueueAdmins,",
+          "desc": "CORE invariant 11: GET invoices/pending is gated (it carried lib/auth restrict, which hangs the request)"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "router\\.post\\(\"/api/admin/invoices/retry\", \\.\\.\\.invoiceQueueWriters,",
+          "desc": "CORE invariant 11: POST invoices/retry is master/admin only (it carried lib/auth restrict, which hangs the request)"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "router\\.post\\(\"/api/admin/invoices/process-all\", \\.\\.\\.invoiceQueueWriters,",
+          "desc": "CORE invariant 11: POST invoices/process-all is master/admin only (it carried lib/auth restrict, which hangs the request)"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "router\\.post\\(\"/api/admin/invoices/webhook\", \\.\\.\\.invoiceQueueWriters,",
+          "desc": "CORE invariant 11: POST invoices/webhook is master/admin only; it had nothing in front of its body secret"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "const isFetchableInvoiceDocId = \\(docId\\) => /\\^\\\\d\\+\\$/\\.test",
+          "desc": "CORE invariant 11: only a numeric docId may reach the Gmail fetch (HYP manual-invoice orders carry docId \"EZ\")"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "secret !== process\\.env\\.INVOICE_WEBHOOK_SECRET",
+          "desc": "reference §5: the webhook still checks its body secret behind the admin guard"
+        },
+        {
           "file": "routes/order.js",
           "regex": "CommitFullTransaction",
           "desc": "ZCredit charge call (money-in path)"

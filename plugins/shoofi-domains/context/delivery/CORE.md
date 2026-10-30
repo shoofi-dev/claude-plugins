@@ -401,6 +401,28 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `isDeliveryOnly: true` (`routes/delivery/orders.js`), so it **implies** delivery-only and
     never the converse — a map drawing that point as a doorstep is stating a town centroid
     nobody typed.
+19. **Every `/api/delivery/admin/*` route has exactly two possible callers, and each gets its
+    own gate (`services/delivery/admin-access.js`, shoofi-server).** Until 2026-10-30 none of
+    the 23 had `auth.required`, so anyone could add or delete drivers, assign, reassign or
+    cancel deliveries, and create cities and areas.
+    - **The 18 in `routes/delivery/admin.js`** are admin-web only: `...deliveryDashboardAdmin`
+      = `auth.required` + `checkAdminRole(DASHBOARD_ROLES)`, the list from
+      `utils/analytics-access.js`, with `master` named. The gate keeps the internet out. It
+      does **not** rank staff: viewer-only accounts did 17,427 of the logged reassigns and 92
+      cancels (audit log, 2026-03-22..10-29). So narrowing a route to admin/master is a product
+      decision, not a cleanup.
+    - **The 5 `/api/delivery/admin/:adminId/...` in `routes/delivery/driver.js`** are
+      shoofir's company-admin screens (`manage-drivers.tsx`, `DriverReassignModal.tsx`,
+      `payments.tsx`): `...companyAdminSelf` = `auth.required` + `app-type: shoofi-shoofir` +
+      **`:adminId === req.auth.id`**. The URL no longer chooses whose company is acted on. The
+      handlers still enforce `role: "admin"`, `isControlledByAdmin`, and same-company on every
+      driver and delivery they touch. Both `companyId`s are **strings** (258/258 in prod), and
+      the strict `!==` compare relies on that. Admin-web tokens are refused here because no
+      dashboard screen calls these routes. Prod has exactly one such account (one company).
+    - Never put a role gate on the second group: mobile JWTs are `{phone, id}` with no
+      `roles`, so it would 403 every company admin silently (shoofir reacts only to 401). A
+      new route under the prefix must join one of the two groups, or
+      `test/integration/delivery-admin-auth.js` fails.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**

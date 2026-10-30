@@ -36,7 +36,8 @@
         "scripts/delivery-only-preflight.js",
         "docs/delivery-only-bookings.md",
         "services/delivery/manual-assignment-ranking.js",
-        "lib/delivery/helpers.js"
+        "lib/delivery/helpers.js",
+        "services/delivery/admin-access.js"
       ],
       "symbols": {
         "services/delivery/assignDriver.js": [
@@ -446,6 +447,51 @@
           "file": "services/delivery/manual-assignment-ranking.js",
           "regex": "RANK_REASONS",
           "desc": "the server side of the contract: reason codes the admin web must translate"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "const \\{ DASHBOARD_ROLES \\} = require\\(\"\\.\\./\\.\\./utils/analytics-access\"\\)",
+          "desc": "the delivery-admin dashboard gate reuses the ONE dashboard role list (master named) rather than redefining it (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "const deliveryDashboardAdmin = \\[auth\\.required, dashboardRoleGate\\]",
+          "desc": "the 18 admin-web delivery routes need a verified token AND any dashboard role (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "req\\.headers\\[\"app-type\"\\] === DRIVER_APP_TYPE[\\s\\S]{0,160}String\\(tokenId\\) === String\\(req\\.params\\.adminId\\)",
+          "desc": "a company-admin route takes only a shoofir token whose own id is :adminId - the URL never chooses the company, and no role gate (mobile tokens carry no roles) (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "const companyAdminSelf = \\[auth\\.required, ownCompanyAdminGate\\]",
+          "desc": "the 5 /:adminId/ routes need a verified token before the own-id check (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "router\\.post\\(\"/api/delivery/admin/reassign\", \\.\\.\\.deliveryDashboardAdmin, async",
+          "desc": "the live-ops reassign - most used by viewer-only staff - sits behind the dashboard gate, not a narrower one (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*router\\.(?:get|post|delete|put|patch)\\(\"/api/delivery/admin/[^\"]*\", async)",
+          "desc": "NO /api/delivery/admin route in this router goes straight to its handler without a gate (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "router\\.delete\\(\"/api/delivery/admin/:adminId/driver/:driverId\", \\.\\.\\.companyAdminSelf, async",
+          "desc": "deleting a driver is a company admin acting on its own company only (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*router\\.(?:get|post|delete|put|patch)\\(\"/api/delivery/admin/[^\"]*\", async)",
+          "desc": "NO /api/delivery/admin/:adminId route in this router goes straight to its handler without a gate (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "driver\\.companyId !== admin\\.companyId",
+          "desc": "the company-admin handlers refuse a driver outside the admin's company with a strict compare of two STRING companyIds (CORE invariant 19)"
         }
       ]
     },

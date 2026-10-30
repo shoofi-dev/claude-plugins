@@ -123,6 +123,27 @@ the `customerinvoices@shoofi.app` Gmail by docId, uploads to DO Spaces, and sets
 `ccPaymentRefData.{url, invoiceStatus, docId, processedAt, failureReason}`. Background
 queue retries every **15s** (max 10). → **Store/settlement tax invoices are the `accountant` domain.**
 
+**The queue is in memory.** `pendingInvoices` is a `Map` in the process. A restart or deploy
+drops it, and the order keeps `invoiceStatus: "pending"` with nothing left to retry it.
+Prod on 2026-10-30, across 188 store DBs: 41,351 `completed`, 4,122 `none`,
+**2,916 `pending`** (newest 2026-09-22) and 12 `failed`. `docId` is a number on most orders.
+Flagged with no verdict: whether those pending orders should be re-queued.
+
+**Admin routes** (`routes/admin.js`, CORE invariant 11). Every one is `auth.required` plus a
+role check, and no client calls any of them.
+| Route | Roles | What it does |
+|---|---|---|
+| `GET /api/admin/invoices/pending` | `DASHBOARD_ROLES` | the size of this process's in-memory queue (one instance; prod runs two) |
+| `POST /api/admin/invoices/retry` `{docId}` | master, admin | queues one `docId` |
+| `POST /api/admin/invoices/process-all` | master, admin | queues every `invoiceStatus:"pending"` order in the **`app-name` header's** DB (one store, `shoofi` when absent) |
+| `POST /api/admin/invoices/webhook` `{docId, secret}` | master, admin | fetches now, falls back to the queue. Also needs `secret === INVOICE_WEBHOOK_SECRET`, which is not in `.env.production` (the DO app spec was not checked). No provider calls it. |
+
+The queue keeps the whole `req` and reads only `req.app.db` and the `app-name` header from
+it. It makes no HTTP call that carries request headers. `retry` puts `docId` into the Gmail
+query (`subject:<docId>`) and the public Spaces key (`invoices/doc-<docId>.pdf`) unvalidated.
+Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restrict`, which
+hangs the request (CORE invariant 11), so none of them answered.
+
 ## 6. Refunds (customer-side — you own these)
 - **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
   `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.

@@ -193,7 +193,7 @@ especially closely. The zones (per `CLAUDE.md`):
 
 ## 3a. An API permission change is a change to every app that calls the path
 Before adding or tightening `auth.required`, `checkAdminRole`, an entry in shoofi-server's
-`utils/restricted-admin-routes.js`, a role list, or anything that changes what a token must
+`utils/restricted-admin-routes.js` or `utils/admin-token-routes.js`, a role list, or anything that changes what a token must
 carry: grep **all four clients** (shoofi-app, shoofi-partner, shoofi-shoofir,
 shoofi-delivery-web) for the path **without** the `/api` prefix, plus its last segment, and
 list every caller and the token it sends in the PR's **Permission impact** section. Do it

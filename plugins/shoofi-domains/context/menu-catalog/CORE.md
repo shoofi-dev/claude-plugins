@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -10,8 +10,9 @@ reference: ./reference.md   # data model, endpoint tables, flows, options/extras
 Products, categories, menu assembly, options/extras, availability & stock, catalog i18n.
 
 ## Scope
-Server: `routes/menu.js`, `routes/product.js`, `routes/category.js`, the catalog slice of
-`routes/store.js`, `routes/translations.js`, `services/translations/owned-translations.js` (rows
+Server: `routes/menu.js`, `routes/product.js` (and its gate `services/catalog/product-access.js`), `routes/category.js`, the catalog slice of
+`routes/store.js` (and who may save the store document, `services/catalog/store-update-access.js`
+— invariant 28), `routes/translations.js`, `services/translations/owned-translations.js` (rows
 written by code — invariant 24), `routes/global-search.js`, `utils/menu-cache.js`,
 `utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`,
 `utils/general-category-order.js` (tile order),
@@ -738,6 +739,85 @@ boundary and say so in the PR.
     - **The app card** (`screens/stores/components/item.tsx`) shows "جديد"/"חדש"
       (`store-new-tag` + `defaultValue`, `StoreBadge` variant `new`). At most two badges, in the
       order offer, new, status. When all three apply, "new" is dropped.
+
+26. **EVERY PRODUCT ROUTE CARRIES ITS GATE ON THE ROUTE; A PARTNER WRITES ONLY ITS OWN STORE**
+    (`services/catalog/product-access.js`, reference §7 / §8). Until 2026-10-30, 23 routes in
+    `routes/product.js` had no auth. Given only a store's `app-name`, anyone could insert, edit,
+    hide, re-stock, re-order or delete that store's products, or upload images into it.
+    - **`PRODUCT_ADMIN`** is `auth.required` + `checkAdminRole(DASHBOARD_ROLES)` (from
+      `utils/analytics-access.js`), so any dashboard role, `viewer` and `accountant` included.
+      It is for the routes only the admin web calls. Prod's audit log has product adds, updates
+      and deletes by viewer-only accounts, so a narrower list locks out real menu editors.
+    - **`PRODUCT_ADMIN_OR_OWN_STORE`** is a dashboard role, OR `app-type: shoofi-partner` whose
+      token's `shoofi.storeUsers` doc has `appName === req.headers['app-name']`. It is for the
+      routes the partner app calls: `insert`, `update`, `delete`,
+      `update/{isInStore,isInStore/byCategory,quantity,isHidden,activeTastes,order}`, `GET extras`,
+      `POST /api/admin/images/upload`, `POST /api/images`. The two image routes and `GET extras`
+      have no live caller (a commented-out menu item, unrendered components), but the partner's
+      `stores/menu/index.ts` still calls them. Prod had 0 `images` docs across all 262 store DBs
+      on 2026-10-30.
+      One partner token is one store (`switch-store` re-mints it; the master-login token is
+      minted onto that store's doc), so another store's `app-name` is a 403. The handlers keep
+      reading `app-name`, which the gate has just proven to be the token's store.
+    - **Never put a role-only gate on an own-store route.** Partner tokens carry no `roles`, and
+      the 403 is silent in the app. Grep shoofi-partner (`stores/menu/index.ts`) before moving a
+      route between the two lists.
+    - A new route in `routes/product.js` must take one of the two. Every route there is gated;
+      `test/integration/product-admin-auth.js` fails for a route without `auth.required` first, or
+      one missing from its `IN_SCOPE` list (the two bulk-price routes keep their own
+      `BULK_PRICE_ROLES` and are listed apart).
+    - The gate changes nothing about the menu cache. Each route clears exactly the keys it
+      cleared before. Six still clear only the regular key, not `_schoolProject`, which breaks
+      invariant 2 and predates the gate: `update/activeTastes`, `update/order`,
+      `update/order-per-category`, `bulk-reorder`, `reset-order/:categoryId`, `migrate-orders`.
+28. **A STORE DOCUMENT IS SAVED BY STAFF, OR BY ITS OWN PARTNER FOR THE FIELDS ITS SCREENS EDIT**
+    (`POST /api/store/update`, `routes/store.js` → `services/catalog/store-update-access.js`). The
+    route `$set`s each top-level key it receives into `<app-name>.store` and keeps every other key.
+    Until 2026-10-30 it had no auth, so anyone with an `app-name` could set `coinsSettings`
+    (`earnPercent: 100`), `accounting` (bank account, commission tiers) or `hyp` on any store.
+    - **Who:** `...STORE_UPDATE_ACCESS` = `auth.required` + `storeUpdateGate`. Any
+      `DASHBOARD_ROLES` role may save any field of any store. Prod's audit log has 2,539 saves
+      (2026-03-22..10-29) by admin, master and viewer-only accounts, so staff roles are not
+      narrowed. A partner token (`app-type: shoofi-partner`) passes only when its
+      `shoofi.storeUsers` doc's `appName` equals the `app-name` header. Customer and driver
+      tokens get 403, and no token gets 401. The own-store check is a copy of `ownStoreGate` in
+      `services/catalog/product-access.js` (shoofi-server #346); fold the two together once both
+      have merged.
+    - **What a partner writes:** only `PARTNER_STORE_FIELDS`: `isStoreClose`, `isOpen`, `isBusy`,
+      `openHours`, `creditcard_support`, `cash_support`, `takeaway_support`,
+      `delivery_support`, `isOrderLaterSupport`, `drive_in_support`, `invoicePrintCount`,
+      `ramadanSettings`. Those are exactly the controls of the partner app's store-management
+      screen and header (`screens/admin/store-managment`, `components/layout/header`). The
+      app posts its WHOLE copy of `POST /api/store` on every save, wrapped as `{ data }`. Each
+      key outside the list is left out of the write, so it keeps its stored value; nothing the
+      owner can edit is lost. **Add a key only when a partner screen edits it, never because the
+      app sends it.**
+    - **Why the list is the fix, not a loss.** The partner's copy is often stale. In prod
+      (`store-update-history`, 2026-05-27..10-30), 13,173 of 13,240 partner saves changed only
+      listed fields or values `POST /api/store` computes. Each of the other 67 wrote a stale copy
+      back. Admin-enabled coins were switched off (shnetzel-classic 2026-09-28; at least three stores the
+      evening after a 2026-04-17 enable script). A store an admin had hidden was shown again
+      (tweaky-taybe 2026-10-21). A description was wiped, older cover images came back, and
+      sold-out extras went back on sale. Before 2026-06-10, when `POST /api/store` started
+      stripping `hyp` and `accounting`, the same echo also rewrote HYP credentials and bank
+      details. A missing `coinsSettings` is "off" to `coins-service` (`!!coinsSettings?.enabled`),
+      so a store without one keeps none after a partner save. A dropped key whose value differs
+      from the stored one is logged as
+      `store update: partner write left out fields the partner app cannot edit`.
+    - **Status change** compares only keys the request writes (`writes(key)`), because a partner
+      write never carries `business_visible` and the rest. The explore cache is cleared and the
+      closed/busy SMS sent only for a real change.
+    - **Self-call:** `PUT /api/shoofiAdmin/stores/:storeId/billing-contacts` posts here over HTTP
+      and forwards the caller's `authorization` + `app-type`. Without them the write is refused
+      and that route answers 500.
+    - **Customer app and shoofir** carry the same `updateStoreData` in their copied
+      `screens/admin/store-managment` (legacy; CLAUDE.md "Legacy"). Prod history (30,622 rows since
+      2025-12-19) has no customer-app or shoofir caller: every iOS row is `ShoofiPartners`. Their
+      tokens get 403.
+    - **Still open next to it, not this gate:** `POST /api/admin/store/:appName/coins-settings`
+      (`routes/shoofi-admin.js`) sets `coinsSettings` with no auth, and no client calls it.
+      `GET /api/store/get/:appName` returns the raw store document, `hyp` and `accounting`
+      included, with no auth.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified

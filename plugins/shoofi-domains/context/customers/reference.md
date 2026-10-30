@@ -524,6 +524,20 @@ locations, order details, a snapshot backfill and the paid AI weekly brief.
 - `weekly-status/marketing-spend` was deleted. It read an unregistered
   `weeklyKpiManualInputs` handle and 400'd on every call. CAC is the `acquisition-spend`
   ledger (unit economics).
+**Store management `/api/shoofiAdmin/store/*` and `stores/*` is admin-token only**
+(shoofi-server `utils/admin-token-routes.js`, 2026-10-29). Before that, 23 routes took no token:
+the registry, add, update, delete, mock stores, the platform settings `store/update`, billing
+contacts and the download-link SMS.
+- It's a list, not middleware on each route: `adminTokenGuard` is mounted in `app.js` right
+  after `restrictedAdminGuard`, so a narrower restricted entry wins.
+- Every entry takes every dashboard role. It shuts out anonymous callers and
+  customer/partner/driver tokens without narrowing any staff member. Viewers edit stores
+  today, and whether they should is a product call.
+- `GET store/z-cr` stays open (`OPEN_ROUTES`): all three apps read it at startup, before
+  login. The apps' `shoofiAdminStore` otherwise only calls `available-stores`, and their
+  `store/update` is `/api/store/update`.
+- `test/integration/admin-token-routes.js` checks every entry against
+  `docs/routes-baseline.txt`, so a rename can't silently un-gate it.
 Push campaigns (§5b): `views/admin/customer-campaigns/` has the list with the
 `PushCapSettings` panel, skip counts, the scheduled time and cancel-schedule. The form sends
 the schedule as an Israel wall-clock string and shows stored instants through

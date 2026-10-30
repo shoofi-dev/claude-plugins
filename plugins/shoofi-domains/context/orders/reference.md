@@ -304,6 +304,15 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 - **FRAUD**: `order-fraud-*`, `fraud-config-loader`, `fraud-check-storage` →
   `shoofi.fraudChecks`/`deviceCustomers`/`ipCustomers`.
 - **GROWTH/COINS (secondary)**: `coinsService`, `worldCupService`, attribution — must never fail the order.
+  Coins admin routes (CORE invariant 19): `/api/admin/coins/{expire, customer/:customerId,
+  customer/:customerId/earned, store/:storeAppName/stats}` in `routes/coins.js` (`COINS_ADMIN`) and
+  `/api/admin/coins-settings` + `/api/admin/store/:appName/coins-settings` (GET and POST) in the
+  Coins Settings block of `routes/shoofi-admin.js` (`COINS_SETTINGS_ADMIN`). All eight are
+  `auth.required` + a role check, so no token is 401 and customer, partner and driver tokens are
+  403. Seven take `DASHBOARD_ROLES`; `expire` is master-only (`COINS_EXPIRE_ADMIN`) and audited
+  as `expire_coins`. The customer routes `/api/coins/*` are `auth.required` and read the
+  customer from the token. Store `coinsSettings` is also written by the ungated
+  `POST /api/store/update`.
 
 ## 8. Crons (prod-only, `ENABLE_CRONS=true`; distributed locks — `docs/distributed-cron-jobs.md`)
 - `order-overdue-checker` (5 min): flags overdue `1`/`3` orders + runs the **twin overdue sweeper**.
@@ -557,7 +566,14 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   (open-as store/driver/customer, **master-only**), `admin/order-monitoring/summary/{orderNumber}`
   (timeline; every `admin/order-monitoring/*` route is `auth.required` +
   `checkAdminRole` with ALL admin roles — customer tokens 403, no token 401), `twin-order/admin/{group/:id/full, degrade, undo-degrade, cancel, assign-driver}`,
-  `admin/twin-order-config` (GET/POST), `delivery/admin/{cancel,assign,reassign,drivers,orders}`.
+  `admin/twin-order-config` (GET/POST), `delivery/admin/{cancel,assign,reassign,drivers,orders}`,
+  and the coins admin routes (CORE invariant 19, every dashboard role; `admin/coins/expire` is
+  master-only):
+  `admin/coins-settings` (GET/POST, `src/views/admin/settings/ShoofiSettings.tsx`, the platform
+  on/off switch), `admin/store/{appName}/coins-settings` (GET/POST, `src/views/admin/stores/StoreForm.tsx`)
+  and `admin/coins/customer/{id}/earned` (`src/apis/admin/customers/customer-details.ts`, the
+  customer modal's coins tab). Nothing calls `admin/coins/expire`, `admin/coins/customer/{id}` or
+  `admin/coins/store/{appName}/stats`.
 - **Refunds**: `order/addRefund` is **NOT** used here — admin refunds surface via twin
   `degrade`/`cancel` (`refundOwed`/`refundBreakdown`) and `shoofiAdmin/compensations/*`.
 - **Twin admin**: full lifecycle control (degrade / undo / cancel / assign single|split)
