@@ -45,9 +45,16 @@ for **orders** (joined via `order.appName`).
 ## 2. Customer auth flow (phone + OTP)
 1. **Request** — `POST /api/customer/create` (`customer.js`): generates a 4-digit
    `authCode`, upserts the identity, sends SMS + WhatsApp (`user_verification` template).
-   Test phones (`config/test-phones.js`) skip SMS and accept a fixed code.
+   Test phones (`config/test-phones.js`) skip SMS and accept a fixed code. The reply never
+   carries the code. Until 2026-10-30 the new-customer branch echoed the whole new doc, code
+   included. The login screens read only `phone` and `isBlocked`.
 2. **Verify** — `POST /api/customer/validateAuthCode` (`customer.js`): compares `authCode`,
-   clears it on success, mints a JWT via `authService.toAuthJSON`.
+   "clears" it on success, mints a JWT via `authService.toAuthJSON`. "Clears" means writing
+   `authCode: undefined`, which the v3 driver stores as **null**. Prod 2026-10-30: null or missing
+   on 16,899 customers, 370 store users and 255 drivers. The compare is loose (`==`, number
+   stored vs string sent), so it runs only when **both** sides hold a code (`isCode`, CORE
+   invariant 15). Without that check, `null == undefined` let a request carrying only a phone
+   log in.
 3. **Token** — `utils/auth-service.js generateJWT`: HS256 `jwt.sign({phone, id, exp})`,
    expiry ≈ **4 years**; the token is **persisted onto the user doc** (`token` field).
 4. **Verification** — `routes/auth.js getTokenFromHeaders`: scheme `Authorization: Token <jwt>`;
@@ -266,6 +273,30 @@ shared; each doc keeps its own `_id`, `token` and `roles`, so the per-store `rec
 addressing is unchanged. Guarded on a truthy token (an empty registration can't wipe the
 siblings) and on the phone read off the *authenticated* doc, never the request body; a
 failure there is logged, never fails the registration.
+
+**Support reads customers through five admin-only routes** (CORE invariant 15, 2026-10-30), all
+`auth.required` + `checkAdminRole(CUSTOMER_ADMIN_ROLES)`:
+
+| Route | Admin web caller | Reply |
+|---|---|---|
+| `POST search-customer` | `CustomerSearch.tsx`, the coupon/draft customer pickers | rows + `status.{isLoggedIn, isTryingToLogin, authCode}`; no `token` |
+| `GET /:customerId` | `getCustomerDetailsApi`, `CouponForm` | name, phone, flags, `deletedAt`, addresses |
+| `GET /:customerId/status` | `getCustomerStatusApi` | `badges` |
+| `GET /:customerId/whatsapp-summary` | `getCustomerWhatsappSummaryApi` | the respond.io mirror's summary |
+| `POST /:customerId/update-address-to-current-location` | support's location fix | writes the order, the customer and the booking |
+
+- `status.authCode` is the customer's pending OTP. Support shows it on purpose ("מנסה להתחבר
+  (code)"), so the reply includes it only for a dashboard role (`mayReadPendingCode`). Prod
+  2026-10-30: 2,023 customers hold one. Of those with a WhatsApp send on record, 3 are under a
+  day old and 1,048 are over 30 days old.
+- The RN apps' legacy `search-customer` screens (`stores/admin-customer`) get 403. They
+  `.map` the reply as an array, and it has been `{ customers, pagination }` since 2025-06, so
+  they threw on every result already.
+- No app reads a customer by id (checked in the three RN apps and the website at origin/main,
+  2026-10-30). The customer app uses `GET /details` for itself, so a customer token gets 403
+  for its own id too.
+- `search-customer` is unaudited (a POST missing from `admin-audit-routes.js`). The address
+  fix is audited: 277 since 2026-04-14, 51 of them by viewer-only staff.
 
 ⚠️ **`getCustomerAppName(req, appName)` ignores both arguments and always returns the
 `shoofi` DB** (`utils/app-name-helper.js`) — it is a customer-only helper, so
