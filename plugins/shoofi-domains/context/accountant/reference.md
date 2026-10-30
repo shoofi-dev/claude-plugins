@@ -70,7 +70,11 @@ coupons and delivery-only fees use `storeReportBounds` → `[start, end]` busine
 where `endExclusive` is the next day's business-day start — passed to the two
 `GET /api/shoofiAdmin/compensations` self-calls (`payers=['business']`,
 `recipients=['business']`) with `endExclusive=true`, and stored on the report as
-`reportData.compensationWindow`. Carry-over compensations
+`reportData.compensationWindow`. Those self-calls go out over HTTP to an **admin-only** route
+(CORE invariant 16). They forward the caller's `authorization` + `app-type`
+(`compensationSelfCallHeaders`), and a 401/403 throws (`throwIfCompensationFetchRefused`). That
+turns into a recorded `generation_error` on `POST /reports/generate`, or a flagged store on the
+financial overview, never a report with ₪0 compensations. Carry-over compensations
 (`appNameBackfill.pendingReportCarryover`) are deliberately NOT date-filtered.
 
 **Compensation lock** (`checkCompensationLock`, called from `rejectIfCompensationPeriodClosed`
@@ -80,6 +84,28 @@ compensation whose `createdAt` is inside an existing store report's window (by `
 driver report's window (by `deliveryCompanyId` = `item.deliveryCompany._id`). Delete +
 regenerate the report to reopen. The admin web (`CompensationManagement.tsx`,
 `CompensationModal.tsx`) shows generic error toasts and does not yet surface the 409 message.
+
+**Who may call the compensation API** (`services/compensations/access.js`, CORE invariant 16;
+every route is `auth.required` first):
+
+| Route | Admin roles | Partner (own) | Driver (own) | Client callers |
+|---|---|---|---|---|
+| `GET compensations` (list) | master/admin/manager | — | — | web ניהול פיצויים, יצירת סיכומי חנויות; the store report self-call |
+| `GET compensations/:id` | master/admin/manager | — | — | none found |
+| `POST approve-item` | master/admin/manager | — | — | web ניהול פיצויים |
+| `PUT compensations/:id` | master/admin/manager | — | — | none found |
+| `DELETE compensations/:id` | master/admin/manager | — | — | web ניהול פיצויים |
+| `POST edit/:id` | all except accountant-only | — | — | web ניהול פיצויים + order card `CompensationModal` |
+| `GET order/:orderId` | all except accountant-only | order in its store DB | its (or its company's) `bookDelivery`, by `_id` or `order._id` | web `CardOrder`, `CompensationModal`; shoofir `payments.tsx` |
+| `GET driver/:driverId` | master/admin/manager | — | its own id | web `DriverPayments` (master); shoofir `compensations.tsx` |
+| `GET business/:storeId` | master/admin/manager | its `store._id`; query uses the token's `appName`, not the header | — | partner `screens/admin/compensations` |
+| `POST add` | all except accountant-only | order in its store DB, recipient `business` | its delivery, recipient itself | web `CompensationModal`; partner `BusinessCompensationRequestModal`; shoofir `CompensationRequestModal` |
+
+A partner/driver `add` is stamped server-side (`stampMobileCompensation`): pending, ₪0 approved,
+no approval fields, and `createdBy`, `order.appName`/`storeData.appName` (partner) and
+`deliveryCompany._id` (driver) taken from the token. Admin `add`/`edit` keep taking status and
+`approvedAmount` from the body. The order card files approved compensations directly; 662 of the
+683 items filed in the 120 days to 2026-10-29 are status 1.
 
 **Lifecycle**: `draft →(approve)→ approved →(send: WhatsApp monthly_report to billingContacts)→
 sent`; `send-invoice`; `create-invoice` (§5); status toggles `reportSent/invoiceSent/
@@ -266,7 +292,10 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   appNameBackfill{pendingReportCarryover}, createdAt (BSON Date — the settlement clock)}`. Attributed to the
   report whose window contains `createdAt` (CORE invariant 10), locked once that report exists.
   `payingParty !== compensationFor` is enforced on add/edit
-  (`services/compensations/validate-parties.js`). `compensationFor:'shoofi'` = the store (or driver) owes
+  (`services/compensations/validate-parties.js`). `order._id` is the store order `_id` (admin web,
+  partner) or the `bookDelivery._id` (driver-filed). `createdBy` is an admin `_id` or, on mobile rows,
+  the store's or driver's name. `requestedByBusiness` / `requestedByDriver` flag mobile rows: 49 and
+  279 in prod, the newest driver row dated 2026-05-27. `compensationFor:'shoofi'` = the store (or driver) owes
   Shoofi — store report outcome `compensationsToShoofi`, driver report `totalDriverCharges`; no coupon.
 - **Store `accounting`** (store's own DB): `accountantFileNumber` (the accountant's מספר תיק = the
   Hashavshevet customer account the movein export debits; also on `delivery-company.store`),

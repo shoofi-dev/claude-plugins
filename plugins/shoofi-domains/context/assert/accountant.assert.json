@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@df71e52c (fix/marketing-routes-auth) / 2026-10-28",
+  "lastVerified": "shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -31,7 +31,8 @@
         "routes/admin/coupon-templates.js",
         "services/coupons/coupon-funder.js",
         "utils/coupon-discount.js",
-        "services/coupons/delivery-price-enforcement.js"
+        "services/coupons/delivery-price-enforcement.js",
+        "services/compensations/access.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -59,7 +60,9 @@
           "calculateCommissionTiered",
           "generateStoreReportData",
           "totalForTransfer",
-          "validateCompensationsApproved"
+          "validateCompensationsApproved",
+          "compensationSelfCallHeaders",
+          "throwIfCompensationFetchRefused"
         ],
         "utils/invoice-provider.js": [
           "getActiveProvider"
@@ -145,6 +148,15 @@
         ],
         "services/coupons/delivery-price-enforcement.js": [
           "enforceDeliveryPriceCoupon"
+        ],
+        "services/compensations/access.js": [
+          "compensationAccess",
+          "stampMobileCompensation",
+          "COMPENSATION_ADMIN_ROLES",
+          "ORDER_CARD_ROLES",
+          "ADMIN_ONLY_ITEM_FIELDS",
+          "partnerOwnsOrder",
+          "driverOwnsDelivery"
         ]
       },
       "patterns": [
@@ -156,7 +168,7 @@
         {
           "file": "routes/coupon.js",
           "regex": "router\\.post\\('/api/admin/coupon/create', \\.\\.\\.couponWriters,",
-          "desc": "the admin coupon create is gated \u2014 it had no auth at all before 2026-10-28"
+          "desc": "the admin coupon create is gated — it had no auth at all before 2026-10-28"
         },
         {
           "file": "routes/payments/admin-reports.js",
@@ -562,6 +574,81 @@
           "file": "routes/order-amend.js",
           "regex": "resolveCouponSplit\\(order\\.appliedCoupon\\.coupon, pricing\\.couponDiscount\\)",
           "desc": "CORE invariant 15: amend writes the re-resolved shares together with the new discount"
+        },
+        {
+          "file": "services/compensations/access.js",
+          "regex": "const COMPENSATION_ADMIN_ROLES = \\[\"master\", \"admin\", \"manager\"\\];",
+          "desc": "CORE invariant 16: the admin-only compensation routes name master explicitly (checkAdminRole has no hierarchy)"
+        },
+        {
+          "file": "services/compensations/access.js",
+          "regex": "const ORDER_CARD_ROLES = \\[\"master\", \"admin\", \"manager\", \"senior\", \"operator\", \"viewer\", \"editor\"\\];",
+          "desc": "CORE invariant 16: the order card's compensation calls keep every dashboard role incl. viewer (support files compensations from order cards)"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "const compensationAdminOnly = \\[auth\\.required, checkAdminRole\\(COMPENSATION_ADMIN_ROLES\\)\\];",
+          "desc": "CORE invariant 16: auth.required AND the role check — a customer token passes auth.required alone"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.get\\(\"/api/shoofiAdmin/compensations\", compensationAdminOnly,",
+          "desc": "CORE invariant 16: the list (and the store report self-call) is admin-only"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.post\\(\"/api/shoofiAdmin/compensations/approve-item\", compensationAdminOnly,",
+          "desc": "CORE invariant 16: approving is admin-only"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.delete\\(\"/api/shoofiAdmin/compensations/:id\", compensationAdminOnly,",
+          "desc": "CORE invariant 16: deleting is admin-only"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.post\\(\"/api/shoofiAdmin/compensations/edit/:id\", compensationOrderCardRoles, updateCompensationHandler\\);",
+          "desc": "CORE invariant 16: edit/:id is also the order card's CompensationModal — viewer keeps it"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.post\\(\"/api/shoofiAdmin/compensations/add\", compensationAccess\\(\\{ adminRoles: ORDER_CARD_ROLES, \\.\\.\\.addScope \\}\\)",
+          "desc": "CORE invariant 16: add is admin OR the caller's own order (partner/driver), never role-only"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.get\\(\"/api/shoofiAdmin/compensations/driver/:driverId\", compensationAccess\\(\\{ adminRoles: COMPENSATION_ADMIN_ROLES, \\.\\.\\.driverListScope \\}\\)",
+          "desc": "CORE invariant 16: the driver app reads its own compensations with a role-less token"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.get\\(\"/api/shoofiAdmin/compensations/business/:storeId\", compensationAccess\\(\\{ adminRoles: COMPENSATION_ADMIN_ROLES, \\.\\.\\.businessListScope \\}\\)",
+          "desc": "CORE invariant 16: the partner app reads its own store's compensations with a role-less token"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "stampMobileCompensation\\(order, items, req\\.compensationCaller\\)",
+          "desc": "CORE invariant 16: a partner/driver add is stamped server-side (pending, ₪0 approved, createdBy + settlement identity)"
+        },
+        {
+          "file": "services/compensations/access.js",
+          "regex": "stamped\\.status = 0;\\s*stamped\\.approvedAmount = 0;",
+          "desc": "CORE invariant 16: a non-admin caller cannot file a pre-approved compensation"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "compensations\\?\\$\\{compensationParams\\}`, compensationSelfCallHeaders\\(req\\)\\)",
+          "desc": "CORE invariant 10/16: the store report's compensation self-call forwards the generating admin's token to the admin-only list"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "compensations\\?\\$\\{shoofiCompensationParams\\}`, compensationSelfCallHeaders\\(req\\)\\)",
+          "desc": "CORE invariant 10/16: the store report's Shoofi-compensation self-call forwards the token too"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "if \\(status === 401 \\|\\| status === 403\\) \\{\\s*throw new Error",
+          "desc": "CORE invariant 10/16: a refused compensation fetch FAILS the report instead of settling it with ₪0 compensations"
         }
       ]
     }
