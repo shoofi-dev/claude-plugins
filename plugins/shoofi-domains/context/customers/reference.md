@@ -571,7 +571,7 @@ Do not "fix" them opportunistically; they are scheduled work, not bugs to discov
    to route on `app-name`. **Remember: identity routing is by `app-type` throughout this domain.**
 9. **Dead/inherited (hands-off per §1c)** — the `AUTH_API`/`Authenticator` const block is
    imported in all three RN apps but **referenced 0 times** (legacy pre-`customer` surface);
-   admin web has an unused `AdminTokens` interface; `routes/user.js` is legacy expressCart admin.
+   admin web has an unused `AdminTokens` interface; `routes/user.js` (legacy expressCart admin) is deleted by shoofi-server#359.
 10. **KNOWN — not yet handled (AI helper; recorded in shoofi-server `docs/ai-helper.md`,
     2026-10-16):** `POST /api/customer/delete` soft-deletes the identity doc but leaves
     `shoofi.tasteProfiles {"owner.customerId": <id>}` in place; only the app's cached copy goes
