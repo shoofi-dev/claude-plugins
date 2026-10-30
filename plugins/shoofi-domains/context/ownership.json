@@ -31,7 +31,13 @@
         "routes/ai-helper.js",
         "utils/extras-required.js",
         "services/menu/promotions.js",
-        "services/translations/"
+        "services/translations/",
+        "utils/extras-icons/",
+        "services/catalog/extras-catalog.js",
+        "services/catalog/extras-icons-sync.js",
+        "utils/crons/extras-icons-sync-cron.js",
+        "routes/admin/extras-catalog.js",
+        "scripts/seed-extras-catalog.js"
       ],
       "shoofi-partner": [
         "screens/admin/product",

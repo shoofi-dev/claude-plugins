@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -30,7 +30,13 @@ it — `services/ordering-intelligence/{taxonomy,product-labeler,craving}.js`,
 (admin web: `src/views/admin/dish-types/DishTypes.tsx`, `src/apis/admin/dish-taxonomy.ts`), and the
 monthly menu spellcheck — `utils/menu-spellcheck-text.js`, `services/catalog/menu-spellcheck.js`,
 `utils/crons/menu-spellcheck-cron.js`, `routes/admin/menu-spellcheck.js` (admin web:
-`src/views/admin/stores/MenuSpellcheck.tsx`, `src/apis/admin/menu-spellcheck.ts`), and what the
+`src/views/admin/stores/MenuSpellcheck.tsx`, `src/apis/admin/menu-spellcheck.ts`), the shared
+extras catalog and the option icons map (invariant 29) — `utils/extras-icons/`,
+`services/catalog/extras-catalog.js`, `services/catalog/extras-icons-sync.js`,
+`utils/crons/extras-icons-sync-cron.js`, `routes/admin/extras-catalog.js`,
+`scripts/seed-extras-catalog.js` (app: `utils/extras-icons.ts`,
+`components/extras-controls/ExtraOptionIcon.tsx` — on shoofi-app branch `feat/extras-icons`, not
+on `main` as of 2026-10-30), and what the
 AI helper's taste profile does to suggestions — `services/ordering-intelligence/avoid.js`, the
 profile hooks and chat-ordering modes in `suggest.js` / `suggest-service.js`,
 `utils/extras-required.js`, and `GET /api/ai-helper/cuisines` (`routes/ai-helper.js` →
@@ -41,7 +47,8 @@ merge are the customers domain's; the cart the quick add writes into and the def
 checkout are the orders domain's.
 Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/sold-by-weight.md`,
 `docs/menu-import-issues.md` (the worklist — now also documents the `lint` phase),
-`docs/combo-deals.md`, `docs/store-launch-date.md`, `docs/for-you.md`, `docs/menu-spellcheck.md`, `docs/ai-helper.md`.
+`docs/combo-deals.md`, `docs/store-launch-date.md`, `docs/for-you.md`, `docs/menu-spellcheck.md`, `docs/ai-helper.md`,
+`docs/extras-icons.md`.
 Mostly **server-first**: catalog data is server-owned and clients render it — but if a task
 needs a client change (partner product screens, customer menu display), do it full-stack,
 one PR per repo.
@@ -818,6 +825,43 @@ boundary and say so in the PR.
       (`routes/shoofi-admin.js`) sets `coinsSettings` with no auth, and no client calls it.
       `GET /api/store/get/:appName` returns the raw store document, `hyp` and `accounting`
       included, with no auth.
+
+29. **OPTION ICONS COME FROM ONE PUBLISHED MAP, KEYED EXACTLY AS THE APP KEYS A NAME; A MACHINE
+    MAY ONLY APPLY A CONFIDENT MATCH TO A KEY THAT EXISTS** (`docs/extras-icons.md`, reference §2
+    and §7i). The customer app reads `extras-icons/v1/map.json` from the `shoofi-spaces` CDN and
+    looks each option up by `extraIconKey(nameAR, nameHE)`. Nothing about icons is in the menu
+    response or the menu cache, so invariant 2 does not apply.
+    - **The key is a byte-for-byte contract.** `utils/extras-icons/normalize.js` must equal
+      shoofi-app `utils/extras-icons.ts` (strip harakat/tatweel, fold أإآٱ→ا ى→ي ة→ه, strip
+      Hebrew points, keep only 0-9 A-Z a-z ء–ي ٠–٩ א–ת %, collapse spaces, lower-case; Arabic
+      wins, else `he:<hebrew>`). Change both together. `test/integration/extras-icons.js` holds a
+      verbatim copy of the app's functions and fuzzes both against each other.
+    - **Central, by design.** `shoofi.extras-catalog` (one per key, `_id` = stable snake_case key,
+      never renamed; `parent` is the icon fallback; `iconFile`), `shoofi.extras-catalog-aliases`
+      (one per name key: `kind` ingredient or a non-ingredient kind, `key`, `modifier`
+      none|without|extra|on_side, `source`), `shoofi.extras-catalog-queue` (unknown names),
+      `shoofi.extras-catalog-runs`. The alias table is the matcher: a name is known when it has a
+      row there. Store DBs are only read (the nightly scan); no product is ever written.
+    - **The save hook never touches the save.** `routes/product.js` insert, update (only when
+      `extras` is sent) and create-from-mock call `extrasCatalog.noteProductExtrasInBackground`
+      after the write and the cache clears. It is not awaited and catches everything, and a central
+      db without `collection()` is a no-op. Never `await` it, and never let it refuse a product.
+    - **Who may write an alias.** Seed (`$setOnInsert`), the deterministic rule ("بدون X" / "בלי X" /
+      "اضافة X" over a known plain ingredient), Claude Haiku (`MODELS.fast`, no `effort`) ONLY via
+      `classify.decide`: verdict `match`, a key already in the catalog, confidence ≥
+      `AUTO_CONFIDENCE` (0.9), and `without` agreeing with a negation word in the text. Machine
+      writes are insert-only. New ingredients, not-food, unsure and anything else go to the queue
+      (`review`) for a person; `POST /api/admin/extras-catalog/queue/resolve` is the only path that
+      overwrites an alias.
+    - **Spaces: `map.json` is the only object ever overwritten; a PNG never is.** PNGs are served
+      `immutable` for a year, so `putIcon` HEADs first and refuses an existing object, and only an
+      entry with `iconFile: null` may get one. Publishing refuses a map that lost > 10% of the last
+      publish's names (`MIN_KEEP_RATIO`; < 1,000 names with no publish on record), and `force`
+      never bypasses that.
+    - **The nightly sync is off by default.** 04:45 Asia/Jerusalem, lock `cron:extras-icons-sync`,
+      and on top of `ENABLE_CRONS` it runs only when `shoofi.store {id:1}.isExtrasIconsSyncEnabled
+      === true`. `extrasIconsSyncDryRun === true` makes it a dry run that calls the model but writes
+      only its run record. Both fields are server-only, not in `SHOOFI_CONFIG_PUBLIC_FIELDS`.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
