@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -203,7 +203,18 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    - Writes go through `linkFromRequest` → `resolveLink`, which 400s a coupon / deal / product /
      store that doesn't exist. Marketing promotes existing offers only (Sari, 2026-10-28); never
      add a "create the coupon from here" path. A coupon scoped to exactly one store gets that
-     `appName` filled in (the app opens the store; otherwise "my coupons").
+     `appName` filled in. Builds before feat/coupon-detail-link open that store with it (any other
+     coupon: "my coupons", which lists only personal coupons, so a public multi-store coupon was a
+     dead end).
+   - **Every `coupon` link opens the coupon page** (shoofi-app `coupon-detail`,
+     `screens/coupon-detail`, 2026-10-30), single-store coupons included. The page reads
+     `GET /api/coupons/:id/public` (payments CORE, "What a marketing coupon link shows") and says
+     what the coupon gives, its dates, the code with a copy button or "applied automatically at
+     checkout", and where it works: "all stores", or the eligible stores, each opening through
+     `openStoreAtProduct`. It never touches the cart and never claims or applies the coupon. The
+     tap event is unchanged: every caller still calls `trackMarketingTap` / `trackPushOpen` before
+     `openMarketingLink`, and only the router's `coupon` case changed. A phone sees this after
+     `eas update`.
    - Older app builds never read `link`: writers keep an ad's `appName`/`pageName`
      (`legacyAdFields`) and a story's `target` (`targetForLink`) in step, and reads fill `link` in
      for items saved before it (`withLink`). An admin form that sends no `link` must not flatten a

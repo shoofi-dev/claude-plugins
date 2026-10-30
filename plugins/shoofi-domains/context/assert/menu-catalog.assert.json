@@ -1,10 +1,11 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@feat/coupon-detail-link / 2026-10-30 (CORE invariant 18 shared public-coupon filter); shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
         "routes/menu.js",
+        "services/coupons/public-coupon.js",
         "utils/store-launch.js",
         "docs/store-launch-date.md",
         "routes/product.js",
@@ -524,8 +525,13 @@
         },
         {
           "file": "lib/campaign-category-sync.js",
-          "regex": "isCustomerSpecific: \\{ \\$nin: \\[true, 'true'\\] \\}",
-          "desc": "doc CORE invariant 18: a customer-specific coupon does not put the store in the حملات row"
+          "regex": "'applicableTo\\.stores\\.0': \\{ \\$exists: true \\},\\s*\\.\\.\\.EVERYONE_COUPON_FILTER",
+          "desc": "doc CORE invariant 18: the حملات row counts only coupons every customer can see (EVERYONE_COUPON_FILTER)"
+        },
+        {
+          "file": "services/coupons/public-coupon.js",
+          "regex": "const EVERYONE_COUPON_FILTER = Object\\.freeze\\(\\{\\s*isCustomerSpecific: \\{ \\$nin: \\[true, 'true'\\] \\},\\s*isPurchasedCoupon: \\{ \\$nin: \\[true, 'true'\\] \\},",
+          "desc": "doc CORE invariant 18: a customer-specific or purchased coupon does not put the store in the حملات row"
         },
         {
           "file": "routes/promotion.js",
