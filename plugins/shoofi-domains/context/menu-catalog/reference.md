@@ -118,6 +118,28 @@ this per-store doc, NOT central `shoofi.stores`**), `hasGeneralCategories`,
 `mockStoreAppName`, `outOfStockExtras` (surfaced in the menu response),
 plus open/visibility flags.
 
+**Who writes it: `POST /api/store/update`** (CORE invariant 28, `services/catalog/store-update-access.js`).
+`$set` of each top-level key received (`req.body.data || req.body`, `_id` = the target), so a key
+left out keeps its stored value; a nested object (`coinsSettings`, `accounting`) is replaced whole.
+- **Dashboard** (`DASHBOARD_ROLES`, `Bearer` + `app-type: shoofi-admin`): any store, any key. Admin-web
+  callers: `views/admin/stores/StoreData.tsx`, `views/admin/accounting/{BankAccountDetails,ContractDetails}.tsx`
+  (both re-post the whole `GET /api/store/get/:appName` document), `apis/delivery/update-store.ts`
+  (`{ isStoreClose, _id }`, default `app-name: shoofi`). Server: the billing-contacts self-call
+  (`PUT /api/shoofiAdmin/stores/:storeId/billing-contacts`, forwards the admin's token).
+- **Partner** (`Token` + `app-type: shoofi-partner`, own store only): `PARTNER_STORE_FIELDS`, i.e.
+  `isStoreClose isOpen isBusy openHours creditcard_support cash_support takeaway_support
+  delivery_support isOrderLaterSupport drive_in_support invoicePrintCount ramadanSettings`.
+  The partner app posts `{ data: <its whole storeData> }` from `screens/admin/store-managment`
+  `onSave` and the header open/close/busy toggles. That copy is `POST /api/store`'s answer:
+  the stored keys minus `SENSITIVE_STORE_FIELDS`, plus `workingHours`, `isDeliveryOpen`,
+  `isTwoPhaseCaptureActive`, `isPartnerOrderAmendActive`, `isDeliveryOnlyActive`,
+  `walletPaymentProvider`, `googlePay*`, computed on every read and read from storage by
+  nothing. With no `coinsSettings` stored it carries the app's `defaultCoinsSettings`
+  (`enabled: false`); the coins toggle has been commented out of the screen since 2026-05-27.
+- `invoicePrintCount` missing or invalid in the request is written as `1`, for any caller.
+- `isStockManagment === true` in the write runs the stock backfill (§5), so only a dashboard save
+  can run it.
+
 ⚠️ **`hasGeneralCategories` lives in TWO documents and they drift.** `GET /api/menu`
 reads it from this per-store `store {id:1}` doc (`routes/menu.js`), but the admin
 store form writes it to central `shoofi.stores`
@@ -505,7 +527,8 @@ Three interacting product fields — keep them consistent:
 **human-confirmed, applies to ALL products, no exceptions:**
 `quantity <= 0  ⟺  { isInStore:false, outOfStockByQuantity:true }`.
 Enforced at: product edit (`product.js`), set-quantity
-(`product.js`), enable-stock backfill (`store.js`), and the
+(`product.js`), enable-stock backfill (`store.js`, dashboard saves only: a partner
+write cannot carry `isStockManagment`), and the
 order lifecycle via `utils/order-stock.js` (`decrementOrderStock` /
 `restoreOrderStock` — idempotent via `stockDecremented`/`stockRestored`; restore
 only re-enables products that were `outOfStockByQuantity`, never un-hides manual
@@ -580,6 +603,7 @@ the cache read.
 - `/api/shoofiAdmin/category/{GET list, add, GET :id, update/:id, update-order, :id DELETE}` **[admin]** — platform categories (central `shoofi.categories`); `POST /api/shoofiAdmin/category/list` **[public]** (same documents as the GET, the apps' boot read)
 - `GET /api/shoofiAdmin/explore/categories-with-stores-v2` and v1 **[public]** — the home, store cards through `toPublicStore` (no `accounting`); `/api/shoofiAdmin/explore/{clear-cache, clear-cache-keys, cache-stats, debug-area}` **[admin]**
 - `GET /api/store/get/:appName` **[admin]** — the whole per-store `store` document, payment credentials included (it had no auth). Admin web only; the server reads `db.store` directly instead of calling it.
+- `POST /api/store/update` — save the per-store `store` document (`$set` per key). Its own gate, not `CATALOG_ADMIN`: `auth.required` + `storeUpdateGate` — any dashboard role, any key; a partner token for its own `app-name` only, cut to `PARTNER_STORE_FIELDS`; customer/driver 403, no token 401. Answers `200 { message: "Successfully saved" }` either way (§2 `store`, CORE invariant 28).
 - Public store lists through `toPublicStore` (no `accounting`/`hyp`/`credentials`/`fraudConfig`): explore v1/v2, `POST /api/shoofiAdmin/available-stores` (store + each `deliveryCompanies[].company`), `POST /api/menu/search`, `POST /api/twin-order/eligible-stores`, `POST /api/for-you/suggest` cards.
 - `GET /api/admin/categories/:page?` — **no auth** still (delivery-web `get-categories.ts` sends no token). The legacy expressCart `GET /category/:cat/:pageNum?` is removed (2026-10-30).
 - `POST /api/admin/menu-import-issues` — record one import run's issues (whole run, one call)

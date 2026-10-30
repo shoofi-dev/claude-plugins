@@ -304,6 +304,15 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 - **FRAUD**: `order-fraud-*`, `fraud-config-loader`, `fraud-check-storage` →
   `shoofi.fraudChecks`/`deviceCustomers`/`ipCustomers`.
 - **GROWTH/COINS (secondary)**: `coinsService`, `worldCupService`, attribution — must never fail the order.
+  Coins admin routes (CORE invariant 19): `/api/admin/coins/{expire, customer/:customerId,
+  customer/:customerId/earned, store/:storeAppName/stats}` in `routes/coins.js` (`COINS_ADMIN`) and
+  `/api/admin/coins-settings` + `/api/admin/store/:appName/coins-settings` (GET and POST) in the
+  Coins Settings block of `routes/shoofi-admin.js` (`COINS_SETTINGS_ADMIN`). All eight are
+  `auth.required` + a role check, so no token is 401 and customer, partner and driver tokens are
+  403. Seven take `DASHBOARD_ROLES`; `expire` is master-only (`COINS_EXPIRE_ADMIN`) and audited
+  as `expire_coins`. The customer routes `/api/coins/*` are `auth.required` and read the
+  customer from the token. Store `coinsSettings` is also written by the ungated
+  `POST /api/store/update`.
 
 ## 8. Crons (prod-only, `ENABLE_CRONS=true`; distributed locks — `docs/distributed-cron-jobs.md`)
 - `order-overdue-checker` (5 min): flags overdue `1`/`3` orders + runs the **twin overdue sweeper**.
@@ -354,6 +363,10 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
   the bundle that can render combo deals — without it the server strips combos from the menu
   (menu-catalog reference §6b). `helpers/combo-pricing.ts` is the client copy of
   `calculateComboExtrasPrice` (CORE invariant 11).
+- **Public pre-checkout reads** (CORE invariant 18): `admin/check-order-time-valid` (the cart's
+  `isOrderTimeValid` on submit, maybe logged out) and `admin/calander/disabled/hours/:date` (the
+  `pick-time` dialog, not reachable from the cart on main: `onPickTime` is defined, never bound).
+  Both stay unauthenticated on purpose and return no order.
 - **Order creation** = **`POST order/create` as multipart/form-data** (`body` = JSON
   cart payload + `img` files), built by `stores/cart/index.ts` (`getCartData` →
   `produtsAdapter`) via `hooks/checkout/use-checkout-submit.ts` from
@@ -449,7 +462,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
 - **API client**: axios (`utils/http-interceptor/index.ts`), token `@storage_userToken`
   as `"Token …"`, `app-type: shoofi-partner`, `app-name` = `@storage_storeDB` (per-call overridable).
 - **Endpoints** (`stores/orders/index.tsx`, controller `order/`): `admin/orders` (list),
-  `admin/not-viewd` (incoming feed), **`update/viewd` = ACCEPT** (→ `6→1`, future `14→1`,
+  `admin/all/not-viewd` (incoming feed, when `isAdmin(ROLES.all)`, which is every prod store
+  user: 394/394 carry `roles: ["all"]` on 2026-10-30), `admin/not-viewd` (the same feed for a
+  store user without `all`, and before user details load), **`update/viewd` = ACCEPT** (→ `6→1`, future `14→1`,
   sends `readyMinutes` — not persisted, §2), `update` (forward/back status + note), `update-item-collected`,
   `start-preparing` / `update-start-preparing`, `update-delay`, `printed`,
   `book-delivery`, `*-custom-delivery`, `addRefund`, `future-orders-ready`, `drive-in-arrival-confirm`.
@@ -460,6 +475,22 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
 - **Twin**: read-only from the order payload (`order.twinGroup`, `twinPeerInfo.orderDate`);
   the partner caps the **second store's** prep window (`TWIN_SECONDARY_EARLY_MAX_MIN=10`).
   No twin endpoint is called — twin timing is server-computed.
+- **Gates (CORE invariant 18)**: everything the partner reads from the order admin takes
+  `ORDERS_DASHBOARD_OR_STORE_MEMBER`, so the phone must own the `app-name` store:
+  - the live feed `admin/all/not-viewd` (and `admin/not-viewd`);
+  - `admin/orders` (the list and the print sweep);
+  - `admin/school-project-orders-for-print`, `future-orders-ready`, `get-custom-delivery`;
+  - `admin/not-printed` (defined in `stores/orders`, never called);
+  - the `calander` writes (`stores/calander`, behind the dashboard's commented-out calendar
+    item).
+
+  The partner always sends `@storage_storeDB` as the header, and that is the token's store or
+  one of its phone's memberships. Even mid-`switchStore` (store first, token second) it passes.
+  `admin/my-stores/new-orders-count` (`utils/cross-store-alerts`) stays `auth.required`: it is
+  token-scoped and ignores the header.
+  **Any 401 signs the store out** (`utils/http-interceptor` → `OPEN_GENERAL_SERVER_ERROR_DIALOG`
+  `isSignOut: true` → `resetAppState` + restart), so a partner-polled route must never 401 a
+  logged-in terminal.
 - **Realtime**: WS `?appType=shoofi-partner`; handles `order_status_updated`,
   `unviewed_orders_updated`, `future_order_*` (NOT `menu_refresh`). The `print_order` /
   `print_not_printed` frames still arrive (the server sends `print_not_printed` when
@@ -557,7 +588,19 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   (open-as store/driver/customer, **master-only**), `admin/order-monitoring/summary/{orderNumber}`
   (timeline; every `admin/order-monitoring/*` route is `auth.required` +
   `checkAdminRole` with ALL admin roles — customer tokens 403, no token 401), `twin-order/admin/{group/:id/full, degrade, undo-degrade, cancel, assign-driver}`,
-  `admin/twin-order-config` (GET/POST), `delivery/admin/{cancel,assign,reassign,drivers,orders}`.
+  `admin/twin-order-config` (GET/POST), `delivery/admin/{cancel,assign,reassign,drivers,orders}`,
+  `order/admin/future-orders-count` (the sidebar badge; `app-name: shoofi` counts every store),
+  `order/admin/coupon-orders` (`AppliedCoupons`, `generate-stores-summaries`),
+  `order/statistics/new-orders/:page` (`HeaderStats`), `shoofiAdmin/external-order-providers`
+  (`StoreForm`). These, plus `order/admin/all-orders`, take `ORDERS_DASHBOARD` (any
+  `DASHBOARD_ROLES` seat, CORE invariant 18).
+  Also the coins admin routes (CORE invariant 19, every dashboard role; `admin/coins/expire` is
+  master-only):
+  `admin/coins-settings` (GET/POST, `src/views/admin/settings/ShoofiSettings.tsx`, the platform
+  on/off switch), `admin/store/{appName}/coins-settings` (GET/POST, `src/views/admin/stores/StoreForm.tsx`)
+  and `admin/coins/customer/{id}/earned` (`src/apis/admin/customers/customer-details.ts`, the
+  customer modal's coins tab). Nothing calls `admin/coins/expire`, `admin/coins/customer/{id}` or
+  `admin/coins/store/{appName}/stats`.
 - **Refunds**: `order/addRefund` is **NOT** used here — admin refunds surface via twin
   `degrade`/`cancel` (`refundOwed`/`refundBreakdown`) and `shoofiAdmin/compensations/*`.
 - **Twin admin**: full lifecycle control (degrade / undo / cancel / assign single|split)
