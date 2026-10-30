@@ -117,6 +117,15 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    Reach: wallet orders always (unconditionally manual), card orders only where the flag is
    on — a gateway-issued document cannot take a `ua_uuid`, and `EZ.*` is an undocumented
    pass-through that can reject the whole charge, so do not try `EZ.ua_uuid`.
+11. **Only admin-dashboard users may call the per-order invoice queue routes.**
+   `/api/admin/invoices/{pending,retry,process-all,webhook}` (`routes/admin.js`) drive the
+   `utils/invoice-mail.js` Gmail-fetch queue. Each route is `auth.required` +
+   `checkAdminRole(DASHBOARD_ROLES)` (`invoiceQueueAdmins`), and no client, cron, bridge or
+   server self-call reaches them, so customer, partner and driver tokens get 403. The
+   webhook also keeps its body `INVOICE_WEBHOOK_SECRET` check. No provider calls it.
+   ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
+   throws inside an async middleware and the request **hangs with no response**. Until
+   2026-10-30 that is what `pending`, `retry` and `process-all` did.
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
