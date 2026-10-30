@@ -276,8 +276,8 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
        - A run with any unreadable store DB writes nothing and retries.
        - Served as `impact` on `/performance` push items and by
          `GET /api/admin/marketing/campaign-impact` (same roles; the admin's
-         "השפעת קמפייני פוש" card). Not on `/api/analytics/growth/*`: those routes have no
-         auth.
+         "השפעת קמפייני פוש" card). Not on `/api/analytics/growth/*`, which
+         carries a narrower master/admin gate (reference C4).
    - **The app's queue survives a kill and is flushed before every order.**
      - `shoofi-app/services/marketing-events.ts` mirrors the queue to AsyncStorage
        (`@marketing_event_queue`, ≤200 events, 7-day age-out, taps first, one retry).
