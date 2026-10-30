@@ -6,6 +6,7 @@
       "files": [
         "routes/auth.js",
         "routes/customer.js",
+        "services/customer/identity-response.js",
         "routes/customer-referrals.js",
         "routes/customer-campaigns.js",
         "routes/customer-feedback.js",
@@ -121,6 +122,17 @@
           "regex": "if \\(shouldRunCrons\\) \\{[\\s\\S]*scheduledCampaignsCron\\.startScheduledCampaignsCron\\(app\\.db\\)",
           "desc": "CORE invariant 12: the scheduled-campaigns cron is started inside the shouldRunCrons block - before 2026-10-28 it was never started, so no scheduled campaign sent"
         },
+        {"file": "routes/customer.js", "regex": "const identityListAdmin = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];", "desc": "CORE invariant 2: the partner-account and customer-list routes take a dashboard role; auth.required alone passes a customer or partner token"},
+        {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/store-users/:appName', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: listing a store's users (each doc held the owner's live token) is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/store-users/:appName/:userId', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: reading one store user is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\('/api/customer/store-users/:appName', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: creating a store user (isAdmin/roles from the body) is dashboard-only, so nobody adds their own phone to a store"},
+        {"file": "routes/customer.js", "regex": "router\\.put\\('/api/customer/store-users/:appName/:userId', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: changing a store user's roles is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.delete\\('/api/customer/store-users/:appName/:userId', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: deleting a store user is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\(\"/api/customer/new-customers/:page\\?\", \\.\\.\\.identityListAdmin,", "desc": "reference C4: the new-customers list is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\(\"/api/customer/get-customers/:page\\?\", \\.\\.\\.identityListAdmin,", "desc": "reference C4: the get-customers list (Mongo filter from the body) is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "data: users\\.map\\(toStoreUserResponse\\)", "desc": "CORE invariant 2: the store-users list reply is whitelisted, never the raw doc"},
+        {"file": "services/customer/identity-response.js", "regex": "const IDENTITY_SECRET_FIELDS = Object\\.freeze\\(\\[\\n\\s+\"token\",\\n\\s+\"authCode\",\\n\\s+\"notificationToken\",", "desc": "CORE invariant 2: token, authCode and notificationToken never leave in a reply about someone else"},
+        {"file": "services/customer/identity-response.js", "regex": "const STORE_USER_RESPONSE_FIELDS = Object\\.freeze\\(\\[\\n\\s+\"_id\",\\n\\s+\"phone\",\\n\\s+\"fullName\",\\n\\s+\"isAdmin\",\\n\\s+\"roles\",\\n\\s+\"appName\",\\n\\s+\"created\",\\n\\]\\);", "desc": "reference C4: a store-users reply carries exactly the fields the admin screens read"},
         {
           "file": "controllers/customerCampaignController.js",
           "regex": "\\{ status: \\{ \\$nin: NOT_CLAIMABLE \\}, \\.\\.\\.\\(claimFilter \\|\\| \\{\\}\\), _id: getId\\(campaignId\\) \\}",
