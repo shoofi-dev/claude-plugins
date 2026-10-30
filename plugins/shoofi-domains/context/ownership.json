@@ -78,7 +78,8 @@
         "services/promotions/",
         "utils/promotion-discount.js",
         "services/twin-order/twin-promotions.js",
-        "services/twin-order/twin-delivery-price.js"
+        "services/twin-order/twin-delivery-price.js",
+        "routes/coins.js"
       ],
       "shoofi-app": [
         "screens/checkout",
@@ -205,7 +206,9 @@
         "utils/app-name-helper.js",
         "controllers/customerAddressController.js",
         "routes/ai-helper.js",
-        "services/ordering-intelligence/taste-profile.js"
+        "services/ordering-intelligence/taste-profile.js",
+        "services/customer/",
+        "routes/teacher.js"
       ],
       "shoofi-app": [
         "screens/login",
