@@ -337,7 +337,10 @@ boundary and say so in the PR.
      `POST /api/admin/product-labels/run` (`202` started, `409` a run holds the lock, `503` no
      key) or `node bin/label-products.js`. Every admin endpoint is `auth.required` +
      `checkAdminRole`.
-13. **A CRAVING'S DESCRIPTIVE WORDS ARE FILTERS, NEVER SPELLINGS** (`craving.js`). In text mode,
+13. **A CRAVING'S DESCRIPTIVE WORDS ARE FILTERS, NEVER SPELLINGS** (`craving.js`). The words after
+   «مع / עם / with» in a message that names a dish are the dish's OPTIONS (`option-request.js`,
+   invariant 19) and never reach this parser — «مع فلفل حار» is an option, not a spicy filter; a lone
+   protein after «مع» («شاورما مع دجاج») stays the dish's. In text mode,
    `parseCraving` removes attribute words (sweet, spicy, vegetarian, light/healthy — Arabic, Hebrew,
    Latin) and one protein word (chicken, beef, fish) from the text and turns them into filters on
    the index labels (`satisfies`, and `cravingQuery` as the Mongo prefilter); **only what remains is
@@ -544,9 +547,27 @@ boundary and say so in the PR.
      instead. `priceLine` is `screens/meal/index2.tsx`'s formula and the server's
      (`utils/order-pricing.js`): `price = base + (d > 0 ? Math.round(extras × (1 − d/100)) :
      extras)` — change one, change all three. Straight into the cart only with no defaults and
-     nothing to choose; otherwise the sheet, defaults pre-selected, never added silently. The line
-     goes in through `cartStore.addProductToCartForStore` (orders domain), and a cart of another
-     store is never mixed or silently emptied — the chat asks.
+     nothing to choose; otherwise the sheet, defaults pre-selected (out-of-stock defaults cleared,
+     `withoutOutOfStock`), never added silently. The line goes in through
+     `cartStore.addProductToCartForStore` (orders domain), and a cart of another store is never
+     mixed or silently emptied — the chat asks.
+   - **ONE MESSAGE WITH ITS OPTIONS ADDS DIRECTLY — ONLY WHEN NOTHING IS LEFT TO GUESS** (product
+     owner, 2026-11-01; server `option-request.js`, app `helpers/chat-order.ts` +
+     `useChatAddToCart.ts startFromReply`, `docs/for-you.md`). «بدي شاورما مع حمص وسلطة»: the server
+     searches the dish part only and matches each card's options at the live re-check
+     (`optionMatch`: matched / ambiguous / missing / outOfStock / deselect / noteWithout, on `nameAR`
+     and `nameHE`, the store's `outOfStockExtras` by exact Arabic name). The app then ASKS what is
+     not decided — which store, which dish (all of that store's, `store` input lifts the per-store
+     cap), which option of several («أي سلطة؟»; the same option in two groups is asked, never both)
+     — and adds ONLY when every word resolved to an available option within its cap and every
+     mandatory `single` is answered; a mandatory choice nobody named opens the sheet prefilled. The
+     add is said, not silent: «ضفت … مع …» with «تراجع / عدّل» (`عدّل` replaces the line only when
+     the sheet adds), and every missing / out-of-stock / over-cap word is said; «بدون X» with no
+     option to act on goes in the line's note. The app re-resolves every option against the menu
+     it loaded (by extra + position, id, then name — legacy blank ids) and is the final authority.
+     Only replies whose cards MATCH start it (`text_results`, `without_results`, `ai_reply`) — never a
+     fallback. Behind `isChatOrderingEnabled`, like every chat add. Dishes the sheet cannot show
+     (`chatSheetSupport`) open the store and the chat says which options to add there.
    - **`GET /api/ai-helper/cuisines?lat=&lng=`** — the onboarding's tiles, from the central index
      only: ACTIVE `meal` dish types, most stores first, ≤ 9. Rows come from the area's OPEN
      stores; with fewer than 4 types it widens to the area's closed stores too, then to the whole
