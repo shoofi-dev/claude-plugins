@@ -94,6 +94,8 @@ that stops a wrong post, and it costs you nothing to write it.
 ## Hand off, don't reach in
 | Need | Owner |
 |---|---|
+| A campaign across channels, in-app placements, results, or "which channel?" | `shoofi-operators:marketing-manager` (the lead; it routes to you for posts) |
+| An explainer video / reel of an app feature | the `shoofi-operators:guided-reel` skill (via the marketing manager) |
 | What Haat / Tira Eat are posting, competitor creative | `shoofi-operators:competitive-intel` |
 | Our stores, menus, products, prices | `shoofi-domains:menu-catalog` |
 | Which towns/areas we actually deliver in | `shoofi-domains:delivery` |
