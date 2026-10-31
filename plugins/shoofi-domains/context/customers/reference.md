@@ -244,6 +244,8 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
   error anywhere saying why. The repo's own `find-test-users.js:37` has this bug and always
   reports "no store users found"; don't use it to check your work.
   One phone can map to **multiple** store docs → OTP is propagated with `updateMany`.
+  The only code path that inserts one is `POST /api/customer/store-users/:appName` (admin web,
+  §C4). Its `token` is the live session (CORE invariant 2), so no admin reply carries it.
 - **`delivery-company.customers`** (drivers) — `role`, `isActive`, `companyId`,
   `personalSupportedAreas` (delivery-owned field).
 - **`shoofi.shoofiAdminUsers`** — `phoneNumber`, `password`(bcrypt), `roles[]`, `refreshToken`,
@@ -485,6 +487,26 @@ body (test: "a client cannot set owner or inferred"). `inferred` is written only
   the account's profile across logout: it belongs to the account.
 - **Deletion:** `POST /api/customer/delete` leaves the `tasteProfiles` doc in place — §7 item 10.
 
+## 5c. Marketing content generation (`routes/marketing-generate.js`, CORE invariant 16)
+
+| Endpoint | Gate | Notes |
+|---|---|---|
+| `POST /api/admin/marketing/generate` | master / admin / manager | `{subject:{kind,id,appName?}, channel, what: copy\|image, tone?}`. copy → 200 `{variants, rejected, limits}`; image (banner / story only) → 202 the job. 400 bad channel, 404 no subject, 409 not promotable, 422 nothing passed the guard, 429 budget, 503 no AI backend |
+| `GET /api/admin/marketing/generate/:jobId` | same | `status` queued → generating → rendering → ready / failed (`errorCode`: `no_renderer`, `no_valid_copy`, `no_ai`); `copy`; `images[{id, lang ar\|he\|all, aspectRatio, status, url}]`. Reaps stale jobs and renders on read |
+| `GET /api/admin/marketing/generate/:jobId/images/:imageId` | same | the bytes of a rendered image, fetched server-side from our CDN only (the CDN sends no CORS) |
+
+Data: `shoofi.marketingGenerations` `{what: "image", channel, subject, facts:{lines,name}, status,
+copy, brief, assets[{id, lang, aspectRatio, status pending\|queued\|rendering\|rendered\|failed,
+prompt, references, imageUrl, imageKey, renderBridgeId, renderClaimedAt, generationId}],
+rejected, backend, error, errorCode, createdBy, createdAt}`; TTL 30 days on `createdAt`. Images:
+`marketing-generate/<jobId>/<assetId>-<lang>-<ts>.<ext>` on the Spaces CDN.
+
+Admin client: `shoofi-delivery-web` `src/apis/admin/marketing-generate.ts`,
+`src/views/admin/marketing/components/ContentStep.tsx` (the step), `content.ts` (what the form
+gets), `use-prefill-image.ts` (the banner / story forms attach the image). The prefill's
+`copy` keys: `title_*` = push / note / banner title, `body_*` = push / note body, banner
+description, story caption.
+
 ## 6. Referrals (`routes/customer-referrals.js`)
 8-char code (ambiguity-free alphabet) + TinyURL short link with `/r/:code` fallback. Config on
 `shoofi.store {id:1}.referralConfig` (reward amounts, `minFriendOrderAmount`, validity,
@@ -569,6 +591,30 @@ contacts and the download-link SMS.
   `store/update` is `/api/store/update`.
 - `test/integration/admin-token-routes.js` checks every entry against
   `docs/routes-baseline.txt`, so a rename can't silently un-gate it.
+**Store users (partner accounts) are admin-token only** (shoofi-server `routes/customer.js`
+`identityListAdmin`, 2026-10-30; CORE invariant 2). The store form's "ניהול משתמשים" button opens
+`/admin/stores/:storeId/users` (`StoreUsersList`, `StoreUserForm`). They call
+`src/apis/admin/store-users.ts`:
+
+| Method | Path | Reply `data` |
+|---|---|---|
+| GET | `/api/customer/store-users/:appName` | the store's users |
+| GET | `/api/customer/store-users/:appName/:userId` | one user |
+| POST | `/api/customer/store-users/:appName` | 201, the new user (`isAdmin`/`roles` from the form) |
+| PUT | `/api/customer/store-users/:appName/:userId` | `fullName`, `isAdmin`, `roles` only |
+| DELETE | `/api/customer/store-users/:appName/:userId` | none |
+
+- All five, plus `POST new-customers` and `POST get-customers` (no live caller: `HeaderStats` is
+  commented out in `layouts/Admin.js`), take `auth.required` + every dashboard role. Prod
+  2026-10-30: viewer-only accounts created 13 and deleted 5 store users, so the writes are not
+  narrowed.
+- A store-users reply is whitelisted to `_id, phone, fullName, isAdmin, roles, appName, created`
+  (`toStoreUserResponse`), which is exactly what the screens read. The customer lists keep
+  their shape minus `token`, `authCode`, `notificationToken`, `refreshToken` and `password`.
+- Writes are audited (`create_store_user` / `update_store_user` / `delete_store_user` in
+  `services/audit/admin-audit-routes.js`). The audit middleware only logs an admin-token
+  write, so since the gate there is no unaudited way to create a partner account through the
+  API.
 Push campaigns (§5b): `views/admin/customer-campaigns/` has the list with the
 `PushCapSettings` panel, skip counts, the scheduled time and cancel-schedule. The form sends
 the schedule as an Israel wall-clock string and shows stored instants through
@@ -587,11 +633,13 @@ Do not "fix" them opportunistically; they are scheduled work, not bugs to discov
    code**, and (b) let the user **choose WhatsApp vs SMS** as the delivery channel. Design
    changes here should keep both in mind.
 3. **KNOWN:** `search-customer` (`customer.js`) projects `token` + `authCode` and has no
-   `auth.required`. Accepted for now.
+   `auth.required`. Accepted for now. Verified still true on 2026-10-30: the reply carries the
+   pending OTP as `status.authCode`, and all three RN apps plus the admin web call it.
 4. **KNOWN — to handle later:** unauthenticated identity-adjacent endpoints — address CRUD
    , `search-customer`, storeUsers CRUD, `cash-restrict`, most `/api/shoofiAdmin/*`
    take IDs from the URL/body with no auth. **Never widen this surface further**; adding auth
-   is planned work.
+   is planned work. Flagged for a human (2026-10-30): storeUsers CRUD is gated (§C4), and
+   `cash-restrict` and the `/api/shoofiAdmin/store*` routes (§C4) already are.
 5. **Mass-assignment** — `POST /api/customer/update`  spreads `req.body` into `$set`,
    so `token`/`roles`/`isBlocked` could be overwritten by a caller.
 6. **`jwt.decode` without verification** — `admin/users/refresh-token`  and
@@ -609,7 +657,7 @@ Do not "fix" them opportunistically; they are scheduled work, not bugs to discov
    to route on `app-name`. **Remember: identity routing is by `app-type` throughout this domain.**
 9. **Dead/inherited (hands-off per §1c)** — the `AUTH_API`/`Authenticator` const block is
    imported in all three RN apps but **referenced 0 times** (legacy pre-`customer` surface);
-   admin web has an unused `AdminTokens` interface; `routes/user.js` is legacy expressCart admin.
+   admin web has an unused `AdminTokens` interface; `routes/user.js` (legacy expressCart admin) is deleted by shoofi-server#359.
 10. **KNOWN — not yet handled (AI helper; recorded in shoofi-server `docs/ai-helper.md`,
     2026-10-16):** `POST /api/customer/delete` soft-deletes the identity doc but leaves
     `shoofi.tasteProfiles {"owner.customerId": <id>}` in place; only the app's cached copy goes

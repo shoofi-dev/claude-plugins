@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -11,8 +11,10 @@ Products, categories, menu assembly, options/extras, availability & stock, catal
 
 ## Scope
 Server: `routes/menu.js`, `routes/product.js` (and its gate `services/catalog/product-access.js`), `routes/category.js`, the catalog slice of
-`routes/store.js` (and who may save the store document, `services/catalog/store-update-access.js`
-— invariant 28), `routes/translations.js`, `services/translations/owned-translations.js` (rows
+`routes/store.js` (the category gate `services/catalog/category-access.js`, the public store card
+`services/catalog/public-store.js` — invariant 27, and who may save the store document,
+`services/catalog/store-update-access.js` — invariant 28), `routes/translations.js`,
+`services/translations/owned-translations.js` (rows
 written by code — invariant 24), `routes/global-search.js`, `utils/menu-cache.js`,
 `utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`,
 `utils/general-category-order.js` (tile order),
@@ -406,8 +408,17 @@ boundary and say so in the PR.
    `test/integration/for-you-ai-chat.js` fails otherwise): an unpriced call logs `costUsd: null`, and
    the chat's budget counts such a row at `UNPRICED_BUDGET_PRICE` (twice the dearest known price) —
    never as $0, or a model upgrade would switch the cap off. Features with their own budget or
-   quality gate have their own `MODELS` key (`chat`, `labels`); moving `best` must not move them.
-   The chat's message is stored with digits masked.
+   quality gate have their own `MODELS` key (`chat`, `labels`, `marketing`); moving `best` must not
+   move them. The chat's message is stored with digits masked.
+   - `MODELS.marketing` = `claude-opus-5-5` (2026-10-30, the marketing wizard's generator; customers
+     CORE invariant 16): features `marketing copy` and `marketing image brief`, `effort: "low"`, no
+     `temperature` (Opus 5.5 rejects it), its own daily budget in `services/marketing/generate/budget.js`
+     over every `marketing *` row. Price rows for `claude-opus-5-5` ($4/$20), `claude-sonnet-5-5`
+     ($2/$10) and `claude-haiku-5-5` ($0.10/$0.50) were added with it.
+   - **Not every row is a Claude call.** A finished marketing render is logged as feature
+     `marketing image render`, `model: "artlist:nano-banana-2"`, `backend: "artlist"`, `costUsd: 0`
+     (Artlist is prepaid) and `meta.credits` (130 per 2k image). Count credits from `meta`, not
+     `costUsd`.
 17. **SPELLCHECK PROPOSES; A NAME CHANGES ONLY ON A PERSON'S ACCEPT, AND ONLY IF UNCHANGED**
    (`services/catalog/menu-spellcheck.js`, `docs/menu-spellcheck.md`). A monthly cron
    (`15 3 1 * *`, lock `cron:menu-spellcheck`, shared with the admin "run now") asks Claude
@@ -688,6 +699,17 @@ boundary and say so in the PR.
     reconcile cron (`utils/crons/coupon-campaign-category-cron.js`), and the explore cache is
     busted only on a real membership change. Before 2026-10-26 neither path knew about deals,
     so a deal-only store's offers showed only inside the store (support report, master-burger).
+    **The "public coupon" test exists in THREE shapes and they stay in their own files.** The
+    حملات row's is the two literals above (`$nin: [true, 'true']` on `isCustomerSpecific` and
+    `isPurchasedCoupon`). The customer coupon page's `isPromotableCoupon`
+    (`services/coupons/public-coupon.js`) is strictly STRICTER — it also drops
+    `onlyForOneCustomer` and `claimedByUserId`. `GET /api/coupons/active` (`routes/coupon.js`) is
+    a third, differently-shaped one: `$ne: true` (so it misses the string `'true'`) plus
+    `isForNewUser` and a required `isAutoApply`. A shared `EVERYONE_COUPON_FILTER` was tried and
+    reverted on 2026-10-31 (shoofi-server `CLAUDE.md` says the same): one name hides that the
+    rules differ, so the next tidy-up silently changes which stores appear in the row. The assert
+    pin greps those literals in `lib/campaign-category-sync.js` precisely to catch that — if you
+    ever do share them, re-pin first.
 
 24. **CODE THAT WRITES A TRANSLATION ROW GOES THROUGH `writeOwnedTranslation` — NEVER THE PANEL
     ROUTES, NEVER A SHARED KEY** (`services/translations/owned-translations.js`; reference §2
@@ -735,7 +757,8 @@ boundary and say so in the PR.
       Clients never compute it, so the window changes without an app release.
     - **Listing:** `GET /api/shoofiAdmin/store/all-stores?isNew=true` returns the new stores
       (visible, non-template), newest first, with `newUntil`. For the marketing agent and the
-      Campaign hub. It has the same callers and no auth, like the plain list.
+      Campaign hub. Like the plain list, it takes an admin token with any dashboard role
+      (`utils/admin-token-routes.js`, since 2026-10-29).
     - **The app card** (`screens/stores/components/item.tsx`) shows "جديد"/"חדש"
       (`store-new-tag` + `defaultValue`, `StoreBadge` variant `new`). At most two badges, in the
       order offer, new, status. When all three apply, "new" is dropped.
@@ -770,6 +793,67 @@ boundary and say so in the PR.
       cleared before. Six still clear only the regular key, not `_schoolProject`, which breaks
       invariant 2 and predates the gate: `update/activeTastes`, `update/order`,
       `update/order-per-category`, `bulk-reorder`, `reset-order/:categoryId`, `migrate-orders`.
+
+27. **CATEGORY AND EXPLORE ADMIN ROUTES ARE DASHBOARD-ONLY. THE HOME'S READS STAY PUBLIC, AND NO
+    PUBLIC STORE LIST SENDS A STORE'S SECRETS** (`services/catalog/category-access.js`, `services/catalog/public-store.js`,
+    reference §2 / §7 / §8). Until 2026-10-30 none of these routes had auth. With only an
+    `app-name`, anyone could add, rename, re-discount, re-order or delete any store's categories
+    and tiles, edit or delete the platform categories, or wipe the explore cache.
+    - **`CATALOG_ADMIN`** is `auth.required` + `checkAdminRole(DASHBOARD_ROLES)`. It sits on the
+      route, before multer, on: `/api/category/general/{add, update/:id, :id DELETE, all/by-store,
+      update-order}`, `GET /api/category/by-general/:id`, `/api/store-category/{all, add,
+      update/:id, update-order, :id DELETE}`, `/api/shoofiAdmin/category/{GET list, add, GET :id,
+      update/:id, update-order, :id DELETE}` and `/api/shoofiAdmin/explore/{clear-cache,
+      clear-cache-keys, cache-stats, debug-area}`. The admin web is the only caller (all five
+      clients greped 2026-10-30). Prod's audit log has category writes by viewer-only accounts,
+      so the list is every dashboard role. The partner app manages no categories, so there is no
+      own-store branch. Add one (product-access's `ownStoreGate`) before a mobile app calls any of
+      these, because a role-only gate 403s it silently.
+    - **Public on purpose**, because the customer app calls them before login:
+      `GET /api/category/general/all` (home tiles; the partner and shoofir copies of
+      `screens/explore.tsx` too), `POST /api/shoofiAdmin/category/list` (`App.tsx` boot in
+      shoofi-app and shoofi-partner), and `GET /api/shoofiAdmin/explore/categories-with-stores-v2`
+      (the home). v1 is the same data and stays public for older binaries; it has no caller on
+      main. The GET form of `category/list` returns the same documents as the public POST. It is
+      gated only because nothing but the admin web calls it.
+    - **A public store card carries no secrets.** The customer-facing store lists spread the whole
+      `shoofi.stores` doc into each card. On prod (2026-10-30) 22 visible stores carry
+      `accounting.bankAccount` (bank, branch, account number, company id) and
+      `accounting.contract` (commission tiers). `toPublicStore` drops `PRIVATE_STORE_FIELDS`
+      (`accounting`, `hyp`, `credentials`, `fraudConfig`, the secret half of `routes/store.js`
+      `SENSITIVE_STORE_FIELDS`) at the route response, on explore v1/v2 (cache hits and fresh
+      builds), `POST /api/shoofiAdmin/available-stores`, `POST /api/menu/search`,
+      `POST /api/twin-order/eligible-stores` and every `POST /api/for-you/suggest` card's `store`.
+      `available-stores` also strips each `deliveryCompanies[].company`: on prod 138
+      `delivery-company.store` docs carry `hyp` OAuth tokens (`access_token`, `refresh_token`,
+      `api_key`) and 180 carry `accounting`, and the apps read only the company's `price` and
+      `eta`. The stripping never happens in `getAvailableStores`, because twin eligibility
+      (`isVatExempt`) reads `accounting.bankAccount.businessType` from its result in-process. So
+      `eligible-stores` strips after `filterEligibleStores`. The explore cache (Redis) still holds
+      the raw docs, and For you reads it, so a card is safe only once its route has stripped it.
+      Any new public read that returns a store or company doc must go through `toPublicStore`, or
+      build its card from a positive projection that never selects the four keys — which is what
+      the public coupon page's `eligibleStores` (`services/coupons/public-coupon.js`) does.
+    - **`GET /api/store/get/:appName` is `CATALOG_ADMIN`.** It returns the whole per-store
+      document: `hyp` payment credentials, `accounting`, `fraudConfig.appSecret`. It had no auth.
+      Only the admin web calls it, and its accounting, store-data and settings screens read those
+      fields, so it is gated rather than stripped. Never call **this route** from the server over
+      HTTP. The billing-contacts GET and PUT (`routes/shoofi-admin.js`) read `db.store` directly.
+      Before, they called it with no token, and a copy without `accounting` written back by the
+      PUT would wipe the bank details and contract. Only the *read* is direct: the PUT still
+      writes over HTTP, to `POST /api/store/update`, forwarding the caller's `authorization` +
+      `app-type` (invariant 28). `POST /api/store` needs nothing new: non-admin callers
+      get `sanitizeStoreForPublic`, and the partner's echoed save is cut to `PARTNER_STORE_FIELDS`
+      (shoofi-server #354).
+    - `GET /api/admin/categories/:page?` is still open. delivery-web
+      `src/apis/admin/category/get-categories.ts` (used by `StoreForm.tsx`) calls it with plain
+      `axios` and no token. Switch that to `axiosInstance` before gating it.
+    - `test/integration/catalog-admin-auth.js` fails for any route under these prefixes with no
+      decided audience, for a gated route without `auth.required` first, and for any public store
+      list above whose body holds one of the four keys or their values. It also checks that twin
+      eligibility still drops a store of the other VAT status. The legacy expressCart `GET /category/:cat/:pageNum?` is removed.
+      It searched the dead lunr `productsIndex` and never answered.
+
 28. **A STORE DOCUMENT IS SAVED BY STAFF, OR BY ITS OWN PARTNER FOR THE FIELDS ITS SCREENS EDIT**
     (`POST /api/store/update`, `routes/store.js` → `services/catalog/store-update-access.js`). The
     route `$set`s each top-level key it receives into `<app-name>.store` and keeps every other key.
@@ -814,10 +898,11 @@ boundary and say so in the PR.
       `screens/admin/store-managment` (legacy; CLAUDE.md "Legacy"). Prod history (30,622 rows since
       2025-12-19) has no customer-app or shoofir caller: every iOS row is `ShoofiPartners`. Their
       tokens get 403.
-    - **Still open next to it, not this gate:** `POST /api/admin/store/:appName/coins-settings`
-      (`routes/shoofi-admin.js`) sets `coinsSettings` with no auth, and no client calls it.
+    - **Next to it, but not this gate.** Both were open when this one was written and neither is
+      now. `POST /api/admin/store/:appName/coins-settings` (`routes/shoofi-admin.js`) also writes
+      `coinsSettings`; it carries its own `COINS_SETTINGS_ADMIN`, and no client calls it.
       `GET /api/store/get/:appName` returns the raw store document, `hyp` and `accounting`
-      included, with no auth.
+      included, and is `CATALOG_ADMIN` (`routes/store.js`, invariant 27).
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified

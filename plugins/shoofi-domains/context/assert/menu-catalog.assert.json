@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -92,9 +92,14 @@
         "services/menu/promotions.js",
         "services/translations/owned-translations.js",
         "services/coupons/coupon-drafts.js",
-        "routes/admin/coupon-drafts.js"
+        "routes/admin/coupon-drafts.js",
+        "services/catalog/category-access.js",
+        "services/catalog/public-store.js",
+        "test/integration/catalog-admin-auth.js"
       ],
       "symbols": {
+        "services/catalog/category-access.js": ["CATALOG_ADMIN", "DASHBOARD_ROLES"],
+        "services/catalog/public-store.js": ["toPublicStore", "PRIVATE_STORE_FIELDS"],
         "services/catalog/store-update-access.js": ["STORE_UPDATE_ACCESS", "PARTNER_STORE_FIELDS", "storeUpdateGate", "pickPartnerStoreFields", "partnerRefusedChanges"],
         "services/translations/owned-translations.js": ["writeOwnedTranslation", "TRANSLATION_KEY_COLLISION", "SEEDED_BY"],
         "services/coupons/coupon-drafts.js": ["LABEL_KEY_RE", "labelKey", "LABEL_SURFACES"],
@@ -327,11 +332,15 @@
           "deleteCustomerServed"
         ],
         "services/ai/pricing.js": [
-          "UNPRICED_BUDGET_PRICE"
+          "UNPRICED_BUDGET_PRICE",
+          "claude-opus-5-5",
+          "claude-sonnet-5-5",
+          "claude-haiku-5-5"
         ],
         "services/ai/complete.js": [
           "apiTimeoutMs",
-          "apiMaxRetries"
+          "apiMaxRetries",
+          "marketing: \"claude-opus-5-5\""
         ],
         "services/for-you-quality/reviewer.js": [
           "runReview",
@@ -458,6 +467,126 @@
           "desc": "doc CORE invariant 26: every route in routes/product.js runs auth.required first, no exception list"
         },
         {
+          "file": "services/catalog/category-access.js",
+          "regex": "const CATALOG_ADMIN = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",
+          "desc": "doc CORE invariant 27: category and explore admin routes take any dashboard role (viewer and accountant included)"
+        },
+        {
+          "file": "services/catalog/public-store.js",
+          "regex": "const PRIVATE_STORE_FIELDS = Object\\.freeze\\(\\[\"accounting\", \"hyp\", \"credentials\", \"fraudConfig\"\\]\\);",
+          "desc": "doc CORE invariant 27 / reference §2: a public store card never carries accounting, hyp, credentials or fraudConfig"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "deliveryCompanies: \\(storeData\\.deliveryCompanies \\|\\| \\[\\]\\)\\.map\\(\\(dc\\) =>\\n\\s*dc && dc\\.company \\? \\{ \\.\\.\\.dc, company: toPublicStore\\(dc\\.company\\) \\} : dc",
+          "desc": "doc CORE invariant 27: available-stores strips each delivery company too (they carry HYP OAuth tokens and bank details)"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "\\.\\.\\.toPublicStore\\(storeData\\.store\\),\\n\\s*hasDiscounts,",
+          "desc": "doc CORE invariant 27: available-stores sends a public store card"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "\\{ \\.\\.\\.toPublicStore\\(entry\\.store\\), hasDiscounts, maxDiscountPercent, activePromotion \\}",
+          "desc": "doc CORE invariant 27: menu search sends a public store card"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "res\\.json\\(\\{ enabled: true, config, stores: eligible\\.map\\(toPublicStore\\) \\}\\);",
+          "desc": "doc CORE invariant 27: twin eligible-stores strips the cards only after eligibility read businessType"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "cards: withPublicStores\\(suggested\\.cards\\)",
+          "desc": "doc CORE invariant 27: every For-you card's store is public"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "router\\.get\\(\"/api/store/get/:appName\\?\", \\.\\.\\.CATALOG_ADMIN, async",
+          "desc": "doc CORE invariant 27 / reference §7: the whole store document (payment credentials included) is admin-only"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "const storeDb = await getOrInitializeDb\\(store\\.appName, req\\.app\\.db\\);\\n\\s*const currentStore = await storeDb\\.store\\.findOne\\(\\{\\}\\);",
+          "desc": "doc CORE invariant 27: billing-contacts READS the store document directly, never over GET /api/store/get (a stripped copy written back would wipe accounting); its write is still the self-call of invariant 28"
+        },
+        {
+          "file": "routes/category.js",
+          "regex": "router\\.post\\(\"/api/category/general/add\", \\.\\.\\.CATALOG_ADMIN, upload\\.array",
+          "desc": "doc CORE invariant 27 / reference §7: general-category add is admin-only, gated before multer"
+        },
+        {
+          "file": "routes/category.js",
+          "regex": "router\\.get\\(\"/api/category/general/all/by-store\", \\.\\.\\.CATALOG_ADMIN,",
+          "desc": "doc CORE invariant 27 / reference §7: the admin's tile list is admin-only"
+        },
+        {
+          "file": "routes/category.js",
+          "regex": "router\\.get\\(\"/api/category/general/all\", async",
+          "desc": "doc CORE invariant 27: the home tiles stay public (the customer app reads them before login)"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "router\\.post\\(\"/api/store-category/update/:id\", \\.\\.\\.CATALOG_ADMIN, upload\\.array",
+          "desc": "doc CORE invariant 27 / reference §7: store-category update is admin-only, gated before multer"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "router\\.delete\\(\"/api/store-category/:id\", \\.\\.\\.CATALOG_ADMIN,",
+          "desc": "doc CORE invariant 27 / reference §7: store-category delete is admin-only"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "router\\.post\\(\"/api/category/general/update-order\", \\.\\.\\.CATALOG_ADMIN,",
+          "desc": "doc CORE invariant 27 / invariant 6: the tile reorder is admin-only (and still clears both cache keys)"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "\"/api/shoofiAdmin/category/add\",\\n  \\.\\.\\.CATALOG_ADMIN,\\n  upload\\.array",
+          "desc": "doc CORE invariant 27 / reference §7: platform-category add is admin-only, gated before multer"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.get\\(\"/api/shoofiAdmin/category/list\", \\.\\.\\.CATALOG_ADMIN,",
+          "desc": "doc CORE invariant 27: the GET category list is the admin web's, gated"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.post\\(\"/api/shoofiAdmin/category/list\", async",
+          "desc": "doc CORE invariant 27: the POST category list stays public (App.tsx boot, before login)"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.post\\(\"/api/shoofiAdmin/explore/clear-cache\", \\.\\.\\.CATALOG_ADMIN,",
+          "desc": "doc CORE invariant 27 / reference §7: wiping the explore cache is admin-only"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.post\\(\"/api/shoofiAdmin/explore/debug-area\", \\.\\.\\.CATALOG_ADMIN,",
+          "desc": "doc CORE invariant 27 / reference §7: the area-lookup debug route is admin-only"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.get\\(\"/api/shoofiAdmin/explore/categories-with-stores-v2\", async",
+          "desc": "doc CORE invariant 27: the home read stays public"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "storeLaunch\\.withIsNew\\(toPublicStore\\(storeObj\\), now, newStoreWindowDays\\)",
+          "desc": "doc CORE invariant 27: explore v2 strips accounting from every card, cache hit or fresh build"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "storeLaunch\\.withIsNew\\(toPublicStore\\(entry\\.store\\), now, newStoreWindowDays\\)",
+          "desc": "doc CORE invariant 27: explore v1 strips accounting from every card, cache hit or fresh build"
+        },
+        {
+          "file": "test/integration/catalog-admin-auth.js",
+          "regex": "const NOT_DECIDED_HERE = new Set\\(\\[\"GET /api/admin/categories/:page\\?\"\\]\\);",
+          "desc": "doc CORE invariant 27: the one in-scope route still open, until delivery-web sends a token for it"
+        },
+        {
           "file": "routes/product.js",
           "regex": "\"/api/admin/images/upload\",\\n  \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,\\n  upload\\.array",
           "desc": "doc CORE invariant 26 / reference §7: image upload is admin|own store, gated before multer"
@@ -524,7 +653,7 @@
         },
         {
           "file": "lib/campaign-category-sync.js",
-          "regex": "isCustomerSpecific: \\{ \\$nin: \\[true, 'true'\\] \\}",
+          "regex": "isCustomerSpecific: \\{ \\$nin: \\[true, 'true'\\] \\}|'applicableTo\\.stores\\.0': \\{ \\$exists: true \\},\\s*\\.\\.\\.EVERYONE_COUPON_FILTER",
           "desc": "doc CORE invariant 18: a customer-specific coupon does not put the store in the حملات row"
         },
         {
@@ -1754,7 +1883,7 @@
         },
         {
           "file": "routes/for-you.js",
-          "regex": "return res\\.status\\(200\\)\\.json\\(\\{ \\.\\.\\.result, suggestionId \\}\\);",
+          "regex": "return res\\.status\\(200\\)\\.json\\(\\{ \\.\\.\\.result, (cards: withPublicStores\\(result\\.cards\\), )?suggestionId \\}\\);",
           "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — every reply carries its suggestionId"
         },
         {

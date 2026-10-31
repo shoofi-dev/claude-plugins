@@ -1,11 +1,12 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
         "routes/auth.js",
         "routes/customer.js",
+        "services/customer/identity-response.js",
         "routes/customer-referrals.js",
         "routes/customer-campaigns.js",
         "routes/customer-feedback.js",
@@ -48,9 +49,27 @@
         "services/marketing/approval-queue.js",
         "routes/marketing-approval.js",
         "services/marketing/items.js",
-        "routes/marketing-items.js"
+        "routes/marketing-items.js",
+        "routes/marketing-generate.js",
+        "services/marketing/generate/facts.js",
+        "services/marketing/generate/guard.js",
+        "services/marketing/generate/copy.js",
+        "services/marketing/generate/image.js",
+        "services/marketing/generate/renders.js",
+        "services/marketing/generate/budget.js",
+        "services/marketing/generate/voice.js",
+        "docs/marketing-generate.md",
+        "test/integration/marketing-generate.js"
       ],
       "symbols": {
+        "routes/marketing-generate.js": ["GENERATE_ROLES", "loadSubjectFacts", "checkBudget", "images/:imageId", "CDN_BASE"],
+        "services/marketing/generate/facts.js": ["loadSubjectFacts", "GenerateError", "isPersonalCoupon", "not_new", "personal"],
+        "services/marketing/generate/guard.js": ["extractTokens", "checkText", "normaliseDigits", "ONLY_TODAY", "FREE_WORDS", "DISCOUNT_WORDS"],
+        "services/marketing/generate/copy.js": ["CHANNEL_LIMITS", "generateCopy", "validateVariants", "no_valid_copy", "MAX_ATTEMPTS"],
+        "services/marketing/generate/image.js": ["createImageJob", "runImageJob", "composeRenderPrompt", "no_renderer", "marketingGenerations"],
+        "services/marketing/generate/renders.js": ["claimOnce", "notMine", "marketing image render", "CREDITS_PER_RENDER"],
+        "services/marketing/generate/budget.js": ["marketingAiDailyBudgetUsd", "marketingImageDailyLimit", "UNPRICED_BUDGET_PRICE"],
+        "services/marketing/generate/voice.js": ["HEBREW_VOICE", "ARABIC_VOICE"],
         "services/customer-campaigns/marketing-push-policy.js": [
           "marketingPushCap",
           "marketingPushOptOut",
@@ -132,6 +151,17 @@
           "regex": "if \\(shouldRunCrons\\) \\{[\\s\\S]*scheduledCampaignsCron\\.startScheduledCampaignsCron\\(app\\.db\\)",
           "desc": "CORE invariant 12: the scheduled-campaigns cron is started inside the shouldRunCrons block - before 2026-10-28 it was never started, so no scheduled campaign sent"
         },
+        {"file": "routes/customer.js", "regex": "const identityListAdmin = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];", "desc": "CORE invariant 2: the partner-account and customer-list routes take a dashboard role; auth.required alone passes a customer or partner token"},
+        {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/store-users/:appName', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: listing a store's users (each doc held the owner's live token) is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/store-users/:appName/:userId', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: reading one store user is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\('/api/customer/store-users/:appName', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: creating a store user (isAdmin/roles from the body) is dashboard-only, so nobody adds their own phone to a store"},
+        {"file": "routes/customer.js", "regex": "router\\.put\\('/api/customer/store-users/:appName/:userId', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: changing a store user's roles is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.delete\\('/api/customer/store-users/:appName/:userId', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: deleting a store user is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\(\"/api/customer/new-customers/:page\\?\", \\.\\.\\.identityListAdmin,", "desc": "reference C4: the new-customers list is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\(\"/api/customer/get-customers/:page\\?\", \\.\\.\\.identityListAdmin,", "desc": "reference C4: the get-customers list (Mongo filter from the body) is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "data: users\\.map\\(toStoreUserResponse\\)", "desc": "CORE invariant 2: the store-users list reply is whitelisted, never the raw doc"},
+        {"file": "services/customer/identity-response.js", "regex": "const IDENTITY_SECRET_FIELDS = Object\\.freeze\\(\\[\\n\\s+\"token\",\\n\\s+\"authCode\",\\n\\s+\"notificationToken\",", "desc": "CORE invariant 2: token, authCode and notificationToken never leave in a reply about someone else"},
+        {"file": "services/customer/identity-response.js", "regex": "const STORE_USER_RESPONSE_FIELDS = Object\\.freeze\\(\\[\\n\\s+\"_id\",\\n\\s+\"phone\",\\n\\s+\"fullName\",\\n\\s+\"isAdmin\",\\n\\s+\"roles\",\\n\\s+\"appName\",\\n\\s+\"created\",\\n\\]\\);", "desc": "reference C4: a store-users reply carries exactly the fields the admin screens read"},
         {
           "file": "controllers/customerCampaignController.js",
           "regex": "\\{ status: \\{ \\$nin: NOT_CLAIMABLE \\}, \\.\\.\\.\\(claimFilter \\|\\| \\{\\}\\), _id: getId\\(campaignId\\) \\}",
@@ -478,11 +508,19 @@
         {"file": "controllers/customerCampaignController.js", "regex": "if\\ \\(options\\.refuseInProgress\\)\\ delete\\ safeUpdates\\.status;", "desc": "CORE invariant 17: the admin's PUT never sets the status (nor approval: withoutApprovalKeys)"},
         {"file": "utils/crons/scheduled-campaigns-cron.js", "regex": "'scheduling\\.scheduledDate':\\ \\{\\ \\$lte:\\ now\\ \\},\\n\\ \\ \\.\\.\\.publishedQuery\\(\\)", "desc": "CORE invariant 17: the scheduled-campaigns cron picks published campaigns only"},
         {"file": "services/audit/admin-audit-routes.js", "regex": "pattern:\\ '/api/admin/marketing/drafts/:channel/:id/approve',\\ method:\\ 'POST',\\ action:\\ 'approve_marketing_draft'", "desc": "CORE invariant 17: every approve is in the admin audit log"},
-        {"file": "services/audit/admin-audit-routes.js", "regex": "pattern:\\ '/api/admin/marketing/drafts/:channel/:id/revert',\\ method:\\ 'POST',\\ action:\\ 'revert_marketing_to_draft'", "desc": "CORE invariant 17: every back-to-draft is in the admin audit log"}
+        {"file": "services/audit/admin-audit-routes.js", "regex": "pattern:\\ '/api/admin/marketing/drafts/:channel/:id/revert',\\ method:\\ 'POST',\\ action:\\ 'revert_marketing_to_draft'", "desc": "CORE invariant 17: every back-to-draft is in the admin audit log"},
+        {"file": "routes/marketing-generate.js", "regex": "const GENERATE_ROLES = \\[\"master\", \"admin\", \"manager\"\\];", "desc": "CORE invariant 16: content generation is owner-tier only"},
+        {"file": "routes/marketing-generate.js", "regex": "const facts = await loadSubjectFacts\\(req\\.app\\.db, body\\.subject\\);", "desc": "CORE invariant 16: the facts are loaded from the DB by the subject's identity; nothing else in the body is read for them"},
+        {"file": "services/marketing/generate/copy.js", "regex": "push: \\{ title: 40, body: 120 \\},\\s*note: \\{ title: 40, body: 120 \\},\\s*banner: \\{ title: 30, body: 60 \\},\\s*story: \\{ title: null, body: 80 \\},", "desc": "CORE invariant 16: the per-channel length limits"},
+        {"file": "services/marketing/generate/image.js", "regex": "const ASPECT = \\{ banner: \"16:9\", story: \"9:16\" \\};", "desc": "CORE invariant 16: banner 16:9 (the app's ad card), story 9:16"},
+        {"file": "services/marketing/generate/image.js", "regex": "channel === \"banner\" \\? \\[\\{ lang: \"ar\" \\}, \\{ lang: \"he\" \\}\\] : \\[\\{ lang: \"all\" \\}\\]", "desc": "CORE invariant 16: a banner is one render per language (text baked in), a story one text-free render"},
+        {"file": "services/social-posts/render-service.js", "regex": "if \\(!post\\) return marketingRenders\\(\\)\\.claimOnce\\(db, \\{ bridgeId \\}\\);", "desc": "CORE invariant 16: marketing renders ride the bridge's social claim, after social renders"},
+        {"file": "services/social-posts/render-service.js", "regex": "out\\.notMine \\? \\{ stale: true \\} : out", "desc": "CORE invariant 16: a finish for a non-social id is answered by the marketing renders module"},
+        {"file": "services/database/DatabaseInitializationService.js", "regex": "db\\.marketingGenerations = db\\.collection\\('marketingGenerations'\\);", "desc": "CORE invariant 16: the generation jobs collection is registered"}
       ]
     },
     "shoofi-app": {
-      "files": ["utils/http-interceptor/index.ts", "hooks/use-notifications.ts", "utils/marketing-link.ts", "services/marketing-events.ts", "components/profile/MarketingPushToggle.tsx"],
+      "files": ["utils/http-interceptor/index.ts", "hooks/use-notifications.ts", "utils/marketing-link.ts", "services/marketing-events.ts", "components/profile/MarketingPushToggle.tsx", "navigation/MainStackNavigator.tsx"],
       "patterns": [
         {"file": "services/marketing-events.ts", "regex": "const QUEUE_KEY = \"@marketing_event_queue\";", "desc": "CORE invariant 11: the event queue is mirrored to AsyncStorage (survives a kill)"},
         {"file": "services/marketing-events.ts", "regex": "export const ORDER_FLUSH_TIMEOUT_MS = 1500;", "desc": "CORE invariant 11: an order waits at most 1.5s for the queue"},
@@ -495,6 +533,16 @@
           "file": "utils/marketing-link.ts",
           "regex": "return openStoreAtProduct\\(navigate, \\{ appName: link\\.appName \\}, link\\.productId\\)",
           "desc": "CORE invariant 11: store opens go through the twin-guarded opener"
+        },
+        {
+          "file": "utils/marketing-link.ts",
+          "regex": "case \"coupon\":\\s*navigate\\(\"coupon-detail\", \\{ couponId: link\\.couponId",
+          "desc": "CORE invariant 11: every coupon link opens the coupon page, single-store coupons included - never the store, never 'my coupons'"
+        },
+        {
+          "file": "navigation/MainStackNavigator.tsx",
+          "regex": "<Stack\\.Screen name=\"coupon-detail\" component=\\{CouponDetailScreen\\} />",
+          "desc": "CORE invariant 11: the coupon page route the marketing router navigates to"
         },
         {
           "file": "components/profile/MarketingPushToggle.tsx",
@@ -528,9 +576,22 @@
         "src/views/admin/customer-campaigns/CustomerCampaignsList.tsx",
         "src/utils/marketing-approval.ts",
         "src/views/admin/marketing-drafts/MarketingDrafts.tsx",
-        "src/components/admin/ApproveDialog.tsx"
+        "src/components/admin/ApproveDialog.tsx",
+        "src/apis/admin/marketing-generate.ts",
+        "src/views/admin/marketing/components/ContentStep.tsx",
+        "src/views/admin/marketing/use-prefill-image.ts"
       ],
       "patterns": [
+        {
+          "file": "src/apis/admin/marketing-generate.ts",
+          "regex": "axiosInstance\\.post\\(\"/admin/marketing/generate\", \\{ subject, channel, what: \"copy\", tone \\}\\)",
+          "desc": "CORE invariant 16: the wizard sends only the subject's identity, the channel and the tone - never a fact"
+        },
+        {
+          "file": "src/utils/marketing-prefill.ts",
+          "regex": "if \\(url\\.startsWith\\(cdnUrl\\)\\) \\(out as any\\)\\[urlKey\\] = url;",
+          "desc": "CORE invariant 16: a prefilled generated image URL is kept only when it is on our CDN"
+        },
         {
           "file": "src/utils/jerusalem-time.ts",
           "regex": "export const SCHEDULE_TIMEZONE = 'Asia/Jerusalem';",
