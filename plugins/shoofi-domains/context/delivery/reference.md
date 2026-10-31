@@ -42,7 +42,8 @@ if it supports **BOTH** `store.supportedCities` (ObjectId[] — permission) **AN
 `4` DELIVERED; `5` WAITING_IN_STORE; cancels `-1` by-driver, `-2` by-store, `-3` by-admin.
 Transitions: driver `approve`/`start`/`complete`/`cancel`/`waiting-in-store`
 (`routes/delivery/orders.js`); admin `assign`/`reassign`/`cancel` + generic
-`order/status/update` (`admin.js`); store cancel `-2`. Every transition writes a
+`order/status/update` (`admin.js`, admin-web only, CORE invariant 19); store cancel `-2`
+(`store/order/cancel`, the delivery's own store or a dashboard role). Every transition writes a
 `centralizedFlowMonitor` event. (⚠️ status-value inconsistencies exist — see §10.)
 
 ## 2b. Delivery-only bookings (store books a courier, no order)
@@ -358,7 +359,10 @@ that picks a driver. The same admin manages its own fleet in `screens/delivery-d
 (`delivery/admin/:adminId/{drivers, driver/add, driver/update/:driverId, driver/:driverId}`), and
 `payments.tsx` reads `delivery/admin/:adminId/drivers` for its driver picker. All five send
 `adminId = userDetails.customerId`, which is the token's own id. The server requires exactly that
-(`companyAdminSelf`, CORE invariant 19): another id in the URL is a 403. Twin pairs collapse into `TwinOrderCard` (`groupTwinPairs`, unless
+(`companyAdminSelf`, CORE invariant 19): another id in the URL is a 403.
+shoofir's only call into the six routes outside that prefix is `delivery/book/:bookId`, from
+the inherited customer order-timer (`screens/order/active`). There a driver gets only its own
+deliveries, and a company admin also gets its company's. Twin pairs collapse into `TwinOrderCard` (`groupTwinPairs`, unless
 `twinAssignmentMode === 'split'`), so anything admin-only must be wired into BOTH cards or
 it silently does not exist for twins.
 **Delivery-only:** `components/delivery-driver/OrderCard.tsx` renders a `طلب يدوي` badge on its
@@ -415,13 +419,20 @@ delivery-status renderer in the repo falls back to the raw value
 **Delivery-only:** `DeliveryListAnalytics.tsx` marks these rows with a `ידנית` badge and shows a
 `ביטול משלוח` button — `isDeliveryOnly && !CLOSED_DELIVERY_STATUSES.includes(status)` — which
 POSTs `delivery/order/status/update` with `status: -3`. That route clears `isPendingAssignment`
-and pushes the driver a cancellation (see CORE invariants 12–13).
+and pushes the driver a cancellation (see CORE invariants 12–13). The web is the route's only
+caller, and so it takes only a dashboard token (`deliveryDashboardAdmin`, CORE invariant 19), as
+does `delivery/driver/:id/orders`, the live-ops place cache's per-courier fallback
+(`apis/delivery/get-driver-orders.ts`).
 This is where a human curates coverage — treat it as the source of truth UI for §1/§4.
 
 ### C3. shoofi-partner — STORE-OWNER (booking trigger + coverage check)
 `app-type: shoofi-partner`. Books delivery: `order/book-delivery` (`{updateData:{isDeliverySent},
 orderId}`), `order/book-custom-delivery` (ad-hoc), reads `delivery/book/:bookId` +
-`delivery/order/:orderId/driver`. Store-side coverage/ETA: `hooks/useAvailableDrivers.ts` →
+`delivery/order/:orderId/driver` (`getOrderDriverDetails`: the order list v1/v2, school orders,
+and the delivery-only list, which passes the booking's own `_id`). The server answers only for
+the token's own store (`bookDelivery.appName = storeUsers.appName`, CORE invariant 19).
+Another store's id is a 404. `delivery/store/order/cancel` takes the same store token, but
+nothing in partner calls it. Store-side coverage/ETA: `hooks/useAvailableDrivers.ts` →
 `POST /delivery/available-drivers` (`stores/shoofi-admin`). Key: `stores/orders/index.tsx`,
 `screens/book-delivery/*`, `hooks/useAvailableDrivers.ts`.
 **Delivery-only booking (§2b) lives here:** `screens/delivery-only/{book,list}/index.tsx`,
@@ -434,6 +445,17 @@ subtree on the Urovo POS, so the quote lines below it are unmounted while it is 
 copy of the shoofir driver UI — no `isAdmin`, no reassign, no `DriverReassignModal`, and no
 navigation entry point despite being registered in `navigation/MainStackNavigator.tsx`),
 customer-app city/address remnants, `screens/menu/menu.tsx.backup`.
+
+### C4. shoofi-app — CUSTOMER (ETA + courier status only)
+`app-type: shoofi-shopping`, `Token`. The app's one delivery call is
+`delivery/book/:bookId` with `order.orderId` (`ordersStore.getDeliveryByBookId`). It is used by
+the `order-timer.tsx` in `screens/order/{active,history,item}` and by
+`twin-active-order-header.tsx`, both polling every 30 s, and it reads only `status` and
+`expectedDeliveryAt`. The server returns only the customer's own delivery
+(`order.customerId = token id`, CORE invariant 19). Another customer's delivery is a 404,
+which the twin header already treats as "no booking yet". A 401 opens the app's sign-out
+dialog, but every screen that polls this route already sits behind the auth-gated
+`order/customer-active-orders`. The app never calls `delivery/order/:orderId/driver`.
 
 ## 10. Known status / flagged for verdict (do NOT silently "fix")
 1. **CONFIRMED BUG — FIXED** (partner PR #4): partner `DELIVERY_STATUS` was `0..3`, off by one
