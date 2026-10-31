@@ -75,6 +75,24 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    routes and nowhere else — which is why an admin-token integration test copied as a
    template 401s the moment it is pointed at a customer route. **Do not "fix" this by
    accepting both from an unrelated ticket** — every real client already sends the right one.
+
+   **So the stored `token` IS the credential, and it never leaves in a reply about someone
+   else.** Whoever reads a user doc's `token` is that user until their next login (partner
+   tokens live 1500 days). `authCode` is the pending OTP and `notificationToken` addresses the
+   device. Only the login (`validateAuthCode`) and `switch-store` replies carry a token, and
+   only to its owner. Every admin reply about other people goes through
+   `services/customer/identity-response.js`, and that holds for admin callers too.
+   **The partner-account routes are dashboard-only** (shoofi-server `fix/store-users-auth`,
+   2026-10-30). `/api/customer/store-users/:appName[/:userId]` (GET, GET one, POST, PUT,
+   DELETE), `POST new-customers` and `POST get-customers` carry `...identityListAdmin` =
+   `[auth.required, checkAdminRole(DASHBOARD_ROLES)]`. Before that all seven were open: the
+   GETs returned every store owner's live `token`, and the POST let anyone add their own phone
+   to any store with `isAdmin: true, roles: ["all"]`. The admin web is the only caller, and
+   the partner app has no staff screen, so a partner token gets 403 on its own store as well.
+   Every dashboard role is accepted, because viewer-only staff create and delete store users
+   in prod. A future partner self-management screen needs a per-audience rule (own `appName`
+   from the token, no granting roles the caller lacks), never a role-only gate. Pinned by
+   `test/integration/store-users-admin-auth.js`.
 3. **Impersonation** (`imp:true`) bypasses that check by design — it is **`master`-role only and
    audited**. Never loosen the gate or drop the audit.
 4. **The partner `switch-store` flow** re-mints a **per-store token** and sets
@@ -429,9 +447,15 @@ All of these are **known and accepted for now**. They are scheduled work, not di
   toward it, don't implement unasked):** (a) a **max-retry limit on requesting a code**, and
   (b) letting the user **choose WhatsApp vs SMS** for delivery.
 - **KNOWN:** `search-customer` projects `token` + `authCode` and has no auth.
+  Verified still true on 2026-10-30. The reply carries the pending OTP itself as
+  `status.authCode`, and `isLoggedIn` is derived from the token. The token itself is not in
+  the reply. All three RN apps and the admin web call it.
 - **KNOWN — to handle later:** several identity-adjacent endpoints (address CRUD,
   `search-customer`, storeUsers CRUD, `cash-restrict`) take IDs from the URL/body with no auth.
   **Never widen this surface further.**
+  Flagged for a human (2026-10-30): storeUsers CRUD is gated as of shoofi-server
+  `fix/store-users-auth` (invariant 2), and `cash-restrict` already carries
+  `auth.required` + `checkAdminRole` on main. This list may want trimming.
 - **NOT a bug (verified):** the driver app sends `app-name: 'shoofi'` on push-token
   registration, but the server routes on **`app-type`**, so the token lands correctly on
   `delivery-company.customers`. (Leftovers: an unused `db` variable in that handler, and a
