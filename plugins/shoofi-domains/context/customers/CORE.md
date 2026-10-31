@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -75,6 +75,24 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    routes and nowhere else — which is why an admin-token integration test copied as a
    template 401s the moment it is pointed at a customer route. **Do not "fix" this by
    accepting both from an unrelated ticket** — every real client already sends the right one.
+
+   **So the stored `token` IS the credential, and it never leaves in a reply about someone
+   else.** Whoever reads a user doc's `token` is that user until their next login (partner
+   tokens live 1500 days). `authCode` is the pending OTP and `notificationToken` addresses the
+   device. Only the login (`validateAuthCode`) and `switch-store` replies carry a token, and
+   only to its owner. Every admin reply about other people goes through
+   `services/customer/identity-response.js`, and that holds for admin callers too.
+   **The partner-account routes are dashboard-only** (shoofi-server `fix/store-users-auth`,
+   2026-10-30). `/api/customer/store-users/:appName[/:userId]` (GET, GET one, POST, PUT,
+   DELETE), `POST new-customers` and `POST get-customers` carry `...identityListAdmin` =
+   `[auth.required, checkAdminRole(DASHBOARD_ROLES)]`. Before that all seven were open: the
+   GETs returned every store owner's live `token`, and the POST let anyone add their own phone
+   to any store with `isAdmin: true, roles: ["all"]`. The admin web is the only caller, and
+   the partner app has no staff screen, so a partner token gets 403 on its own store as well.
+   Every dashboard role is accepted, because viewer-only staff create and delete store users
+   in prod. A future partner self-management screen needs a per-audience rule (own `appName`
+   from the token, no granting roles the caller lacks), never a role-only gate. Pinned by
+   `test/integration/store-users-admin-auth.js`.
 3. **Impersonation** (`imp:true`) bypasses that check by design — it is **`master`-role only and
    audited**. Never loosen the gate or drop the audit.
 4. **The partner `switch-store` flow** re-mints a **per-store token** and sets
@@ -203,7 +221,18 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    - Writes go through `linkFromRequest` → `resolveLink`, which 400s a coupon / deal / product /
      store that doesn't exist. Marketing promotes existing offers only (Sari, 2026-10-28); never
      add a "create the coupon from here" path. A coupon scoped to exactly one store gets that
-     `appName` filled in (the app opens the store; otherwise "my coupons").
+     `appName` filled in. Builds before feat/coupon-detail-link open that store with it (any other
+     coupon: "my coupons", which lists only personal coupons, so a public multi-store coupon was a
+     dead end).
+   - **Every `coupon` link opens the coupon page** (shoofi-app `coupon-detail`,
+     `screens/coupon-detail`, 2026-10-30), single-store coupons included. The page reads
+     `GET /api/coupons/:id/public` (payments CORE, "What a marketing coupon link shows") and says
+     what the coupon gives, its dates, the code with a copy button or "applied automatically at
+     checkout", and where it works: "all stores", or the eligible stores, each opening through
+     `openStoreAtProduct`. It never touches the cart and never claims or applies the coupon. The
+     tap event is unchanged: every caller still calls `trackMarketingTap` / `trackPushOpen` before
+     `openMarketingLink`, and only the router's `coupon` case changed. A phone sees this after
+     `eas update`.
    - Older app builds never read `link`: writers keep an ad's `appName`/`pageName`
      (`legacyAdFields`) and a story's `target` (`targetForLink`) in step, and reads fill `link` in
      for items saved before it (`withLink`). An admin form that sends no `link` must not flatten a
@@ -445,9 +474,15 @@ All of these are **known and accepted for now**. They are scheduled work, not di
   toward it, don't implement unasked):** (a) a **max-retry limit on requesting a code**, and
   (b) letting the user **choose WhatsApp vs SMS** for delivery.
 - **KNOWN:** `search-customer` projects `token` + `authCode` and has no auth.
+  Verified still true on 2026-10-30. The reply carries the pending OTP itself as
+  `status.authCode`, and `isLoggedIn` is derived from the token. The token itself is not in
+  the reply. All three RN apps and the admin web call it.
 - **KNOWN — to handle later:** several identity-adjacent endpoints (address CRUD,
   `search-customer`, storeUsers CRUD, `cash-restrict`) take IDs from the URL/body with no auth.
   **Never widen this surface further.**
+  Flagged for a human (2026-10-30): storeUsers CRUD is gated as of shoofi-server
+  `fix/store-users-auth` (invariant 2), and `cash-restrict` already carries
+  `auth.required` + `checkAdminRole` on main. This list may want trimming.
 - **NOT a bug (verified):** the driver app sends `app-name: 'shoofi'` on push-token
   registration, but the server routes on **`app-type`**, so the token lands correctly on
   `delivery-company.customers`. (Leftovers: an unused `db` variable in that handler, and a
