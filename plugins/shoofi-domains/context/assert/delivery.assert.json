@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/delivery-mobile-auth / 2026-10-31 (CORE invariant 20 — the two dashboard gates in admin-access.js, only one checks app-type); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -492,6 +492,11 @@
           "file": "routes/delivery/driver.js",
           "regex": "driver\\.companyId !== admin\\.companyId",
           "desc": "the company-admin handlers refuse a driver outside the admin's company with a strict compare of two STRING companyIds (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "const dashboardRoleGate = checkAdminRole\\(DASHBOARD_ROLES\\);",
+          "desc": "the /api/delivery/admin/* gate is roles-only — dashboardRoleGate carries NO app-type test (CORE invariant 20)"
         }
       ]
     },

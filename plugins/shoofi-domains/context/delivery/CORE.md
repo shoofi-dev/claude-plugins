@@ -424,6 +424,29 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
       new route under the prefix must join one of the two groups, or
       `test/integration/delivery-admin-auth.js` fails.
 
+20. **"Dashboard caller" means two different things inside
+    `services/delivery/admin-access.js`, and only one of them checks `app-type`.**
+    `dashboardRoleGate` (line 95) is `checkAdminRole(DASHBOARD_ROLES)` and nothing else — no
+    `app-type` test — so `...deliveryDashboardAdmin` admits **any** `auth.required` token that
+    carries a dashboard role, whatever app it came from. `hasDashboardRole()` (line 135), the
+    dashboard branch of `deliveryOwnerAccess` (and therefore of `deliveryOwnerOrDashboard` /
+    `storeOwnerOrDashboard`, the six routes outside the prefix), additionally requires
+    `req.headers["app-type"] === "shoofi-admin"`. The file's header comment describes the admin
+    web as sending `Bearer` + `app-type: shoofi-admin`, which reads like a gate and is not one
+    on the first group.
+    - Consequence when stacking: `...deliveryDashboardAdmin, checkAdminRole(["master","admin"])`
+      — the shape `POST /api/delivery/admin/driver/:driverId/move-company` uses — **intersects**
+      to exactly `{master, admin}` and is safe. `checkAdminRole` is stateless, reads
+      `req.auth.roles` and only writes `req.adminUser`, so running it twice is not a
+      double-403. Narrowing a route this way needs no change to `deliveryDashboardAdmin`.
+    - Do **not** "tidy" the two into one helper. Adding the `app-type` test to
+      `dashboardRoleGate` silently 403s any non-`shoofi-admin` caller of the
+      `/api/delivery/admin/*` routes, and dropping it from `hasDashboardRole` would let a
+      role-carrying token of any app type read another owner's delivery.
+    - `withDeliveryScope` is a no-op unless a gate set `req.deliveryScope`, and
+      `dashboardRoleGate` never does — so it is correctly absent from a dashboard-only route,
+      and its absence there is not a missing scope check.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
   `isDeliveryOnlySupport` field, so the gate returns `platform_disabled`/`store_disabled` for
