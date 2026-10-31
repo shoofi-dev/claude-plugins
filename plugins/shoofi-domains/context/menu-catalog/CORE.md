@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -411,13 +411,21 @@ boundary and say so in the PR.
    `test/integration/for-you-ai-chat.js` fails otherwise): an unpriced call logs `costUsd: null`, and
    the chat's budget counts such a row at `UNPRICED_BUDGET_PRICE` (twice the dearest known price) —
    never as $0, or a model upgrade would switch the cap off. Features with their own budget or
-   quality gate have their own `MODELS` key (`chat`, `labels`, `marketing`); moving `best` must not
+   quality gate have their own `MODELS` key (`chat`, `labels`, `marketing`, `support`); moving `best` must not
    move them. The chat's message is stored with digits masked.
    - `MODELS.marketing` = `claude-opus-5-5` (2026-10-30, the marketing wizard's generator; customers
      CORE invariant 16): features `marketing copy` and `marketing image brief`, `effort: "low"`, no
      `temperature` (Opus 5.5 rejects it), its own daily budget in `services/marketing/generate/budget.js`
      over every `marketing *` row. Price rows for `claude-opus-5-5` ($4/$20), `claude-sonnet-5-5`
      ($2/$10) and `claude-haiku-5-5` ($0.10/$0.50) were added with it.
+   - `MODELS.support` = `claude-opus-5-5` (2026-11-01, the admin support assistant —
+     shoofi-server `docs/support-agent.md`): features `support-agent`, `support-agent dedupe`,
+     `support-agent insights`, `effort: "low"`, its own daily budget (`supportAgentDailyBudgetUsd`,
+     default $10) over every `support-agent*` row. It is the one caller of **`converse()`**, the second
+     entry point in `complete.js`: one tool-use round (`messages` + `tools` in, raw content blocks out),
+     API backend only, logged through the same `recordUsage` — a tool loop is still one priced row per
+     model call. A server-side refusal fallback can serve a call on another model; the row logs the
+     model that actually answered (`res.model`).
    - **Not every row is a Claude call.** A finished marketing render is logged as feature
      `marketing image render`, `model: "artlist:nano-banana-2"`, `backend: "artlist"`, `costUsd: 0`
      (Artlist is prepaid) and `meta.credits` (130 per 2k image). Count credits from `meta`, not
