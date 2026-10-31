@@ -607,8 +607,8 @@
       "patterns": [
         {
           "file": "src/apis/admin/marketing-generate.ts",
-          "regex": "axiosInstance\\.post\\(\"/admin/marketing/generate\", \\{ subject, channel, what: \"copy\", tone \\}\\)",
-          "desc": "CORE invariant 16: the wizard sends only the subject's identity, the channel and the tone - never a fact"
+          "regex": "axiosInstance\\.post\\(\"/admin/marketing/generate\", \\{ subject, channel, what: \"copy\", tone(?:, \\.\\.\\.\\(templateId \\? \\{ templateId \\} : \\{\\}\\))? \\}\\)",
+          "desc": "CORE invariant 16: the wizard sends only the subject's identity, the channel and the tone - never a fact (plus, where templates exist, the picked template's id - still a reference, never a fact)"
         },
         {
           "file": "src/utils/marketing-prefill.ts",
