@@ -690,6 +690,18 @@ boundary and say so in the PR.
     reconcile cron (`utils/crons/coupon-campaign-category-cron.js`), and the explore cache is
     busted only on a real membership change. Before 2026-10-26 neither path knew about deals,
     so a deal-only store's offers showed only inside the store (support report, master-burger).
+    ⚠️ **Do NOT collapse that coupon filter with the public coupon page's, however alike they
+    look** (attempted and reverted on `feat/coupon-detail-link`, shoofi-server#368). The row's
+    filter skips two flags; `isPromotableCoupon` (`services/coupons/public-coupon.js`) is
+    **strictly stricter** — it also refuses `onlyForOneCustomer` and `claimedByUserId` — and
+    `routes/coupon.js`'s `/api/coupons/active` is a third shape again (`$ne: true`, which unlike
+    `$nin: [true,'true']` misses the legacy string rows). Three readers, three deliberately
+    different rules, none sharing a constant. Share one and the next tidy-up "aligns" them, which
+    silently changes which stores are in the row. The import also costs: pulling
+    `services/coupons/public-coupon.js` into `lib/campaign-category-sync.js` drags 22 further
+    modules (the whole delivery / notification / websocket stack, via `utils/store-service`) into
+    the campaign-sync require graph — and so into `scripts/run-campaign-reconcile.js` and the
+    infra-free test suite.
 
 24. **CODE THAT WRITES A TRANSLATION ROW GOES THROUGH `writeOwnedTranslation` — NEVER THE PANEL
     ROUTES, NEVER A SHARED KEY** (`services/translations/owned-translations.js`; reference §2

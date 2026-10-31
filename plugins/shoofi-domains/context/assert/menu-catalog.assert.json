@@ -653,6 +653,11 @@
           "desc": "doc CORE invariant 18: a customer-specific coupon does not put the store in the حملات row"
         },
         {
+          "file": "routes/coupon.js",
+          "regex": "isCustomerSpecific: \\{ \\$ne: true \\}",
+          "desc": "doc CORE invariant 18: /api/coupons/active is a THIRD, deliberately different public-coupon shape ($ne, so legacy 'true' string rows slip through) — never share a constant with the حملات filter"
+        },
+        {
           "file": "routes/promotion.js",
           "regex": "await syncCampaignBucket\\(req, appName\\)",
           "desc": "doc CORE invariant 18: promotion writes re-sync the store's حملات membership"
