@@ -539,7 +539,7 @@
         {"file": "routes/marketing-generate.js", "regex": "router\\.post\\(\"/api/admin/marketing/generate/:jobId/revise\", \\.\\.\\.ownerTier,", "desc": "CORE invariant 16: revising a picture is owner-tier"},
         {"file": "routes/marketing-generate.js", "regex": "router\\.post\\(\"/api/admin/marketing/generate/:jobId/versions/:versionId/restore\", \\.\\.\\.ownerTier,", "desc": "CORE invariant 16: restoring a version is owner-tier"},
         {"file": "routes/marketing-generate.js", "regex": "const facts = await loadSubjectFacts\\(req\\.app\\.db, job\\.subject\\);", "desc": "CORE invariant 16: a revision reloads the facts from the DB by the job's subject"},
-        {"file": "services/marketing/generate/image.js", "regex": "buildImageBriefPrompt\\(\\{ facts, channel: job\\.channel, tone: job\\.tone, direction, feedback, revision: job\\.revision, template: job\\.template \\}\\)", "desc": "CORE invariant 16: a revision with notes is briefed in runImageJob, so its words pass the same guard"},
+        {"file": "services/marketing/generate/image.js", "regex": "buildImageBriefPrompt\\(\\{ facts, channel: job\\.channel, tone: job\\.tone, direction, feedback, revision: job\\.revision, template: job\\.template \\}\\)", "desc": "CORE invariant 16 + 18: a revision with notes is briefed in runImageJob, so its words pass the same guard - and the job's own template snapshot rides into that same brief, never a style from the request"},
         {"file": "services/marketing/generate/image.js", "regex": "\"cleanly aligned\\. Never invent characters, and add no other words, numbers or prices\\.\"", "desc": "CORE invariant 16: the words-exactly rule stays in code, not in an editable direction field"},
         {"file": "services/marketing/generate/budget.js", "regex": "Math\\.max\\(j\\.renderCount \\|\\| 0, \\(j\\.assets && j\\.assets\\.length\\) \\|\\| 0\\)", "desc": "CORE invariant 16: revision renders count against the daily image limit"},
         {"file": "services/marketing/templates.js", "regex": "const published = \\(doc\\) => !doc\\.approval \\|\\| doc\\.approval\\.status === \"published\";", "desc": "CORE invariant 18: templates learn from published items only, never drafts"},
@@ -633,8 +633,8 @@
         },
         {
           "file": "src/apis/admin/marketing-generate.ts",
-          "regex": "axiosInstance\\.post\\(\"/admin/marketing/generate\", \\{ subject, channel, what: \"copy\", tone, \\.\\.\\.\\(templateId \\? \\{ templateId \\} : \\{\\}\\) \\}\\)",
-          "desc": "CORE invariant 16 + 18: the wizard sends only the subject's identity, the channel, the tone and a template id - never a fact or a style"
+          "regex": "axiosInstance\\.post\\(\"/admin/marketing/generate\", \\{ subject, channel, what: \"copy\", tone(?:, \\.\\.\\.\\(templateId \\? \\{ templateId \\} : \\{\\}\\))? \\}\\)",
+          "desc": "CORE invariant 16 + 18: the wizard sends only the subject's identity, the channel, the tone and (where templates exist) the picked template's id - never a fact and never a style"
         },
         {
           "file": "src/utils/marketing-prefill.ts",
