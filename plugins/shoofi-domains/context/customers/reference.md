@@ -509,7 +509,10 @@ Admin client: `shoofi-delivery-web` `src/apis/admin/marketing-generate.ts`,
 `src/views/admin/marketing/components/ContentStep.tsx` (the step),
 `src/components/admin/image-generation/` (`ImageRevision` — "עוד אפשרות" / "בקש שינוי" / earlier
 versions — and `DesignGuidelines`, shared with the social posts screen), `content.ts` (what the form
-gets), `use-prefill-image.ts` (the banner / story forms attach the image). The prefill's
+gets; `subjectFromLink` = a form's link → the subject), `use-prefill-image.ts` (the banner /
+story forms attach the image: the prefill, and `attachGeneratedImage` from the in-form bar),
+`components/FormGenerate.tsx` (the step with `mode="form"`, rendered above each channel form's
+`<form>` so Enter in it never submits the form). The prefill's
 `copy` keys: `title_*` = push / note / banner title, `body_*` = push / note body, banner
 description, story caption.
 
