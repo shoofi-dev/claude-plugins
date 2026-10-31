@@ -1,11 +1,12 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
         "routes/auth.js",
         "routes/customer.js",
+        "services/customer/identity-response.js",
         "routes/customer-referrals.js",
         "routes/customer-campaigns.js",
         "routes/customer-feedback.js",
@@ -123,6 +124,17 @@
           "regex": "if \\(shouldRunCrons\\) \\{[\\s\\S]*scheduledCampaignsCron\\.startScheduledCampaignsCron\\(app\\.db\\)",
           "desc": "CORE invariant 12: the scheduled-campaigns cron is started inside the shouldRunCrons block - before 2026-10-28 it was never started, so no scheduled campaign sent"
         },
+        {"file": "routes/customer.js", "regex": "const identityListAdmin = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];", "desc": "CORE invariant 2: the partner-account and customer-list routes take a dashboard role; auth.required alone passes a customer or partner token"},
+        {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/store-users/:appName', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: listing a store's users (each doc held the owner's live token) is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/store-users/:appName/:userId', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: reading one store user is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\('/api/customer/store-users/:appName', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: creating a store user (isAdmin/roles from the body) is dashboard-only, so nobody adds their own phone to a store"},
+        {"file": "routes/customer.js", "regex": "router\\.put\\('/api/customer/store-users/:appName/:userId', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: changing a store user's roles is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.delete\\('/api/customer/store-users/:appName/:userId', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: deleting a store user is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\(\"/api/customer/new-customers/:page\\?\", \\.\\.\\.identityListAdmin,", "desc": "reference C4: the new-customers list is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\(\"/api/customer/get-customers/:page\\?\", \\.\\.\\.identityListAdmin,", "desc": "reference C4: the get-customers list (Mongo filter from the body) is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "data: users\\.map\\(toStoreUserResponse\\)", "desc": "CORE invariant 2: the store-users list reply is whitelisted, never the raw doc"},
+        {"file": "services/customer/identity-response.js", "regex": "const IDENTITY_SECRET_FIELDS = Object\\.freeze\\(\\[\\n\\s+\"token\",\\n\\s+\"authCode\",\\n\\s+\"notificationToken\",", "desc": "CORE invariant 2: token, authCode and notificationToken never leave in a reply about someone else"},
+        {"file": "services/customer/identity-response.js", "regex": "const STORE_USER_RESPONSE_FIELDS = Object\\.freeze\\(\\[\\n\\s+\"_id\",\\n\\s+\"phone\",\\n\\s+\"fullName\",\\n\\s+\"isAdmin\",\\n\\s+\"roles\",\\n\\s+\"appName\",\\n\\s+\"created\",\\n\\]\\);", "desc": "reference C4: a store-users reply carries exactly the fields the admin screens read"},
         {
           "file": "controllers/customerCampaignController.js",
           "regex": "\\{ status: \\{ \\$nin: NOT_CLAIMABLE \\}, \\.\\.\\.\\(claimFilter \\|\\| \\{\\}\\), _id: getId\\(campaignId\\) \\}",
@@ -451,7 +463,7 @@
       ]
     },
     "shoofi-app": {
-      "files": ["utils/http-interceptor/index.ts", "hooks/use-notifications.ts", "utils/marketing-link.ts", "services/marketing-events.ts", "components/profile/MarketingPushToggle.tsx"],
+      "files": ["utils/http-interceptor/index.ts", "hooks/use-notifications.ts", "utils/marketing-link.ts", "services/marketing-events.ts", "components/profile/MarketingPushToggle.tsx", "navigation/MainStackNavigator.tsx"],
       "patterns": [
         {"file": "services/marketing-events.ts", "regex": "const QUEUE_KEY = \"@marketing_event_queue\";", "desc": "CORE invariant 11: the event queue is mirrored to AsyncStorage (survives a kill)"},
         {"file": "services/marketing-events.ts", "regex": "export const ORDER_FLUSH_TIMEOUT_MS = 1500;", "desc": "CORE invariant 11: an order waits at most 1.5s for the queue"},
@@ -464,6 +476,16 @@
           "file": "utils/marketing-link.ts",
           "regex": "return openStoreAtProduct\\(navigate, \\{ appName: link\\.appName \\}, link\\.productId\\)",
           "desc": "CORE invariant 11: store opens go through the twin-guarded opener"
+        },
+        {
+          "file": "utils/marketing-link.ts",
+          "regex": "case \"coupon\":\\s*navigate\\(\"coupon-detail\", \\{ couponId: link\\.couponId",
+          "desc": "CORE invariant 11: every coupon link opens the coupon page, single-store coupons included - never the store, never 'my coupons'"
+        },
+        {
+          "file": "navigation/MainStackNavigator.tsx",
+          "regex": "<Stack\\.Screen name=\"coupon-detail\" component=\\{CouponDetailScreen\\} />",
+          "desc": "CORE invariant 11: the coupon page route the marketing router navigates to"
         },
         {
           "file": "components/profile/MarketingPushToggle.tsx",
