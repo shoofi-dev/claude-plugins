@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -22,7 +22,8 @@ Server: `routes/order.js`, `routes/twin-order.js`, `routes/order-fraud-*.js`,
 (the order-side guard for fixed-delivery-price coupons, invariant 14), `utils/marketing-touch.js`
 (order-side marketing attribution, invariant 15), `services/marketing/order-facts.js` +
 `services/marketing/reconcile.js` (one marketing fact per checkout, kept true by a cron —
-invariant 16), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
+invariant 16), who may call the coins admin routes (`routes/coins.js` `/api/admin/coins/*` and the
+Coins Settings block of `routes/shoofi-admin.js`, invariant 19), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
 (shoofir), monitoring/twin-admin (delivery-web).
 
 **Not yours:** payment internals (`payments`), settlement/payouts (`accountant`), driver
@@ -238,6 +239,12 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       (re-derives the stack from the claimed promotions), amend repricing + ledger reconcile
       (`allocateAcrossParts`). Reading `promotions.items.promotionId` alone silently ignores
       the second deal.
+    - **Describing a deal in words** (`POST /api/admin/promotions/assist`,
+      `services/promotions/promotion-assistant.js`): Claude proposes the deal FORM's fields
+      from the store's own catalogue; `applyPromotionProposal` keeps only what the form can
+      hold (known type/config keys, ids from THIS store) and the person saves through the
+      normal create route. It writes nothing. Requests a deal cannot express (Shoofi funding,
+      several stores, daily hours, one customer) come back as `noFit` → coupon drafts.
     - **One ranking, three readers**: `rankDeals` (`promotion-service.js`) is the only place
       that picks the winning deal of each kind — `quotePromotions` (the menu/cart/checkout
       quote) and the admin form's live preview (`previewPromotionQuote`,
@@ -399,6 +406,127 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `upsertedCount`), so a racing second instance reports 0.
     - Tests: `test/integration/marketing-attribution.js`. It drives the real create and twin
       routers on mongodb-memory-server.
+
+17. **PARTNER AUTO-PRINT: A SENT TICKET IS A PRINTED TICKET, AND THE NOT-PRINTED SWEEP IS
+    BOUNDED** (shoofi-partner, `App.tsx` + `helpers/printer/print.ts` + `utils/print-{outcome,
+    attempts,queue,batch}.ts`; reference C3 "Auto-print"). `isPrinted` is the ONLY "already
+    printed" signal. The tablet sets it through `POST /api/order/printed` (`auth.required`,
+    no role gate) after a ticket prints. After every successful batch, the tablet asks
+    `admin/orders` for `isNotPrinted` orders and prints those too (the "sweep").
+    Three rules, each one a fix for a loop seen in prod (super-abu-shaqra, 2026-10-28, order
+    6370-3519 printed over and over):
+    - **Epson's completion timeout is "unconfirmed", never a failure.** `"Print timeout
+      occurred."` (`CODE_ERR_TIMEOUT` from `sendData`) arrives AFTER the data reached the
+      printer, so the paper comes out. It is not retried, and the order IS marked printed.
+      `sendData` gets a height-scaled timeout (30s floor, 60s ceiling, `sendDataTimeoutMs`).
+      The old library default was 5000ms, shorter than a long ticket takes over Bluetooth.
+      Real failures (connect, paper, buffer, our own JS ceiling) stay `"failed"`: they are
+      retried once and not marked.
+    - **The sweep sends `ordersDate` (the current business day).** Without it the server
+      applies NO date window (`routes/order.js` builds one only `if (ordersDate)`). The sweep
+      sends `AUTO_PRINT_SWEEP_STATUSES` = `1,2,3,6` (+ forced `14`/`15`), never cancelled,
+      rejected or already-left-the-store statuses. It also skips an order after
+      `MAX_AUTO_PRINT_ATTEMPTS` (2) attempts this app session that did not get it marked.
+      Explicit prints (accept, the row's print button) are never filtered or capped.
+    - **Image i belongs to queue[i].** A failed capture keeps a `null` slot
+      (`captureAlignedToQueue`) and is not printed. Skipping it used to shift later images
+      onto the wrong order and mark an unprinted one printed.
+    So: never make a print path's success depend on Epson's completion callback alone, and
+    never drop the sweep's date or cap. A stuck order is diagnosed from
+    `<store>.client-error` `source: "printer-testPrint"` rows (they now carry `outcome`),
+    plus the store's only `isPrinted:false, isViewd:true` orders.
+18. **THE STORE-CALENDAR AND ORDER-ADMIN READS ARE GATED PER AUDIENCE, AND THE PARTNER GATE IS
+    STORE MEMBERSHIP, NOT "THE TOKEN'S OWN STORE"** (shoofi-server `services/orders/admin-access.js`).
+    Until 2026-10-30, anyone who sent a store's `app-name` could close its hours, or read its
+    orders with the customers' names and phones. Some routes had no auth; others had
+    `auth.required` only, which a customer token passes (shared secret). Each route declares
+    its gate itself:
+    - **`ORDERS_DASHBOARD_OR_STORE_MEMBER`** = `auth.required` + `storeMemberGate`. A
+      `DASHBOARD_ROLES` admin token passes for any store. A `shoofi-partner` token passes when
+      its own `storeUsers` doc (`req.auth.id`) has `appName` = the `app-name` header, or when
+      another `storeUsers` doc with the same phone is on that store. That second test is the one
+      `POST /api/customer/switch-store` makes before minting a token. Used on:
+      - **`GET /api/order/admin/all/not-viewd`, the partner's LIVE new-order feed**;
+      - `GET admin/not-viewd`, `GET admin/not-printed`;
+      - `POST admin/orders/:page?` (the order list and the auto-print sweep, invariant 17);
+      - `POST admin/school-project-orders-for-print`;
+      - `GET /api/order/future-orders-ready` (`FutureOrderReminderGlobal`);
+      - `POST /api/order/get-custom-delivery` (`screens/book-delivery/list`; the store's own
+        `bookDelivery`);
+      - the four `POST /api/admin/calander/{disable/hour/insert,disable/hour/insert/multi,enable/hour,enable/hour/multi}`.
+    - **Why not exact match** (the #346 `ownStoreGate`): the feed is a new-order poll.
+      `authStore.switchStore` (shoofi-partner) persists the new store name BEFORE the new
+      token, so a poll in between carries store B with A's token. A 403 is silent in the
+      app, and it blanks the store's new orders.
+    - **`ORDERS_DASHBOARD`** = `auth.required` + `checkAdminRole(DASHBOARD_ROLES)`, on
+      `GET /api/order/admin/future-orders-count`, `POST /api/order/admin/coupon-orders`,
+      `POST /api/order/admin/all-orders/:page?`, `POST /api/order/statistics/new-orders/:page?`,
+      `POST /api/order/byDate` (no caller) and `GET /api/shoofiAdmin/external-order-providers`.
+      Only the admin web calls them.
+    - **Every `/api/order/admin/*` route carries one of the two.** The one exception is
+      `GET admin/my-stores/new-orders-count` (`auth.required`): it takes the store set from the
+      token's phone (`storeUsers`), ignores `app-name` and returns counts only. The customer's
+      own reads (`customer-orders`, `customer-active-orders`, `customer-orders-history`,
+      `customer-last-completed-order`, `customer-invoices`) stay `auth.required`, because they
+      select by `req.auth.id`. A static test fails for a new login-only admin route.
+    - **Public by decision:** `GET /api/admin/calander/disabled/hours/:date` (the time pickers;
+      projected to `{_id, date, hour}`) and `GET /api/admin/check-order-time-valid` (the customer
+      cart on submit, maybe logged out; returns only the school ordering window). Neither returns
+      an order. Gating them would 401 a logged-out customer.
+    - **Who really calls `not-viewd`:** almost nobody, in steady state. All 394 prod `storeUsers`
+      docs (2026-10-30) carry `isAdmin: true` + `roles: ["all"]`, so once user details load the
+      partner polls **`admin/all/not-viewd`** instead (`isAdmin(ROLES.all)`, `stores/orders`).
+      `not-viewd` is reached by a store user without `all` (`POST /api/customer/store-users/:appName`
+      defaults `roles: []`) and by the new-orders screen before details load. Both send a token.
+    - ⚠️ **A 401 signs the partner out.** Its interceptor treats any 401 as sign-out
+      (`resetAppState`, then a restart). A gate on a partner-polled route must never 401 a
+      logged-in terminal. Pinned by `test/integration/orders-admin-auth.js`.
+    - **The feed after the change, prod 2026-10-30:** in the previous 7 days, 90 stores accepted
+      3,218 orders. Every one of those stores has at least one `storeUsers` doc on it with a live
+      token, so its terminal polls with a token whose own `appName` is the header store (an exact
+      match). The switch-store window (header = new store, token = old store, same phone) is
+      tested both ways.
+    - **Still `auth.required` only, outside this sweep:** the order MUTATIONS (`update`,
+      `update/viewd`, `printed`, `update-delay`, `start-preparing`, `update-start-preparing`,
+      `update-item-collected`, `book-delivery`, `book-custom-delivery`, `update-custom-delivery`,
+      `drive-in-arrival(-confirm)`, `update/all`). These are status transitions, so any change
+      is high-risk. Ungated money paths `addRefund` and `updateCCPayment` belong to payments.
+
+19. **THE COINS ADMIN ROUTES ARE DASHBOARD-ONLY, GATED ON THE ROUTE ITSELF.** Coins have no
+    domain of their own; orders owns their order-side wiring and, since 2026-10-30, who may call
+    their admin routes. Until then seven of these eight had no auth: anyone could read any
+    customer's coin wallet, switch coins off platform-wide, set a store's `earnPercent` /
+    `coinValue` (free money for customers), or run the expiry sweep.
+    - **Seven on the dashboard gate, the sweep master-only.** `auth.required` +
+      `checkAdminRole(DASHBOARD_ROLES)` (`utils/analytics-access.js`, so `viewer` and
+      `accountant` pass) on seven routes. In `routes/coins.js` it is `COINS_ADMIN` on
+      `GET /api/admin/coins/customer/:customerId[/earned]` and
+      `GET /api/admin/coins/store/:storeAppName/stats`. `POST /api/admin/coins/expire` is
+      `COINS_EXPIRE_ADMIN` = `checkAdminRole(["master"])`: it is the only code that permanently
+      deletes coins, nobody calls it, and prod had no sweep rows, so narrowing it took access
+      from no one. A run is audited as `expire_coins` (`services/audit/admin-audit-routes.js`).
+      In `routes/shoofi-admin.js` it is
+      `COINS_SETTINGS_ADMIN`, built inside the Coins Settings block from locally named requires,
+      on `GET|POST /api/admin/coins-settings` and `GET|POST /api/admin/store/:appName/coins-settings`.
+      Not in `utils/restricted-admin-routes.js`.
+    - **No mobile caller, so no per-audience branch.** The admin web is the only client
+      (`ShoofiSettings.tsx`, `StoreForm.tsx`, `customer-details.ts`). The customer app reads
+      `store.coinsSettings` from store data and never calls these routes. The partner app's coins
+      toggle is commented out in `screens/admin/store-managment`, so a partner token gets 403
+      even for its own store. A mobile app that needs one of these later gets a per-audience
+      check (guardrails §3a), never a role-only gate: mobile tokens carry no `roles`.
+    - **The settings are still writable another way.** `POST /api/store/update` (`routes/store.js`)
+      `$set`s the posted store document with no auth, so a store's `coinsSettings` can be written
+      there without the clamps of the coins-settings route. The partner app round-trips the
+      field through it on every store save. That route is not orders' and is not gated yet.
+    - **Expiry stays unscheduled on purpose.** Expiry is computed on read (`coin-buckets.js`);
+      `expireCoins` is the only code that permanently deletes coins and this route is its only
+      trigger. Prod had 0 sweep-written `expire` rows on 2026-10-30. The `expire` rows that do
+      exist carry an `orderId`: they are `refundCoins` clawing back coins earned on a cancelled
+      order, not the sweep.
+    - Tests: `test/integration/coins-admin-auth.js` (static gate check on every route plus every
+      `/api/admin/*` route in `routes/coins.js`, 401/403 matrix, every dashboard role on seven
+      routes, master-only on expire, the audit entry, refused writes write nothing).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
