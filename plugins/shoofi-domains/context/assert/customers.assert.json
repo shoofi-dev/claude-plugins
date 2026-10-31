@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (CORE invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (CORE invariant 11 active list); shoofi-server@feat/marketing-image-revise / 2026-10-31 (CORE invariant 16 revise + design guidelines); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -67,7 +67,8 @@
         "services/marketing/generate/facts.js": ["loadSubjectFacts", "GenerateError", "isPersonalCoupon", "not_new", "personal"],
         "services/marketing/generate/guard.js": ["extractTokens", "checkText", "normaliseDigits", "ONLY_TODAY", "FREE_WORDS", "DISCOUNT_WORDS"],
         "services/marketing/generate/copy.js": ["CHANNEL_LIMITS", "generateCopy", "validateVariants", "no_valid_copy", "MAX_ATTEMPTS"],
-        "services/marketing/generate/image.js": ["createImageJob", "runImageJob", "composeRenderPrompt", "no_renderer", "marketingGenerations"],
+        "services/marketing/generate/image.js": ["createImageJob", "runImageJob", "composeRenderPrompt", "no_renderer", "marketingGenerations", "requestRevision", "rerender", "restoreVersion", "revisionBlock", "bannerLayout", "storyLayout"],
+        "services/social-posts/brand-direction.js": ["bannerLayout", "storyLayout", "getDirection"],
         "services/marketing/generate/renders.js": ["claimOnce", "notMine", "marketing image render", "CREDITS_PER_RENDER"],
         "services/marketing/generate/budget.js": ["marketingAiDailyBudgetUsd", "marketingImageDailyLimit", "UNPRICED_BUDGET_PRICE"],
         "services/marketing/generate/voice.js": ["HEBREW_VOICE", "ARABIC_VOICE"],
@@ -526,7 +527,13 @@
         {"file": "services/marketing/generate/image.js", "regex": "channel === \"banner\" \\? \\[\\{ lang: \"ar\" \\}, \\{ lang: \"he\" \\}\\] : \\[\\{ lang: \"all\" \\}\\]", "desc": "CORE invariant 16: a banner is one render per language (text baked in), a story one text-free render"},
         {"file": "services/social-posts/render-service.js", "regex": "if \\(!post\\) return marketingRenders\\(\\)\\.claimOnce\\(db, \\{ bridgeId \\}\\);", "desc": "CORE invariant 16: marketing renders ride the bridge's social claim, after social renders"},
         {"file": "services/social-posts/render-service.js", "regex": "out\\.notMine \\? \\{ stale: true \\} : out", "desc": "CORE invariant 16: a finish for a non-social id is answered by the marketing renders module"},
-        {"file": "services/database/DatabaseInitializationService.js", "regex": "db\\.marketingGenerations = db\\.collection\\('marketingGenerations'\\);", "desc": "CORE invariant 16: the generation jobs collection is registered"}
+        {"file": "services/database/DatabaseInitializationService.js", "regex": "db\\.marketingGenerations = db\\.collection\\('marketingGenerations'\\);", "desc": "CORE invariant 16: the generation jobs collection is registered"},
+        {"file": "routes/marketing-generate.js", "regex": "router\\.post\\(\"/api/admin/marketing/generate/:jobId/revise\", \\.\\.\\.ownerTier,", "desc": "CORE invariant 16: revising a picture is owner-tier"},
+        {"file": "routes/marketing-generate.js", "regex": "router\\.post\\(\"/api/admin/marketing/generate/:jobId/versions/:versionId/restore\", \\.\\.\\.ownerTier,", "desc": "CORE invariant 16: restoring a version is owner-tier"},
+        {"file": "routes/marketing-generate.js", "regex": "const facts = await loadSubjectFacts\\(req\\.app\\.db, job\\.subject\\);", "desc": "CORE invariant 16: a revision reloads the facts from the DB by the job's subject"},
+        {"file": "services/marketing/generate/image.js", "regex": "buildImageBriefPrompt\\(\\{ facts, channel: job\\.channel, tone: job\\.tone, direction, feedback, revision: job\\.revision \\}\\)", "desc": "CORE invariant 16: a revision with notes is briefed in runImageJob, so its words pass the same guard"},
+        {"file": "services/marketing/generate/image.js", "regex": "\"cleanly aligned\\. Never invent characters, and add no other words, numbers or prices\\.\"", "desc": "CORE invariant 16: the words-exactly rule stays in code, not in an editable direction field"},
+        {"file": "services/marketing/generate/budget.js", "regex": "Math\\.max\\(j\\.renderCount \\|\\| 0, \\(j\\.assets && j\\.assets\\.length\\) \\|\\| 0\\)", "desc": "CORE invariant 16: revision renders count against the daily image limit"}
       ]
     },
     "shoofi-app": {
@@ -587,17 +594,21 @@
         "src/utils/marketing-approval.ts",
         "src/views/admin/marketing-drafts/MarketingDrafts.tsx",
         "src/components/admin/ApproveDialog.tsx",
+        "src/components/admin/PublishPlanField.tsx",
         "src/views/admin/marketing/hub/active-model.ts",
         "src/views/admin/marketing/hub/MarketingHub.tsx",
         "src/apis/admin/marketing-generate.ts",
         "src/views/admin/marketing/components/ContentStep.tsx",
-        "src/views/admin/marketing/use-prefill-image.ts"
+        "src/views/admin/marketing/use-prefill-image.ts",
+        "src/components/admin/image-generation/ImageRevision.tsx",
+        "src/components/admin/image-generation/DesignGuidelines.tsx",
+        "src/components/admin/image-generation/guidelines.ts"
       ],
       "patterns": [
         {
           "file": "src/apis/admin/marketing-generate.ts",
-          "regex": "axiosInstance\\.post\\(\"/admin/marketing/generate\", \\{ subject, channel, what: \"copy\", tone \\}\\)",
-          "desc": "CORE invariant 16: the wizard sends only the subject's identity, the channel and the tone - never a fact"
+          "regex": "axiosInstance\\.post\\(\"/admin/marketing/generate\", \\{ subject, channel, what: \"copy\", tone(?:, \\.\\.\\.\\(templateId \\? \\{ templateId \\} : \\{\\}\\))? \\}\\)",
+          "desc": "CORE invariant 16: the wizard sends only the subject's identity, the channel and the tone - never a fact (plus, where templates exist, the picked template's id - still a reference, never a fact)"
         },
         {
           "file": "src/utils/marketing-prefill.ts",
@@ -626,7 +637,7 @@
         },
         {"file": "src/utils/marketing-approval.ts", "regex": "export\\ const\\ DRAFT_ROLES\\ =\\ \\[\"master\",\\ \"admin\",\\ \"manager\"\\];", "desc": "CORE invariant 17: the admin's draft/approve roles match the server's DRAFT_ROLES / APPROVE_ROLES"},
         {"file": "src/utils/marketing-approval.ts", "regex": "if\\ \\(approval\\ ==\\ null\\)\\ return\\ doc\\ \\&\\&\\ doc\\.status\\ ===\\ \"scheduled\"\\ \\?\\ \"scheduled\"\\ :\\ \"live\";", "desc": "CORE invariant 17: no record = grandfathered = published on the admin side too"},
-        {"file": "src/components/admin/ApproveDialog.tsx", "regex": "publishAt\\ =\\ fromJerusalemInputValue\\(local\\);", "desc": "CORE invariant 17: a scheduled publish is picked in Israel time and sent as an instant, whatever the browser's zone"},
+        {"file": "src/components/admin/PublishPlanField.tsx", "regex": "const publishAt = fromJerusalemInputValue\\(plan\\.local\\);", "desc": "CORE invariant 17: a scheduled publish is picked in Israel time and sent as an instant, whatever the browser's zone"},
         {"file": "src/views/admin/ads/AdsList.tsx", "regex": "includePending=true", "desc": "CORE invariant 17: the admin banner list asks for drafts too, which /ads/list hides from customers"},
         {
           "file": "src/views/admin/marketing/hub/active-model.ts",
