@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@9a07c2fb / 2026-10-31 (CORE public coupon page - EVERYONE_COUPON_FILTER reverted; the two filters stay separate); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -78,7 +78,6 @@
           "hasClientFeature"
         ],
         "services/coupons/public-coupon.js": [
-          "EVERYONE_COUPON_FILTER",
           "UPCOMING_WINDOW_DAYS",
           "isPromotableCoupon",
           "couponTiming",
@@ -268,6 +267,11 @@
           "file": "routes/coupon.js",
           "regex": "return res\\.status\\(404\\)\\.json\\(\\{ message: 'Coupon not available', code: 'COUPON_NOT_AVAILABLE' \\}\\)",
           "desc": "CORE: personal, expired and unknown coupons are one identical 404"
+        },
+        {
+          "file": "services/coupons/public-coupon.js",
+          "regex": "if \\(isFlagOn\\(coupon\\.isCustomerSpecific\\)\\) return false;\\s*if \\(isFlagOn\\(coupon\\.isPurchasedCoupon\\)\\) return false;",
+          "desc": "CORE: a customer-specific or purchased coupon is never promotable - the same two the حملات row tests inline in lib/campaign-category-sync.js, deliberately not shared"
         },
         {
           "file": "services/coupons/public-coupon.js",

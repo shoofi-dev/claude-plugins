@@ -199,9 +199,11 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
   `restrictions` (categories / products / areas as booleans only). Never spread the coupon
   document into it: no customer, usage, split, funding or admin-name field.
 - **Only a promotable coupon** (`isPromotableCoupon`): not `isCustomerSpecific`,
-  `isPurchasedCoupon`, `onlyForOneCustomer`, nor `claimedByUserId`. The first two are
-  `EVERYONE_COUPON_FILTER`, the #325 definition the حملات row also reads (menu-catalog CORE
-  invariant 18). Plus `isActive`, not expired, and started or starting within
+  `isPurchasedCoupon`, `onlyForOneCustomer`, nor `claimedByUserId`. The first two are the #325
+  "every customer may see it" rule, which the حملات row applies too — as its own inline
+  `$nin: [true, 'true']` Mongo filter in `lib/campaign-category-sync.js`, never a shared
+  constant (menu-catalog CORE invariant 18); `isPromotableCoupon` is the stricter of the two.
+  Plus `isActive`, not expired, and started or starting within
   `UPCOMING_WINDOW_DAYS` (30). Anything else, an unknown or malformed id included, is the SAME
   404 `{code:'COUPON_NOT_AVAILABLE'}`, so a personal coupon cannot be told from a missing one.
 - **Where it works = checkout's store rule**: a non-empty `applicableTo.stores` limits
