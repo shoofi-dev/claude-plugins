@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (CORE invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -43,6 +43,7 @@
         "services/marketing/performance.js",
         "routes/marketing-performance.js",
         "services/marketing/campaign-impact.js",
+        "services/marketing/active.js",
         "services/customer/admin-access.js",
         "routes/teacher.js",
         "routes/marketing-generate.js",
@@ -84,6 +85,7 @@
         "services/marketing/viewer-key.js": ["deviceViewerKey"],
         "services/marketing/performance.js": ["getPerformance", "holdoutLift", "listOrderFacts", "pushCampaignsFor", "itemNames", "listCampaignImpact"],
         "services/marketing/campaign-impact.js": ["marketingCampaignImpact", "computeCampaignImpact", "computeDueImpacts", "recipientsOf", "impactsFor", "judge", "METHOD_VERSION"],
+        "services/marketing/active.js": ["getActiveMarketing", "WARNING_LABELS", "findCollisions", "bannerStatus", "loadDealBadges", "loadNewStoreBadges", "attachResults", "PUSH_COLLISION_MS"],
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
         "utils/auth-service.js": ["generateJWT", "toAuthJSON"],
         "utils/app-name-helper.js": ["getCustomerAppName"],
@@ -478,6 +480,14 @@
         {"file": "services/marketing/campaign-impact.js", "regex": "if \\(afterRead\\.unavailable\\.length\\) return \\{ skipped: \"stores_unavailable\"", "desc": "CORE invariant 11: an unreadable store DB means nothing is written; the next run retries"},
         {"file": "routes/marketing-performance.js", "regex": "\"/api/admin/marketing/campaign-impact\",\\n  auth\\.required,\\n  checkAdminRole\\(RESULTS_ROLES\\),", "desc": "CORE invariant 11: campaign impact is served behind the dashboard roles - wider than the master/admin analytics gate - never on an /api/analytics/growth route"},
         {"file": "services/database/DatabaseInitializationService.js", "regex": "db\\.marketingCampaignImpact = db\\.collection\\('marketingCampaignImpact'\\);", "desc": "CORE invariant 11: the campaign impact handle is registered"},
+        {"file": "routes/marketing-performance.js", "regex": "const ACTIVE_ROLES = \\[\"master\", \"admin\", \"manager\"\\];", "desc": "CORE invariant 11: the active list is owner-tier only (master named: no hierarchy)"},
+        {"file": "routes/marketing-performance.js", "regex": "\"/api/admin/marketing/active\",\\n  auth\\.required,\\n  checkAdminRole\\(ACTIVE_ROLES\\),", "desc": "CORE invariant 11: the active list's gate sits on its route line"},
+        {"file": "services/marketing/active.js", "regex": "if \\(start > nowIso\\) return \"scheduled\";\\n  if \\(end < nowIso\\) return \"ended_recently\";", "desc": "CORE invariant 11: a banner's status is /ads/valid's string compare, not a parsed date"},
+        {"file": "services/marketing/active.js", "regex": "else if \\(store\\.business_visible !== true\\) warnings\\.push\\(\"story_store_hidden\"\\);", "desc": "CORE invariant 11: a live story of a hidden store is flagged - /stories/valid never serves it"},
+        {"file": "services/marketing/active.js", "regex": "\\{ isActive: true \\},\\n      \\{ projection: \\{ titleHE: 1, titleAR: 1, startDate: 1, endDate: 1,", "desc": "CORE invariant 11: a note is live on isActive alone (the app ignores its dates)"},
+        {"file": "services/marketing/active.js", "regex": "if \\(!started \\|\\| started\\.getTime\\(\\) < now - PUSH_STUCK_MS\\) warnings\\.push\\(\"push_stuck_in_progress\"\\);", "desc": "CORE invariant 11: a push in_progress for over an hour is flagged stuck"},
+        {"file": "services/marketing/active.js", "regex": "\"execution\\.startedAt\": 1, \"execution\\.completedAt\": 1, \"execution\\.totalUsers\": 1, \"holdout\\.pct\": 1,", "desc": "CORE invariant 11: the active list projects push execution fields, never execution.results"},
+        {"file": "services/marketing/active.js", "regex": "const PUSH_COLLISION_MS = 24 \\* 3600 \\* 1000;", "desc": "CORE invariant 11: two pushes within 24h to overlapping areas are a collision"},
         {"file": "routes/marketing-generate.js", "regex": "const GENERATE_ROLES = \\[\"master\", \"admin\", \"manager\"\\];", "desc": "CORE invariant 16: content generation is owner-tier only"},
         {"file": "routes/marketing-generate.js", "regex": "const facts = await loadSubjectFacts\\(req\\.app\\.db, body\\.subject\\);", "desc": "CORE invariant 16: the facts are loaded from the DB by the subject's identity; nothing else in the body is read for them"},
         {"file": "services/marketing/generate/copy.js", "regex": "push: \\{ title: 40, body: 120 \\},\\s*note: \\{ title: 40, body: 120 \\},\\s*banner: \\{ title: 30, body: 60 \\},\\s*story: \\{ title: null, body: 80 \\},", "desc": "CORE invariant 16: the per-channel length limits"},
@@ -543,6 +553,8 @@
         "src/views/admin/customer-campaigns/PushCapSettings.tsx",
         "src/views/admin/customer-campaigns/HoldoutField.tsx",
         "src/views/admin/customer-campaigns/CustomerCampaignsList.tsx",
+        "src/views/admin/marketing/hub/active-model.ts",
+        "src/views/admin/marketing/hub/MarketingHub.tsx",
         "src/apis/admin/marketing-generate.ts",
         "src/views/admin/marketing/components/ContentStep.tsx",
         "src/views/admin/marketing/use-prefill-image.ts"
@@ -577,6 +589,16 @@
           "file": "src/views/admin/customer-campaigns/CustomerCampaignsList.tsx",
           "regex": "קבוצת ביקורת: \\{campaign\\.execution\\.holdoutCount\\}",
           "desc": "CORE invariant 12: the list shows holdoutCount in the results column"
+        },
+        {
+          "file": "src/views/admin/marketing/hub/active-model.ts",
+          "regex": "axiosInstance\\.get\\(\"/admin/marketing/active\"\\)",
+          "desc": "CORE invariant 11: the hub reads the active list and never recomputes a status"
+        },
+        {
+          "file": "src/views/admin/marketing/hub/active-model.ts",
+          "regex": "export const NO_SUBJECT_LABEL = \"ללא יעד\";",
+          "desc": "CORE invariant 11: items without a subject are grouped as ללא יעד"
         }
       ]
     }

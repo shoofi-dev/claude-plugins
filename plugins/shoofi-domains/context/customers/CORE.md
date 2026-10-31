@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -315,8 +315,35 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
        the queue ≤1.5s, never throws, then returns the touch for the body.
      - Never send anything beyond `marketingTouch` on `/api/order/create`: the route spreads
        `...parsedBodey` onto the order, so an extra field lands unsanitized.
-   Pinned by `test/integration/marketing-links.js` and `test/integration/marketing-attribution.js`
-   (server), `__tests__/services/marketing-events-queue.test.ts` (app).
+   - **The active list is read-only and keeps each channel's OWN rule** (2026-10-30).
+     `GET /api/admin/marketing/active` (`services/marketing/active.js`, in
+     `routes/marketing-performance.js`) lists every banner, story, launch popup, note,
+     customer-app push, coupon campaign (`couponCampaigns`), social publication and automatic
+     card badge (deal, "new") that is live, scheduled or ended in the last 7 days, as
+     `{channel, id, title{he,ar}, name, subject{kind,id,appName?,label,key}|null, status:
+     live|scheduled|ended_recently, startsAt, endsAt, targeting{everyone,areas,store,segment,
+     summary}, createdBy, createdAt, updatedAt, editPath, automatic, results{views,taps,orders}|null,
+     warnings[]}`, plus `collisions` (pushes within 24h to overlapping `cityAreaId`s; >1 live
+     banner per subject), `warningLabels`, `platform` and `sourceErrors`. Shape and rules:
+     shoofi-server `docs/marketing-attribution.md` "The active list".
+     - **Gate: `ACTIVE_ROLES` = master/admin/manager** (`auth.required` + `checkAdminRole` on the
+       route), narrower than `RESULTS_ROLES`: it names creators and links to edit forms only the
+       owner tier opens. The admin's מרכז שיווק (`/admin/marketing`) has the same sidebar roles.
+     - **It writes nothing** (no collection, no index build) and never reads
+       `shoofi.notifications`; push campaigns never project `execution.results`. Results come from
+       `performance.getPerformance` in batches of ≤200 item ids (a story sums its story + popup
+       placements; a push's views are `pushSent`).
+     - **Status = what the customer app experiences; a disagreement is a `warnings` code, never a
+       different status.** Banners use `/ads/valid`'s STRING compare (prod stores `YYYY-MM-DD`, so
+       a banner disappears at 00:00 UTC of its end date: `banner_end_day_excluded`); stories need
+       `business_visible: true` on the store (`story_store_hidden`) and a 50-year expiry reads as
+       none (`story_never_expires`); notes are live on `isActive` alone because `/notes/valid`
+       ignores their dates, and only the newest is shown; a push `in_progress` over an hour is
+       `push_stuck_in_progress`. Badges are computed, never written (menu-catalog invariant 18):
+       the card shows the newest running deal and a public coupon beats it. Never "fix" a status
+       here to match the stored dates; fix the channel, then this follows.
+   Pinned by `test/integration/marketing-links.js`, `test/integration/marketing-attribution.js` and
+   `test/integration/marketing-active.js` (server), `__tests__/services/marketing-events-queue.test.ts` (app).
 
 12. **Marketing pushes: opt-out and frequency cap apply inside `executeCampaign` ONLY, to
     customer-app audiences ONLY.** Every other push (order status, `feedback_request`,
