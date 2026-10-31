@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -42,7 +42,9 @@
         "services/marketing/daily-stats.js",
         "services/marketing/performance.js",
         "routes/marketing-performance.js",
-        "services/marketing/campaign-impact.js"
+        "services/marketing/campaign-impact.js",
+        "services/customer/admin-access.js",
+        "routes/teacher.js"
       ],
       "symbols": {
         "services/customer-campaigns/marketing-push-policy.js": [
@@ -276,6 +278,27 @@
           "regex": "\"schoolProject\\.studentIds\\.0\": \\{ \\$exists: false \\}",
           "desc": "school-project customers with no student linked are deactivated; the filter tolerates a concurrent re-add"
         },
+        {"file": "services/customer/admin-access.js", "regex": "const SCHOOL_SECTION_ROLES = \\[\"master\", \"admin\", \"manager\", \"viewer\"\\];", "desc": "CORE invariant 14: the school routes take the schools sidebar's roles, the same list as the registration routes"},
+        {"file": "services/customer/admin-access.js", "regex": "const SCHOOL_ADMIN = \\[auth\\.required, checkAdminRole\\(SCHOOL_SECTION_ROLES\\)\\];", "desc": "CORE invariant 14: auth.required alone passes a customer token; the role check keeps it out"},
+        {"file": "services/customer/admin-access.js", "regex": "const ADMIN_CREATE = \\[auth\\.required, adminCreateGate\\];", "desc": "CORE invariant 14: admin-create needs a token"},
+        {"file": "services/customer/admin-access.js", "regex": "if \\(hasAnyRole\\(req\\.auth, DASHBOARD_ROLES\\)\\) \\{[\\s\\S]*?const record = await mobileCallerRecord\\(req\\);\\n\\s+if \\(record && record\\.isAdmin\\) return next\\(\\);", "desc": "CORE invariant 14: admin-create also takes a mobile caller whose own record is isAdmin (the RN login screens; never role-only)"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\(\"/api/customer/create-school-project-batch\", \\.\\.\\.SCHOOL_ADMIN,", "desc": "reference 4: the class-list upload (creates customers) is admin-only"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\(\"/api/customer/delete-all-school-project-students\", \\.\\.\\.SCHOOL_ADMIN,", "desc": "reference 4: deleting a school's students is admin-only"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\(\"/api/customer/admin-create\", \\.\\.\\.ADMIN_CREATE, async \\(req, res\\) => \\{\\n(?:.*\\n){3,12}?\\s+const customerObj = \\{\\n\\s+phone: sanitize\\(req\\.body\\.phone\\),\\n\\s+created: new Date\\(\\),\\n\\s+\\};", "desc": "CORE invariant 14: admin-create is gated and stores only phone + created, so the body cannot set a role or flag"},
+        {"file": "routes/customer.js", "regex": "if \\(typeof req\\.body\\.phone !== \"string\"\\) \\{", "desc": "CORE invariant 14: admin-create refuses a non-string phone (an operator object would match an arbitrary customer)"},
+        {"file": "routes/customer.js", "regex": "customers\\.findOne\\(\\{ phone: customerObj\\.phone \\}\\)", "desc": "CORE invariant 14: admin-create looks up by the sanitized phone, never the raw body"},
+        {"file": "routes/shoofi-admin.js", "regex": "router\\.delete\\(\"/api/admin/schools/:id\", \\.\\.\\.SCHOOL_ADMIN,", "desc": "reference 4: the admin school routes are SCHOOL_ADMIN"},
+        {"file": "routes/shoofi-admin.js", "regex": "router\\.post\\(\"/api/admin/school-settings\", \\.\\.\\.SCHOOL_ADMIN,", "desc": "reference 4: the school hours / payment-methods write is SCHOOL_ADMIN"},
+        {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/admin/school-settings\", async", "desc": "reference 4: the school-settings read stays public (the customer cart reads it)"},
+        {"file": "routes/teacher.js", "regex": "router\\.post\\(\"/api/admin/teacher/create\", \\.\\.\\.DASHBOARD_ADMIN,", "desc": "reference 4: the teacher routes take a dashboard role"},
+        {"file": "routes/customer.js", "regex": "const isCode = \\(value\\) => value !== null && value !== undefined && value !== \"\";\\n\\s+if \\(\\n\\s+\\(isCode\\(customer\\.authCode\\) && isCode\\(customerObj\\.authCode\\) && customer\\.authCode == customerObj\\.authCode\\) \\|\\|", "desc": "CORE invariant 15: the OTP login compares only when both the stored and the sent code are present (null == undefined let a bare phone log in)"},
+        {"file": "routes/customer.js", "regex": "const \\{ authCode: _sentCode, \\.\\.\\.newCustomerReply \\} = customerObj;\\n\\s+res\\.status\\(200\\)\\.json\\(newCustomerReply\\);", "desc": "CORE invariant 15: POST /create never echoes the code it just sent"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\(\"/api/customer/search-customer\", auth\\.required, checkAdminRole\\(CUSTOMER_ADMIN_ROLES\\),", "desc": "CORE invariant 15: customer search (returns the pending OTP) is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "authCode: mayReadPendingCode && customer\\.authCode", "desc": "CORE invariant 15: the pending OTP is included only for a dashboard-role caller"},
+        {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/:customerId', auth\\.required, checkAdminRole\\(CUSTOMER_ADMIN_ROLES\\),", "desc": "reference 5: customer by id is dashboard-only, own id included"},
+        {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/:customerId/status', auth\\.required, checkAdminRole\\(CUSTOMER_ADMIN_ROLES\\),", "desc": "reference 5: customer badges are dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/:customerId/whatsapp-summary', auth\\.required, checkAdminRole\\(CUSTOMER_ADMIN_ROLES\\),", "desc": "reference 5: the respond.io conversation summary is dashboard-only"},
+        {"file": "routes/customer.js", "regex": "router\\.post\\('/api/customer/:customerId/update-address-to-current-location', auth\\.required, checkAdminRole\\(CUSTOMER_ADMIN_ROLES\\),", "desc": "reference 5: support's address fix (writes order, customer and booking) is dashboard-only"},
         {
           "file": "routes/auth.js",
           "regex": "app-type",
