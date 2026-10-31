@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -436,6 +436,56 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       "to handle later" list describe the state before this change.
     Pinned by shoofi-server `test/integration/customer-search-admin-auth.js` and
     `test/integration/otp-verify-requires-code.js`.
+16. **Generated marketing text states only the subject's facts, loaded from the DB.**
+    `POST /api/admin/marketing/generate` (`routes/marketing-generate.js`, shoofi-server
+    `feat/marketing-generate`, 2026-10-30) writes the AR + HE text for a banner / story / note /
+    push, or draws a banner or story image, for the admin wizard's "תוכן" step. Shoofi-server
+    `docs/marketing-generate.md` has the detail.
+    - **Gate:** `[auth.required, checkAdminRole(GENERATE_ROLES)]`, `GENERATE_ROLES =
+      ["master", "admin", "manager"]`, on all three routes (the POST, `GET /:jobId`,
+      `GET /:jobId/images/:imageId`). Pinned in `test/integration/marketing-routes-auth.js` with
+      the other marketing write paths (invariant 10).
+    - **The body names the subject, nothing else.** `loadSubjectFacts(req.app.db, body.subject)`
+      (`services/marketing/generate/facts.js`) reads the coupon, deal, product, store, "new"
+      window (`launchState`) or app page itself. Never add a fact field to the request. A
+      subject customers can't use now is refused with a 409 `code` before any AI call:
+      `personal` (the same rule as the wizard's `isPromotableCoupon`), `inactive`, `expired`,
+      `hidden`, `not_new`. This is invariant 11's "promote existing offers only" at the content
+      layer.
+    - **The guard is the control, not the prompt.** `guard.js checkText` rejects any generated
+      percentage, ₪ amount, other number, date, time, Latin word (a code), month or weekday
+      name, "today only" / "tomorrow", "free" or "discount" that the facts do not allow
+      (Arabic-Indic digits normalised first). One bad field drops the whole AR + HE idea; the
+      retry is told why; none left → 422 `no_valid_copy`. Never "repair" a rejected token. The
+      image job runs the same guard on its headline / caption before anything renders. It
+      cannot read the picture back: a generator may still draw an extra word on a banner.
+    - **Limits** (`copy.js CHANNEL_LIMITS`): push and note title ≤ 40 / body ≤ 120; banner
+      title ≤ 30 / body ≤ 60; story caption ≤ 80, no title.
+    - **Images:** banner 16:9, TWO renders (Arabic headline, Hebrew headline), because the app
+      shows no text over a banner and picks `imageAR` / `imageHE` by language. Story 9:16, ONE
+      render with NO text, because a story has one media file and the viewer prints
+      `caption.ar` / `caption.he`. A product's photo is the `subject` reference; a store logo
+      is never sent.
+    - **Renders reuse the bridge's social loop.** `render-service.js claimOnce` hands out a
+      `shoofi.marketingGenerations` render (same job shape, `postId` = the job) when no social
+      render is queued, and `finishRender` routes a non-social id to
+      `services/marketing/generate/renders.js`. Social renders go first. The Spaces key stays on
+      the server. No `renders` bridge → the job fails `no_renderer`, never a silent queue.
+      `marketingGenerations` has a 30-day TTL and must stay registered in
+      `DatabaseInitializationService` (`social-posts-collections.js` scans the folder).
+    - **Every call is logged and priced** (menu-catalog invariant 16): `MODELS.marketing`
+      (`claude-opus-5-5`), features `marketing copy` / `marketing image brief`; each finished
+      render is a `marketing image render` row (backend `artlist`, `costUsd: 0`,
+      `meta.credits: 130`). A daily guard (`budget.js`) refuses with 429 past
+      `shoofi.store {id:1}.marketingAiDailyBudgetUsd` (default $3) or
+      `marketingImageDailyLimit` (default 20 renders).
+    - **Nothing is published here.** The wizard opens the channel's own form prefilled
+      (`?prefill=` gains `image: {jobId, id|idAr|idHe, url…}`; the form fetches the bytes
+      through `GET …/images/:imageId` and attaches them as an upload), and the person saves it
+      through the channel's own route — which still runs invariant 11's `resolveLink`.
+    - ⚠️ **The Hebrew voice is pending the owner's sign-off** (`voice.js HEBREW_VOICE`, a
+      written spec; nothing was measured for Hebrew). The Arabic is the social `VOICE`.
+    Pinned by shoofi-server `test/integration/marketing-generate.js`.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
