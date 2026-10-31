@@ -1,7 +1,7 @@
 ---
 operator: social-marketing
 class: B (operator / department head — ships drafts, not code)
-last-verified: shoofi-server@main / 2026-10-27
+last-verified: shoofi-server@feat/marketing-generate (§1d Hebrew for in-app campaign text) / 2026-10-30; shoofi-server@main / 2026-10-27
 scope: reads shoofi-server data read-only; writes drafts. Never publishes, never holds the Meta token.
 ---
 
@@ -59,9 +59,21 @@ are annoyed. Take vocabulary, script, register and length from it. Take nothing 
 Safe vocabulary observed in the data: سخن، جاهز، يوصل، بدي، مش، بس، شو، تمام، وين، خلص، فش،
 ماشي، هسا، الشليح، عالعافية، يعطيك العافية، يسلمو.
 
-### 1d. Hebrew — out of scope for now
+### 1d. Hebrew — social posts still Arabic; in-app campaign text is AR + HE
 3.7% of customers write in Hebrew (a separate segment, not code-switching). **Decision
-2026-09-21: Arabic only for now.** Do not produce Hebrew posts until a human asks.
+2026-09-21: Arabic only for now.** Do not produce Hebrew *posts* until a human asks.
+
+**Owner decision 5 (2026-10-28) reverses this for campaign content: Arabic AND Hebrew**, and
+asks for Hebrew in this social flow too. The social pipeline (`post-service.js`) has not been
+changed yet, so posts stay Arabic. The in-app marketing generator (shoofi-server
+`services/marketing/generate/`, 2026-10-30, customers CORE invariant 16) already writes both:
+- Arabic = this operator's voice C, the same `VOICE` constant (now read in two places — change
+  it here, in `constants.js`, and nothing else).
+- Hebrew = a written spec, `HEBREW_VOICE` in `services/marketing/generate/voice.js`: plural
+  imperative (הזמינו), one line, plain Hebrew, no English, ≤ 1 emoji, the courier is "שליח", not a
+  translation of the Arabic. **Nothing was measured** — there is no Hebrew corpus like §1's.
+  ⚠️ **Pending the owner's sign-off on the Hebrew register.** Until then every Hebrew text is a
+  draft a person edits, and this operator does not produce Hebrew posts.
 
 ---
 
@@ -197,7 +209,8 @@ reference real product photos we already have.
    server's env, never here. The system-user token (with the insights permissions, §3b) was
    generated 2026-10-26; it belongs in the App Platform app's env, never here.
 2. **Cadence**, once manual runs have been tested.
-3. **Hebrew**, for the 3.7%.
+3. **Hebrew**, for the 3.7% — the owner decided AR + HE (2026-10-28); the Hebrew register
+   (`HEBREW_VOICE`, §1d) still needs the owner's sign-off.
 4. ~~The auth gap in §3a~~ — fixed 2026-09-21; §3a now describes the gate as enforced.
 
 ## Definition of done
