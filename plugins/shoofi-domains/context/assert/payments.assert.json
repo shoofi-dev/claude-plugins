@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@9a07c2fb / 2026-10-31 (EVERYONE_COUPON_FILTER revert); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -78,7 +78,6 @@
           "hasClientFeature"
         ],
         "services/coupons/public-coupon.js": [
-          "EVERYONE_COUPON_FILTER",
           "UPCOMING_WINDOW_DAYS",
           "isPromotableCoupon",
           "couponTiming",

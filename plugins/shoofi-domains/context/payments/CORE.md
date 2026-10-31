@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@9a07c2fb / 2026-10-31 (EVERYONE_COUPON_FILTER revert); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -199,9 +199,12 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
   `restrictions` (categories / products / areas as booleans only). Never spread the coupon
   document into it: no customer, usage, split, funding or admin-name field.
 - **Only a promotable coupon** (`isPromotableCoupon`): not `isCustomerSpecific`,
-  `isPurchasedCoupon`, `onlyForOneCustomer`, nor `claimedByUserId`. The first two are
-  `EVERYONE_COUPON_FILTER`, the #325 definition the حملات row also reads (menu-catalog CORE
-  invariant 18). Plus `isActive`, not expired, and started or starting within
+  `isPurchasedCoupon`, `onlyForOneCustomer`, nor `claimedByUserId`. The first two are the #325
+  rule the حملات row applies too — but as its own `$nin: [true, 'true']` literals in
+  `lib/campaign-category-sync.js`, deliberately NOT a shared constant: this test is strictly
+  stricter, and a shared `EVERYONE_COUPON_FILTER` was tried and reverted on 2026-10-31
+  (menu-catalog CORE invariant 18 — do not re-share them without re-pinning first). Plus
+  `isActive`, not expired, and started or starting within
   `UPCOMING_WINDOW_DAYS` (30). Anything else, an unknown or malformed id included, is the SAME
   404 `{code:'COUPON_NOT_AVAILABLE'}`, so a personal coupon cannot be told from a missing one.
 - **Where it works = checkout's store rule**: a non-empty `applicableTo.stores` limits
