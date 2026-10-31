@@ -14,15 +14,32 @@
 
 | Operator | Owns |
 |---|---|
+| `marketing-manager` | **Leads marketing.** Every marketing ask enters here; it knows the fleet, the skills and the admin marketing hub, and routes the work — running a specialist's playbook itself, handing back to the session for agents only the session can call, and stopping at every human gate. |
 | `competitive-intel` | Haat + Tira Eat — the coverage gap, price gaps, menu coverage, promos, ratings, and competitor↔our-store matching |
 | `social-marketing` | Shoofi's own Facebook/Instagram content — Arabic only, one account. Drafts posts, stories and ad copy against live platform data. **Never publishes.** |
 
-Planned: `marketing-growth`, `merchant-success`, `retention-crm`, `bizops-brief`, `support-cx`.
+Planned: `merchant-success`, `retention-crm`, `bizops-brief`, `support-cx`.
 
-Invoke namespaced: **`shoofi-operators:competitive-intel`**, **`shoofi-operators:social-marketing`**.
+Invoke namespaced: **`shoofi-operators:marketing-manager`**, **`shoofi-operators:competitive-intel`**,
+**`shoofi-operators:social-marketing`**.
 
-The two do not overlap: what *competitors* post is `competitive-intel`'s social phase; what
+`competitive-intel` and `social-marketing` do not overlap: what *competitors* post is `competitive-intel`'s social phase; what
 *we* post is `social-marketing`. Neither reaches into the other.
+
+## Skills
+
+| Skill | Makes |
+|---|---|
+| `/shoofi-operators:guided-reel` | A guided explainer reel: Shadi (the 3D courier mascot) explains a feature in Arabic and Hebrew, lip-synced, beside a phone showing real app screens with the key item zoomed out. Four human gates (script, voice, clip credits, final). Builder: `skills/guided-reel/scripts/reel.py` driven by a `reel.json`. |
+
+## The marketing manager and delegation
+
+A subagent cannot start another subagent, so `marketing-manager` "delegates" three ways:
+it runs a specialist's playbook itself after loading that specialist's doc (social posts,
+reels), it ends its turn with a `HAND-OFF →` block the session passes to an agent only the
+session can call (a Class A owner, `competitive-intel`), or it stops at a gate for a person
+(script approval, Artlist credits). It has **no `tools:` line on purpose**: it needs the Artlist
+connector's tools, whose names depend on how the connector is installed.
 
 ## The house pattern — approval before trust
 
@@ -59,14 +76,23 @@ answered with evidence rather than argument.
 
 ```
 .claude-plugin/plugin.json
+agents/marketing-manager.md              # the lead: routing, delegation, hard limits
 agents/competitive-intel.md              # mission, hard limits, hand-offs, definition of done
 agents/social-marketing.md
+context/marketing-manager/CORE.md        # ALWAYS read: owner decisions, the fleet, routing,
+                                         #   the admin marketing hub + endpoints, results
 context/competitive-intel/CORE.md        # ALWAYS read: competitor endpoints + field lists,
                                          #   the two asymmetries, the matching design,
                                          #   the mapping collection, open questions
 context/social-marketing/CORE.md         # ALWAYS read: the measured voice spec and its
                                          #   evidence, the account model, the approval
                                          #   chain, the coupon rule, what exists today
+skills/guided-reel/SKILL.md              # Shadi explainer reel: steps + gates
+skills/guided-reel/scripts/reel.py       #   the builder (Chrome renders, ffmpeg composites)
+skills/guided-reel/assets/shadi/         #   blue-screen poses: stand.png, point.png
+skills/guided-reel/references/           #   shadi.md (look, voice, lip-sync), screens.md,
+                                         #   reel-json.md (spec format, QA, flicker)
+skills/guided-reel/examples/invite-friend/reel.json
 ```
 
 ## Adding an operator
