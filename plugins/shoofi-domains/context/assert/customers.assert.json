@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (CORE invariant 11 active list); shoofi-server@feat/marketing-image-revise / 2026-10-31 (CORE invariant 16 revise + design guidelines); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (CORE invariant 11 active list); shoofi-server@feat/marketing-templates + shoofi-delivery-web@feat/marketing-templates / 2026-10-31 (CORE invariant 18 learned templates, reference 5d); shoofi-server@feat/marketing-image-revise / 2026-10-31 (CORE invariant 16 revise + design guidelines); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -59,6 +59,11 @@
         "services/marketing/generate/renders.js",
         "services/marketing/generate/budget.js",
         "services/marketing/generate/voice.js",
+        "services/marketing/templates.js",
+        "routes/marketing-templates.js",
+        "utils/crons/marketing-templates-cron.js",
+        "docs/marketing-templates.md",
+        "test/integration/marketing-templates.js",
         "docs/marketing-generate.md",
         "test/integration/marketing-generate.js"
       ],
@@ -69,6 +74,9 @@
         "services/marketing/generate/copy.js": ["CHANNEL_LIMITS", "generateCopy", "validateVariants", "no_valid_copy", "MAX_ATTEMPTS"],
         "services/marketing/generate/image.js": ["createImageJob", "runImageJob", "composeRenderPrompt", "no_renderer", "marketingGenerations", "requestRevision", "rerender", "restoreVersion", "revisionBlock", "bannerLayout", "storyLayout"],
         "services/social-posts/brand-direction.js": ["bannerLayout", "storyLayout", "getDirection"],
+        "services/marketing/templates.js": ["learnChannel", "runTemplates", "templateForGeneration", "hasFacts", "MAX_APPROVED", "MAX_PENDING", "marketing templates"],
+        "routes/marketing-templates.js": ["TEMPLATE_ROLES", "runMarketingTemplates"],
+        "utils/crons/marketing-templates-cron.js": ["cron:marketing-templates", "acquireLock"],
         "services/marketing/generate/renders.js": ["claimOnce", "notMine", "marketing image render", "CREDITS_PER_RENDER"],
         "services/marketing/generate/budget.js": ["marketingAiDailyBudgetUsd", "marketingImageDailyLimit", "UNPRICED_BUDGET_PRICE"],
         "services/marketing/generate/voice.js": ["HEBREW_VOICE", "ARABIC_VOICE"],
@@ -531,9 +539,18 @@
         {"file": "routes/marketing-generate.js", "regex": "router\\.post\\(\"/api/admin/marketing/generate/:jobId/revise\", \\.\\.\\.ownerTier,", "desc": "CORE invariant 16: revising a picture is owner-tier"},
         {"file": "routes/marketing-generate.js", "regex": "router\\.post\\(\"/api/admin/marketing/generate/:jobId/versions/:versionId/restore\", \\.\\.\\.ownerTier,", "desc": "CORE invariant 16: restoring a version is owner-tier"},
         {"file": "routes/marketing-generate.js", "regex": "const facts = await loadSubjectFacts\\(req\\.app\\.db, job\\.subject\\);", "desc": "CORE invariant 16: a revision reloads the facts from the DB by the job's subject"},
-        {"file": "services/marketing/generate/image.js", "regex": "buildImageBriefPrompt\\(\\{ facts, channel: job\\.channel, tone: job\\.tone, direction, feedback, revision: job\\.revision(?:, template: job\\.template)? \\}\\)", "desc": "CORE invariant 16: a revision with notes is briefed in runImageJob, so its words pass the same guard"},
+        {"file": "services/marketing/generate/image.js", "regex": "buildImageBriefPrompt\\(\\{ facts, channel: job\\.channel, tone: job\\.tone, direction, feedback, revision: job\\.revision, template: job\\.template \\}\\)", "desc": "CORE invariant 16 + 18: a revision with notes is briefed in runImageJob, so its words pass the same guard - and the job's own template snapshot rides into that same brief, never a style from the request"},
         {"file": "services/marketing/generate/image.js", "regex": "\"cleanly aligned\\. Never invent characters, and add no other words, numbers or prices\\.\"", "desc": "CORE invariant 16: the words-exactly rule stays in code, not in an editable direction field"},
-        {"file": "services/marketing/generate/budget.js", "regex": "Math\\.max\\(j\\.renderCount \\|\\| 0, \\(j\\.assets && j\\.assets\\.length\\) \\|\\| 0\\)", "desc": "CORE invariant 16: revision renders count against the daily image limit"}
+        {"file": "services/marketing/generate/budget.js", "regex": "Math\\.max\\(j\\.renderCount \\|\\| 0, \\(j\\.assets && j\\.assets\\.length\\) \\|\\| 0\\)", "desc": "CORE invariant 16: revision renders count against the daily image limit"},
+        {"file": "services/marketing/templates.js", "regex": "const published = \\(doc\\) => !doc\\.approval \\|\\| doc\\.approval\\.status === \"published\";", "desc": "CORE invariant 18: templates learn from published items only, never drafts"},
+        {"file": "services/marketing/templates.js", "regex": "status: \"suggested\",\\n      name,", "desc": "CORE invariant 18: the daily job only ever writes suggested templates"},
+        {"file": "services/marketing/templates.js", "regex": "const MAX_APPROVED = 4;\\nconst MAX_PENDING = 2;", "desc": "CORE invariant 18: at most 4 approved and 2 suggested per channel"},
+        {"file": "services/marketing/templates.js", "regex": "return /\\[0-9٠-٩\\]\\|%\\|₪\\|NIS\\|shekel/i\\.test\\(s\\);", "desc": "CORE invariant 18: a template style with a number, percent or currency is dropped - templates carry no facts"},
+        {"file": "services/marketing/templates.js", "regex": "_id: ObjectId\\(String\\(templateId\\)\\), channel, status: \"approved\"", "desc": "CORE invariant 18: a generation takes only an approved template of its own channel, loaded from the DB"},
+        {"file": "services/marketing/templates.js", "regex": "channel === \"story\" && story \\? \\{ id: `template-\\$\\{t\\._id\\}`, role: \"style\"", "desc": "CORE invariant 18: only a story's (text-free) example is a generator reference, never a banner's"},
+        {"file": "routes/marketing-templates.js", "regex": "const TEMPLATE_ROLES = \\[\"master\", \"admin\", \"manager\"\\];", "desc": "CORE invariant 18: templates are owner-tier"},
+        {"file": "routes/marketing-generate.js", "regex": "const template = await templateForGeneration\\(shoofiDb, body\\.templateId, channel\\);", "desc": "CORE invariant 18: the generator resolves the template by id on the server"},
+        {"file": "services/database/DatabaseInitializationService.js", "regex": "db\\.marketingTemplates = db\\.collection\\('marketingTemplates'\\);", "desc": "CORE invariant 18: the templates collection is registered"}
       ]
     },
     "shoofi-app": {
@@ -602,13 +619,21 @@
         "src/views/admin/marketing/use-prefill-image.ts",
         "src/components/admin/image-generation/ImageRevision.tsx",
         "src/components/admin/image-generation/DesignGuidelines.tsx",
-        "src/components/admin/image-generation/guidelines.ts"
+        "src/components/admin/image-generation/guidelines.ts",
+        "src/apis/admin/marketing-templates.ts",
+        "src/views/admin/marketing/components/TemplatePicker.tsx",
+        "src/views/admin/marketing-templates/MarketingTemplates.tsx"
       ],
       "patterns": [
         {
+          "file": "src/views/admin/marketing/components/TemplatePicker.tsx",
+          "regex": "if \\(!next \\|\\| list\\) return;\\n    try \\{\\n      const out = await listTemplatesApi\\(\\{ channel, status: \"approved\" \\}\\);",
+          "desc": "CORE invariant 18: templates on create are optional - nothing is fetched until clicked, and only approved ones of the channel"
+        },
+        {
           "file": "src/apis/admin/marketing-generate.ts",
           "regex": "axiosInstance\\.post\\(\"/admin/marketing/generate\", \\{ subject, channel, what: \"copy\", tone(?:, \\.\\.\\.\\(templateId \\? \\{ templateId \\} : \\{\\}\\))? \\}\\)",
-          "desc": "CORE invariant 16: the wizard sends only the subject's identity, the channel and the tone - never a fact (plus, where templates exist, the picked template's id - still a reference, never a fact)"
+          "desc": "CORE invariant 16 + 18: the wizard sends only the subject's identity, the channel, the tone and (where templates exist) the picked template's id - never a fact and never a style"
         },
         {
           "file": "src/utils/marketing-prefill.ts",

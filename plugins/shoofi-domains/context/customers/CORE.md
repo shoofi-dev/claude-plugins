@@ -631,6 +631,33 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
     checked atomically, push immediate/scheduled/revert, the body can't set the state, the
     8-role matrix and audit.
 
+18. **Marketing templates are learned from PUBLISHED items, carry no facts, and are offered only
+    after the owner approves them** (2026-10-31, shoofi-server `services/marketing/templates.js`,
+    `docs/marketing-templates.md`). A daily cron (`utils/crons/marketing-templates-cron.js`,
+    04:40 Israel, Redis lock) learns 3–4 reusable designs per channel. Banner and story get an
+    AI design recipe; note and push get a wording pattern. The admin wizard offers them,
+    optionally, on create.
+    - **Sources = published only:** no `approval` or `approval.status: "published"` (inv 17); a
+      push must be completed / in progress / scheduled. Last 60 days, ranked by tap-through from
+      `marketingDailyStats` (≥ 50 impressions), else by recency. Never learn from a draft.
+    - **The job only writes `suggested`.** `approved` comes from the owner via
+      `POST /api/admin/marketing/templates/:id/approve` (master / admin / manager). Limits: ≤ 4
+      approved per channel (409 `full`), ≤ 2 suggested. A match refreshes `examples` but never
+      rewrites an approved template's `style`. Rejected templates are listed to the model as
+      "never suggest again".
+    - **No facts in a template:** `hasFacts` drops a `style` with a digit, `%`, `₪`, "NIS" or
+      "shekel". A banner's example picture is never sent as a generator reference (an old
+      headline is printed on it); a story's is, as `style`.
+    - **Generation takes a template by id only.** `POST /api/admin/marketing/generate`
+      `templateId` → `templateForGeneration`: approved + same channel, else 400 `template`. The
+      style comes from the DB, never the request. The words still pass inv 16's guard. An image
+      job snapshots `{id, name, style}`.
+    - One Claude call per channel per day (pictures attached → API backend), feature
+      `marketing templates`, which counts against the marketing daily budget. The run checks the
+      budget before each channel.
+    Pinned by shoofi-server `test/integration/marketing-templates.js` and
+    `marketing-routes-auth.js`.
+
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
 - **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin
