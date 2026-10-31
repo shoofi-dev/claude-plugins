@@ -1510,7 +1510,7 @@
         },
         {
           "file": "services/ordering-intelligence/suggest-service.js",
-          "regex": "const forClaude = applyProfile\\(docs, taste, profile\\);\\s*const ai = await aiChatTurn\\(\\{\\s*shoofiDb, text, lang, history, docs: forClaude\\.docs, stores, closedStores, taste: forClaude\\.taste, customerId, now,",
+          "regex": "(?:const forClaude = applyProfile\\(docs, taste, profile\\);\\s*const ai = await aiChatTurn\\(\\{ shoofiDb, text, lang, history, docs: forClaude\\.docs, stores, closedStores, taste: forClaude\\.taste, customerId, now \\}\\)|const forClaude = applyProfile\\(docs, taste, profile\\);\\s*const ai = await aiChatTurn\\(\\{\\s*shoofiDb, text, lang, history, docs: forClaude\\.docs, stores, closedStores, taste: forClaude\\.taste, customerId, now,)",
           "desc": "doc CORE invariant 18 / reference §7f: Claude picks only from the avoid-filtered docs and gets the PROFILE-APPLIED taste, so rejected facts hold on the Claude path too"
         },
         {
@@ -1850,7 +1850,7 @@
         },
         {
           "file": "services/ordering-intelligence/suggest-service.js",
-          "regex": "const cards = byOptionFit\\(dropAtServe\\(live, docsByKey, avoid, craving, trace\\), optionRequest\\)\\.slice\\(0, limit\\);",
+          "regex": "(?:const cards = dropAtServe\\(live, docsByKey, avoid, craving, trace\\)\\.slice\\(0, limit\\);|const cards = byOptionFit\\(dropAtServe\\(live, docsByKey, avoid, craving, trace\\), optionRequest\\)\\.slice\\(0, limit\\);)",
           "desc": "doc CORE invariant 18: the last check at serve time, on both paths"
         },
         {
@@ -2055,7 +2055,7 @@
         },
         {
           "file": "services/ordering-intelligence/suggest-service.js",
-          "regex": "const cards = byOptionFit\\(dropAtServe\\(live, docsByKey, avoid, craving, trace\\), optionRequest\\)\\.slice\\(0, limit\\);\\n\\s*const served = await topUpSeen\\(ranked, cards, \\{ limit, dbFor, docsByKey, avoid, craving, trace \\}\\);",
+          "regex": "(?:const cards = dropAtServe\\(live, docsByKey, avoid, craving, trace\\)\\.slice\\(0, limit\\);\\n\\s*const served = await topUpSeen\\(ranked, cards, \\{ limit, dbFor, docsByKey, avoid, craving, trace \\}\\);|const cards = byOptionFit\\(dropAtServe\\(live, docsByKey, avoid, craving, trace\\), optionRequest\\)\\.slice\\(0, limit\\);\\n\\s*const served = await topUpSeen\\(ranked, cards, \\{ limit, dbFor, docsByKey, avoid, craving, trace \\}\\);)",
           "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the top-up is decided on the cards that passed the live re-check and the last check"
         },
         {
@@ -2425,17 +2425,17 @@
         },
         {
           "file": "hooks/useChatAddToCart.ts",
-          "regex": "if \\(twinOrderStore\\?\\.isTwinModeActive \\|\\| twinCartStore\\.cartItems\\.length > 0\\) return \\{ ok: false, reason: \"twin\" \\};\\n\\s*if \\(cartStore\\.cartItems\\.length > 0 && \\(await cartStore\\.getIsSchoolProject\\(\\)\\)\\) return \\{ ok: false, reason: \"school\" \\};",
+          "regex": "(?:if \\(twinOrderStore\\?\\.isTwinModeActive \\|\\| twinCartStore\\.cartItems\\.length > 0\\) return fallback\\(card, \"twin\"\\);\\n\\s*if \\(cartStore\\.cartItems\\.length > 0 && \\(await cartStore\\.getIsSchoolProject\\(\\)\\)\\) return fallback\\(card, \"school\"\\);|if \\(twinOrderStore\\?\\.isTwinModeActive \\|\\| twinCartStore\\.cartItems\\.length > 0\\) return \\{ ok: false, reason: \"twin\" \\};\\n\\s*if \\(cartStore\\.cartItems\\.length > 0 && \\(await cartStore\\.getIsSchoolProject\\(\\)\\)\\) return \\{ ok: false, reason: \"school\" \\};)",
           "desc": "doc CORE invariant 19 / reference §7f: twin orders and a school cart open the store instead of a chat add"
         },
         {
           "file": "hooks/useChatAddToCart.ts",
-          "regex": "if \\(storeData\\.isCheckAge && !\\(await AsyncStorage\\.getItem\\(\"@age_check_approved\"\\)\\)\\) return \\{ ok: false, reason: \"age_check\" \\};",
+          "regex": "(?:if \\(storeData\\.isCheckAge && !\\(await AsyncStorage\\.getItem\\(\"@age_check_approved\"\\)\\)\\) return fallback\\(card, \"age_check\"\\);|if \\(storeData\\.isCheckAge && !\\(await AsyncStorage\\.getItem\\(\"@age_check_approved\"\\)\\)\\) return \\{ ok: false, reason: \"age_check\" \\};)",
           "desc": "doc CORE invariant 19 / reference §7f: an age-checked store opens the store (its age gate) instead"
         },
         {
           "file": "hooks/useChatAddToCart.ts",
-          "regex": "if \\(raw && !support\\.ok\\) return \\{ ok: false, reason: \\(support as any\\)\\.reason \\};",
+          "regex": "(?:if \\(raw && !support\\.ok\\) return fallback\\(card, \\(support as any\\)\\.reason\\);|if \\(raw && !support\\.ok\\) return \\{ ok: false, reason: \\(support as any\\)\\.reason \\};)",
           "desc": "doc CORE invariant 19: whatever chatSheetSupport refuses opens the store at the dish"
         },
         {
