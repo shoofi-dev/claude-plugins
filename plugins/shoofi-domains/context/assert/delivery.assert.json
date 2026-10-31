@@ -492,6 +492,81 @@
           "file": "routes/delivery/driver.js",
           "regex": "driver\\.companyId !== admin\\.companyId",
           "desc": "the company-admin handlers refuse a driver outside the admin's company with a strict compare of two STRING companyIds (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "const deliveryOwnerOrDashboard = deliveryOwnerAccess\\(\\{ customer: true, partner: true, driver: true \\}\\)",
+          "desc": "book/:bookId takes a dashboard role or the delivery's own customer, store or driver (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "const storeOwnerOrDashboard = deliveryOwnerAccess\\(\\{ partner: true \\}\\)",
+          "desc": "order/:orderId/driver and store/order/cancel take a dashboard role or the delivery's own store only (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "req\\.headers\\[\"app-type\"\\] === ADMIN_APP_TYPE &&[\\s\\S]{0,120}DASHBOARD_ROLES\\.some",
+          "desc": "the dashboard branch of the owner gate is an admin-web token with any of the ONE dashboard role list (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "return \\{ appName: String\\(user\\.appName\\) \\}",
+          "desc": "a partner token's deliveries are those whose appName is its storeUsers.appName, read from the token's own record (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "\"order\\.customerId\": \\{ \\$in: tokenIds \\}",
+          "desc": "a customer token's deliveries are those whose order.customerId is the token id, string or ObjectId (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "me\\.role === \"admin\" \\? idVariants\\(me\\.companyId\\)",
+          "desc": "only a company admin's driver token also reaches its company's deliveries, by its STRING companyId matched in both shapes (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "return req\\.deliveryScope \\? \\{ \\$and: \\[query, req\\.deliveryScope\\] \\} : query",
+          "desc": "the owner filter is ANDed into the handler's own query, so another owner's delivery is not found; a dashboard caller's query is unchanged (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "router\\.get\\(\"/api/delivery/book/:bookId\", \\.\\.\\.deliveryOwnerOrDashboard, async",
+          "desc": "the customer app's ETA poll is gated per owner, not by role: a role gate would 403 every customer silently (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "router\\.get\\(\"/api/delivery/order/:orderId/driver\", \\.\\.\\.storeOwnerOrDashboard, async",
+          "desc": "the partner's driver row reads only its own store's deliveries (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "router\\.post\\(\"/api/delivery/store/order/cancel\", \\.\\.\\.storeOwnerOrDashboard, async",
+          "desc": "only the delivery's own store (or staff) may cancel it as the store (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "router\\.post\\(\"/api/delivery/order/status/update\", \\.\\.\\.deliveryDashboardAdmin, async",
+          "desc": "the generic status update is admin-web only; drivers move status through /api/delivery/driver/order/* (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*router\\.(?:get|post|delete|put|patch)\\(\"[^\"]*\", async)",
+          "desc": "NO route in routes/delivery/admin.js, inside or outside /api/delivery/admin/, goes straight to its handler without a gate (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "res\\.status\\(200\\)\\.json\\(redactDeliveryCredentials\\(delivery\\)\\)",
+          "desc": "book/:bookId never hands out the snapshot's driver session token or company HYP key (CORE invariant 19)"
+        },
+        {
+          "file": "lib/delivery/helpers.js",
+          "regex": "const \\{ token, authCode, notificationToken, \\.\\.\\.safeDriver \\} = safe\\.driver",
+          "desc": "redactDeliveryCredentials strips the driver's live session token, auth code and push token from a delivery doc (CORE invariant 19)"
+        },
+        {
+          "file": "lib/delivery/helpers.js",
+          "regex": "const \\{ hyp, accounting, credentials, \\.\\.\\.safeCompany \\} = company;",
+          "desc": "redactDeliveryCredentials strips the company's HYP keys, bank account and credentials, on company and on driver.company (CORE invariant 19)"
         }
       ]
     },
