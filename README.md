@@ -11,7 +11,7 @@ copy-pasting into each repo.
 |--------|----------|--------------|
 | `shoofi-testing` | `/shoofi-testing:cover-changes`, `/shoofi-testing:local-app-e2e`, `/shoofi-testing:pr-emulator-flows` | **cover-changes**: after finishing a feature/bug, generates the tests covering the changed flow across the repo(s) it touched; bootstraps each repo's test infra (best-fit runner) on first use. **local-app-e2e**: stands up the local stack (Mongo + server on :1111) and drives the customer/partner/driver app through its real UI on an iOS simulator with Maestro. **pr-emulator-flows**: writes the CI flows for one pull request — Maestro under `.maestro/ci/pr/` for the apps, Playwright under `tests/ci/pr/` for the admin web — that the Emulator workflow runs and the AI Tasks board's "Prepare tests" button asks for. |
 | `shoofi-domains` | `menu-catalog`, `orders`, `payments`, `accountant`, `delivery`, `customers` subagents | **Class A — code owners.** Domain "employees" — one per territory, **full-stack across all 5 repos** by default. Each loads the shared constitution + its human-reviewed context doc and ships work as PRs you review. Ships `docs-check`, a drift checker.|
-| `shoofi-operators` | `competitive-intel` subagent | **Class B — operators ("department heads").** Own a *business function* rather than a slice of code: they feed on data and the outside world and ship decisions, alerts, briefs and drafts — **never product code**. Gate is **human approval**, not tests. |
+| `shoofi-operators` | `marketing-manager`, `social-marketing`, `competitive-intel` subagents; `/shoofi-operators:guided-reel` | **Class B — operators ("department heads").** Own a *business function* rather than a slice of code: they feed on data and the outside world and ship decisions, alerts, briefs and drafts — **never product code**. Gate is **human approval**, not tests. |
 
 ### `shoofi-domains` — the domain-owner model
 
@@ -48,10 +48,14 @@ writes the spec and hands it to the owning Class A agent.
 
 | Operator | Owns |
 |---|---|
+| `marketing-manager` | **the lead of marketing** — the entry point for every marketing ask; knows every marketing agent, skill and admin screen and routes the work there (posts, guided reels, in-app campaigns, results) |
+| `social-marketing` | Shoofi's own Facebook/Instagram content — drafts only, never publishes |
 | `competitive-intel` | Haat + Tira Eat — the coverage gap ("who's open on them and closed on us"), price gaps, menu coverage, promos, ratings, and the competitor↔our-store matching everything else depends on |
 
-Planned: `social-media`, `marketing-growth`, `merchant-success`, `retention-crm`,
-`bizops-brief`, `support-cx`. See `plugins/shoofi-operators/README.md`.
+Skill: **`/shoofi-operators:guided-reel`** — a lip-synced explainer reel (Arabic + Hebrew) in
+which Shadi, the courier mascot, walks through a feature on real app screens.
+
+Planned: `merchant-success`, `retention-crm`, `bizops-brief`, `support-cx`. See `plugins/shoofi-operators/README.md`.
 
 ## Layout
 
@@ -72,7 +76,12 @@ plugins/
     context/assert/<domain>.assert.json  #   machine-checkable claims
     scripts/docs-check.js                # drift checker (zero deps)
   shoofi-operators/
+    agents/marketing-manager.md          # Class B lead: routes every marketing ask
+    agents/social-marketing.md
     agents/competitive-intel.md          # Class B operator: mission, hard limits, hand-offs
+    context/marketing-manager/CORE.md    #   the marketing map: fleet, routing, owner decisions
+    skills/guided-reel/                  # Shadi explainer reels: SKILL.md, scripts/reel.py,
+                                         #   assets/shadi poses, references, worked example
     context/competitive-intel/CORE.md    #   always read: competitor endpoints + field lists,
                                          #   the matching design, the mapping collection
 ```

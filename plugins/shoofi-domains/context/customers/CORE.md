@@ -469,9 +469,10 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
     push, or draws a banner or story image, for the admin wizard's "תוכן" step. Shoofi-server
     `docs/marketing-generate.md` has the detail.
     - **Gate:** `[auth.required, checkAdminRole(GENERATE_ROLES)]`, `GENERATE_ROLES =
-      ["master", "admin", "manager"]`, on all three routes (the POST, `GET /:jobId`,
-      `GET /:jobId/images/:imageId`). Pinned in `test/integration/marketing-routes-auth.js` with
-      the other marketing write paths (invariant 10).
+      ["master", "admin", "manager"]`, on every route (the POST, `GET /:jobId`,
+      `GET /:jobId/images/:imageId`, `POST /:jobId/revise`, `POST /:jobId/versions/:id/restore`).
+      Pinned in `test/integration/marketing-routes-auth.js` with the other marketing write paths
+      (invariant 10).
     - **The body names the subject, nothing else.** `loadSubjectFacts(req.app.db, body.subject)`
       (`services/marketing/generate/facts.js`) reads the coupon, deal, product, store, "new"
       window (`launchState`) or app page itself. Never add a fact field to the request. A
@@ -506,6 +507,23 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       `meta.credits: 130`). A daily guard (`budget.js`) refuses with 429 past
       `shoofi.store {id:1}.marketingAiDailyBudgetUsd` (default $3) or
       `marketingImageDailyLimit` (default 20 renders).
+    - **Revising a picture keeps every guarantee** (2026-10-31). `POST /:jobId/revise` with no
+      notes ("עוד אפשרות") re-renders the same brief and words (`image.js rerender`, no Claude
+      call); with notes ("בקש שינוי") Claude gets the previous brief, its words and the fenced
+      notes (`revisionBlock`, "the rules win") and the new words go through the SAME guard —
+      notes asking for "50% off" fail the job `no_valid_copy`, they never render. The facts are
+      reloaded (an expired coupon is a 409 here too), the renders count against
+      `marketingImageDailyLimit` (`renderCount` / `lastQueuedAt`), and the replaced result is
+      kept in `versions` (newest 8; `restore` swaps one back). Only from `ready` / `failed`
+      (409 `busy`), scoped to the state read.
+    - **The design guidelines are the social brand direction** (`socialPostsDirection`,
+      `services/social-posts/brand-direction.js`): a banner uses `photography` + `bannerLayout`,
+      a story `photography` + `storyLayout`. Style only — the canvas, the bands the app covers,
+      "the words EXACTLY as written" (banner) / "No text of any kind" (story), the palette, the
+      logo rule and the exclusions stay in `composeRenderPrompt`. Never move one of those into a
+      direction field. The admin edits them from the picture (web
+      `components/admin/image-generation/`, the one revision bar every generated picture uses,
+      social posts included) or the "הנחיות ויזואליות" screen.
     - **Nothing is published here.** The wizard opens the channel's own form prefilled
       (`?prefill=` gains `image: {jobId, id|idAr|idHe, url…}`; the form fetches the bytes
       through `GET …/images/:imageId` and attaches them as an upload), and the person saves it
