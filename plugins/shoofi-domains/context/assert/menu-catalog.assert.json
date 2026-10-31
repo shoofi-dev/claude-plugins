@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -653,7 +653,7 @@
         },
         {
           "file": "lib/campaign-category-sync.js",
-          "regex": "isCustomerSpecific: \\{ \\$nin: \\[true, 'true'\\] \\}",
+          "regex": "isCustomerSpecific: \\{ \\$nin: \\[true, 'true'\\] \\}|'applicableTo\\.stores\\.0': \\{ \\$exists: true \\},\\s*\\.\\.\\.EVERYONE_COUPON_FILTER",
           "desc": "doc CORE invariant 18: a customer-specific coupon does not put the store in the حملات row"
         },
         {

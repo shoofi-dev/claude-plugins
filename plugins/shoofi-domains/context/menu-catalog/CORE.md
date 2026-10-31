@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -699,6 +699,17 @@ boundary and say so in the PR.
     reconcile cron (`utils/crons/coupon-campaign-category-cron.js`), and the explore cache is
     busted only on a real membership change. Before 2026-10-26 neither path knew about deals,
     so a deal-only store's offers showed only inside the store (support report, master-burger).
+    **The "public coupon" test exists in THREE shapes and they stay in their own files.** The
+    حملات row's is the two literals above (`$nin: [true, 'true']` on `isCustomerSpecific` and
+    `isPurchasedCoupon`). The customer coupon page's `isPromotableCoupon`
+    (`services/coupons/public-coupon.js`) is strictly STRICTER — it also drops
+    `onlyForOneCustomer` and `claimedByUserId`. `GET /api/coupons/active` (`routes/coupon.js`) is
+    a third, differently-shaped one: `$ne: true` (so it misses the string `'true'`) plus
+    `isForNewUser` and a required `isAutoApply`. A shared `EVERYONE_COUPON_FILTER` was tried and
+    reverted on 2026-10-31 (shoofi-server `CLAUDE.md` says the same): one name hides that the
+    rules differ, so the next tidy-up silently changes which stores appear in the row. The assert
+    pin greps those literals in `lib/campaign-category-sync.js` precisely to catch that — if you
+    ever do share them, re-pin first.
 
 24. **CODE THAT WRITES A TRANSLATION ROW GOES THROUGH `writeOwnedTranslation` — NEVER THE PANEL
     ROUTES, NEVER A SHARED KEY** (`services/translations/owned-translations.js`; reference §2
@@ -820,7 +831,9 @@ boundary and say so in the PR.
       (`isVatExempt`) reads `accounting.bankAccount.businessType` from its result in-process. So
       `eligible-stores` strips after `filterEligibleStores`. The explore cache (Redis) still holds
       the raw docs, and For you reads it, so a card is safe only once its route has stripped it.
-      Any new public read that returns a store or company doc must go through `toPublicStore`.
+      Any new public read that returns a store or company doc must go through `toPublicStore`, or
+      build its card from a positive projection that never selects the four keys — which is what
+      the public coupon page's `eligibleStores` (`services/coupons/public-coupon.js`) does.
     - **`GET /api/store/get/:appName` is `CATALOG_ADMIN`.** It returns the whole per-store
       document: `hyp` payment credentials, `accounting`, `fraudConfig.appSecret`. It had no auth.
       Only the admin web calls it, and its accounting, store-data and settings screens read those
