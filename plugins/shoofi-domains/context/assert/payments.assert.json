@@ -78,7 +78,6 @@
           "hasClientFeature"
         ],
         "services/coupons/public-coupon.js": [
-          "EVERYONE_COUPON_FILTER",
           "UPCOMING_WINDOW_DAYS",
           "isPromotableCoupon",
           "couponTiming",
