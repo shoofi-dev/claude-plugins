@@ -239,6 +239,12 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       (re-derives the stack from the claimed promotions), amend repricing + ledger reconcile
       (`allocateAcrossParts`). Reading `promotions.items.promotionId` alone silently ignores
       the second deal.
+    - **Describing a deal in words** (`POST /api/admin/promotions/assist`,
+      `services/promotions/promotion-assistant.js`): Claude proposes the deal FORM's fields
+      from the store's own catalogue; `applyPromotionProposal` keeps only what the form can
+      hold (known type/config keys, ids from THIS store) and the person saves through the
+      normal create route. It writes nothing. Requests a deal cannot express (Shoofi funding,
+      several stores, daily hours, one customer) come back as `noFit` → coupon drafts.
     - **One ranking, three readers**: `rankDeals` (`promotion-service.js`) is the only place
       that picks the winning deal of each kind — `quotePromotions` (the menu/cart/checkout
       quote) and the admin form's live preview (`previewPromotionQuote`,

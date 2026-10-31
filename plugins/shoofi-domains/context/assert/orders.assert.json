@@ -35,6 +35,7 @@
         "services/promotions/promotion-service.js",
         "utils/promotion-discount.js",
         "services/twin-order/twin-promotions.js",
+        "services/promotions/promotion-assistant.js",
         "docs/promotions.md",
         "services/coupons/delivery-price-enforcement.js",
         "services/twin-order/twin-delivery-price.js",
@@ -108,6 +109,10 @@
         ],
         "services/twin-order/twin-promotions.js": [
           "enforceTwinSidePromotions"
+        ],
+        "services/promotions/promotion-assistant.js": [
+          "runPromotionAssistant",
+          "applyPromotionProposal"
         ],
         "services/coupons/delivery-price-enforcement.js": [
           "enforceDeliveryPriceCoupon",
