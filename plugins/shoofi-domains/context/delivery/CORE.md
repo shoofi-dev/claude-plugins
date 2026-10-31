@@ -450,11 +450,49 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
       was the driver's CURRENT session on 500/500 checked, and 4,767 held `company.hyp.api_key`.
       `redactDeliveryCredentials` (`lib/delivery/helpers.js`) strips `driver.{token, authCode,
       notificationToken}` and `{company, driver.company}.{hyp, accounting, credentials}`. Run it
-      on any route that hands out a raw delivery doc. `book/:bookId` and `orders/batch` now do.
-      `GET /api/delivery/order/:id` (`routes/delivery/driver.js`) does not, and it is still
-      unauthenticated.
+      on any route that hands out a raw delivery doc. `book/:bookId`, `orders/batch` and
+      `GET /api/delivery/order/:id` do. Since the driver-loop change, every `/api/delivery`
+      response also goes through `services/delivery/response-redaction.js` (see the driver-loop
+      bullet below).
       `test/integration/delivery-mobile-admin-auth.js` fails if any route in
       `routes/delivery/admin.js` reaches its handler without `auth.required` plus a gate.
+    - **The driver loop is gated too (2026-10-30), and `driverId` comes from the token.**
+      Before this, `routes/delivery/orders.js` had no auth, and
+      `driver/order/{approve,cancel,start,complete,waiting-in-store}` took `driverId` from the
+      **body**, so anyone could move any delivery as any driver. These five routes now take
+      `...driverSelfAction`: a shoofir token, a 403 if the body's `driverId` names anyone else,
+      and then the field is **overwritten with the token id**. Each handler's existing
+      `driver._id = driverId` filter is therefore the ownership check. Cancel, start, complete and
+      waiting answer **404 on a miss**. They used to answer 200 and still send the flow event and
+      the customer push for a delivery that never moved. There is no "offer" state to accept:
+      assignment writes `driver` before status `1`, and an `isPendingAssignment` booking has no
+      driver at all. A company admin acts on its own assignments like any driver, and moves its
+      drivers' work only through the `/:adminId/` reassign route. shoofir always sends its own
+      `userDetails.customerId`. In prod over the 30 days to 2026-10-30, 8,939 approves, 8,463
+      starts, 8,574 completes and 1,415 waiting-in-store came from 46-47 drivers. The other
+      routes in the file:
+      `list` takes `...driverListAccess`: a dashboard role (the admin web's driver-routes view,
+      any driver), or the driver's own `customerId`. `GET order/:id` (driver.js) takes
+      `...deliveryOwnerOrDashboard`. `book` takes `...storeOwnerOrDashboard`, and a store token
+      books for its own store whatever `app-name` says; only the admin web's legacy
+      `/delivery-order` page calls it, and partner books through `routes/order.js` in process.
+      `update`, `create-customer`, `employe-list` and `employe-payments` are
+      `...deliveryDashboardAdmin`; their callers are legacy admin-web pages. shoofir's
+      order-details also posts `update`, but without the `bookId` the service keys on, so it has
+      never matched a row (0 `delivery_status_update` events, ever). **Nothing calls the loop over
+      HTTP from the server.** Order creation, twin orders, the assignment scheduler and the crons
+      call `services/delivery/*` in process. Keep it that way, or forward a token.
+    - **No `/api/delivery` response carries a session token or a company's payment keys.**
+      `redactDeliveryResponses` is installed once, path-scoped, at the top of
+      `routes/delivery.js`. It removes `token`, `authCode` and `notificationToken` from any
+      person record (any object with a `phone`, or under a `driver` key). It removes
+      `{hyp, accounting, credentials}` from the `company` embedded in a delivery (an object with
+      a `bookId`) or in a person record. A **company document on its own keeps them**: the admin
+      web's DriverPayments and company screens read `accounting` and `hyp` there. Driver records
+      carry `token` too (235 of 258), and `company/:companyId/employees` used to return them raw
+      and unauthenticated. **82 routes in `geography.js`, `company.js` and `driver.js` are still
+      ungated.** They are pinned as `NOT_YET_GATED` in
+      `test/integration/delivery-driver-loop-admin-auth.js`, so the list can only shrink.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
