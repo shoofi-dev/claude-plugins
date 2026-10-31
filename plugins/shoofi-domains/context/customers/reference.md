@@ -491,7 +491,7 @@ body (test: "a client cannot set owner or inferred"). `inferred` is written only
 
 | Endpoint | Gate | Notes |
 |---|---|---|
-| `POST /api/admin/marketing/generate` | master / admin / manager | `{subject:{kind,id,appName?}, channel, what: copy\|image, tone?}`. copy → 200 `{variants, rejected, limits}`; image (banner / story only) → 202 the job. 400 bad channel, 404 no subject, 409 not promotable, 422 nothing passed the guard, 429 budget, 503 no AI backend |
+| `POST /api/admin/marketing/generate` | master / admin / manager | `{subject:{kind,id,appName?}, channel, what: copy\|image, tone?}`. copy → 200 `{variants, rejected, limits}`; image (banner / story / social only) → 202 the job. 400 bad channel, 404 no subject, 409 not promotable, 422 nothing passed the guard, 429 budget, 503 no AI backend |
 | `GET /api/admin/marketing/generate/:jobId` | same | `status` queued → generating → rendering → ready / failed (`errorCode`: `no_renderer`, `no_valid_copy`, `no_ai`); `copy`; `images[{id, lang ar\|he\|all, aspectRatio, status, url}]`. Reaps stale jobs and renders on read |
 | `GET /api/admin/marketing/generate/:jobId/images/:imageId` | same | the bytes of a rendered image, fetched server-side from our CDN only (the CDN sends no CORS) |
 | `POST /api/admin/marketing/generate/:jobId/revise` | same | `{notes?}` ≤ 600. No notes = re-render the same brief and words; notes = a new brief told what to change, through the guard. 202 the job; 400 notes too long / not an image job; 409 `busy` or not promotable; 429 image limit |
@@ -514,7 +514,12 @@ story forms attach the image: the prefill, and `attachGeneratedImage` from the i
 `components/FormGenerate.tsx` (the step with `mode="form"`, rendered above each channel form's
 `<form>` so Enter in it never submits the form). The prefill's
 `copy` keys: `title_*` = push / note / banner title, `body_*` = push / note body, banner
-description, story caption.
+description, story caption, social caption (`body_ar` only — posts are Arabic).
+
+Channel `social` (2026-10-31): copy = body only, ≤ 280; image = ONE 1:1 render, no words, the
+story's layout (`CANVAS` in `image.js`). No learned templates for it (the cron learns the in-app
+channels only). The social post form (`views/admin/marketing/social/SocialPostForm.tsx`) uses a
+story's 9:16 render when the post is a story.
 
 ## 5d. Marketing templates (`routes/marketing-templates.js`, CORE invariant 18)
 
@@ -530,6 +535,22 @@ createdAt, lastSeenAt, lastUsedAt, decidedBy, decidedAt}`, no TTL, no index. Adm
 `src/apis/admin/marketing-templates.ts`, `views/admin/marketing/components/TemplatePicker.tsx`
 ("תבניות" in the "תוכן" step, which fetches nothing until clicked), and
 `views/admin/marketing-templates/MarketingTemplates.tsx` (`/admin/marketing/templates`).
+
+## 5e. Marketing social channel (`routes/marketing-social.js`, CORE invariant 17)
+
+| Endpoint | Gate | Notes |
+|---|---|---|
+| `GET /api/admin/marketing/social/config` | master / admin / manager | `{targets: {facebook, instagram: {ready, reason}}, maxCaption}` — the form warns before saving |
+| `GET /api/admin/marketing/social/:id` | same | the post for its form (`publicSocial`: `source`, `status`, `state`, caption, format, targets[], results, media, link, marketingItemId, approval) |
+| `POST /api/admin/marketing/social` | same | `{caption, format: post\|story, targets[], mediaType, mediaUrl, key?, mimetype?, bytes?, durationSec?, link?, marketingItemId?, ownPlan?, publishWhen?, publishAt?}` → 201 a draft. 400 `BAD_CAPTION` / `BAD_FORMAT` / `BAD_CONTENT` / `BAD_MEDIA` (not our manual-media CDN file) |
+| `PUT /api/admin/marketing/social/:id` | same | same fields, while nothing went out (409 `ALREADY_SENT`); an approved one records `previousCaption` in `history` |
+| `DELETE /api/admin/marketing/social/:id` | same | `status: "cancelled"` while nothing went out; it leaves the item |
+
+Approve / revert are the item's and the drafts routes' (`channel = social`). Audited
+`create_marketing_social_post`, `update_marketing_social_post`, `delete_marketing_social_post`.
+Admin client: `shoofi-delivery-web` `src/apis/admin/marketing-social.ts`,
+`src/views/admin/marketing/social/SocialPostForm.tsx`, the item card's social preview
+(`MarketingItemCard.tsx`, `socialState` in `utils/marketing-approval.ts`).
 
 ## 6. Referrals (`routes/customer-referrals.js`)
 8-char code (ambiguity-free alphabet) + TinyURL short link with `/r/:code` fallback. Config on
