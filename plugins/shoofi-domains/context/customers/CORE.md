@@ -528,6 +528,12 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       (`?prefill=` gains `image: {jobId, id|idAr|idHe, url…}`; the form fetches the bytes
       through `GET …/images/:imageId` and attaches them as an upload), and the person saves it
       through the channel's own route — which still runs invariant 11's `resolveLink`.
+    - **The same step lives inside every channel form** ("✨ צור עם AI" at the top of the
+      banner, story, note and push forms — on create AND on edit, and on a form opened from a
+      marketing item's "הוסף ערוץ", which skips the wizard; web `FormGenerate`). Its subject
+      is the form's own "מה נפתח בלחיצה" link (`subjectFromLink`); a form with no link yet has
+      the button disabled, and a sent push or the saved-draft prompt shows none. "מלא בטופס"
+      REPLACES the form's text fields and picture; nothing is saved until the form is.
     - ⚠️ **The Hebrew voice is pending the owner's sign-off** (`voice.js HEBREW_VOICE`, a
       written spec; nothing was measured for Hebrew). The Arabic is the social `VOICE`.
     Pinned by shoofi-server `test/integration/marketing-generate.js`.

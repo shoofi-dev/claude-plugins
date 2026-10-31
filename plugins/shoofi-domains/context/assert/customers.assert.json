@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (CORE invariant 11 active list); shoofi-server@feat/marketing-templates + shoofi-delivery-web@feat/marketing-templates / 2026-10-31 (CORE invariant 18 learned templates, reference 5d); shoofi-server@feat/marketing-image-revise / 2026-10-31 (CORE invariant 16 revise + design guidelines); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-delivery-web@feat/marketing-generate-in-forms / 2026-10-31 (CORE invariant 16: generation inside every channel form, create and edit); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (CORE invariant 11 active list); shoofi-server@feat/marketing-templates + shoofi-delivery-web@feat/marketing-templates / 2026-10-31 (CORE invariant 18 learned templates, reference 5d); shoofi-server@feat/marketing-image-revise / 2026-10-31 (CORE invariant 16 revise + design guidelines); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -622,7 +622,8 @@
         "src/components/admin/image-generation/guidelines.ts",
         "src/apis/admin/marketing-templates.ts",
         "src/views/admin/marketing/components/TemplatePicker.tsx",
-        "src/views/admin/marketing-templates/MarketingTemplates.tsx"
+        "src/views/admin/marketing-templates/MarketingTemplates.tsx",
+        "src/views/admin/marketing/components/FormGenerate.tsx"
       ],
       "patterns": [
         {
@@ -673,6 +674,16 @@
           "file": "src/views/admin/marketing/hub/active-model.ts",
           "regex": "export const NO_SUBJECT_LABEL = \"ללא יעד\";",
           "desc": "CORE invariant 11: items without a subject are grouped as ללא יעד"
+        },
+        {
+          "file": "src/views/admin/marketing/content.ts",
+          "regex": "export function subjectFromLink\\(",
+          "desc": "CORE invariant 16: a channel form generates from the subject its own link points at (create and edit)"
+        },
+        {
+          "file": "src/views/admin/ads/add/AddEditAd.tsx",
+          "regex": "<FormGenerate channel=\"banner\" link=\\{currentLink\\}",
+          "desc": "CORE invariant 16: the banner form's AI bar generates from the form's current link"
         }
       ]
     }
