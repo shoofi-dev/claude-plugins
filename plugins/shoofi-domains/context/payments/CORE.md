@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@9a07c2fb / 2026-10-31 (public coupon page: the shared EVERYONE_COUPON_FILTER constant was removed from the code); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -199,9 +199,13 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
   `restrictions` (categories / products / areas as booleans only). Never spread the coupon
   document into it: no customer, usage, split, funding or admin-name field.
 - **Only a promotable coupon** (`isPromotableCoupon`): not `isCustomerSpecific`,
-  `isPurchasedCoupon`, `onlyForOneCustomer`, nor `claimedByUserId`. The first two are
-  `EVERYONE_COUPON_FILTER`, the #325 definition the حملات row also reads (menu-catalog CORE
-  invariant 18). Plus `isActive`, not expired, and started or starting within
+  `isPurchasedCoupon`, `onlyForOneCustomer`, nor `claimedByUserId`. The first two are the #325
+  "every customer can see it" definition the حملات row applies too — there as the two
+  `$nin: [true, 'true']` literals in `lib/campaign-category-sync.js` (menu-catalog CORE invariant
+  18). The same rule, written out in each file, never a shared constant: `isPromotableCoupon` is
+  strictly stricter, and one name for both is how a tidy-up silently changes which stores appear
+  in that row (tried and reverted 2026-10-31, shoofi-server `9a07c2fb`). Plus `isActive`, not
+  expired, and started or starting within
   `UPCOMING_WINDOW_DAYS` (30). Anything else, an unknown or malformed id included, is the SAME
   404 `{code:'COUPON_NOT_AVAILABLE'}`, so a personal coupon cannot be told from a missing one.
 - **Where it works = checkout's store rule**: a non-empty `applicableTo.stores` limits
