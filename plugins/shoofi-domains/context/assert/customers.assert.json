@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -463,7 +463,7 @@
       ]
     },
     "shoofi-app": {
-      "files": ["utils/http-interceptor/index.ts", "hooks/use-notifications.ts", "utils/marketing-link.ts", "services/marketing-events.ts", "components/profile/MarketingPushToggle.tsx"],
+      "files": ["utils/http-interceptor/index.ts", "hooks/use-notifications.ts", "utils/marketing-link.ts", "services/marketing-events.ts", "components/profile/MarketingPushToggle.tsx", "navigation/MainStackNavigator.tsx"],
       "patterns": [
         {"file": "services/marketing-events.ts", "regex": "const QUEUE_KEY = \"@marketing_event_queue\";", "desc": "CORE invariant 11: the event queue is mirrored to AsyncStorage (survives a kill)"},
         {"file": "services/marketing-events.ts", "regex": "export const ORDER_FLUSH_TIMEOUT_MS = 1500;", "desc": "CORE invariant 11: an order waits at most 1.5s for the queue"},
@@ -476,6 +476,16 @@
           "file": "utils/marketing-link.ts",
           "regex": "return openStoreAtProduct\\(navigate, \\{ appName: link\\.appName \\}, link\\.productId\\)",
           "desc": "CORE invariant 11: store opens go through the twin-guarded opener"
+        },
+        {
+          "file": "utils/marketing-link.ts",
+          "regex": "case \"coupon\":\\s*navigate\\(\"coupon-detail\", \\{ couponId: link\\.couponId",
+          "desc": "CORE invariant 11: every coupon link opens the coupon page, single-store coupons included - never the store, never 'my coupons'"
+        },
+        {
+          "file": "navigation/MainStackNavigator.tsx",
+          "regex": "<Stack\\.Screen name=\"coupon-detail\" component=\\{CouponDetailScreen\\} />",
+          "desc": "CORE invariant 11: the coupon page route the marketing router navigates to"
         },
         {
           "file": "components/profile/MarketingPushToggle.tsx",
