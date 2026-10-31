@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -340,7 +340,9 @@
         "services/ai/complete.js": [
           "apiTimeoutMs",
           "apiMaxRetries",
-          "marketing: \"claude-opus-5-5\""
+          "marketing: \"claude-opus-5-5\"",
+          "support: \"claude-opus-5-5\"",
+          "async function converse("
         ],
         "services/for-you-quality/reviewer.js": [
           "runReview",
@@ -1852,6 +1854,21 @@
           "desc": "doc CORE invariant 18: the last check at serve time, on both paths"
         },
         {
+          "file": ["services/ordering-intelligence/option-request.js", "services/ordering-intelligence/suggest-service.js"],
+          "regex": "(?:return \\{ dishText, wanted: wanted\\.slice\\(0, MAX_WORDS\\), without: without\\.slice\\(0, MAX_WORDS\\), extrasQuestion: false \\};|const query = stripFillers\\(mention\\.rest\\);)",
+          "desc": "doc CORE invariant 13 + 19 / reference §7: parseOptionRequest splits one message into the dish text and its wanted/without option words (capped at MAX_WORDS), so only what is LEFT after them is matched against dish names. TRANSITIONAL: the second path is the pre-#380 form of the same claim in suggest-service.js — drop it once shoofi-server #380 is on main"
+        },
+        {
+          "file": ["services/ordering-intelligence/option-request.js", "services/ordering-intelligence/suggest-service.js"],
+          "regex": "(?:const out = \\{ matched: \\[\\], ambiguous: \\[\\], missing: \\[\\], outOfStock: \\[\\], deselect: \\[\\], noteWithout: \\[\\] \\};|hasRequiredOptions: hasRequiredOptions\\(row\\),)",
+          "desc": "doc CORE invariant 19 / reference §7: matchOptions answers the card's options in exactly these six buckets (matched / ambiguous / missing / outOfStock / deselect / noteWithout), which is what decides a straight-to-cart add. TRANSITIONAL: the second path is the pre-#380 card-shape claim in suggest-service.js — drop it once shoofi-server #380 is on main"
+        },
+        {
+          "file": ["services/ordering-intelligence/option-request.js", "utils/extras-required.js"],
+          "regex": "(?:const group = \\{ ar: e\\.nameAR \\|\\| header\\?\\.nameAR \\|\\| \"\", he: e\\.nameHE \\|\\| header\\?\\.nameHE \\|\\| \"\" \\};|e\\.isGroupHeader !== true && \\(e\\.type === \"single\" \\|\\| e\\.type === \"weight\"\\))",
+          "desc": "doc reference §4 extras: optionsOf walks the extras array with its group headers — an option's group name is the extra's own nameAR/nameHE, falling back to the header's. TRANSITIONAL: the second path is the other server-side reader of the same header/option shape (utils/extras-required.js) — drop it once shoofi-server #380 is on main"
+        },
+        {
           "file": "services/ordering-intelligence/suggest.js",
           "regex": "if \\(!storesByApp\\.has\\(cart\\.appName\\)\\) return picker\\.cards;",
           "desc": "doc CORE invariant 19: with a cart, drink/sweet come from the cart's store ONLY"
@@ -2432,6 +2449,41 @@
           "file": "hooks/useChatAddToCart.ts",
           "regex": "(?:if \\(raw && !support\\.ok\\) return fallback\\(card, \\(support as any\\)\\.reason\\);|if \\(raw && !support\\.ok\\) return \\{ ok: false, reason: \\(support as any\\)\\.reason \\};)",
           "desc": "doc CORE invariant 19: whatever chatSheetSupport refuses opens the store at the dish"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "(?:return \\{ sheet, busyCardId, quickAdd, addFromSheet, closeSheet, clearSheet, onAction, decrement \\};|return \\{ sheet, busyCardId, quickAdd, addFromSheet, closeSheet, clearSheet, onAction, decrement, startFromReply \\};)",
+          "desc": "doc CORE invariant 19 / reference §7f: the chat-add hook's own API — startFromReply is the one-message order entry point, alongside quickAdd and the sheet. TRANSITIONAL: the first alternative is the pre-#83 form of the same return — drop it once shoofi-app #83 is on main"
+        },
+        {
+          "file": ["helpers/chat-order.ts", "helpers/extras-defaults.ts"],
+          "regex": "(?:const out: Applied = \\{ selections: withoutOutOfStock\\(prepared, base, outOfStockExtras\\), added: \\[\\], unmet: \\[\\], ask: \\[\\], note: \\[\\] \\};|export const resolveExtraDefaults = \\()",
+          "desc": "doc CORE invariant 19 / reference §7f: applyOptionMatch starts from the menu's own defaults and then applies the server's match on top. TRANSITIONAL: the second path is the defaults resolver it starts from — drop it once shoofi-app #83 is on main"
+        },
+        {
+          "file": ["helpers/chat-order.ts", "hooks/useChatAddToCart.ts"],
+          "regex": "(?:const byId = ref\\.optionId \\? opts\\.find\\(\\(o\\) => o && String\\(o\\.id\\) === String\\(ref\\.optionId\\)\\) : null;|export function findMenuProduct\\(menu: any, productId: string\\): any \\| null \\{)",
+          "desc": "doc CORE invariant 19 / reference §7f: findOption re-resolves every option against the menu the app loaded — extra + position, then id, then name (legacy blank ids) — and the app is the final authority. TRANSITIONAL: the second path is the same claim for the product itself (findMenuProduct) — drop it once shoofi-app #83 is on main"
+        },
+        {
+          "file": ["helpers/chat-order.ts", "helpers/extras-defaults.ts"],
+          "regex": "(?:if \\(extra\\.type === \"single\"\\) return \\{ \\.\\.\\.selections, \\[extra\\.id\\]: option\\.id \\};|if \\(extra\\.type === \"multi\" && Array\\.isArray\\(extra\\.defaultOptionIds\\)\\) \\{)",
+          "desc": "doc reference §7f: addOption — a single replaces its answer, a multi adds within its cap (maxCount ?? max). TRANSITIONAL: the second path is the same single/multi split in the defaults resolver — drop it once shoofi-app #83 is on main"
+        },
+        {
+          "file": ["helpers/chat-order.ts", "helpers/extras-defaults.ts"],
+          "regex": "(?:export function withoutOutOfStock\\(prepared: any, selections: Record<string, any>, outOfStockExtras: string\\[\\]\\): Record<string, any> \\{|defaults\\.push\\(\\{ extraId: extra\\.id, value: extra\\.defaultOptionId \\}\\);)",
+          "desc": "doc CORE invariant 19 / reference §4 extras: defaults are seeded WITHOUT a stock check, so the chat clears the out-of-stock ones (withoutOutOfStock) before it prefills. TRANSITIONAL: the second path is the unchecked default push itself — drop it once shoofi-app #83 is on main"
+        },
+        {
+          "file": ["helpers/chat-order.ts", "helpers/extras-defaults.ts"],
+          "regex": "(?:const title = optionName\\(e, lang\\) \\|\\| optionName\\(header, lang\\);|extras\\.filter\\(\\(e\\) => e && !e\\.isGroupHeader\\)\\.length === 1 && !extra\\.isGroupHeader;)",
+          "desc": "doc reference §4 extras / §7f: extrasListText titles each group by the extra's own name, falling back to its header's, and group headers are never offered as options. TRANSITIONAL: the second path is the other reader of that header/extra split — drop it once shoofi-app #83 is on main"
+        },
+        {
+          "file": ["helpers/chat-order.ts", "helpers/for-you-copy.ts"],
+          "regex": "(?:export const ORDERABLE_REPLIES = \\[\"text_results\", \"without_results\", \"ai_reply\"\\];|for_you_reply_text_results: \\{ ar:)",
+          "desc": "doc CORE invariant 19: only replies whose cards MATCH what was asked start a one-message order — text_results, without_results, ai_reply, never a fallback. TRANSITIONAL: the second path is the copy row of the first of those reply codes — drop it once shoofi-app #83 is on main"
         },
         {
           "file": "hooks/useChatAddToCart.ts",

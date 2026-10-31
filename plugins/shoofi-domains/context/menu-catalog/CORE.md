@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -337,7 +337,10 @@ boundary and say so in the PR.
      `POST /api/admin/product-labels/run` (`202` started, `409` a run holds the lock, `503` no
      key) or `node bin/label-products.js`. Every admin endpoint is `auth.required` +
      `checkAdminRole`.
-13. **A CRAVING'S DESCRIPTIVE WORDS ARE FILTERS, NEVER SPELLINGS** (`craving.js`). In text mode,
+13. **A CRAVING'S DESCRIPTIVE WORDS ARE FILTERS, NEVER SPELLINGS** (`craving.js`). The words after
+   «مع / עם / with» in a message that names a dish are the dish's OPTIONS (`option-request.js`,
+   invariant 19) and never reach this parser — «مع فلفل حار» is an option, not a spicy filter; a lone
+   protein after «مع» («شاورما مع دجاج») stays the dish's. In text mode,
    `parseCraving` removes attribute words (sweet, spicy, vegetarian, light/healthy — Arabic, Hebrew,
    Latin) and one protein word (chicken, beef, fish) from the text and turns them into filters on
    the index labels (`satisfies`, and `cravingQuery` as the Mongo prefilter); **only what remains is
@@ -408,13 +411,21 @@ boundary and say so in the PR.
    `test/integration/for-you-ai-chat.js` fails otherwise): an unpriced call logs `costUsd: null`, and
    the chat's budget counts such a row at `UNPRICED_BUDGET_PRICE` (twice the dearest known price) —
    never as $0, or a model upgrade would switch the cap off. Features with their own budget or
-   quality gate have their own `MODELS` key (`chat`, `labels`, `marketing`); moving `best` must not
+   quality gate have their own `MODELS` key (`chat`, `labels`, `marketing`, `support`); moving `best` must not
    move them. The chat's message is stored with digits masked.
    - `MODELS.marketing` = `claude-opus-5-5` (2026-10-30, the marketing wizard's generator; customers
      CORE invariant 16): features `marketing copy` and `marketing image brief`, `effort: "low"`, no
      `temperature` (Opus 5.5 rejects it), its own daily budget in `services/marketing/generate/budget.js`
      over every `marketing *` row. Price rows for `claude-opus-5-5` ($4/$20), `claude-sonnet-5-5`
      ($2/$10) and `claude-haiku-5-5` ($0.10/$0.50) were added with it.
+   - `MODELS.support` = `claude-opus-5-5` (2026-11-01, the admin support assistant —
+     shoofi-server `docs/support-agent.md`): features `support-agent`, `support-agent dedupe`,
+     `support-agent insights`, `effort: "low"`, its own daily budget (`supportAgentDailyBudgetUsd`,
+     default $10) over every `support-agent*` row. It is the one caller of **`converse()`**, the second
+     entry point in `complete.js`: one tool-use round (`messages` + `tools` in, raw content blocks out),
+     API backend only, logged through the same `recordUsage` — a tool loop is still one priced row per
+     model call. A server-side refusal fallback can serve a call on another model; the row logs the
+     model that actually answered (`res.model`).
    - **Not every row is a Claude call.** A finished marketing render is logged as feature
      `marketing image render`, `model: "artlist:nano-banana-2"`, `backend: "artlist"`, `costUsd: 0`
      (Artlist is prepaid) and `meta.credits` (130 per 2k image). Count credits from `meta`, not
@@ -544,9 +555,27 @@ boundary and say so in the PR.
      instead. `priceLine` is `screens/meal/index2.tsx`'s formula and the server's
      (`utils/order-pricing.js`): `price = base + (d > 0 ? Math.round(extras × (1 − d/100)) :
      extras)` — change one, change all three. Straight into the cart only with no defaults and
-     nothing to choose; otherwise the sheet, defaults pre-selected, never added silently. The line
-     goes in through `cartStore.addProductToCartForStore` (orders domain), and a cart of another
-     store is never mixed or silently emptied — the chat asks.
+     nothing to choose; otherwise the sheet, defaults pre-selected (out-of-stock defaults cleared,
+     `withoutOutOfStock`), never added silently. The line goes in through
+     `cartStore.addProductToCartForStore` (orders domain), and a cart of another store is never
+     mixed or silently emptied — the chat asks.
+   - **ONE MESSAGE WITH ITS OPTIONS ADDS DIRECTLY — ONLY WHEN NOTHING IS LEFT TO GUESS** (product
+     owner, 2026-11-01; server `option-request.js`, app `helpers/chat-order.ts` +
+     `useChatAddToCart.ts startFromReply`, `docs/for-you.md`). «بدي شاورما مع حمص وسلطة»: the server
+     searches the dish part only and matches each card's options at the live re-check
+     (`optionMatch`: matched / ambiguous / missing / outOfStock / deselect / noteWithout, on `nameAR`
+     and `nameHE`, the store's `outOfStockExtras` by exact Arabic name). The app then ASKS what is
+     not decided — which store, which dish (all of that store's, `store` input lifts the per-store
+     cap), which option of several («أي سلطة؟»; the same option in two groups is asked, never both)
+     — and adds ONLY when every word resolved to an available option within its cap and every
+     mandatory `single` is answered; a mandatory choice nobody named opens the sheet prefilled. The
+     add is said, not silent: «ضفت … مع …» with «تراجع / عدّل» (`عدّل` replaces the line only when
+     the sheet adds), and every missing / out-of-stock / over-cap word is said; «بدون X» with no
+     option to act on goes in the line's note. The app re-resolves every option against the menu
+     it loaded (by extra + position, id, then name — legacy blank ids) and is the final authority.
+     Only replies whose cards MATCH start it (`text_results`, `without_results`, `ai_reply`) — never a
+     fallback. Behind `isChatOrderingEnabled`, like every chat add. Dishes the sheet cannot show
+     (`chatSheetSupport`) open the store and the chat says which options to add there.
    - **`GET /api/ai-helper/cuisines?lat=&lng=`** — the onboarding's tiles, from the central index
      only: ACTIVE `meal` dish types, most stores first, ≤ 9. Rows come from the area's OPEN
      stores; with fewer than 4 types it widens to the area's closed stores too, then to the whole
