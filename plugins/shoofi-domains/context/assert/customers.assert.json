@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-delivery-web@feat/marketing-generate-in-forms / 2026-10-31 (CORE invariant 16: generation inside every channel form, create and edit); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (CORE invariant 11 active list); shoofi-server@feat/marketing-templates + shoofi-delivery-web@feat/marketing-templates / 2026-10-31 (CORE invariant 18 learned templates, reference 5d); shoofi-server@feat/marketing-image-revise / 2026-10-31 (CORE invariant 16 revise + design guidelines); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/marketing-social + shoofi-delivery-web@feat/marketing-social / 2026-10-31 (CORE invariant 17: the social channel of a marketing item, reference 5c + 5e); shoofi-delivery-web@feat/marketing-generate-in-forms / 2026-10-31 (CORE invariant 16: generation inside every channel form, create and edit); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (CORE invariant 11 active list); shoofi-server@feat/marketing-templates + shoofi-delivery-web@feat/marketing-templates / 2026-10-31 (CORE invariant 18 learned templates, reference 5d); shoofi-server@feat/marketing-image-revise / 2026-10-31 (CORE invariant 16 revise + design guidelines); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -51,6 +51,8 @@
         "routes/marketing-approval.js",
         "services/marketing/items.js",
         "routes/marketing-items.js",
+        "services/marketing/social.js",
+        "routes/marketing-social.js",
         "routes/marketing-generate.js",
         "services/marketing/generate/facts.js",
         "services/marketing/generate/guard.js",
@@ -102,6 +104,8 @@
         "services/marketing/approval-queue.js": ["listDrafts", "toRows", "describeItems", "linkLabel"],
         "services/marketing/items.js": ["attachOnCreate", "planOnUpdate", "setItemPlan", "approveItem", "revertItem", "deleteItem", "lateAsNowFor", "freshPlan", "HAS_CHANNELS", "NOTHING_TO_APPROVE"],
         "routes/marketing-items.js": ["/api/admin/marketing/items"],
+        "services/marketing/social.js": ["createSocial", "updateSocial", "deleteSocial", "sendDueNow", "publicSocial", "ALREADY_SENT"],
+        "routes/marketing-social.js": ["/api/admin/marketing/social"],
         "services/marketing/campaign-impact.js": ["marketingCampaignImpact", "computeCampaignImpact", "computeDueImpacts", "recipientsOf", "impactsFor", "judge", "METHOD_VERSION"],
         "services/marketing/active.js": ["getActiveMarketing", "WARNING_LABELS", "findCollisions", "bannerStatus", "loadDealBadges", "loadNewStoreBadges", "attachResults", "PUSH_COLLISION_MS"],
         "services/database/DatabaseInitializationService.js": ["store-users", "persistent-alerts"],
@@ -502,6 +506,9 @@
         {"file": "services/marketing/approval.js", "regex": "_id:\\ item\\._id,\\n\\ +\"approval\\.status\":\\ STATUS\\.DRAFT,\\n\\ +\"approval\\.when\":", "desc": "CORE invariant 17: approve is atomic on the draft state and the plan it read - a double click publishes once, an edit in between is a 409"},
         {"file": "services/marketing/approval.js", "regex": "if\\ \\(at\\.getTime\\(\\)\\ <=\\ now\\.getTime\\(\\)\\)\\ throw\\ new\\ ApprovalError\\(409,", "desc": "CORE invariant 17: a draft scheduled for a time that has passed is refused at approval, never published late"},
         {"file": "routes/marketing-approval.js", "regex": "approval\\.approve\\(req\\.app\\.db,\\ \\{\\ channel,\\ id\\ \\},\\ req,\\ new\\ Date\\(\\),\\ \\{\\ lateAsNow\\ \\}\\)", "desc": "CORE invariant 17: approving takes no timing - it follows the draft's own plan (a channel joining an item that already went out: a passed time means now)"},
+        {"file": "services/marketing/approval.js", "regex": "const\\ social\\ =\\ item\\.channel\\ ===\\ \"social\"\\ \\?\\ socialApproval\\(", "desc": "CORE invariant 17: approving a social draft moves it onto the publisher's schedule in the same atomic write, and refuses a target the server is not connected to"},
+        {"file": "services/marketing/items.js", "regex": "\"SOCIAL_NOT_CONNECTED\"", "desc": "CORE invariant 17: a social post the server cannot publish refuses the approval of the whole marketing item"},
+        {"file": "services/social-posts/publication-service.js", "regex": "status:\\ \\{\\ \\$nin:\\ \\[\"cancelled\",\\ \"draft\"\\]\\ \\}", "desc": "CORE invariant 17: a marketing social draft is not on the scheduling screen (it is approved on its item)"},
         {"file": "services/marketing/items.js", "regex": "const\\ stale\\ =\\ plans\\.filter\\(\\(x\\)\\ =>\\ x\\.stale\\);\\n\\ \\ if\\ \\(stale\\.length\\)\\ \\{", "desc": "CORE invariant 17: approving a marketing item approves nothing if any channel's scheduled time has passed"},
         {"file": "services/marketing/items.js", "regex": "const\\ record\\ =\\ \\{\\ \\.\\.\\.approval\\.draftRecord\\(req,\\ now,\\ plan\\),\\ ownPlan:\\ own\\ \\};", "desc": "CORE invariant 17: a channel joins its marketing item as a draft, following the item's timing unless it overrides it"},
         {"file": "routes/marketing-items.js", "regex": "const\\ \\{\\ DRAFT_ROLES,\\ APPROVE_ROLES\\ \\}\\ =\\ require\\(\"\\./marketing-approval\"\\);", "desc": "CORE invariant 17: marketing items use the same master/admin/manager roles as the drafts"},
@@ -531,7 +538,7 @@
         {"file": "routes/marketing-generate.js", "regex": "const GENERATE_ROLES = \\[\"master\", \"admin\", \"manager\"\\];", "desc": "CORE invariant 16: content generation is owner-tier only"},
         {"file": "routes/marketing-generate.js", "regex": "const facts = await loadSubjectFacts\\(req\\.app\\.db, body\\.subject\\);", "desc": "CORE invariant 16: the facts are loaded from the DB by the subject's identity; nothing else in the body is read for them"},
         {"file": "services/marketing/generate/copy.js", "regex": "push: \\{ title: 40, body: 120 \\},\\s*note: \\{ title: 40, body: 120 \\},\\s*banner: \\{ title: 30, body: 60 \\},\\s*story: \\{ title: null, body: 80 \\},", "desc": "CORE invariant 16: the per-channel length limits"},
-        {"file": "services/marketing/generate/image.js", "regex": "const ASPECT = \\{ banner: \"16:9\", story: \"9:16\" \\};", "desc": "CORE invariant 16: banner 16:9 (the app's ad card), story 9:16"},
+        {"file": "services/marketing/generate/image.js", "regex": "const ASPECT = \\{ banner: \"16:9\", story: \"9:16\", social: \"1:1\" \\};", "desc": "CORE invariant 16: banner 16:9 (the app's ad card), story 9:16, social 1:1 (both feeds show a square whole)"},
         {"file": "services/marketing/generate/image.js", "regex": "channel === \"banner\" \\? \\[\\{ lang: \"ar\" \\}, \\{ lang: \"he\" \\}\\] : \\[\\{ lang: \"all\" \\}\\]", "desc": "CORE invariant 16: a banner is one render per language (text baked in), a story one text-free render"},
         {"file": "services/social-posts/render-service.js", "regex": "if \\(!post\\) return marketingRenders\\(\\)\\.claimOnce\\(db, \\{ bridgeId \\}\\);", "desc": "CORE invariant 16: marketing renders ride the bridge's social claim, after social renders"},
         {"file": "services/social-posts/render-service.js", "regex": "out\\.notMine \\? \\{ stale: true \\} : out", "desc": "CORE invariant 16: a finish for a non-social id is answered by the marketing renders module"},
@@ -623,7 +630,9 @@
         "src/apis/admin/marketing-templates.ts",
         "src/views/admin/marketing/components/TemplatePicker.tsx",
         "src/views/admin/marketing-templates/MarketingTemplates.tsx",
-        "src/views/admin/marketing/components/FormGenerate.tsx"
+        "src/views/admin/marketing/components/FormGenerate.tsx",
+        "src/views/admin/marketing/social/SocialPostForm.tsx",
+        "src/apis/admin/marketing-social.ts"
       ],
       "patterns": [
         {

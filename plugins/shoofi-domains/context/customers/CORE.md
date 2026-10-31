@@ -488,11 +488,14 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       image job runs the same guard on its headline / caption before anything renders. It
       cannot read the picture back: a generator may still draw an extra word on a banner.
     - **Limits** (`copy.js CHANNEL_LIMITS`): push and note title ≤ 40 / body ≤ 120; banner
-      title ≤ 30 / body ≤ 60; story caption ≤ 80, no title.
+      title ≤ 30 / body ≤ 60; story caption ≤ 80, no title; social caption ≤ 280, no title
+      (the form uses the Arabic only — posts stay Arabic).
     - **Images:** banner 16:9, TWO renders (Arabic headline, Hebrew headline), because the app
       shows no text over a banner and picks `imageAR` / `imageHE` by language. Story 9:16, ONE
       render with NO text, because a story has one media file and the viewer prints
-      `caption.ar` / `caption.he`. A product's photo is the `subject` reference; a store logo
+      `caption.ar` / `caption.he`. Social (2026-10-31, a marketing item's Facebook / Instagram
+      post, invariant 17) 1:1, ONE render with NO text and the story's layout — the caption
+      goes under it. A product's photo is the `subject` reference; a store logo
       is never sent.
     - **Renders reuse the bridge's social loop.** `render-service.js claimOnce` hands out a
       `shoofi.marketingGenerations` render (same job shape, `postId` = the job) when no social
@@ -546,7 +549,8 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
     `services/marketing/approval.js`, `feat/marketing-approval`). It covers home banners
     (`shoofi.ads`), stories and launch popups (`shoofi.stories`; a popup is a `shoofi-stories`
     story), the home note banner (`shoofi.notes`) and push campaigns
-    (`shoofi["customer-campaigns"]`, handle `customerCampaigns`).
+    (`shoofi["customer-campaigns"]`, handle `customerCampaigns`), and since 2026-10-31 a
+    marketing item's social post (`shoofi.socialPublications`, `source: "marketing"`).
     - **One record per doc, written by the server only:** `approval: {status: draft|published,
       when: now|schedule, createdBy, createdAt, approvedBy, approvedAt, publishAt, revertedBy,
       revertedAt}`. The ids come from `req.auth.id` (invariant 7). The ads, stories and notes
@@ -625,6 +629,26 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       separate approver and no reject. `GET /api/admin/marketing/drafts` lists every draft in
       one row shape, its `plan` included (`services/marketing/approval-queue.js`). Audited as
       `approve_marketing_draft` and `revert_marketing_to_draft`.
+    - **Social channel** (owner 2026-10-31, "post on our social media pages also from here";
+      shoofi-server `services/marketing/social.js`, `routes/marketing-social.js`,
+      `feat/marketing-social`). A marketing item's Facebook / Instagram post is a
+      `shoofi.socialPublications` row with `source: "marketing"`, `status: "draft"`,
+      `marketingItemId`, `link` and the same `approval` record.
+      - **A draft never reaches Meta:** the scheduling screen's list hides `draft`, `claimNow`
+        refuses it, the publish cron only takes `scheduled`. Approving (the item, or
+        `drafts/social/:id/approve`) moves it to `scheduled` at the publish time in the same
+        atomic write (filter `status: "draft"`); "now" is also claimed and sent at once
+        (`sendDueNow`, exclusive claim).
+      - **A target not connected on the server refuses the WHOLE item** (409
+        `SOCIAL_NOT_CONNECTED`, checked with `PUBLISH_AT_PAST` before anything is approved).
+      - Once approved, **its state comes from its own status** (`stateOf` → `socialStateOf`):
+        `approved`/future `scheduled` = scheduled, anything sent or failed = live. The item's
+        timing moves its `scheduledAt` while it waits (`withSocialClock`). Back to draft, edit
+        and delete only while nothing went out (`SOCIAL_UNSENT`); delete = `cancelled`, which
+        leaves the item (`PIECE_FILTER`).
+      - `mediaUrl` must be a file uploaded through `POST /api/admin/social-publications/media`
+        (`manualMediaProblem`). The caption is Arabic (social-marketing CORE §1d). Pinned by
+        shoofi-server `test/integration/marketing-social.js`.
     - **Not covered (owner to decide):** coupon-to-phones sends and raw
       `POST /api/notifications/send*`.
 
