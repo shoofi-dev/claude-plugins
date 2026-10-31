@@ -118,9 +118,12 @@ The rules:
   wanted and what the resolution kept.
 
 ### When you are consulted to fix red CI before a merge
-The merge job doesn't refuse a red PR. First it re-runs the failed jobs once (a flaky
-test needs no code). If the PR is still red, it may start a session on the PR's branch
-with the failing logs:
+The merge job doesn't refuse a red PR. First it checks whether **`main` is red too**: it
+runs docs-check against the repo's `main`, or reads (and, if stale, re-runs) main's own CI.
+If `main` fails the same way, the job stops that PR with a "main is red too" note and no
+session at all, because a PR can't fix a problem it didn't cause. Otherwise it re-runs the
+failed jobs once (a flaky test needs no code). If the PR is still red, it may start a
+session on the PR's branch with the failing logs:
 - **Fix the cause, never the gate.** The bridge rejects a fix that:
   - edits `.github/` or `package.json` `"scripts"`;
   - raises a number in a `*baseline*` file;
@@ -139,6 +142,13 @@ with the failing logs:
   head (README, "Moving or changing a pinned line without deadlocking"); the job then
   merges the docs PR first. When you move a pinned line yourself, write the docs PR that
   way from the start.
+- **A docs PR is checked against code `main` at merge time, not when it was written.**
+  claude-plugins#168 pinned `EVERYONE_COUPON_FILTER` after shoofi-server#368's last commit
+  had removed it. From the moment it merged, every server PR's `docs:check` was red, and
+  every admin-web PR's too, from a second pin that had drifted. Before a docs PR merges,
+  run docs-check from it against every code repo's `main`
+  (`--repo shoofi-server=… --repo shoofi-delivery-web=…`, all five), and fix any pin that
+  doesn't match first.
 
 ## 1b. You are full-stack by default
 Your domain is a **territory across all 5 repos**, not one repo: `shoofi-server`
@@ -193,7 +203,7 @@ especially closely. The zones (per `CLAUDE.md`):
 
 ## 3a. An API permission change is a change to every app that calls the path
 Before adding or tightening `auth.required`, `checkAdminRole`, an entry in shoofi-server's
-`utils/restricted-admin-routes.js`, a role list, or anything that changes what a token must
+`utils/restricted-admin-routes.js` or `utils/admin-token-routes.js`, a role list, or anything that changes what a token must
 carry: grep **all four clients** (shoofi-app, shoofi-partner, shoofi-shoofir,
 shoofi-delivery-web) for the path **without** the `/api` prefix, plus its last segment, and
 list every caller and the token it sends in the PR's **Permission impact** section. Do it
