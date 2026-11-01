@@ -103,10 +103,16 @@ happens after each answer. Never assume yes.
 | Home note banner | `shoofi.notes` | `/admin/notes` |
 | Push campaign | `shoofi["customer-campaigns"]` | `/admin/customer-campaigns` |
 
-- **Hub:** `/admin/marketing` (active list + results), **wizard** `/admin/marketing/new?subject=…`
+- **Hub:** `/admin/marketing` — the ONE marketing screen (2026-11-01). Tabs in the URL:
+  סקירה (today's summary + every piece by subject; `view=current|live|scheduled|draft|
+  ended_recently|attention|all`, `channel`, `kind`, `q`, `open`, `auto`), ממתין לאישור
+  (`tab=approve`; `/admin/marketing/drafts` and `/approvals` forward there), תוצאות
+  (`tab=results`), תבניות (`tab=templates`). **Wizard** "קידום חדש" `/admin/marketing/new?subject=…`
   (subject = `coupon | store | store_new | product | deal | page` → pick channels → generate →
-  each channel's form prefilled), drafts `/admin/marketing/drafts`, approvals
-  `/admin/marketing/approvals`, a marketing item `/admin/marketing/items/:id`.
+  each channel's form prefilled), a קידום (marketing item) `/admin/marketing/items/:id`.
+  Names the team uses: **קופון** = a discount code, **מבצע** = an automatic in-store deal,
+  **קידום** = telling customers about one of them (its channels). Every form and the item
+  page return to `?back=` (the screen that opened them).
 - **Marketing items** (`shoofi.marketingItems`, `routes/marketing-items.js`): one item groups a
   subject's channels; its timing applies to every channel unless a channel overrides it.
 - **Drafts and approval** (`services/marketing/approval.js`): every channel document carries

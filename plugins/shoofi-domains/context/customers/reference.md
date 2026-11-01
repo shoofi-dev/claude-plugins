@@ -535,7 +535,8 @@ suggested|approved|rejected|retired, name, summary (Hebrew), style (English), ex
 createdAt, lastSeenAt, lastUsedAt, decidedBy, decidedAt}`, no TTL, no index. Admin client:
 `src/apis/admin/marketing-templates.ts`, `views/admin/marketing/components/TemplatePicker.tsx`
 ("תבניות" in the "תוכן" step, which fetches nothing until clicked), and
-`views/admin/marketing-templates/MarketingTemplates.tsx` (`/admin/marketing/templates`).
+`views/admin/marketing-templates/MarketingTemplates.tsx` — מרכז שיווק's "תבניות" tab
+(`/admin/marketing?tab=templates`; `/admin/marketing/templates` forwards there).
 
 ## 5e. Marketing social channel (`routes/marketing-social.js`, CORE invariant 17)
 
