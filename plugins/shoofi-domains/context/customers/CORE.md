@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -18,6 +18,14 @@ Accounts, phone+OTP login, tokens & sessions, profiles, addresses, referrals.
 Server: `routes/{auth,customer,customer-referrals,customer-campaigns,customer-feedback,
 shoofi-admin-users}.js`, `utils/{auth-service,admin-auth-service,app-name-helper}.js`,
 `controllers/customerAddressController.js`. Clients: login/OTP/profile in all four apps.
+Also yours: **who a push campaign may reach**: the customer's marketing-push opt-out
+(`routes/customer-marketing-preferences.js`), the frequency cap
+(`services/customer-campaigns/marketing-push-policy.js`), and the campaign send and schedule
+path (`controllers/customerCampaignController.js`, `utils/crons/scheduled-campaigns-cron.js`).
+See invariant 12 and reference §5b. Also the campaign **holdout** and the per-customer
+**audience record** `shoofi.marketingPushAudience` (`services/customer-campaigns/{holdout,
+push-audience}.js`, invariant 13). Measuring lift FROM that record is `orders`' (per-checkout
+order facts); the record itself, and its exactness, is yours.
 **Not yours:** order history content (`orders`), coins/rewards (growth), driver coverage
 fields (`delivery`) — you own the identity record they hang off.
 Also yours: the school-project enrollment (`services/customer/school-project-enrollment.js`)
@@ -67,6 +75,24 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    routes and nowhere else — which is why an admin-token integration test copied as a
    template 401s the moment it is pointed at a customer route. **Do not "fix" this by
    accepting both from an unrelated ticket** — every real client already sends the right one.
+
+   **So the stored `token` IS the credential, and it never leaves in a reply about someone
+   else.** Whoever reads a user doc's `token` is that user until their next login (partner
+   tokens live 1500 days). `authCode` is the pending OTP and `notificationToken` addresses the
+   device. Only the login (`validateAuthCode`) and `switch-store` replies carry a token, and
+   only to its owner. Every admin reply about other people goes through
+   `services/customer/identity-response.js`, and that holds for admin callers too.
+   **The partner-account routes are dashboard-only** (shoofi-server `fix/store-users-auth`,
+   2026-10-30). `/api/customer/store-users/:appName[/:userId]` (GET, GET one, POST, PUT,
+   DELETE), `POST new-customers` and `POST get-customers` carry `...identityListAdmin` =
+   `[auth.required, checkAdminRole(DASHBOARD_ROLES)]`. Before that all seven were open: the
+   GETs returned every store owner's live `token`, and the POST let anyone add their own phone
+   to any store with `isAdmin: true, roles: ["all"]`. The admin web is the only caller, and
+   the partner app has no staff screen, so a partner token gets 403 on its own store as well.
+   Every dashboard role is accepted, because viewer-only staff create and delete store users
+   in prod. A future partner self-management screen needs a per-audience rule (own `appName`
+   from the token, no granting roles the caller lacks), never a role-only gate. Pinned by
+   `test/integration/store-users-admin-auth.js`.
 3. **Impersonation** (`imp:true`) bypasses that check by design — it is **`master`-role only and
    audited**. Never loosen the gate or drop the audit.
 4. **The partner `switch-store` flow** re-mints a **per-store token** and sets
@@ -177,6 +203,490 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
      logs in again starts with no taste profile. The For-you quality collections need nothing
      there: the event copy (`forYouEvents`) carries no customer id, the reviews (`forYouReviews`)
      only a one-way hash, and golden cases none (menu-catalog CORE invariant 22).
+10. **Push campaigns are owner-tier admin only.** Every `routes/customer-campaigns.js` route
+   carries `...adminOnly` = `[auth.required, checkAdminRole(CAMPAIGN_ROLES)]`, with
+   `CAMPAIGN_ROLES = ["master", "admin", "manager"]` (2026-10-28). Before that they were
+   `auth.required` only, and a plain customer token passes `auth.required` (invariant 7's
+   shared secret): it could search customers, preview audiences and push to all of them. The
+   only caller is the admin's קמפייני פוש screen. `master` is named because `checkAdminRole` has
+   no hierarchy. The frequency-cap config (`GET/PUT /push-cap-config`) and
+   `POST /:id/unschedule` sit behind the same `...adminOnly` (2026-10-28). They are declared
+   **before** `/:id`, which would otherwise read `push-cap-config` as a campaign id. Pinned by `test/integration/marketing-routes-auth.js`, which also covers the
+   other marketing write paths (ads, stories, notes, `notifications/send*`, coupon campaigns,
+   admin coupons) — those files have no domain owner yet.
+11. **Every marketing surface opens ONE `link` shape, and it points at something real.** The
+   home banner (ads), stories and launch popups, the home note banner and push campaigns carry
+   `link` = `none | store{appName} | product{appName,productId} | deal{appName,promotionId} |
+   coupon{couponId, appName?} | page{page ∈ LINK_PAGES}` (`utils/marketing-link.js`, 2026-10-28).
+   - Writes go through `linkFromRequest` → `resolveLink`, which 400s a coupon / deal / product /
+     store that doesn't exist. Marketing promotes existing offers only (Sari, 2026-10-28); never
+     add a "create the coupon from here" path. A coupon scoped to exactly one store gets that
+     `appName` filled in. Builds before feat/coupon-detail-link open that store with it (any other
+     coupon: "my coupons", which lists only personal coupons, so a public multi-store coupon was a
+     dead end).
+   - **Every `coupon` link opens the coupon page** (shoofi-app `coupon-detail`,
+     `screens/coupon-detail`, 2026-10-30), single-store coupons included. The page reads
+     `GET /api/coupons/:id/public` (payments CORE, "What a marketing coupon link shows") and says
+     what the coupon gives, its dates, the code with a copy button or "applied automatically at
+     checkout", and where it works: "all stores", or the eligible stores, each opening through
+     `openStoreAtProduct`. It never touches the cart and never claims or applies the coupon. The
+     tap event is unchanged: every caller still calls `trackMarketingTap` / `trackPushOpen` before
+     `openMarketingLink`, and only the router's `coupon` case changed. A phone sees this after
+     `eas update`.
+   - Older app builds never read `link`: writers keep an ad's `appName`/`pageName`
+     (`legacyAdFields`) and a story's `target` (`targetForLink`) in step, and reads fill `link` in
+     for items saved before it (`withLink`). An admin form that sends no `link` must not flatten a
+     saved one (`unchangedOrLegacyLink`). An announcement (`storeAppName: "shoofi-stories"`) has
+     no menu, so its legacy default is `none`, never `store`.
+   - A push campaign's `link` rides in the push `data` next to `campaignId`; the customer app's
+     push-tap router (`hooks/use-notifications.ts` → `utils/marketing-link.ts`) opens it, store
+     opens via `openStoreAtProduct` (twin-order guard).
+   - Views / taps / push opens go to `POST /api/marketing/events` (`routes/marketing-events.js`):
+     `auth.optional`, the customer comes from the token (never the body, and never an admin
+     token), guests by `device-id`; `sanitizeEvent` drops junk, future (>5 min) and >7-day-old
+     events; batches cap at 50; it always answers 200. `marketingEvents` has a 180-day TTL and its
+     indexes are requested in the background, never awaited on the write. Results:
+     `GET /api/admin/marketing/results` (every dashboard role).
+   - **The handle must be registered.** `db.marketingEvents = db.collection('marketingEvents')`
+     in `DatabaseInitializationService`. The route catches everything and answers
+     `accepted: 0`, so a missing registration drops EVERY event silently. It shipped that way
+     in #333; the tests' Proxy handle hid it.
+   - **Events → facts → rollups** (shoofi-server `docs/marketing-attribution.md`).
+     - Which orders a tap led to is the SERVER's join. After each checkout,
+       `services/marketing/order-facts.js` reads this customer's AND this device's
+       `tap`/`push_open` events from the 7 days before it into one fact per checkout
+       (orders CORE invariant 16). `order.marketingTouch` is only the fallback for an event
+       that never arrived.
+     - The device key is `deviceViewerKey(header)` (`services/marketing/viewer-key.js`). The
+       events route writes `viewerKey` with it and the facts look guests up with it, both
+       truncated to 64 characters: the app's `@storage_deviceId` runs longer than that. It is
+       the `device-id` HEADER, never `orders.deviceId`. So a guest's taps
+       (`viewerKey: "device:<id>"`) are credited after they log in.
+     - **Impersonation.** An event posted with an `imp: true` token (master-minted "open as
+       customer") is still stored, with `impersonated: true` and the customer's `viewerKey`.
+       The touch lookup never uses it (`impersonated: { $ne: true }`) and the daily funnel
+       skips it. A checkout placed under such a token is recorded with `isImpersonated` +
+       `excludeFromReports`. `GET /api/admin/marketing/results` still counts impersonated
+       events, so it doesn't match the rollup there.
+     - A touch counts for an order only if it happened before the order (orders CORE
+       invariant 16, the touch-precedence rule).
+     - `shoofi.marketingDailyStats` (per Israel date × placement × itemId, kept forever)
+       holds funnel + orders under last/first/any. Reports:
+       `GET /api/admin/marketing/{performance, order-facts, daily}` (the same roles as
+       results; a fact never holds a phone or a name).
+     - **`/performance` lists push campaigns even with no events.** With `placement=push` or
+       no placement, it includes every customer-app push campaign (`customer-campaigns`,
+       `appType` absent or `shoofi-app`, `channels.push` not false) whose
+       `execution.startedAt` is in `[from, to]`, plus every requested itemId that is one.
+       Each gets funnel zeros, attributed orders and the holdout lift (`pushCampaignsFor`,
+       `services/marketing/performance.js`). A push nobody opened still has a lift, and for
+       a push the lift is THE number. Partner/driver campaigns are not customer pushes.
+     - Push items carry `funnel.pushSent` (`execution.totalUsers`, the treated group once a
+       holdout runs, else the treated audience count), `funnel.openRate`
+       (= `pushOpens / pushSent`) and a `campaign` block. Every item carries a
+       server-resolved `name`: ad / note `titleHE` (else `titleAR`), story/popup
+       "<store> · <caption>" ("שופי" for an announcement), or the campaign name.
+     - `funnel.tapperDays` (and the rollup's `tappers`) = distinct people per day who tapped
+       OR opened. A push item only ever has `push_open` (the route enforces
+       `push_open ⇔ push`), so for a push it means openers. This matches `tappers` in
+       `/results`. `viewerDays` is a sum of daily distinct viewers, not distinct people.
+     - **Every push gets a before/after impact, once** (`services/marketing/campaign-impact.js`,
+       `shoofi.marketingCampaignImpact`, `_id` = campaignId). The marketing cron (hourly at
+       :20) computes it when the 24h window has closed plus 2h, up to 4 per run, newest first,
+       back 180 days. It counts the recipients' placed/completed checkouts (twin = one, any
+       store) in the 24h after `execution.startedAt`, against the same 24h one to four weeks
+       earlier. `noiseBand = max(2·sd, 2·√mean)`. `verdict` is up/down only past it, and
+       `too_small` under 200 recipients or a usual of < 5 orders.
+       - Recipients are the audience's `treated` rows, else `shoofi.notifications` by
+         `data.campaignId`. That collection has no index on `data.campaignId` in prod (5.3M rows), so the query
+         MUST be bounded by an `_id` time range around the run.
+       - It cannot tell the push from the day or an overlapping push (`overlaps` names them).
+         With a holdout, the holdout lift is the causal number.
+       - A run with any unreadable store DB writes nothing and retries.
+       - Served as `impact` on `/performance` push items and by
+         `GET /api/admin/marketing/campaign-impact` (same roles; the admin's
+         "השפעת קמפייני פוש" card). Not on `/api/analytics/growth/*`, which
+         carries a narrower master/admin gate (reference C4).
+   - **The app's queue survives a kill and is flushed before every order.**
+     - `shoofi-app/services/marketing-events.ts` mirrors the queue to AsyncStorage
+       (`@marketing_event_queue`, ≤200 events, 7-day age-out, taps first, one retry).
+     - All three submits (`stores/cart` `submitOrder`, `stores/twin-order` place,
+       `screens/checkout` digital-place-pending) call `prepareMarketingForOrder()`. It gives
+       the queue ≤1.5s, never throws, then returns the touch for the body.
+     - Never send anything beyond `marketingTouch` on `/api/order/create`: the route spreads
+       `...parsedBodey` onto the order, so an extra field lands unsanitized.
+   - **The active list is read-only and keeps each channel's OWN rule** (2026-10-30).
+     `GET /api/admin/marketing/active` (`services/marketing/active.js`, in
+     `routes/marketing-performance.js`) lists every banner, story, launch popup, note,
+     customer-app push, coupon campaign (`couponCampaigns`), social publication and automatic
+     card badge (deal, "new") that is live, scheduled or ended in the last 7 days, as
+     `{channel, id, title{he,ar}, name, subject{kind,id,appName?,label,key}|null, status:
+     live|scheduled|ended_recently, startsAt, endsAt, targeting{everyone,areas,store,segment,
+     summary}, createdBy, createdAt, updatedAt, editPath, automatic, results{views,taps,orders}|null,
+     warnings[]}`, plus `collisions` (pushes within 24h to overlapping `cityAreaId`s; >1 live
+     banner per subject), `warningLabels`, `platform` and `sourceErrors`. Shape and rules:
+     shoofi-server `docs/marketing-attribution.md` "The active list".
+     - **Gate: `ACTIVE_ROLES` = master/admin/manager** (`auth.required` + `checkAdminRole` on the
+       route), narrower than `RESULTS_ROLES`: it names creators and links to edit forms only the
+       owner tier opens. The admin's מרכז שיווק (`/admin/marketing`) has the same sidebar roles.
+     - **It writes nothing** (no collection, no index build) and never reads
+       `shoofi.notifications`; push campaigns never project `execution.results`. Results come from
+       `performance.getPerformance` in batches of ≤200 item ids (a story sums its story + popup
+       placements; a push's views are `pushSent`).
+     - **Status = what the customer app experiences; a disagreement is a `warnings` code, never a
+       different status.** Banners use `/ads/valid`'s STRING compare (prod stores `YYYY-MM-DD`, so
+       a banner disappears at 00:00 UTC of its end date: `banner_end_day_excluded`); stories need
+       `business_visible: true` on the store (`story_store_hidden`) and a 50-year expiry reads as
+       none (`story_never_expires`); notes are live on `isActive` alone because `/notes/valid`
+       ignores their dates, and only the newest is shown; a push `in_progress` over an hour is
+       `push_stuck_in_progress`. Badges are computed, never written (menu-catalog invariant 18):
+       the card shows the newest running deal and a public coupon beats it. Never "fix" a status
+       here to match the stored dates; fix the channel, then this follows.
+   Pinned by `test/integration/marketing-links.js`, `test/integration/marketing-attribution.js` and
+   `test/integration/marketing-active.js` (server), `__tests__/services/marketing-events-queue.test.ts` (app).
+
+12. **Marketing pushes: opt-out and frequency cap apply inside `executeCampaign` ONLY, to
+    customer-app audiences ONLY.** Every other push (order status, `feedback_request`,
+    delivery, partner and driver alerts) calls `notificationService.sendNotification`
+    directly. That function knows neither rule, so a customer who turned offers off still hears
+    about their order. Keep it that way: never move either rule into `sendNotification`.
+    - **Opt-out** = `shoofi.customers.marketingPushOptOut: true`. Unset means opted in, which is
+      every customer before 2026-10-28. The customer sets it through
+      `GET/PUT /api/customer/marketing-preferences` (`auth.required`, customer app-type only).
+      The route writes **`req.auth.id`'s own doc, never an id from a header, body or URL**.
+      `routes/notifications.js` reads a client `user-id` header, which is a known IDOR and must
+      not be copied (invariant 7). The router is mounted above `routes/customer.js`, whose
+      catch-all `GET /api/customer/:customerId` would otherwise answer it.
+    - **Cap** = `shoofi.store {id:1}.marketingPushCap {enabled, maxPushes, windowDays}`. It means
+      "at most N campaign pushes per customer per D days". **Off until an admin turns it on**
+      (`DEFAULTS.enabled: false`), and edited from the קמפייני פוש screen. It counts the
+      customer's existing `shoofi.notifications` records **that carry `data.campaignId`** since
+      the cutoff. `sendNotification` writes one record per recipient and only a campaign send
+      sets `data.campaignId`, so transactional records never count. There is no separate send log.
+    - Both are filtered **before** the per-user send loop (`userIds = policy.userIds`), and the
+      result records `execution.skippedOptOut` / `skippedCapped` / `pushCap`.
+    - **A campaign is claimed atomically**: `claimCampaign` is one `findOneAndUpdate` to
+      `in_progress`. It used to read the status and then write. The cron claims only a due
+      `scheduled` campaign that is published (invariant 17). A lost claim throws `code: 'CAMPAIGN_NOT_CLAIMABLE'`, and the cron
+      skips it without marking it failed, because that would overwrite a run that is sending.
+      The admin's `PUT /:id` refuses an `in_progress` campaign (409) for the same reason.
+    - **`scheduling.scheduledDate` is a Date.** A wall-clock string without an offset is read in
+      the campaign's timezone (`Asia/Jerusalem`). The cron queries `$lte: <Date>`, and a stored
+      string never matches it. That is why no scheduled campaign ever sent before 2026-10-28,
+      along with the cron never being started.
+
+13. **A held-out customer gets NOTHING from that campaign, and the audience record says exactly
+    who got what.** `campaign.holdout = { pct }`, 0–50, **default 0 = off** (a campaign saved
+    before 2026-10-28 has no `holdout` and reads as 0). Customer-app audiences only.
+    - **Order:** opt-out, then cap (invariant 12), THEN holdout. `assignHoldout`
+      (`services/customer-campaigns/holdout.js`) draws only from `policy.userIds` (who would
+      really have been sent) and the send loop gets `holdout.treatedIds`. A held-out customer
+      gets no `sendNotification` call at all: no push, no websocket, no `shoofi.notifications`
+      record, so **no cap count**. Never move the holdout ahead of the opt-out or the cap, and
+      never move it into `sendNotification`.
+    - **Deterministic:** `holdoutBucket` = sha256(`campaignId:customerId`), first 8 hex, mod
+      10000; held out when `< pct × 100`. No randomness, no stored state: a retried execution
+      puts everyone in the same group, and another campaign draws a different slice.
+    - **Too small to measure:** fewer than `MIN_AUDIENCE` (200) eligible customers (after
+      opt-out and cap) → no holdout, `execution.holdoutSkippedReason: "audience_below_minimum"`.
+      A partner/driver campaign with a pct records `"not_customer_audience"` and writes no rows.
+    - **The record is a contract the orders domain's lift reporting reads. Keep it exact:**
+      `shoofi.marketingPushAudience` (that exact Mongo name, via `shoofiDb.collection(...)`),
+      one row per (campaign, customer):
+      `{ campaignId: string, customerId: string, group: "treated"|"holdout"|"capped"|"opted_out", at: Date }`.
+      It is an **assignment** record (intention to treat): `treated` = sent to, even if that
+      push then failed for a missing device token; `at` = the run's assignment instant, the same
+      for every row of the run (not each push's send time). Indexes: unique
+      `{campaignId, customerId}`, `{campaignId, group}`, `{customerId, at: -1}`, TTL 400 days on
+      `{at}` (`RETENTION_DAYS`).
+    - **Never in the send's way:** `recordAudience` runs alongside the send loop, in unordered
+      1000-row `bulkWrite` chunks, and **never throws**. A failure is logged and counted
+      (`execution.audienceRecordErrors` / `audienceRecorded` / `audienceRecordError`); the send
+      goes on, once. The indexes are built once per db in the background and **never awaited by
+      a write** (`ensureIndexesOnce`; shoofi-server#306: a write gated on a failing build on a
+      NEW collection was lost).
+    - **A retried execution never doubles a row:** rows are **upserts** on (campaignId,
+      customerId), which is correct even before the unique index finishes building on first
+      deploy. Non-treated groups are `$setOnInsert` (the first run stands); **`treated` wins**
+      (a pipeline update; an existing treated row keeps its first `at`), so no `holdout` row ever
+      belongs to a customer the campaign pushed, even if the pct was edited between runs. Don't
+      "simplify" this to insertMany-and-ignore-duplicates.
+    - **On `execution`:** `holdoutCount`, `holdoutPct` (what was APPLIED, 0 when skipped; the
+      stored `holdout.pct` can be edited afterwards, so analysis reads this one),
+      `holdoutSkippedReason`. `totalUsers` = the treated count (who was sent to).
+    - Edited with the campaign (`POST /`, `PUT /:id`, the same `...adminOnly` roles; 400 outside
+      0–50, never clamped), from the admin form's "קבוצת ביקורת %" field (`HoldoutField.tsx`).
+
+14. **The school-project routes, the teacher routes and `admin-create` are gated on each route**
+    (2026-10-30, `services/customer/admin-access.js`). Before that none had auth: anyone could
+    create a customer by phone, upload a class list that creates customers, delete every student
+    of a school, or create teachers.
+    - **`SCHOOL_ADMIN`** = `auth.required` + `SCHOOL_SECTION_ROLES` (master/admin/manager/viewer,
+      the admin web's schools sidebar) on `/api/admin/schools*`, `POST /api/admin/school-settings`
+      and the `/api/customer/` school and student routes (reference §4). Only the admin web calls
+      them. The list copies `routes/admin/school-registrations.js`, which can't be required there
+      because it opens Redis. A test fails if the two lists drift.
+    - **`ADMIN_CREATE`** on `POST /api/customer/admin-create` takes a dashboard role, OR a mobile
+      token whose own record (looked up by `app-type`, as in `routes/auth.js`) has `isAdmin`. The
+      three RN login screens call it in place of `customer/create` when `userDetailsStore.isAdmin()`
+      is true. Their tokens carry no roles, so **never make this gate role-only.** In prod, 1
+      customer, every storeUser (394) and 0 drivers carry `isAdmin`. The handler stores only
+      `{phone, created}`. Never let it copy more of the body: the body must not be able to give
+      an account a role or a flag.
+      It also refuses a non-string `phone` (400) and looks the existing customer up by the
+      sanitized value: an object such as `{"$ne": null}` used to answer with an arbitrary
+      customer's phone, name and id, and every partner token passes this gate.
+    - `DASHBOARD_ADMIN` on `/api/admin/teacher/*` (no caller, no `teachers` data in prod).
+    - **Open on purpose:** `GET /api/admin/school-settings` (the customer cart; the values are
+      already public on `GET /api/store/get/shoofi`) and `GET /api/admin/check-order-time-valid`.
+      **Still unscoped:** `POST /api/customer/get-students-by-ids`.
+    Pinned by shoofi-server `test/integration/school-admin-auth.js`.
+15. **The OTP login needs a real code, and the pending code is shown to staff only**
+    (shoofi-server `fix/customer-search-auth`, 2026-10-30).
+    - **`validateAuthCode` compares only when BOTH the stored and the sent code are present**
+      (`isCode`: not null, undefined or ""). A successful login stores `authCode: null`
+      (the v3 driver writes `undefined` as null), and `null == undefined` is true. Until this
+      fix, a request carrying only a phone logged into any customer, partner or driver account
+      and overwrote the owner's session. Never compare a possibly-empty code with bare `==`.
+      This is not the planned hardening (expiry, attempts, lockout). That is still open.
+    - **`POST /create` never echoes the code it just sent.** It used to, for a new phone, so
+      anyone could register a number they don't own.
+    - **`search-customer` is dashboard-only**, and `status.authCode` (the pending OTP, shown to
+      support on purpose) is included only for a dashboard role (`mayReadPendingCode`). Never
+      `token`. OTPs never expire, so a readable code is a login. The RN apps' legacy screens
+      are refused: they have mapped an object as an array since 2025-06 and never worked. Fix
+      that screen and give it a code-free answer before opening the route to a mobile token.
+    - **`GET /:customerId`, `/status`, `/whatsapp-summary` and
+      `POST /:customerId/update-address-to-current-location` are dashboard-only.** Their only
+      caller is the admin web, so a customer token is refused even for its own id.
+    - Flagged for a human: the Known-status `search-customer` line and its place in the
+      "to handle later" list describe the state before this change.
+    Pinned by shoofi-server `test/integration/customer-search-admin-auth.js` and
+    `test/integration/otp-verify-requires-code.js`.
+16. **Generated marketing text states only the subject's facts, loaded from the DB.**
+    `POST /api/admin/marketing/generate` (`routes/marketing-generate.js`, shoofi-server
+    `feat/marketing-generate`, 2026-10-30) writes the AR + HE text for a banner / story / note /
+    push, or draws a banner or story image, for the admin wizard's "תוכן" step. Shoofi-server
+    `docs/marketing-generate.md` has the detail.
+    - **Gate:** `[auth.required, checkAdminRole(GENERATE_ROLES)]`, `GENERATE_ROLES =
+      ["master", "admin", "manager"]`, on every route (the POST, `GET /:jobId`,
+      `GET /:jobId/images/:imageId`, `POST /:jobId/revise`, `POST /:jobId/versions/:id/restore`).
+      Pinned in `test/integration/marketing-routes-auth.js` with the other marketing write paths
+      (invariant 10).
+    - **The body names the subject, nothing else.** `loadSubjectFacts(req.app.db, body.subject)`
+      (`services/marketing/generate/facts.js`) reads the coupon, deal, product, store, "new"
+      window (`launchState`) or app page itself. Never add a fact field to the request. A
+      subject customers can't use now is refused with a 409 `code` before any AI call:
+      `personal` (the same rule as the wizard's `isPromotableCoupon`), `inactive`, `expired`,
+      `hidden`, `not_new`. This is invariant 11's "promote existing offers only" at the content
+      layer.
+    - **The guard is the control, not the prompt.** `guard.js checkText` rejects any generated
+      percentage, ₪ amount, other number, date, time, Latin word (a code), month or weekday
+      name, "today only" / "tomorrow", "free" or "discount" that the facts do not allow
+      (Arabic-Indic digits normalised first). One bad field drops the whole AR + HE idea; the
+      retry is told why; none left → 422 `no_valid_copy`. Never "repair" a rejected token. The
+      image job runs the same guard on its headline / caption before anything renders. It
+      cannot read the picture back: a generator may still draw an extra word on a banner.
+    - **Limits** (`copy.js CHANNEL_LIMITS`): push and note title ≤ 40 / body ≤ 120; banner
+      title ≤ 30 / body ≤ 60; story caption ≤ 80, no title; social caption ≤ 280, no title
+      (the form uses the Arabic only — posts stay Arabic).
+    - **Images:** banner 16:9, TWO renders (Arabic headline, Hebrew headline), because the app
+      shows no text over a banner and picks `imageAR` / `imageHE` by language. Story 9:16, ONE
+      render with NO text, because a story has one media file and the viewer prints
+      `caption.ar` / `caption.he`. Social (2026-10-31, a marketing item's Facebook / Instagram
+      post, invariant 17) 1:1, ONE render with NO text and the story's layout — the caption
+      goes under it. A product's photo is the `subject` reference; a store logo
+      is never sent.
+    - **Renders reuse the bridge's social loop.** `render-service.js claimOnce` hands out a
+      `shoofi.marketingGenerations` render (same job shape, `postId` = the job) when no social
+      render is queued, and `finishRender` routes a non-social id to
+      `services/marketing/generate/renders.js`. Social renders go first. The Spaces key stays on
+      the server. No `renders` bridge → the job fails `no_renderer`, never a silent queue.
+      `marketingGenerations` has a 30-day TTL and must stay registered in
+      `DatabaseInitializationService` (`social-posts-collections.js` scans the folder).
+    - **Every call is logged and priced** (menu-catalog invariant 16): `MODELS.marketing`
+      (`claude-opus-5-5`), features `marketing copy` / `marketing image brief`; each finished
+      render is a `marketing image render` row (backend `artlist`, `costUsd: 0`,
+      `meta.credits: 130`). A daily guard (`budget.js`) refuses with 429 past
+      `shoofi.store {id:1}.marketingAiDailyBudgetUsd` (default $3) or
+      `marketingImageDailyLimit` (default 20 renders).
+    - **Revising a picture keeps every guarantee** (2026-10-31). `POST /:jobId/revise` with no
+      notes ("עוד אפשרות") re-renders the same brief and words (`image.js rerender`, no Claude
+      call); with notes ("בקש שינוי") Claude gets the previous brief, its words and the fenced
+      notes (`revisionBlock`, "the rules win") and the new words go through the SAME guard —
+      notes asking for "50% off" fail the job `no_valid_copy`, they never render. The facts are
+      reloaded (an expired coupon is a 409 here too), the renders count against
+      `marketingImageDailyLimit` (`renderCount` / `lastQueuedAt`), and the replaced result is
+      kept in `versions` (newest 8; `restore` swaps one back). Only from `ready` / `failed`
+      (409 `busy`), scoped to the state read.
+    - **The design guidelines are the social brand direction** (`socialPostsDirection`,
+      `services/social-posts/brand-direction.js`): a banner uses `photography` + `bannerLayout`,
+      a story `photography` + `storyLayout`. Style only — the canvas, the bands the app covers,
+      "the words EXACTLY as written" (banner) / "No text of any kind" (story), the palette, the
+      logo rule and the exclusions stay in `composeRenderPrompt`. Never move one of those into a
+      direction field. The admin edits them from the picture (web
+      `components/admin/image-generation/`, the one revision bar every generated picture uses,
+      social posts included) or the "הנחיות ויזואליות" screen.
+    - **Nothing is published here.** The wizard opens the channel's own form prefilled
+      (`?prefill=` gains `image: {jobId, id|idAr|idHe, url…}`; the form fetches the bytes
+      through `GET …/images/:imageId` and attaches them as an upload), and the person saves it
+      through the channel's own route — which still runs invariant 11's `resolveLink`.
+    - **The same step lives inside every channel form** ("✨ צור עם AI" at the top of the
+      banner, story, note and push forms — on create AND on edit, and on a form opened from a
+      marketing item's "הוסף ערוץ", which skips the wizard; web `FormGenerate`). Its subject
+      is the form's own "מה נפתח בלחיצה" link (`subjectFromLink`); a form with no link yet has
+      the button disabled, and a sent push or the saved-draft prompt shows none. "מלא בטופס"
+      REPLACES the form's text fields and picture; nothing is saved until the form is.
+    - ⚠️ **The Hebrew voice is pending the owner's sign-off** (`voice.js HEBREW_VOICE`, a
+      written spec; nothing was measured for Hebrew). The Arabic is the social `VOICE`.
+    Pinned by shoofi-server `test/integration/marketing-generate.js`.
+
+17. **Every in-app marketing item is a draft until someone approves it; the draft itself says
+    when it goes out (פרסם עכשיו or תזמן), and approving only approves and then follows that;
+    an item saved before drafts existed is published** (owner's decisions 2026-10-30, "draft
+    then approve, like the coupons prompt" and "the publish-now / schedule is defined in the
+    draft, approve only marks it approved"; shoofi-server
+    `services/marketing/approval.js`, `feat/marketing-approval`). It covers home banners
+    (`shoofi.ads`), stories and launch popups (`shoofi.stories`; a popup is a `shoofi-stories`
+    story), the home note banner (`shoofi.notes`) and push campaigns
+    (`shoofi["customer-campaigns"]`, handle `customerCampaigns`), and since 2026-10-31 a
+    marketing item's social post (`shoofi.socialPublications`, `source: "marketing"`).
+    - **One record per doc, written by the server only:** `approval: {status: draft|published,
+      when: now|schedule, createdBy, createdAt, approvedBy, approvedAt, publishAt, revertedBy,
+      revertedAt}`. The ids come from `req.auth.id` (invariant 7). The ads, stories and notes
+      writers copy named fields only, and their edits never `$set` the record whole (an
+      approval landing mid-edit would be undone): they move only the plan (`planSet`). The
+      campaign create drops `approval`, and the PUT drops `approval`, `approval.*` and `status`
+      (`withoutApprovalKeys`). Never let a create or update copy the record or the status from
+      a request.
+    - **The plan is the draft's.** Banner/story/popup/note forms send `publishWhen: now|schedule`
+      and `publishAt` on add and update (`planFromBody`); none sent (an older admin build) =
+      "now". A schedule must be future and within a year, checked **on save** (400). An edit
+      applies a new plan to a draft, moves a scheduled item to its new time ("now" = live at
+      once), and is ignored on a live item. **A push keeps its plan in its own `scheduling`**
+      (immediate | scheduled + `scheduledDate`), mirrored to `approval.when`; a scheduled push
+      needs a future time on create and on every edit before it is sent.
+    - **Marketing items** (owner 2026-10-30, "a marketing item and its channels";
+      `services/marketing/items.js`, `routes/marketing-items.js`). `shoofi.marketingItems`
+      `{subject, link, title, plan, createdBy, …}` is one thing being marketed; each channel
+      points at it with `marketingItemId` (no list on the item, no index).
+      - The item's `plan` is the channels' default timing; `approval.ownPlan: true` = the
+        channel overrides it. `PUT /api/admin/marketing/items/:id/plan` moves the following
+        draft/scheduled channels (an armed push only to a future time). A plan from a
+        following channel's form without `ownPlan` IS the item's timing.
+      - A channel created without `marketingItemId` gets a one-channel item
+        (`attachOnCreate`): approval is always per item. Joining after the item's time
+        passed = "now".
+      - `POST …/items/:id/approve` approves every draft channel; if any scheduled time has
+        passed, nothing is approved (409 `PUBLISH_AT_PAST`). A channel added after the item
+        went out waits for its own approval (state `partial`); on the item's timing a passed
+        time then means now (`lateAsNowFor`), an override's is refused.
+      - `/revert` = every published channel (a sent push stays). `DELETE` only with no
+        channels left (`HAS_CHANNELS`). Audited `*_marketing_item*`.
+    - **Create = draft**, whoever creates it. A new push is `status: "draft"` even if the form
+      said send-now, so nothing is sent on create any more. Editing a published item saves
+      directly (as a coupon does after approval). A push `in_progress`/`completed` can't be
+      edited (409), and an armed one keeps a future send time (400).
+    - **Approve** = `POST /api/admin/marketing/drafts/:channel/:id/approve` with **no body** (any
+      timing sent is ignored). "now" publishes at the click, "schedule" at the draft's time; **a
+      scheduled time that has passed is refused** (409 `PUBLISH_AT_PAST`, `publishTimeOf`) until
+      the draft gets a new one, so nothing goes out late. The write is atomic on
+      `approval.status: "draft"` AND the plan the approver read, so a double click publishes or
+      sends once and an edit in between is a 409.
+      - Banner/story/popup/note: `publishAt` = the click or the draft's instant. **The schedule lives
+        on the record**, so every customer read adds the same `visibleQuery(now)`: no record, or
+        published with `publishAt` null or ≤ now. Each channel's own `startDate` / `publishedAt`
+        and end dates keep their old meaning. A note's reads ignore its dates, so a scheduled
+        note is held back by this clause alone.
+      - Push: an immediate draft runs the existing `executeCampaign` (invariants 12–13
+        unchanged); a scheduled one runs the existing `scheduleCampaign` and cron for its
+        `scheduledDate`, and goes back to draft if arming fails.
+    - **Back to draft** = `POST …/:channel/:id/revert`. Customers stop seeing it on their next
+      read, the draft keeps its plan, and a grandfathered item can be reverted too. A push reverts only while nothing was
+      sent (not `in_progress`/`completed` and `execution.startedAt` unset). That check is in the
+      atomic filter, and the push is disarmed to `status: "draft"` in the same write. **Delete**
+      is each channel's existing `DELETE` route.
+    - **Grandfathering:** a doc with no `approval` (or `approval: null`) is published. In prod on
+      2026-10-30, none of the 78 ads, 148 stories, 6 notes or 227 campaigns had the field. So the
+      5 live banners, 86 live stories and 4 live popups stayed live, and no legacy campaign could
+      still be claimed (216 completed, 11 in_progress).
+    - **Customer reads filter with `visibleQuery()` and strip the record** (`publicItem`), so a
+      published or grandfathered item keeps exactly its old shape. The reads and their callers:
+      - `GET /ads/valid`: shoofi-app explore, shoofi-partner legacy explore;
+      - `GET /ads/list`: shoofi-shoofir legacy explore. The admin list passes
+        `includePending=true`; `activeOnly=false` is unfiltered;
+      - `GET /api/stories/valid` and `/announcements`: shoofi-app;
+      - `GET /api/notes/valid`: shoofi-app home and note-banner;
+      - `GET /api/notes/latest`: no app caller on main.
+
+      Admin reads return the record.
+    - **Push send paths need `publishedQuery()`.** `claimCampaign` and `scheduleCampaign` carry
+      it in their atomic filter and throw `CAMPAIGN_IS_DRAFT` (409 on `/:id/execute` and
+      `/:id/schedule`). The cron's `dueFilter` carries it too, and it skips a draft claim without
+      marking it failed.
+    - **Roles mirror coupon drafts:** `DRAFT_ROLES = APPROVE_ROLES = ["master","admin","manager"]`
+      (`routes/marketing-approval.js`), the same roles that create (invariant 10). There's no
+      separate approver and no reject. `GET /api/admin/marketing/drafts` lists every draft in
+      one row shape, its `plan` included (`services/marketing/approval-queue.js`). Audited as
+      `approve_marketing_draft` and `revert_marketing_to_draft`.
+    - **Social channel** (owner 2026-10-31, "post on our social media pages also from here";
+      shoofi-server `services/marketing/social.js`, `routes/marketing-social.js`,
+      `feat/marketing-social`). A marketing item's Facebook / Instagram post is a
+      `shoofi.socialPublications` row with `source: "marketing"`, `status: "draft"`,
+      `marketingItemId`, `link` and the same `approval` record.
+      - **A draft never reaches Meta:** the scheduling screen's list hides `draft`, `claimNow`
+        refuses it, the publish cron only takes `scheduled`. Approving (the item, or
+        `drafts/social/:id/approve`) moves it to `scheduled` at the publish time in the same
+        atomic write (filter `status: "draft"`); "now" is also claimed and sent at once
+        (`sendDueNow`, exclusive claim).
+      - **A target not connected on the server refuses the WHOLE item** (409
+        `SOCIAL_NOT_CONNECTED`, checked with `PUBLISH_AT_PAST` before anything is approved).
+      - Once approved, **its state comes from its own status** (`stateOf` → `socialStateOf`):
+        `approved`/future `scheduled` = scheduled, anything sent or failed = live. The item's
+        timing moves its `scheduledAt` while it waits (`withSocialClock`). Back to draft, edit
+        and delete only while nothing went out (`SOCIAL_UNSENT`); delete = `cancelled`, which
+        leaves the item (`PIECE_FILTER`).
+      - `mediaUrl` must be a file uploaded through `POST /api/admin/social-publications/media`
+        (`manualMediaProblem`). The caption is Arabic (social-marketing CORE §1d). Pinned by
+        shoofi-server `test/integration/marketing-social.js`.
+    - **Not covered (owner to decide):** coupon-to-phones sends and raw
+      `POST /api/notifications/send*`.
+
+    Admin web: `src/utils/marketing-approval.ts` holds the same grandfathering and states. There
+    is the טיוטות שיווק list at `/admin/marketing/drafts`, a פרסם עכשיו / תזמן choice in every
+    channel's form, an approve confirmation that says what will happen, and chips plus אשר /
+    החזר לטיוטה / מחק on every list and form. Pinned by shoofi-server
+    `test/integration/marketing-approval.js`: grandfathered shape, drafts hidden, publish now,
+    a draft-scheduled item hidden-then-shown on every channel, a passed time refused, the plan
+    checked atomically, push immediate/scheduled/revert, the body can't set the state, the
+    8-role matrix and audit.
+
+18. **Marketing templates are learned from PUBLISHED items, carry no facts, and are offered only
+    after the owner approves them** (2026-10-31, shoofi-server `services/marketing/templates.js`,
+    `docs/marketing-templates.md`). A daily cron (`utils/crons/marketing-templates-cron.js`,
+    04:40 Israel, Redis lock) learns 3–4 reusable designs per channel. Banner and story get an
+    AI design recipe; note and push get a wording pattern. The admin wizard offers them,
+    optionally, on create.
+    - **Sources = published only:** no `approval` or `approval.status: "published"` (inv 17); a
+      push must be completed / in progress / scheduled. Last 60 days, ranked by tap-through from
+      `marketingDailyStats` (≥ 50 impressions), else by recency. Never learn from a draft.
+    - **The job only writes `suggested`.** `approved` comes from the owner via
+      `POST /api/admin/marketing/templates/:id/approve` (master / admin / manager). Limits: ≤ 4
+      approved per channel (409 `full`), ≤ 2 suggested. A match refreshes `examples` but never
+      rewrites an approved template's `style`. Rejected templates are listed to the model as
+      "never suggest again".
+    - **No facts in a template:** `hasFacts` drops a `style` with a digit, `%`, `₪`, "NIS" or
+      "shekel". A banner's example picture is never sent as a generator reference (an old
+      headline is printed on it); a story's is, as `style`.
+    - **Generation takes a template by id only.** `POST /api/admin/marketing/generate`
+      `templateId` → `templateForGeneration`: approved + same channel, else 400 `template`. The
+      style comes from the DB, never the request. The words still pass inv 16's guard. An image
+      job snapshots `{id, name, style}`.
+    - One Claude call per channel per day (pictures attached → API backend), feature
+      `marketing templates`, which counts against the marketing daily budget. The run checks the
+      budget before each channel.
+    Pinned by shoofi-server `test/integration/marketing-templates.js` and
+    `marketing-routes-auth.js`.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
@@ -188,9 +698,15 @@ All of these are **known and accepted for now**. They are scheduled work, not di
   toward it, don't implement unasked):** (a) a **max-retry limit on requesting a code**, and
   (b) letting the user **choose WhatsApp vs SMS** for delivery.
 - **KNOWN:** `search-customer` projects `token` + `authCode` and has no auth.
+  Verified still true on 2026-10-30. The reply carries the pending OTP itself as
+  `status.authCode`, and `isLoggedIn` is derived from the token. The token itself is not in
+  the reply. All three RN apps and the admin web call it.
 - **KNOWN — to handle later:** several identity-adjacent endpoints (address CRUD,
   `search-customer`, storeUsers CRUD, `cash-restrict`) take IDs from the URL/body with no auth.
   **Never widen this surface further.**
+  Flagged for a human (2026-10-30): storeUsers CRUD is gated as of shoofi-server
+  `fix/store-users-auth` (invariant 2), and `cash-restrict` already carries
+  `auth.required` + `checkAdminRole` on main. This list may want trimming.
 - **NOT a bug (verified):** the driver app sends `app-name: 'shoofi'` on push-token
   registration, but the server routes on **`app-type`**, so the token lands correctly on
   `delivery-company.customers`. (Leftovers: an unused `db` variable in that handler, and a

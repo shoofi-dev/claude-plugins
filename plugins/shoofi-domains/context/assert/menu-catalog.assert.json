@@ -1,13 +1,16 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
         "routes/menu.js",
+        "utils/store-launch.js",
+        "docs/store-launch-date.md",
         "routes/product.js",
         "routes/category.js",
         "routes/store.js",
+        "services/catalog/store-update-access.js",
         "routes/translations.js",
         "routes/global-search.js",
         "utils/menu-cache.js",
@@ -23,6 +26,8 @@
         "scripts/fix-empty-extra-option-ids.js",
         "docs/sold-by-weight.md",
         "services/catalog/import-index.js",
+        "services/catalog/product-access.js",
+        "test/integration/product-admin-auth.js",
         "utils/order-pricing.js",
         "routes/admin/menu-import-issues.js",
         "docs/menu-import-issues.md",
@@ -87,9 +92,15 @@
         "services/menu/promotions.js",
         "services/translations/owned-translations.js",
         "services/coupons/coupon-drafts.js",
-        "routes/admin/coupon-drafts.js"
+        "routes/admin/coupon-drafts.js",
+        "services/catalog/category-access.js",
+        "services/catalog/public-store.js",
+        "test/integration/catalog-admin-auth.js"
       ],
       "symbols": {
+        "services/catalog/category-access.js": ["CATALOG_ADMIN", "DASHBOARD_ROLES"],
+        "services/catalog/public-store.js": ["toPublicStore", "PRIVATE_STORE_FIELDS"],
+        "services/catalog/store-update-access.js": ["STORE_UPDATE_ACCESS", "PARTNER_STORE_FIELDS", "storeUpdateGate", "pickPartnerStoreFields", "partnerRefusedChanges"],
         "services/translations/owned-translations.js": ["writeOwnedTranslation", "TRANSLATION_KEY_COLLISION", "SEEDED_BY"],
         "services/coupons/coupon-drafts.js": ["LABEL_KEY_RE", "labelKey", "LABEL_SURFACES"],
         "utils/menu-cache.js": [
@@ -105,7 +116,14 @@
           "menuCache",
           "normalizeWeightExtraPrice",
           "soldByWeight",
-          "supportedCategoryIds"
+          "supportedCategoryIds",
+          "PRODUCT_ADMIN_OR_OWN_STORE"
+        ],
+        "services/catalog/product-access.js": [
+          "PRODUCT_ADMIN",
+          "PRODUCT_ADMIN_OR_OWN_STORE",
+          "ownStoreGate",
+          "DASHBOARD_ROLES"
         ],
         "routes/menu.js": [
           "outOfStockExtras",
@@ -314,11 +332,17 @@
           "deleteCustomerServed"
         ],
         "services/ai/pricing.js": [
-          "UNPRICED_BUDGET_PRICE"
+          "UNPRICED_BUDGET_PRICE",
+          "claude-opus-5-5",
+          "claude-sonnet-5-5",
+          "claude-haiku-5-5"
         ],
         "services/ai/complete.js": [
           "apiTimeoutMs",
-          "apiMaxRetries"
+          "apiMaxRetries",
+          "marketing: \"claude-opus-5-5\"",
+          "support: \"claude-opus-5-5\"",
+          "async function converse("
         ],
         "services/for-you-quality/reviewer.js": [
           "runReview",
@@ -352,9 +376,268 @@
         "services/menu/promotions.js": [
           "applyMenuPromotions",
           "storeCardPromotion"
+        ],
+        "utils/store-launch.js": [
+          "DEFAULT_NEW_STORE_WINDOW_DAYS",
+          "parseLaunchDate",
+          "launchState",
+          "withIsNew",
+          "newStoresQuery",
+          "getNewStoreWindowDays",
+          "validateNewStoreWindowDays"
         ]
       },
       "patterns": [
+        {
+          "file": "services/catalog/product-access.js",
+          "regex": "const PRODUCT_ADMIN = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",
+          "desc": "doc CORE invariant 26: dashboard-only product routes take any dashboard role (viewer and accountant included)"
+        },
+        {
+          "file": "services/catalog/product-access.js",
+          "regex": "const PRODUCT_ADMIN_OR_OWN_STORE = \\[auth\\.required, ownStoreGate\\];",
+          "desc": "doc CORE invariant 26: the partner-callable product routes run auth.required, then the own-store gate"
+        },
+        {
+          "file": "services/catalog/product-access.js",
+          "regex": "if \\(hasAnyRole\\(req\\.auth, DASHBOARD_ROLES\\)\\) \\{",
+          "desc": "doc CORE invariant 26: any dashboard role passes the own-store gate for any store"
+        },
+        {
+          "file": "services/catalog/product-access.js",
+          "regex": "if \\(req\\.headers\\[\"app-type\"\\] !== PARTNER_APP_TYPE \\|\\| !req\\.auth \\|\\| !req\\.auth\\.id\\) return null;[\\s\\S]{0,200}storeUsers\\.findOne\\(\\{ _id: getId\\(req\\.auth\\.id\\) \\}\\)",
+          "desc": "doc CORE invariant 26 / reference §8: a partner's store is its token's storeUsers doc, never the body"
+        },
+        {
+          "file": "services/catalog/product-access.js",
+          "regex": "if \\(ownAppName && req\\.headers\\[\"app-name\"\\] === ownAppName\\) \\{",
+          "desc": "doc CORE invariant 26: a partner passes only when app-name IS its own store"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "\"/api/admin/product/insert\",\\n  \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,\\n  upload\\.array",
+          "desc": "doc CORE invariant 26 / reference §7: insert is admin|own store, gated before multer"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "\"/api/admin/product/update\",\\n  \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,\\n  upload\\.array",
+          "desc": "doc CORE invariant 26 / reference §7: update is admin|own store, gated before multer"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/admin/product/delete\", \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,",
+          "desc": "doc CORE invariant 26 / reference §7: delete is admin|own store"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/admin/product/update/isInStore\", \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,",
+          "desc": "doc CORE invariant 26 / reference §8: the partner's stock toggle is admin|own store"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/admin/product/update/quantity\", \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,",
+          "desc": "doc CORE invariant 26 / reference §8: the partner's quantity edit is admin|own store"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/admin/product/update/order\", \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,",
+          "desc": "doc CORE invariant 26 / reference §7: the partner's products-order screen keeps update/order"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.get\\(\"/api/admin/product/:id\", \\.\\.\\.PRODUCT_ADMIN,",
+          "desc": "doc CORE invariant 26 / reference §7: GET product by id is admin-only"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/admin/product/migrate-orders\", \\.\\.\\.PRODUCT_ADMIN,",
+          "desc": "doc CORE invariant 26 / reference §7: the ordering migrations are admin-only"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/product/create-from-mock\", \\.\\.\\.PRODUCT_ADMIN,",
+          "desc": "doc CORE invariant 26 / reference §7: cloning a template product is admin-only"
+        },
+        {
+          "file": "test/integration/product-admin-auth.js",
+          "regex": "\\[\"post\", \"/api/admin/images/upload\", OWN\\],\\n  \\[\"post\", \"/api/images\", OWN\\],",
+          "desc": "doc CORE invariant 26 / reference §7: the two image routes are admin|own store in the test matrix"
+        },
+        {
+          "file": "test/integration/product-admin-auth.js",
+          "regex": "filter\\(\\(r\\) => r\\.handles\\[0\\] !== auth\\.required\\)",
+          "desc": "doc CORE invariant 26: every route in routes/product.js runs auth.required first, no exception list"
+        },
+        {
+          "file": "services/catalog/category-access.js",
+          "regex": "const CATALOG_ADMIN = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",
+          "desc": "doc CORE invariant 27: category and explore admin routes take any dashboard role (viewer and accountant included)"
+        },
+        {
+          "file": "services/catalog/public-store.js",
+          "regex": "const PRIVATE_STORE_FIELDS = Object\\.freeze\\(\\[\"accounting\", \"hyp\", \"credentials\", \"fraudConfig\"\\]\\);",
+          "desc": "doc CORE invariant 27 / reference §2: a public store card never carries accounting, hyp, credentials or fraudConfig"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "deliveryCompanies: \\(storeData\\.deliveryCompanies \\|\\| \\[\\]\\)\\.map\\(\\(dc\\) =>\\n\\s*dc && dc\\.company \\? \\{ \\.\\.\\.dc, company: toPublicStore\\(dc\\.company\\) \\} : dc",
+          "desc": "doc CORE invariant 27: available-stores strips each delivery company too (they carry HYP OAuth tokens and bank details)"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "\\.\\.\\.toPublicStore\\(storeData\\.store\\),\\n\\s*hasDiscounts,",
+          "desc": "doc CORE invariant 27: available-stores sends a public store card"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "\\{ \\.\\.\\.toPublicStore\\(entry\\.store\\), hasDiscounts, maxDiscountPercent, activePromotion \\}",
+          "desc": "doc CORE invariant 27: menu search sends a public store card"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "res\\.json\\(\\{ enabled: true, config, stores: eligible\\.map\\(toPublicStore\\) \\}\\);",
+          "desc": "doc CORE invariant 27: twin eligible-stores strips the cards only after eligibility read businessType"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "cards: withPublicStores\\(suggested\\.cards\\)",
+          "desc": "doc CORE invariant 27: every For-you card's store is public"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "router\\.get\\(\"/api/store/get/:appName\\?\", \\.\\.\\.CATALOG_ADMIN, async",
+          "desc": "doc CORE invariant 27 / reference §7: the whole store document (payment credentials included) is admin-only"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "const storeDb = await getOrInitializeDb\\(store\\.appName, req\\.app\\.db\\);\\n\\s*const currentStore = await storeDb\\.store\\.findOne\\(\\{\\}\\);",
+          "desc": "doc CORE invariant 27: billing-contacts READS the store document directly, never over GET /api/store/get (a stripped copy written back would wipe accounting); its write is still the self-call of invariant 28"
+        },
+        {
+          "file": "routes/category.js",
+          "regex": "router\\.post\\(\"/api/category/general/add\", \\.\\.\\.CATALOG_ADMIN, upload\\.array",
+          "desc": "doc CORE invariant 27 / reference §7: general-category add is admin-only, gated before multer"
+        },
+        {
+          "file": "routes/category.js",
+          "regex": "router\\.get\\(\"/api/category/general/all/by-store\", \\.\\.\\.CATALOG_ADMIN,",
+          "desc": "doc CORE invariant 27 / reference §7: the admin's tile list is admin-only"
+        },
+        {
+          "file": "routes/category.js",
+          "regex": "router\\.get\\(\"/api/category/general/all\", async",
+          "desc": "doc CORE invariant 27: the home tiles stay public (the customer app reads them before login)"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "router\\.post\\(\"/api/store-category/update/:id\", \\.\\.\\.CATALOG_ADMIN, upload\\.array",
+          "desc": "doc CORE invariant 27 / reference §7: store-category update is admin-only, gated before multer"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "router\\.delete\\(\"/api/store-category/:id\", \\.\\.\\.CATALOG_ADMIN,",
+          "desc": "doc CORE invariant 27 / reference §7: store-category delete is admin-only"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "router\\.post\\(\"/api/category/general/update-order\", \\.\\.\\.CATALOG_ADMIN,",
+          "desc": "doc CORE invariant 27 / invariant 6: the tile reorder is admin-only (and still clears both cache keys)"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "\"/api/shoofiAdmin/category/add\",\\n  \\.\\.\\.CATALOG_ADMIN,\\n  upload\\.array",
+          "desc": "doc CORE invariant 27 / reference §7: platform-category add is admin-only, gated before multer"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.get\\(\"/api/shoofiAdmin/category/list\", \\.\\.\\.CATALOG_ADMIN,",
+          "desc": "doc CORE invariant 27: the GET category list is the admin web's, gated"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.post\\(\"/api/shoofiAdmin/category/list\", async",
+          "desc": "doc CORE invariant 27: the POST category list stays public (App.tsx boot, before login)"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.post\\(\"/api/shoofiAdmin/explore/clear-cache\", \\.\\.\\.CATALOG_ADMIN,",
+          "desc": "doc CORE invariant 27 / reference §7: wiping the explore cache is admin-only"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.post\\(\"/api/shoofiAdmin/explore/debug-area\", \\.\\.\\.CATALOG_ADMIN,",
+          "desc": "doc CORE invariant 27 / reference §7: the area-lookup debug route is admin-only"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "router\\.get\\(\"/api/shoofiAdmin/explore/categories-with-stores-v2\", async",
+          "desc": "doc CORE invariant 27: the home read stays public"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "storeLaunch\\.withIsNew\\(toPublicStore\\(storeObj\\), now, newStoreWindowDays\\)",
+          "desc": "doc CORE invariant 27: explore v2 strips accounting from every card, cache hit or fresh build"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "storeLaunch\\.withIsNew\\(toPublicStore\\(entry\\.store\\), now, newStoreWindowDays\\)",
+          "desc": "doc CORE invariant 27: explore v1 strips accounting from every card, cache hit or fresh build"
+        },
+        {
+          "file": "test/integration/catalog-admin-auth.js",
+          "regex": "const NOT_DECIDED_HERE = new Set\\(\\[\"GET /api/admin/categories/:page\\?\"\\]\\);",
+          "desc": "doc CORE invariant 27: the one in-scope route still open, until delivery-web sends a token for it"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "\"/api/admin/images/upload\",\\n  \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,\\n  upload\\.array",
+          "desc": "doc CORE invariant 26 / reference §7: image upload is admin|own store, gated before multer"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "router\\.post\\(\"/api/images\", \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE,",
+          "desc": "doc CORE invariant 26 / reference §7: the image list is admin|own store"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "router\\.post\\(\"/api/store/update\", \\.\\.\\.STORE_UPDATE_ACCESS, async",
+          "desc": "doc CORE invariant 28: POST /api/store/update runs auth.required + the store-update gate"
+        },
+        {
+          "file": "services/catalog/store-update-access.js",
+          "regex": "^const STORE_UPDATE_ACCESS = \\[auth\\.required, storeUpdateGate\\];",
+          "desc": "doc CORE invariant 28: the gate is auth.required, then storeUpdateGate"
+        },
+        {
+          "file": "services/catalog/store-update-access.js",
+          "regex": "if \\(hasAnyRole\\(req\\.auth, DASHBOARD_ROLES\\)\\) \\{",
+          "desc": "doc CORE invariant 28: every dashboard role may save any store"
+        },
+        {
+          "file": "services/catalog/store-update-access.js",
+          "regex": "if \\(ownAppName && req\\.headers\\[\"app-name\"\\] === ownAppName\\) \\{",
+          "desc": "doc CORE invariant 28: a partner token passes only for its own storeUsers.appName"
+        },
+        {
+          "file": "services/catalog/store-update-access.js",
+          "regex": "const PARTNER_STORE_FIELDS = Object\\.freeze\\(\\[\\n(?:\\s*//.*\\n|\\s*\"(?:isStoreClose|isOpen|isBusy|openHours|creditcard_support|cash_support|takeaway_support|delivery_support|isOrderLaterSupport|drive_in_support|invoicePrintCount|ramadanSettings)\",\\n){16}\\]\\);",
+          "desc": "doc CORE invariant 28 / reference §2 store: a partner writes exactly these twelve fields (four comment lines between them)"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "const picked = pickPartnerStoreFields\\(partnerSent\\);\\n\\s*storeDoc = picked\\.allowed;",
+          "desc": "doc CORE invariant 28: a partner's write is cut to PARTNER_STORE_FIELDS before the $set"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "const writes = \\(key\\) => Object\\.prototype\\.hasOwnProperty\\.call\\(storeDoc, key\\);",
+          "desc": "doc CORE invariant 28: a status change compares only the keys the request writes"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "if \\(req\\.headers\\.authorization\\) selfCallHeaders\\.authorization = req\\.headers\\.authorization;",
+          "desc": "doc CORE invariant 28: the billing-contacts self-call to POST /api/store/update forwards the admin's token"
+        },
         {
           "file": "routes/shoofi-admin.js",
           "regex": "activePromotion = await storeCardPromotion\\(storeDb\\)",
@@ -372,7 +655,7 @@
         },
         {
           "file": "lib/campaign-category-sync.js",
-          "regex": "isCustomerSpecific: \\{ \\$nin: \\[true, 'true'\\] \\}",
+          "regex": "isCustomerSpecific: \\{ \\$nin: \\[true, 'true'\\] \\}|'applicableTo\\.stores\\.0': \\{ \\$exists: true \\},\\s*\\.\\.\\.EVERYONE_COUPON_FILTER",
           "desc": "doc CORE invariant 18: a customer-specific coupon does not put the store in the حملات row"
         },
         {
@@ -384,6 +667,36 @@
           "file": "routes/shoofi-admin.js",
           "regex": "futureOrderEnabled,\\s*activePromotion\\s*};",
           "desc": "doc CORE invariant 18: explore v2 storesMap carries activePromotion"
+        },
+        {
+          "file": "utils/store-launch.js",
+          "regex": "const DEFAULT_NEW_STORE_WINDOW_DAYS = 30;",
+          "desc": "doc CORE invariant 25: a store is new for 30 days unless Settings says otherwise"
+        },
+        {
+          "file": "utils/store-launch.js",
+          "regex": "isNew: t >= start\\.getTime\\(\\) && t < until\\.getTime\\(\\)",
+          "desc": "doc CORE invariant 25: new while launchDate <= now < launchDate + N; a future date is not new"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "launchDate: launch\\.absent \\? \\(store\\.launchDate \\|\\| null\\) : launch\\.value",
+          "desc": "doc CORE invariant 25: the store form writes launchDate on shoofi.stores; an omitted field keeps it"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "storesMap: withIsNewMap\\(cachedData\\.storesMap\\)",
+          "desc": "doc CORE invariant 25: explore v2 applies isNew after the cache read, never into the cache"
+        },
+        {
+          "file": "routes/shoofi-admin.js",
+          "regex": "if \\(req\\.query\\.isNew === 'true'\\)",
+          "desc": "doc CORE invariant 25 / reference §7: all-stores?isNew=true lists the new stores"
+        },
+        {
+          "file": "routes/menu.js",
+          "regex": "storeLaunch\\.withIsNew\\(",
+          "desc": "doc CORE invariant 25: menu search carries isNew"
         },
         {
           "file": "services/translations/owned-translations.js",
@@ -1197,7 +1510,7 @@
         },
         {
           "file": "services/ordering-intelligence/suggest-service.js",
-          "regex": "const forClaude = applyProfile\\(docs, taste, profile\\);\\s*const ai = await aiChatTurn\\(\\{ shoofiDb, text, lang, history, docs: forClaude\\.docs, stores, closedStores, taste: forClaude\\.taste, customerId, now \\}\\)",
+          "regex": "(?:const forClaude = applyProfile\\(docs, taste, profile\\);\\s*const ai = await aiChatTurn\\(\\{ shoofiDb, text, lang, history, docs: forClaude\\.docs, stores, closedStores, taste: forClaude\\.taste, customerId, now \\}\\)|const forClaude = applyProfile\\(docs, taste, profile\\);\\s*const ai = await aiChatTurn\\(\\{\\s*shoofiDb, text, lang, history, docs: forClaude\\.docs, stores, closedStores, taste: forClaude\\.taste, customerId, now,)",
           "desc": "doc CORE invariant 18 / reference §7f: Claude picks only from the avoid-filtered docs and gets the PROFILE-APPLIED taste, so rejected facts hold on the Claude path too"
         },
         {
@@ -1537,8 +1850,23 @@
         },
         {
           "file": "services/ordering-intelligence/suggest-service.js",
-          "regex": "const cards = dropAtServe\\(live, docsByKey, avoid, craving, trace\\)\\.slice\\(0, limit\\);",
+          "regex": "(?:const cards = dropAtServe\\(live, docsByKey, avoid, craving, trace\\)\\.slice\\(0, limit\\);|const cards = byOptionFit\\(dropAtServe\\(live, docsByKey, avoid, craving, trace\\), optionRequest\\)\\.slice\\(0, limit\\);)",
           "desc": "doc CORE invariant 18: the last check at serve time, on both paths"
+        },
+        {
+          "file": ["services/ordering-intelligence/option-request.js", "services/ordering-intelligence/suggest-service.js"],
+          "regex": "(?:return \\{ dishText, wanted: wanted\\.slice\\(0, MAX_WORDS\\), without: without\\.slice\\(0, MAX_WORDS\\), extrasQuestion: false \\};|const query = stripFillers\\(mention\\.rest\\);)",
+          "desc": "doc CORE invariant 13 + 19 / reference §7: parseOptionRequest splits one message into the dish text and its wanted/without option words (capped at MAX_WORDS), so only what is LEFT after them is matched against dish names. TRANSITIONAL: the second path is the pre-#380 form of the same claim in suggest-service.js — drop it once shoofi-server #380 is on main"
+        },
+        {
+          "file": ["services/ordering-intelligence/option-request.js", "services/ordering-intelligence/suggest-service.js"],
+          "regex": "(?:const out = \\{ matched: \\[\\], ambiguous: \\[\\], missing: \\[\\], outOfStock: \\[\\], deselect: \\[\\], noteWithout: \\[\\] \\};|hasRequiredOptions: hasRequiredOptions\\(row\\),)",
+          "desc": "doc CORE invariant 19 / reference §7: matchOptions answers the card's options in exactly these six buckets (matched / ambiguous / missing / outOfStock / deselect / noteWithout), which is what decides a straight-to-cart add. TRANSITIONAL: the second path is the pre-#380 card-shape claim in suggest-service.js — drop it once shoofi-server #380 is on main"
+        },
+        {
+          "file": ["services/ordering-intelligence/option-request.js", "utils/extras-required.js"],
+          "regex": "(?:const group = \\{ ar: e\\.nameAR \\|\\| header\\?\\.nameAR \\|\\| \"\", he: e\\.nameHE \\|\\| header\\?\\.nameHE \\|\\| \"\" \\};|e\\.isGroupHeader !== true && \\(e\\.type === \"single\" \\|\\| e\\.type === \"weight\"\\))",
+          "desc": "doc reference §4 extras: optionsOf walks the extras array with its group headers — an option's group name is the extra's own nameAR/nameHE, falling back to the header's. TRANSITIONAL: the second path is the other server-side reader of the same header/option shape (utils/extras-required.js) — drop it once shoofi-server #380 is on main"
         },
         {
           "file": "services/ordering-intelligence/suggest.js",
@@ -1572,7 +1900,7 @@
         },
         {
           "file": "routes/for-you.js",
-          "regex": "return res\\.status\\(200\\)\\.json\\(\\{ \\.\\.\\.result, suggestionId \\}\\);",
+          "regex": "return res\\.status\\(200\\)\\.json\\(\\{ \\.\\.\\.result, (cards: withPublicStores\\(result\\.cards\\), )?suggestionId \\}\\);",
           "desc": "doc CORE invariant 21: For you is gated on the server, and every reply is logged — every reply carries its suggestionId"
         },
         {
@@ -1742,7 +2070,7 @@
         },
         {
           "file": "services/ordering-intelligence/suggest-service.js",
-          "regex": "const cards = dropAtServe\\(live, docsByKey, avoid, craving, trace\\)\\.slice\\(0, limit\\);\\n\\s*const served = await topUpSeen\\(ranked, cards, \\{ limit, dbFor, docsByKey, avoid, craving, trace \\}\\);",
+          "regex": "(?:const cards = dropAtServe\\(live, docsByKey, avoid, craving, trace\\)\\.slice\\(0, limit\\);\\n\\s*const served = await topUpSeen\\(ranked, cards, \\{ limit, dbFor, docsByKey, avoid, craving, trace \\}\\);|const cards = byOptionFit\\(dropAtServe\\(live, docsByKey, avoid, craving, trace\\), optionRequest\\)\\.slice\\(0, limit\\);\\n\\s*const served = await topUpSeen\\(ranked, cards, \\{ limit, dbFor, docsByKey, avoid, craving, trace \\}\\);)",
           "desc": "doc CORE invariant 23: a quick reply prefers what the chat has not shown — the top-up is decided on the cards that passed the live re-check and the last check"
         },
         {
@@ -1814,10 +2142,13 @@
     },
     "shoofi-app": {
       "files": [
+        "screens/stores/components/item.tsx",
+        "components/store-badge/index.tsx",
         "helpers/family.ts",
         "screens/ai-helper/FamilyScreen.tsx",
         "screens/ai-helper/FamilyStep.tsx",
         "hooks/useOpenStoreAtProduct.ts",
+        "utils/open-store-at-product.ts",
         "screens/menu/components/GeneralCategoriesList.tsx",
         "__tests__/components/general-categories-open-product.test.tsx",
         "helpers/for-you-copy.ts",
@@ -1905,14 +2236,29 @@
       },
       "patterns": [
         {
+          "file": "screens/stores/components/item.tsx",
+          "regex": "t\\(\"store-new-tag\", \\{",
+          "desc": "doc CORE invariant 25: the store card's new badge, with a defaultValue (translations come from the DB)"
+        },
+        {
+          "file": "screens/stores/components/item.tsx",
+          "regex": "if \\(newBadge && out\\.length < 2\\)",
+          "desc": "doc CORE invariant 25: at most two badges; new is dropped when offer and status both show"
+        },
+        {
+          "file": "components/store-badge/index.tsx",
+          "regex": "new: \\{ bg: themeStyle\\.BADGE_NEW_BG",
+          "desc": "doc CORE invariant 25: StoreBadge has a new variant"
+        },
+        {
           "file": "screens/menu/components/GeneralCategoriesList.tsx",
           "regex": "cat\\.subCategories",
           "desc": "doc reference §8: tile-grid stores find a productId through generalCategories[].subCategories[].products — general categories carry no products of their own"
         },
         {
-          "file": "hooks/useOpenStoreAtProduct.ts",
+          "file": "utils/open-store-at-product.ts",
           "regex": "navigate\\(\"menuScreen\"",
-          "desc": "doc reference §8: a For-you card opens menuScreen with productId, never the broken meal route"
+          "desc": "doc reference §8: a For-you card (and a banner / story / push link) opens menuScreen with productId, never the broken meal route"
         },
         {
           "file": "helpers/for-you-copy.ts",
@@ -2091,18 +2437,53 @@
         },
         {
           "file": "hooks/useChatAddToCart.ts",
-          "regex": "if \\(twinOrderStore\\?\\.isTwinModeActive \\|\\| twinCartStore\\.cartItems\\.length > 0\\) return fallback\\(card, \"twin\"\\);\\n\\s*if \\(cartStore\\.cartItems\\.length > 0 && \\(await cartStore\\.getIsSchoolProject\\(\\)\\)\\) return fallback\\(card, \"school\"\\);",
+          "regex": "(?:if \\(twinOrderStore\\?\\.isTwinModeActive \\|\\| twinCartStore\\.cartItems\\.length > 0\\) return fallback\\(card, \"twin\"\\);\\n\\s*if \\(cartStore\\.cartItems\\.length > 0 && \\(await cartStore\\.getIsSchoolProject\\(\\)\\)\\) return fallback\\(card, \"school\"\\);|if \\(twinOrderStore\\?\\.isTwinModeActive \\|\\| twinCartStore\\.cartItems\\.length > 0\\) return \\{ ok: false, reason: \"twin\" \\};\\n\\s*if \\(cartStore\\.cartItems\\.length > 0 && \\(await cartStore\\.getIsSchoolProject\\(\\)\\)\\) return \\{ ok: false, reason: \"school\" \\};)",
           "desc": "doc CORE invariant 19 / reference §7f: twin orders and a school cart open the store instead of a chat add"
         },
         {
           "file": "hooks/useChatAddToCart.ts",
-          "regex": "if \\(storeData\\.isCheckAge && !\\(await AsyncStorage\\.getItem\\(\"@age_check_approved\"\\)\\)\\) return fallback\\(card, \"age_check\"\\);",
+          "regex": "(?:if \\(storeData\\.isCheckAge && !\\(await AsyncStorage\\.getItem\\(\"@age_check_approved\"\\)\\)\\) return fallback\\(card, \"age_check\"\\);|if \\(storeData\\.isCheckAge && !\\(await AsyncStorage\\.getItem\\(\"@age_check_approved\"\\)\\)\\) return \\{ ok: false, reason: \"age_check\" \\};)",
           "desc": "doc CORE invariant 19 / reference §7f: an age-checked store opens the store (its age gate) instead"
         },
         {
           "file": "hooks/useChatAddToCart.ts",
-          "regex": "if \\(raw && !support\\.ok\\) return fallback\\(card, \\(support as any\\)\\.reason\\);",
+          "regex": "(?:if \\(raw && !support\\.ok\\) return fallback\\(card, \\(support as any\\)\\.reason\\);|if \\(raw && !support\\.ok\\) return \\{ ok: false, reason: \\(support as any\\)\\.reason \\};)",
           "desc": "doc CORE invariant 19: whatever chatSheetSupport refuses opens the store at the dish"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "(?:return \\{ sheet, busyCardId, quickAdd, addFromSheet, closeSheet, clearSheet, onAction, decrement \\};|return \\{ sheet, busyCardId, quickAdd, addFromSheet, closeSheet, clearSheet, onAction, decrement, startFromReply \\};)",
+          "desc": "doc CORE invariant 19 / reference §7f: the chat-add hook's own API — startFromReply is the one-message order entry point, alongside quickAdd and the sheet. TRANSITIONAL: the first alternative is the pre-#83 form of the same return — drop it once shoofi-app #83 is on main"
+        },
+        {
+          "file": ["helpers/chat-order.ts", "helpers/extras-defaults.ts"],
+          "regex": "(?:const out: Applied = \\{ selections: withoutOutOfStock\\(prepared, base, outOfStockExtras\\), added: \\[\\], unmet: \\[\\], ask: \\[\\], note: \\[\\] \\};|export const resolveExtraDefaults = \\()",
+          "desc": "doc CORE invariant 19 / reference §7f: applyOptionMatch starts from the menu's own defaults and then applies the server's match on top. TRANSITIONAL: the second path is the defaults resolver it starts from — drop it once shoofi-app #83 is on main"
+        },
+        {
+          "file": ["helpers/chat-order.ts", "hooks/useChatAddToCart.ts"],
+          "regex": "(?:const byId = ref\\.optionId \\? opts\\.find\\(\\(o\\) => o && String\\(o\\.id\\) === String\\(ref\\.optionId\\)\\) : null;|export function findMenuProduct\\(menu: any, productId: string\\): any \\| null \\{)",
+          "desc": "doc CORE invariant 19 / reference §7f: findOption re-resolves every option against the menu the app loaded — extra + position, then id, then name (legacy blank ids) — and the app is the final authority. TRANSITIONAL: the second path is the same claim for the product itself (findMenuProduct) — drop it once shoofi-app #83 is on main"
+        },
+        {
+          "file": ["helpers/chat-order.ts", "helpers/extras-defaults.ts"],
+          "regex": "(?:if \\(extra\\.type === \"single\"\\) return \\{ \\.\\.\\.selections, \\[extra\\.id\\]: option\\.id \\};|if \\(extra\\.type === \"multi\" && Array\\.isArray\\(extra\\.defaultOptionIds\\)\\) \\{)",
+          "desc": "doc reference §7f: addOption — a single replaces its answer, a multi adds within its cap (maxCount ?? max). TRANSITIONAL: the second path is the same single/multi split in the defaults resolver — drop it once shoofi-app #83 is on main"
+        },
+        {
+          "file": ["helpers/chat-order.ts", "helpers/extras-defaults.ts"],
+          "regex": "(?:export function withoutOutOfStock\\(prepared: any, selections: Record<string, any>, outOfStockExtras: string\\[\\]\\): Record<string, any> \\{|defaults\\.push\\(\\{ extraId: extra\\.id, value: extra\\.defaultOptionId \\}\\);)",
+          "desc": "doc CORE invariant 19 / reference §4 extras: defaults are seeded WITHOUT a stock check, so the chat clears the out-of-stock ones (withoutOutOfStock) before it prefills. TRANSITIONAL: the second path is the unchecked default push itself — drop it once shoofi-app #83 is on main"
+        },
+        {
+          "file": ["helpers/chat-order.ts", "helpers/extras-defaults.ts"],
+          "regex": "(?:const title = optionName\\(e, lang\\) \\|\\| optionName\\(header, lang\\);|extras\\.filter\\(\\(e\\) => e && !e\\.isGroupHeader\\)\\.length === 1 && !extra\\.isGroupHeader;)",
+          "desc": "doc reference §4 extras / §7f: extrasListText titles each group by the extra's own name, falling back to its header's, and group headers are never offered as options. TRANSITIONAL: the second path is the other reader of that header/extra split — drop it once shoofi-app #83 is on main"
+        },
+        {
+          "file": ["helpers/chat-order.ts", "helpers/for-you-copy.ts"],
+          "regex": "(?:export const ORDERABLE_REPLIES = \\[\"text_results\", \"without_results\", \"ai_reply\"\\];|for_you_reply_text_results: \\{ ar:)",
+          "desc": "doc CORE invariant 19: only replies whose cards MATCH what was asked start a one-message order — text_results, without_results, ai_reply, never a fallback. TRANSITIONAL: the second path is the copy row of the first of those reply codes — drop it once shoofi-app #83 is on main"
         },
         {
           "file": "hooks/useChatAddToCart.ts",
@@ -2478,6 +2859,7 @@
     },
     "shoofi-delivery-web": {
       "files": [
+        "src/views/admin/stores/StoreForm.tsx",
         "src/views/admin/dish-types/DishTypes.tsx",
         "src/apis/admin/dish-taxonomy.ts",
         "src/views/admin/ai-usage/AiUsage.tsx",
@@ -2490,6 +2872,16 @@
       ],
       "symbols": {},
       "patterns": [
+        {
+          "file": "src/views/admin/stores/StoreForm.tsx",
+          "regex": "name=\"launchDate\"",
+          "desc": "doc CORE invariant 25: the store form's تاريخ الافتتاح field"
+        },
+        {
+          "file": "src/views/admin/settings/ShoofiSettings.tsx",
+          "regex": "newStoreWindowDays: 30,",
+          "desc": "doc CORE invariant 25: the new-store window under Settings → Shoofi, default 30"
+        },
         {
           "file": "src/apis/admin/dish-taxonomy.ts",
           "regex": "/admin/dish-taxonomy",

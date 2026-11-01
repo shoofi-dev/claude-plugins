@@ -123,6 +123,27 @@ the `customerinvoices@shoofi.app` Gmail by docId, uploads to DO Spaces, and sets
 `ccPaymentRefData.{url, invoiceStatus, docId, processedAt, failureReason}`. Background
 queue retries every **15s** (max 10). → **Store/settlement tax invoices are the `accountant` domain.**
 
+**The queue is in memory.** `pendingInvoices` is a `Map` in the process. A restart or deploy
+drops it, and the order keeps `invoiceStatus: "pending"` with nothing left to retry it.
+Prod on 2026-10-30, across 188 store DBs: 41,351 `completed`, 4,122 `none`,
+**2,916 `pending`** (newest 2026-09-22) and 12 `failed`. `docId` is a number on most orders.
+Flagged with no verdict: whether those pending orders should be re-queued.
+
+**Admin routes** (`routes/admin.js`, CORE invariant 11). Every one is `auth.required` plus a
+role check, and no client calls any of them.
+| Route | Roles | What it does |
+|---|---|---|
+| `GET /api/admin/invoices/pending` | `DASHBOARD_ROLES` | the size of this process's in-memory queue (one instance; prod runs two) |
+| `POST /api/admin/invoices/retry` `{docId}` | master, admin | queues one `docId` |
+| `POST /api/admin/invoices/process-all` | master, admin | queues every `invoiceStatus:"pending"` order in the **`app-name` header's** DB (one store, `shoofi` when absent) |
+| `POST /api/admin/invoices/webhook` `{docId, secret}` | master, admin | fetches now, falls back to the queue. Also needs `secret === INVOICE_WEBHOOK_SECRET`, which is not in `.env.production` (the DO app spec was not checked). No provider calls it. |
+
+The queue keeps the whole `req` and reads only `req.app.db` and the `app-name` header from
+it. It makes no HTTP call that carries request headers. `retry` puts `docId` into the Gmail
+query (`subject:<docId>`) and the public Spaces key (`invoices/doc-<docId>.pdf`) unvalidated.
+Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restrict`, which
+hangs the request (CORE invariant 11), so none of them answered.
+
 ## 6. Refunds (customer-side — you own these)
 - **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
   `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.
@@ -196,7 +217,14 @@ queue retries every **15s** (max 10). → **Store/settlement tax invoices are th
   Pay → no card token, just session id; server reads the ZCredit session for the amount.
 - **Coupons**: the app never computes a coupon discount — it shows the server's
   `discountAmount` (auto-apply and manual re-validate in `components/total-price/index.tsx`)
-  and posts it in `appliedCoupon` (`hooks/checkout/use-checkout-submit.ts`). It declares what
+  and posts it in `appliedCoupon` (`hooks/checkout/use-checkout-submit.ts`, read from
+  `couponsStore.appliedCoupon`). **The coupon submit sends is the one the total was priced with**:
+  `couponsStore.getAndApplyAutoCoupons` / `applyCoupon` only quote, and TotalPrice's
+  `commitCoupon` writes its own state and `couponsStore.setAppliedCoupon` together, only from a
+  response its effect has not superseded. Before this, a late, superseded auto-apply answer
+  wrote the store directly, so an order went out at the discounted total with
+  `appliedCoupon: null` (no couponUsages row; 8265-1164, GCP 5194-1334 on 2026-10-27).
+  Checkout also clears a store coupon left from an earlier visit on mount. It declares what
   its bundle can render in `x-client-features` (`consts/shared.ts` `CLIENT_FEATURES`, sent by
   `utils/http-interceptor`); `delivery-price-coupon` unlocks fixed-delivery-price coupons.
   A merged change to that list reaches phones only with `eas update`.
