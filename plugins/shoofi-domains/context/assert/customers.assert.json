@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (CORE invariant 12: a click sends in the background, several at a time); shoofi-server@feat/marketing-social + shoofi-delivery-web@feat/marketing-social / 2026-10-31 (CORE invariant 17: the social channel of a marketing item, reference 5c + 5e); shoofi-delivery-web@feat/marketing-generate-in-forms / 2026-10-31 (CORE invariant 16: generation inside every channel form, create and edit); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (CORE invariant 11 active list); shoofi-server@feat/marketing-templates + shoofi-delivery-web@feat/marketing-templates / 2026-10-31 (CORE invariant 18 learned templates, reference 5d); shoofi-server@feat/marketing-image-revise / 2026-10-31 (CORE invariant 16 revise + design guidelines); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/marketing-hub-ux + shoofi-delivery-web@feat/marketing-hub-ux / 2026-11-01 (CORE invariant 11: the active list reads the approval record first - draft / approved-later; invariant 17: the approval queue is the hub's tab); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (CORE invariant 12: a click sends in the background, several at a time); shoofi-server@feat/marketing-social + shoofi-delivery-web@feat/marketing-social / 2026-10-31 (CORE invariant 17: the social channel of a marketing item, reference 5c + 5e); shoofi-delivery-web@feat/marketing-generate-in-forms / 2026-10-31 (CORE invariant 16: generation inside every channel form, create and edit); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (CORE invariant 11 active list); shoofi-server@feat/marketing-templates + shoofi-delivery-web@feat/marketing-templates / 2026-10-31 (CORE invariant 18 learned templates, reference 5d); shoofi-server@feat/marketing-image-revise / 2026-10-31 (CORE invariant 16 revise + design guidelines); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -535,6 +535,9 @@
         {"file": "services/marketing/active.js", "regex": "if \\(!started \\|\\| started\\.getTime\\(\\) < now - PUSH_STUCK_MS\\) warnings\\.push\\(\"push_stuck_in_progress\"\\);", "desc": "CORE invariant 11: a push in_progress for over an hour is flagged stuck"},
         {"file": "services/marketing/active.js", "regex": "\"execution\\.startedAt\": 1, \"execution\\.completedAt\": 1, \"execution\\.totalUsers\": 1, \"holdout\\.pct\": 1,", "desc": "CORE invariant 11: the active list projects push execution fields, never execution.results"},
         {"file": "services/marketing/active.js", "regex": "const PUSH_COLLISION_MS = 24 \\* 3600 \\* 1000;", "desc": "CORE invariant 11: two pushes within 24h to overlapping areas are a collision"},
+        {"file": "services/marketing/active.js", "regex": "if \\(rec\\.status !== approval\\.STATUS\\.PUBLISHED\\) \\{", "desc": "CORE invariant 11: the active list reads the approval record first - a draft is `draft` whatever its dates say"},
+        {"file": "services/marketing/active.js", "regex": "if \\(at && at > now && item\\.status !== \"ended_recently\"\\) \\{\\n    item\\.status = \"scheduled\";", "desc": "CORE invariant 11: an approved piece whose publishAt is ahead is `scheduled`"},
+        {"file": "services/marketing/active.js", "regex": "\\{ status: \"draft\", \"approval\\.status\": approval\\.STATUS\\.DRAFT \\}", "desc": "CORE invariant 11: push drafts with a draft record are listed; a legacy draft is not"},
         {"file": "routes/marketing-generate.js", "regex": "const GENERATE_ROLES = \\[\"master\", \"admin\", \"manager\"\\];", "desc": "CORE invariant 16: content generation is owner-tier only"},
         {"file": "routes/marketing-generate.js", "regex": "const facts = await loadSubjectFacts\\(req\\.app\\.db, body\\.subject\\);", "desc": "CORE invariant 16: the facts are loaded from the DB by the subject's identity; nothing else in the body is read for them"},
         {"file": "services/marketing/generate/copy.js", "regex": "push: \\{ title: 40, body: 120 \\},\\s*note: \\{ title: 40, body: 120 \\},\\s*banner: \\{ title: 30, body: 60 \\},\\s*story: \\{ title: null, body: 80 \\},", "desc": "CORE invariant 16: the per-channel length limits"},
@@ -636,7 +639,10 @@
         "src/views/admin/marketing-templates/MarketingTemplates.tsx",
         "src/views/admin/marketing/components/FormGenerate.tsx",
         "src/views/admin/marketing/social/SocialPostForm.tsx",
-        "src/apis/admin/marketing-social.ts"
+        "src/apis/admin/marketing-social.ts",
+        "src/views/admin/marketing-drafts/ApprovalQueue.tsx",
+        "src/views/admin/marketing/hub/hub-url.ts",
+        "src/utils/return-to.ts"
       ],
       "patterns": [
         {
@@ -685,8 +691,8 @@
         },
         {
           "file": "src/views/admin/marketing/hub/active-model.ts",
-          "regex": "export const NO_SUBJECT_LABEL = \"ללא יעד\";",
-          "desc": "CORE invariant 11: items without a subject are grouped as ללא יעד"
+          "regex": "export const NO_SUBJECT_LABEL = \"כללי \\(בלי יעד\\)\";",
+          "desc": "CORE invariant 11: items without a subject are grouped as כללי (בלי יעד), last"
         },
         {
           "file": "src/views/admin/marketing/content.ts",
@@ -697,6 +703,16 @@
           "file": "src/views/admin/ads/add/AddEditAd.tsx",
           "regex": "<FormGenerate channel=\"banner\" link=\\{currentLink\\}",
           "desc": "CORE invariant 16: the banner form's AI bar generates from the form's current link"
+        },
+        {
+          "file": "src/views/admin/marketing/hub/active-model.ts",
+          "regex": "case \"current\":\\n      return item\\.status === \"live\" \\|\\| item\\.status === \"scheduled\";",
+          "desc": "CORE invariant 11: the hub's default view is what customers see now or soon - never a draft"
+        },
+        {
+          "file": "src/views/admin/marketing-drafts/MarketingDrafts.tsx",
+          "regex": "<Navigate to=\\{hubUrl\\(\\{ tab: \"approve\" \\}\\)\\} replace />",
+          "desc": "CORE invariant 17: the approval queue is the hub's tab; the old route forwards there"
         },
         {
           "file": "src/components/admin/ApproveDialog.tsx",

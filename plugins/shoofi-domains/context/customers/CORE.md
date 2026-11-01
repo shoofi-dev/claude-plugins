@@ -319,13 +319,21 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
      `GET /api/admin/marketing/active` (`services/marketing/active.js`, in
      `routes/marketing-performance.js`) lists every banner, story, launch popup, note,
      customer-app push, coupon campaign (`couponCampaigns`), social publication and automatic
-     card badge (deal, "new") that is live, scheduled or ended in the last 7 days, as
-     `{channel, id, title{he,ar}, name, subject{kind,id,appName?,label,key}|null, status:
-     live|scheduled|ended_recently, startsAt, endsAt, targeting{everyone,areas,store,segment,
-     summary}, createdBy, createdAt, updatedAt, editPath, automatic, results{views,taps,orders}|null,
-     warnings[]}`, plus `collisions` (pushes within 24h to overlapping `cityAreaId`s; >1 live
-     banner per subject), `warningLabels`, `platform` and `sourceErrors`. Shape and rules:
-     shoofi-server `docs/marketing-attribution.md` "The active list".
+     card badge (deal, "new") that is live, scheduled, waiting for approval or ended in the last
+     7 days, as `{channel, id, title{he,ar}, name, subject{kind,id,appName?,label,key}|null,
+     status: live|scheduled|draft|ended_recently, startsAt, endsAt, targeting{everyone,areas,
+     store,segment,summary}, createdBy, createdAt, updatedAt, editPath, marketingItemId,
+     automatic, results{views,taps,orders}|null, warnings[]}`, plus `collisions` (pushes within
+     24h to overlapping `cityAreaId`s; >1 live banner per subject — drafts collide with nothing),
+     `warningLabels`, `platform` and `sourceErrors`. Shape and rules: shoofi-server
+     `docs/marketing-attribution.md` "The active list".
+     - **The approval record decides first** (2026-11-01, `withApproval`): a piece whose
+       `approval.status` is `draft` is `draft` whatever its dates say (customers see nothing —
+       before this it read "live"), and an approved one whose `approval.publishAt` is ahead is
+       `scheduled` from that time. No record = grandfathered, the channel's own status. Push
+       drafts (`status: "draft"` + a draft record) and a קידום's social drafts are listed; a
+       legacy push `draft` with no record is not. A קידום's social post takes its subject from
+       its `link`.
      - **Gate: `ACTIVE_ROLES` = master/admin/manager** (`auth.required` + `checkAdminRole` on the
        route), narrower than `RESULTS_ROLES`: it names creators and links to edit forms only the
        owner tier opens. The admin's מרכז שיווק (`/admin/marketing`) has the same sidebar roles.
@@ -667,7 +675,8 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       `POST /api/notifications/send*`.
 
     Admin web: `src/utils/marketing-approval.ts` holds the same grandfathering and states. There
-    is the טיוטות שיווק list at `/admin/marketing/drafts`, a פרסם עכשיו / תזמן choice in every
+    is the approval queue — מרכז שיווק's "ממתין לאישור" tab (`/admin/marketing?tab=approve`;
+    `/admin/marketing/drafts` forwards there), a פרסם עכשיו / תזמן choice in every
     channel's form, an approve confirmation that says what will happen, and chips plus אשר /
     החזר לטיוטה / מחק on every list and form. Pinned by shoofi-server
     `test/integration/marketing-approval.js`: grandfathered shape, drafts hidden, publish now,
