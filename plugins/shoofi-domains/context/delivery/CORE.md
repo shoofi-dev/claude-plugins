@@ -210,6 +210,18 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
    company's admin login (`delivery-company.customers`, `role: "admin"`) **also takes jobs** —
    one such account took ~1,164 in 30 days — so it is a fleet, not a courier. Any per-driver
    table (lateness, load, pay) must flag `role === "admin"` rows rather than rank them.
+   **A "drivers" search returns those admins too, and switching one off re-routes a whole
+   company.** `GET /api/delivery/company/employee/search` *widens* the filter it is given:
+   `role=driver` becomes `role: { $in: ['driver', 'admin'] }`
+   (`routes/delivery/company.js`), so every courier-search UI silently lists company admins
+   beside the couriers. That matters because `resolveManualAdmin` picks the admin by
+   `{companyId, role: 'admin', isActive: true}` (`services/delivery/assignDriver.js`) and
+   returns `null` when none is active — logging `has no active admin — falling back to
+   auto-assignment`. So deactivating the only active admin of an
+   `isControlledByAdmin && manualAssignmentOnly` company is not "this one person stops
+   getting new assignments": it drops that **company** out of manual-admin routing into
+   auto-assignment, silently, with a `console.warn` as the only trace. A support toggle
+   built on this search must show the row's `role` — the search already returns it.
    **`centralizedFlowMonitor.trackOrderFlowEvent` RETHROWS — always wrap it.** It logs and then
    `throw error` (`services/monitoring/centralized-flow-monitor.js:63-66`), so an `await`ed call
    with no local try/catch turns a monitoring failure into a 5xx on the dispatch route *after*

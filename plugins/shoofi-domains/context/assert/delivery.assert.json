@@ -426,6 +426,16 @@
           "desc": "the support escape on update-active-status: this exact string is what skips the shift guard, so every admin-web toggle has to send it. Rename it and support silently starts getting SHIFT_NOT_BOOKED in Arabic"
         },
         {
+          "file": "routes/delivery/company.js",
+          "regex": "filters\\.role\\s*=\\s*\\{\\s*\\$in:\\s*\\[\\s*['\"]driver['\"],\\s*['\"]admin['\"]\\s*\\]\\s*\\}",
+          "desc": "employee/search WIDENS role=driver to driver|admin, so every courier-search UI also lists company admins. Deactivating the only active admin of an isControlledByAdmin && manualAssignmentOnly company drops that company out of manual-admin routing into auto-assignment (resolveManualAdmin returns null). Narrow this to 'driver' and the admin rows vanish from the support activation panel; widen it further and more non-couriers appear as couriers"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "has no active admin — falling back to auto-assignment",
+          "desc": "the ONLY trace that a manualAssignmentOnly company lost its admin and is now auto-assigning is this console.warn. If it is removed, the re-routing described in CORE.md invariant 6 becomes completely silent"
+        },
+        {
           "file": "services/delivery/driver-status-service.js",
           "regex": "async function setDriverActiveStatus",
           "desc": "the deactivation path takes no account of the driver's active deliveries, on purpose - 59% of switch-offs happen while he holds one and it produced 0 orphaned deliveries in 30 days. If a bookDelivery read appears here, somebody has built the alert reference.md 5 says not to"
