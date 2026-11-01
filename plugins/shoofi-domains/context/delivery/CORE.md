@@ -573,6 +573,21 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
   run on the shift system, where an hourly sweep would switch off drivers who
   never had a shift to miss. The guard and the cron share the predicate so they
   cannot disagree.
+- **The activation refusal ladder has two rungs, and only the second one can be
+  escaped.** `POST /api/delivery/company/employee/:id/update-active-status`
+  (`routes/delivery/company.js`) checks a **driver block first** —
+  `getActiveDriverBlock` → 403 `DRIVER_BLOCKED` — and it applies even to a driver
+  who is already active, so re-asserting `isActive: true` is not a way back in.
+  Only after that does the shift guard above run, and it is skipped entirely when
+  `deliveryConfig.useBookingSystem === false` **or `updatedBySource ===
+  "shoofi_support"`**. That string is not a label: it is the support escape, and
+  it is why every operator toggle in the admin web sends it
+  (`shoofi-delivery-web/src/apis/delivery/driver-activation.ts`,
+  `components/Cards/DriverCard.tsx`). A support screen that omits it gets a 400
+  `SHIFT_NOT_BOOKED` whose message is in Arabic and reads like the driver's own
+  refusal. A block is never escaped by it, by design — so a support UI should
+  show the block *before* the press rather than letting an operator discover it
+  by pressing. **Deactivation has no gate of any kind.**
 - **STILL BROKEN (client side):** `ShiftsCalendar.tsx` day/list view and both
   Excel exports sort `startTime` lexicographically, floating the tail to the top;
   and both `getBusinessDayStartHour` copies INFER the start hour from the loaded
