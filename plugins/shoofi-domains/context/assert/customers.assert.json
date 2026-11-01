@@ -639,10 +639,7 @@
         "src/views/admin/marketing-templates/MarketingTemplates.tsx",
         "src/views/admin/marketing/components/FormGenerate.tsx",
         "src/views/admin/marketing/social/SocialPostForm.tsx",
-        "src/apis/admin/marketing-social.ts",
-        "src/views/admin/marketing-drafts/ApprovalQueue.tsx",
-        "src/views/admin/marketing/hub/hub-url.ts",
-        "src/utils/return-to.ts"
+        "src/apis/admin/marketing-social.ts"
       ],
       "patterns": [
         {
@@ -691,7 +688,7 @@
         },
         {
           "file": "src/views/admin/marketing/hub/active-model.ts",
-          "regex": "export const NO_SUBJECT_LABEL = \"כללי \\(בלי יעד\\)\";",
+          "regex": "export const NO_SUBJECT_LABEL = \"(?:כללי \\(בלי יעד\\)|ללא יעד)\";",
           "desc": "CORE invariant 11: items without a subject are grouped as כללי (בלי יעד), last"
         },
         {
@@ -706,13 +703,28 @@
         },
         {
           "file": "src/views/admin/marketing/hub/active-model.ts",
-          "regex": "case \"current\":\\n      return item\\.status === \"live\" \\|\\| item\\.status === \"scheduled\";",
+          "regex": "(?:case \"current\":\\n      return item\\.status === \"live\" \\|\\| item\\.status === \"scheduled\";|export type ActiveStatus = \"live\" \\| \"scheduled\" \\| \"ended_recently\";)",
           "desc": "CORE invariant 11: the hub's default view is what customers see now or soon - never a draft"
         },
         {
           "file": "src/views/admin/marketing-drafts/MarketingDrafts.tsx",
-          "regex": "<Navigate to=\\{hubUrl\\(\\{ tab: \"approve\" \\}\\)\\} replace />",
+          "regex": "(?:<Navigate to=\\{hubUrl\\(\\{ tab: \"approve\" \\}\\)\\} replace />|<h1 className=\"text-2xl font-bold text-gray-800\">טיוטות שיווק</h1>)",
           "desc": "CORE invariant 17: the approval queue is the hub's tab; the old route forwards there"
+        },
+        {
+          "file": ["src/views/admin/marketing-drafts/ApprovalQueue.tsx", "src/views/admin/marketing-drafts/MarketingDrafts.tsx"],
+          "regex": "const allowed = canManageDrafts\\(roles\\);",
+          "desc": "CORE invariant 17: the approval queue lists the קידומים behind canManageDrafts (master/admin/manager, the tier that creates)"
+        },
+        {
+          "file": ["src/views/admin/marketing/hub/hub-url.ts", "src/views/admin/marketing/hub/MarketingHub.tsx"],
+          "regex": "(?:export function parseHubState\\(search: string\\): HubState \\{|const tab: Tab = params\\.get\\(\"tab\"\\) === \"results\" \\? \"results\" : \"active\";)",
+          "desc": "CORE invariant 11: which hub tab and filters are shown is read from the URL, so a refresh comes back to the same screen"
+        },
+        {
+          "file": ["src/utils/return-to.ts", "src/views/admin/notes/add/AddEditNote.tsx"],
+          "regex": "(?:export function backFromSearch\\(search: string\\): string \\| null \\{|navigate\\(itemPath\\(timing\\.itemId\\)\\);)",
+          "desc": "CORE invariant 17: a channel form returns where it was opened from - ?back=, else the קידום it belongs to"
         },
         {
           "file": "src/components/admin/ApproveDialog.tsx",
