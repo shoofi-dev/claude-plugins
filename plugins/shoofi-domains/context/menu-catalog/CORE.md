@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -388,6 +388,18 @@ boundary and say so in the PR.
    `replyParams.stores` and the same dish from open stores (popular fill when nothing matches), and
    the Claude chat is told "named X, which is CLOSED now" — found when GCP was closed at 09:48 and
    its name fell into the dish search.
+   **"Do THEY have…?" is the chat's store, and one store with nothing says so** (`store-focus.js`).
+   The app sends `focusStore` (the store the conversation is on: a reply's `storeScope` or all its
+   cards from one store, the order flow's pick, the store just added from, else the cart's). The
+   server uses it ONLY when the message points back — «عندهم / منهم / هناك / نفس المحل»,
+   «אצלם / יש להם / שם», "they / there" — and names no store itself; second person («عندكم») is
+   Shoofi: every store. Asked about ONE store (that focus, or a single open store named) and nothing
+   matches there → `store_no_match` `{ stores: [store], dish }` with NO cards (closed focus: `closed:
+   true`) — never another store's dish under it; `avoid_no_match` keeps its code. The app offers
+   «دوّر بمحلات ثانية» → the same text with `otherThan` (that store out of both lists, its name out of
+   the dish search). Every one-store reply, a single named closed store's `store_closed` included,
+   carries `storeScope`. «شو / ايش / what» are fillers. Found 2026-11-01: a customer picked a
+   restaurant, asked «في عندهم صدر دجاج؟» and got other stores' chicken.
 15. **CLAUDE IN THE CHAT IS OPT-IN, CAPPED, AND PICKS ONLY FROM OUR SHORTLIST** (`ai-chat.js`).
    Only typed messages, only from a LOGGED-IN customer, and only while `isChatAiEnabled` is true on
    the platform config doc (server-read; not in `SHOOFI_CONFIG_PUBLIC_FIELDS`). Off, a visitor

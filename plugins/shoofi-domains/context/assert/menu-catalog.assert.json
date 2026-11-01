@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -55,6 +55,7 @@
         "bin/label-products.js",
         "services/ai/complete.js",
         "services/ordering-intelligence/store-mention.js",
+        "services/ordering-intelligence/store-focus.js",
         "services/ordering-intelligence/ai-chat.js",
         "services/ai/usage-log.js",
         "services/ai/pricing.js",
@@ -251,6 +252,11 @@
         ],
         "services/ordering-intelligence/store-mention.js": [
           "detectStoreMentions"
+        ],
+        "services/ordering-intelligence/store-focus.js": [
+          "backReference",
+          "resolveStoreScope",
+          "withStoreScope"
         ],
         "services/ordering-intelligence/ai-chat.js": [
           "aiChatTurn",
@@ -1426,6 +1432,26 @@
           "file": "services/ordering-intelligence/store-mention.js",
           "regex": "isDish\\(token\\)",
           "desc": "doc CORE invariant 14: a dish word is never a store mention"
+        },
+        {
+          "file": "services/ordering-intelligence/store-focus.js",
+          "regex": "if \\(!focusStore \\|\\| !back\\.refers\\) return \\{ scope: null \\};",
+          "desc": "doc CORE invariant 14: the chat's store narrows ONLY when the message points back at it («عندهم»)"
+        },
+        {
+          "file": "services/ordering-intelligence/store-focus.js",
+          "regex": "if \\(nothing && result\\.replyCode !== \"avoid_no_match\"\\) \\{",
+          "desc": "doc CORE invariant 14: one store asked about, nothing there → store_no_match with no cards, never another store's dish"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const stores = onlyStore\\.length \\? onlyStore : area\\.open\\.filter\\(\\(s\\) => s\\.appName !== otherThan\\);",
+          "desc": "doc CORE invariant 14 / reference §7: otherThan leaves that store out"
+        },
+        {
+          "file": "routes/for-you.js",
+          "regex": "focusStore: typeof focusStore === \"string\" && /\\^\\[A-Za-z0-9_\\.-\\]\\{1,100\\}\\$/\\.test\\(focusStore\\) \\? focusStore : null,",
+          "desc": "reference §7: focusStore is an appName or ignored"
         },
         {
           "file": "services/ordering-intelligence/store-mention.js",
@@ -2683,6 +2709,16 @@
           "file": "stores/for-you/index.ts",
           "regex": "reset\\(\\) \\{\\n\\s*this\\.messages = \\[\\];\\n\\s*this\\.busy = false;\\n\\s*this\\.draft = \"\";\\n\\s*this\\.scrollOffset = 0;\\n\\s*\\}",
           "desc": "doc reference §7g: reset() clears the conversation only (window state is the caller's; the cart is never touched)"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "const focus = otherThan \\? null : forYouStore\\.focusStore\\?\\.appName \\|\\| \\(cartStore\\.cartItems\\.length \\? await cartStore\\.getCartStoreDBName\\(\\) : null\\);",
+          "desc": "doc CORE invariant 14 / reference §7f: the chat's store, else the cart's, is sent with every typed message"
+        },
+        {
+          "file": "stores/for-you/index.ts",
+          "regex": "if \\(this\\.messages\\.length === 0\\) this\\.focusStore = null;",
+          "desc": "doc reference §7f: a new chat starts on no store"
         },
         {
           "file": "stores/for-you/index.ts",
