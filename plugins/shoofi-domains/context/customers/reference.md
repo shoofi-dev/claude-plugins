@@ -324,12 +324,13 @@ mirror from outliving the logout.
 
 ## 5b. Push campaigns — who a send reaches, scheduling, the cap (`shoofi.customer-campaigns`)
 The admin's קמפייני פוש screen (shoofi-delivery-web `views/admin/customer-campaigns/`) creates
-campaigns, and `executeCampaign` sends them, one `sendNotification` per recipient. CORE
+campaigns, and `executeCampaign` / `startCampaign` send them, one `sendNotification` per
+recipient, `CAMPAIGN_SEND_CONCURRENCY` (default 20) at a time. CORE
 invariants 10 and 11 hold the rules. This section has the depth.
 
 | Route | Auth | What |
 |---|---|---|
-| `POST /api/customer-campaigns/:id/execute` | `...adminOnly` | claim → audience → opt-out + cap filter → holdout → audience record (alongside) + send loop → `completed` |
+| `POST /api/customer-campaigns/:id/execute` | `...adminOnly` | claim (awaited) → answers `{started, startedAt}`; then in the background (`startCampaign` → `sendClaimed`): audience → opt-out + cap filter → holdout → audience record (alongside) + send loop (`execution.progress` every 250) → `completed` |
 | `POST /api/customer-campaigns`, `PUT /:id` | `...adminOnly` | `holdout: { pct }` validated 0–50 (`normalizeHoldoutInput`), 400 outside, never clamped |
 | `POST /api/customer-campaigns/:id/schedule` | `...adminOnly` | future-date check, then `status: 'scheduled'` + Date `scheduledDate` (never from `in_progress`/`completed`) |
 | `POST /api/customer-campaigns/:id/unschedule` | `...adminOnly` | `scheduled` → `draft`, atomically; 400 once the cron has claimed it |
