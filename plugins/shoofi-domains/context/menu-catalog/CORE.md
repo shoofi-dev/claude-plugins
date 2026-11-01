@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -528,7 +528,7 @@ boundary and say so in the PR.
      it when the splash's fade ends), then for home in front and the persona visible. Fired earlier,
      the peek played unseen, used up the session's one peek and inflated the funnel's "seen"
      (invariant 22).
-19. **THE CHAT ADDS TO THE EXISTING CART EXACTLY AS THE MENU WOULD — OR IT OPENS THE STORE**
+19. **THE CHAT ADDS TO THE EXISTING CART EXACTLY AS THE MENU WOULD — AND NEVER LEAVES THE CHAT BY ITSELF**
    (`suggest.js`, `suggest-service.js`, `utils/extras-required.js`; app `hooks/useChatAddToCart.ts`,
    `helpers/chat-cart-line.ts`; reference §7f).
    - Modes `drink`, `sweet`, `cross_sell` take `cart: { appName, productIds }` and never suggest a
@@ -555,11 +555,20 @@ boundary and say so in the PR.
      `useChatAddToCart` loads the dish's store with the FETCH-ONLY `getStoreDataFromServer(appName)`
      and `getMenuFromServer(appName, false)` (explicit `app-name`) — never `getMenu`, `getStoreData`
      or `setStoreDBName`, which overwrite the browsed store other screens read — and finds the
-     product in `menu.menu[].products`. The chat's sheet has chips for `single` and `multi` ONLY
-     (`chatSheetSupport`): a combo, `soldByWeight`, a `weight` (or legacy `categoryId: "weight"`)
-     extra, `pizza-topping`, `counter`, a group header with `freeCount > 0`, any other type — and
-     twin orders, a school cart, an age-checked store, a failed load — open the store at the dish
-     instead. `priceLine` is `screens/meal/index2.tsx`'s formula and the server's
+     product in `menu.menu[].products`. `chatSheetMode`: `single` / `multi` only → the sheet's own
+     chips; `soldByWeight`, a `weight` (or legacy `categoryId: "weight"`) extra, `pizza-topping`,
+     `counter`, a group header with `freeCount > 0` → the MENU'S OWN `ExtrasSection` inside the
+     chat's sheet (controlled by the sheet's selections; its out-of-stock reads see the DISH's
+     store's list through a `menuStore` view — `Object.create(menuStore, { outOfStockExtras })` —
+     never the browsed store's) plus a weight stepper in place of the quantity; such a dish always
+     shows its controls, never a straight add. Only a combo (`comboStore` is the menu's) or an
+     unknown type is "store" — and that, twin orders, a school cart, an age-checked store or a
+     failed load make the chat SAY why (`open_store_page` / `_twin` / `_school` / `_age` / `_failed`,
+     or `order_open_store` with the options) and offer «افتح المحل» (`open_store:<cardId>`); the store
+     opens only when that is tapped. A tap on a card opens the chat's sheet too (`quickAdd(card,
+     { show: true })`: never a straight add) — with `isChatOrderingEnabled` off it still opens the
+     store, the only way to order then. Found 2026-11-01: 4.7% of prod sales (counters 1.5%, pizza
+     1.3%, free-count 1.1%, weight 0.7%, combos 0) and every card tap left the chat. `priceLine` is `screens/meal/index2.tsx`'s formula and the server's
      (`utils/order-pricing.js`): `price = base + (d > 0 ? Math.round(extras × (1 − d/100)) :
      extras)` — change one, change all three. Straight into the cart only with no defaults and
      nothing to choose; otherwise the sheet, defaults pre-selected (out-of-stock defaults cleared,
@@ -581,8 +590,10 @@ boundary and say so in the PR.
      option to act on goes in the line's note. The app re-resolves every option against the menu
      it loaded (by extra + position, id, then name — legacy blank ids) and is the final authority.
      Only replies whose cards MATCH start it (`text_results`, `without_results`, `ai_reply`) — never a
-     fallback. Behind `isChatOrderingEnabled`, like every chat add. Dishes the sheet cannot show
-     (`chatSheetSupport`) open the store and the chat says which options to add there.
+     fallback. Behind `isChatOrderingEnabled`, like every chat add. A dish of the menu's own kind of
+     choices (`chatSheetMode` "menu") opens the sheet with them and `order_pick_in_sheet` names the
+     options to pick — the words are not matched onto counters / pizza halves; a "store" dish says
+     `order_open_store` and offers the page.
    - **`GET /api/ai-helper/cuisines?lat=&lng=`** — the onboarding's tiles, from the central index
      only: ACTIVE `meal` dish types, most stores first, ≤ 9. Rows come from ALL the area's stores,
      open AND closed — the answers are a standing taste profile, not an order for now, so a cuisine
