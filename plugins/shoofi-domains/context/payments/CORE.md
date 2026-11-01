@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -182,6 +182,40 @@ customer-specific and purchased coupons are left out. Both were wrong until 2026
 12:00–18:00 coupon was shown all morning while checkout applied the 08:00–12:00 free-delivery one,
 which was never shown at all. The home screen reloads the list on focus. A public coupon needs a
 `storeTagName` or its card tag is an icon with no text; coupon drafts fill it from `nameForStore`.
+
+**What a marketing coupon link shows** — `GET /api/coupons/:id/public`
+(`services/coupons/public-coupon.js`, 2026-10-30) backs the customer app's coupon page, which
+every marketing `coupon` link opens (customers CORE invariant 11). It is a READ: nothing is
+claimed, applied or recorded, and checkout applies coupons exactly as before.
+- **No auth, on purpose.** Banners, stories and popups reach guests. That is safe only because the
+  reply is built field by field: `_id`, `title`/`description` (`{ar,he}` resolved from the coupon's
+  `nameForStore`→`storeTagName`→`nameForCheckout` / `subNameForStore` keys in
+  `shoofi.translations`; a key with no row is dropped, plain text kept), `type`, `discountType`,
+  `value` (null for `free_delivery` / `delivery_price`: not an amount off), `maxDiscount`,
+  `deliveryPrice`, `minOrderAmount`, `delivery` (`none|free|discount|fixed_price|included`),
+  `start`, `end`, `status` (`active|upcoming`), `activeHours`, `isForNewUser`, `redemption`
+  (`{mode:'auto'}` with NO code, or `{mode:'code', code}`), `allStores`, `stores[]`
+  (`_id, appName, name_ar, name_he, logoUri, coverUri, isOpen, isBusy, isComingSoon`) and
+  `restrictions` (categories / products / areas as booleans only). Never spread the coupon
+  document into it: no customer, usage, split, funding or admin-name field.
+- **Only a promotable coupon** (`isPromotableCoupon`): not `isCustomerSpecific`,
+  `isPurchasedCoupon`, `onlyForOneCustomer`, nor `claimedByUserId`. The first two are the #325
+  definition the حملات row also reads, written inline in `lib/campaign-category-sync.js`
+  (menu-catalog CORE invariant 18; a shared constant was tried and removed, shoofi-server
+  9a07c2fb). Plus `isActive`, not expired, and started or starting within
+  `UPCOMING_WINDOW_DAYS` (30). Anything else, an unknown or malformed id included, is the SAME
+  404 `{code:'COUPON_NOT_AVAILABLE'}`, so a personal coupon cannot be told from a missing one.
+- **Where it works = checkout's store rule**: a non-empty `applicableTo.stores` limits
+  `/api/coupons/apply` and the auto-apply scorer to those stores; an empty one is every store
+  (`allStores: true`). The list drops stores customers cannot see (`business_visible`); a
+  store-scoped coupon none of whose stores is visible is a 404. Open status is the home's
+  (`isStoreOpenNow(openHours) && !isStoreClose`, `isBusy`, `isCoomingSoon`), open stores first.
+- **`delivery: 'free'`** for `free_delivery`, or `isFreeDelivery` on an AUTO-applied delivery
+  coupon (the scorer gives the whole fee). A TYPED `isFreeDelivery` code is priced by
+  `computeCouponDiscount` (`value` off), so the page calls it a `discount`.
+- Residual exposure: a code-entered public coupon's code is readable by anyone holding its id.
+  Accepted: the coupon is public by definition, and `/api/coupons/active` already returns whole
+  public auto-apply documents without auth.
 
 **Fixed delivery price** — `type: 'delivery_price'`, `discountType: 'delivery'`,
 `deliveryPrice: X` (what the customer pays for delivery), `value` = `maxDiscount` = the cap

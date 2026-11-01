@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -22,7 +22,9 @@
         "utils/coupon-discount.js",
         "services/coupons/delivery-price-enforcement.js",
         "services/twin-order/twin-delivery-price.js",
-        "utils/client-features.js"
+        "utils/client-features.js",
+        "services/coupons/public-coupon.js",
+        "routes/coupon.js"
       ],
       "symbols": {
         "utils/hyp-pay.js": [
@@ -74,6 +76,15 @@
         ],
         "utils/client-features.js": [
           "hasClientFeature"
+        ],
+        "services/coupons/public-coupon.js": [
+          "UPCOMING_WINDOW_DAYS",
+          "isPromotableCoupon",
+          "couponTiming",
+          "couponStoreScope",
+          "couponBenefit",
+          "loadPublicCoupon",
+          "business_visible"
         ]
       },
       "patterns": [
@@ -246,6 +257,36 @@
           "file": "routes/order.js",
           "regex": "Apple Pay AMOUNT MISMATCH",
           "desc": "finalizeApplePayOrder backstop: a creation correction on a pre-charged ZCredit wallet order lands in FRAUD_REVIEW (CORE invariant 3)"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "router\\.get\\('/api/coupons/:id/public', async \\(req, res\\) =>",
+          "desc": "CORE 'What a marketing coupon link shows': the coupon page read is public (no auth middleware) - guests tap banners too"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "return res\\.status\\(404\\)\\.json\\(\\{ message: 'Coupon not available', code: 'COUPON_NOT_AVAILABLE' \\}\\)",
+          "desc": "CORE: personal, expired and unknown coupons are one identical 404"
+        },
+        {
+          "file": "services/coupons/public-coupon.js",
+          "regex": "if \\(isFlagOn\\(coupon\\.onlyForOneCustomer\\)\\) return false;\\s*if \\(coupon\\.claimedByUserId\\) return false;",
+          "desc": "CORE: a one-customer-only or claimed coupon is never promotable"
+        },
+        {
+          "file": "services/coupons/public-coupon.js",
+          "regex": "redemption: isAutoApply \\? \\{ mode: 'auto' \\} : \\{ mode: 'code', code: coupon\\.code \\}",
+          "desc": "CORE: an auto-applied coupon's code is not part of the page"
+        },
+        {
+          "file": "services/coupons/public-coupon.js",
+          "regex": "return \\{ allStores: appNames\\.length === 0, appNames \\};",
+          "desc": "CORE: where it works = checkout's applicableTo.stores rule (empty = every store)"
+        },
+        {
+          "file": "services/coupons/public-coupon.js",
+          "regex": "const UPCOMING_WINDOW_DAYS = 30;",
+          "desc": "CORE: an upcoming coupon shows only within 30 days of its start"
         }
       ]
     },
@@ -255,7 +296,10 @@
         "helpers/get-supported-payment-methods.ts",
         "stores/creditCards/index.ts",
         "data/zcredit-config.ts",
-        "helpers/hyp-card.ts"
+        "helpers/hyp-card.ts",
+        "screens/coupon-detail/index.tsx",
+        "services/public-coupon.ts",
+        "helpers/coupon-page-copy.ts"
       ],
       "patterns": [
         {
@@ -282,6 +326,11 @@
           "file": "components/total-price/index.tsx",
           "regex": "couponsStore\\.setAppliedCoupon\\(couponApp\\)",
           "desc": "TotalPrice is the one writer of the coupon submit sends, in the same step as the total it prices"
+        },
+        {
+          "file": "services/public-coupon.ts",
+          "regex": "axiosInstance\\.get\\(`coupons/\\$\\{encodeURIComponent\\(couponId\\)\\}/public`, \\{ silent: true \\}",
+          "desc": "CORE: the coupon page reads the public coupon silently (its own 404/error states, never the app-wide dialog)"
         }
       ]
     },

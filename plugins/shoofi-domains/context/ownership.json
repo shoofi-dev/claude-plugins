@@ -124,7 +124,8 @@
         "utils/hyp-pay.js",
         "utils/invoice-mail.js",
         "lib/schemas/creditCard.json",
-        "services/coupons/delivery-price-enforcement.js"
+        "services/coupons/delivery-price-enforcement.js",
+        "services/coupons/public-coupon.js"
       ],
       "shoofi-app": [
         "components/credit-card/",
@@ -133,7 +134,10 @@
         "helpers/hyp-",
         "helpers/get-supported-payment-methods.ts",
         "stores/creditCards/",
-        "data/zcredit-config.ts"
+        "data/zcredit-config.ts",
+        "screens/coupon-detail",
+        "services/public-coupon.ts",
+        "helpers/coupon-page-copy.ts"
       ]
     },
     "accountant": {
