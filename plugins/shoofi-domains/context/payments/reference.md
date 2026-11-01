@@ -83,6 +83,30 @@ For these: write the analysis + the exact diff you *would* make + the risks, ope
   `zcredit-apple-pay-callback/:intentId` (server safety-net capture, no auth).
 - **`updateCCPayment`** (`order.js`) — standalone ZCredit status confirm (`GetTransactionStatusByReferenceId`).
 
+## 3b. Coupons between quote and charge (map)
+Where a coupon's discount is computed, re-computed or trusted on the way to a charge. Fixed
+delivery price (`type: 'delivery_price'`) rules are in CORE; this is the call-site map.
+| Point | Where | What happens |
+|---|---|---|
+| Formula | `utils/coupon-discount.js` `computeCouponDiscount` → `computeDeliveryPriceDiscount` | the only implementation; type dispatch first; `isCashValuedCoupon` false for this type |
+| Split | `utils/coupon-discount.js` `resolveCouponSplit` (moved from `routes/coupon.js`) | percent split of the discount actually given — quote, creation guard and amend all use it |
+| Quote | `POST /api/coupons/apply` | feature gate → `APP_UPDATE_REQUIRED`; ₪0 → `COUPON_NO_DISCOUNT`; response coupon carries `deliveryPrice` |
+| Auto-apply | `GET /api/coupons/auto-apply/:customerId` `scoreCoupon` | this type scored by `computeCouponDiscount`; ₪0 results filtered before ranking; `belowMinimum` carries `deliveryPrice` |
+| Lists | active / available / customer-available / wallet | `visibleToClient` hides the type from bundles without `delivery-price-coupon` (admin exempt) |
+| Creation | `/api/order/create` → `enforceDeliveryPriceCoupon` | doc-based recompute, fee ≤ area tariff, minus kept delivery deal, `min(posted, server)`; raises `total` by `removed`; `deliveryPriceCouponEntitlement` |
+| Twin | `/api/twin-order/place` + `digital-place-pending` → `enforceTwinSideDeliveryPrice` | primary fee only; secondary's claim removed |
+| Shadow | `utils/order-pricing-shadow.js` | observation only; the total uses the client's coupon |
+| Charge | `processCreditCardPayment` / `processHypTokenPayment` / `processHypWalletPayment` / `finalizeApplePayOrder` / `captureCombined` | charge `order.total` (or the combined persisted totals); nothing recomputes a coupon |
+| J5 | `services/payments/order-authorization.js` | hold = `computeAuthAmount(total)`; capture reads `order.total` |
+| Amend | `routes/order-amend.js` → `calculateOrderPricing` | re-prices from the order's coupon SNAPSHOT, never the document; this type may shrink, never grow (`amendedDeliveryPriceDiscount`); split re-written with it; non-numeric total → 409 `AMEND_UNPRICEABLE` (orders owns amend) |
+| Refund / recharge | `refundOrderPayment`, `services/payments/order-recharge.js` | `capturedAmount` / `order.total` — no coupon math |
+
+Fee source at each point: the app's `availableDrivers.area.price` (takeaway → 0) at quote; the
+client-posted `shippingPrice` at creation (bounded by `resolveDeliveryTariffCeiling` for this
+type and for store delivery deals only); the frozen `order.shippingPrice` at amend. A delivery
+deal and a delivery coupon never both stay on one order (`resolveDeliveryConflict`: the larger
+wins, a tie goes to the deal). Settlement readers of the snapshot are the `accountant` domain.
+
 ## 4. Card tokenization / PCI
 - Cards live in **central `shoofi.creditCards`** (schema `lib/schemas/creditCard.json`):
   `customerId, ccToken, last4Digits, ccType, holderName, cvv, provider(ZCREDIT|HYP),
@@ -98,6 +122,27 @@ captures `DocumentID`/`Hesh` and, in **background `setImmediate`**,
 the `customerinvoices@shoofi.app` Gmail by docId, uploads to DO Spaces, and sets
 `ccPaymentRefData.{url, invoiceStatus, docId, processedAt, failureReason}`. Background
 queue retries every **15s** (max 10). → **Store/settlement tax invoices are the `accountant` domain.**
+
+**The queue is in memory.** `pendingInvoices` is a `Map` in the process. A restart or deploy
+drops it, and the order keeps `invoiceStatus: "pending"` with nothing left to retry it.
+Prod on 2026-10-30, across 188 store DBs: 41,351 `completed`, 4,122 `none`,
+**2,916 `pending`** (newest 2026-09-22) and 12 `failed`. `docId` is a number on most orders.
+Flagged with no verdict: whether those pending orders should be re-queued.
+
+**Admin routes** (`routes/admin.js`, CORE invariant 11). Every one is `auth.required` plus a
+role check, and no client calls any of them.
+| Route | Roles | What it does |
+|---|---|---|
+| `GET /api/admin/invoices/pending` | `DASHBOARD_ROLES` | the size of this process's in-memory queue (one instance; prod runs two) |
+| `POST /api/admin/invoices/retry` `{docId}` | master, admin | queues one `docId` |
+| `POST /api/admin/invoices/process-all` | master, admin | queues every `invoiceStatus:"pending"` order in the **`app-name` header's** DB (one store, `shoofi` when absent) |
+| `POST /api/admin/invoices/webhook` `{docId, secret}` | master, admin | fetches now, falls back to the queue. Also needs `secret === INVOICE_WEBHOOK_SECRET`, which is not in `.env.production` (the DO app spec was not checked). No provider calls it. |
+
+The queue keeps the whole `req` and reads only `req.app.db` and the `app-name` header from
+it. It makes no HTTP call that carries request headers. `retry` puts `docId` into the Gmail
+query (`subject:<docId>`) and the public Spaces key (`invoices/doc-<docId>.pdf`) unvalidated.
+Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restrict`, which
+hangs the request (CORE invariant 11), so none of them answered.
 
 ## 6. Refunds (customer-side — you own these)
 - **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
@@ -128,6 +173,8 @@ queue retries every **15s** (max 10). → **Store/settlement tax invoices are th
 4. **Client-trusts-totals**: the server charges `orderDoc.total` from the client body — it
    does **NOT** recompute the cart in the charge path. The only checks are the Apple Pay
    mismatch backstop and the zero-total→CASH downgrade. **This must never be weakened.**
+   Order CREATION corrects one coupon type before the charge (`delivery_price`, §3b) —
+   it only ever raises `total`, never rejects.
 5. **Coins/coupons settle only AFTER payment success**; failures are logged CRITICAL for
    manual reconciliation, never rolled back against an irreversible capture.
 6. **Order dedup lock** (Redis `SET NX` + fallback + 30s window) prevents double charges.
@@ -168,6 +215,19 @@ queue retries every **15s** (max 10). → **Store/settlement tax invoices are th
 - **What the client sends**: CC → `paymentData.ccToken` (+cvv/id) into `order/create`; the
   **actual charge is server-side** (`use-checkout-charge-cc.ts` is a deprecated no-op). Apple
   Pay → no card token, just session id; server reads the ZCredit session for the amount.
+- **Coupons**: the app never computes a coupon discount — it shows the server's
+  `discountAmount` (auto-apply and manual re-validate in `components/total-price/index.tsx`)
+  and posts it in `appliedCoupon` (`hooks/checkout/use-checkout-submit.ts`, read from
+  `couponsStore.appliedCoupon`). **The coupon submit sends is the one the total was priced with**:
+  `couponsStore.getAndApplyAutoCoupons` / `applyCoupon` only quote, and TotalPrice's
+  `commitCoupon` writes its own state and `couponsStore.setAppliedCoupon` together, only from a
+  response its effect has not superseded. Before this, a late, superseded auto-apply answer
+  wrote the store directly, so an order went out at the discounted total with
+  `appliedCoupon: null` (no couponUsages row; 8265-1164, GCP 5194-1334 on 2026-10-27).
+  Checkout also clears a store coupon left from an earlier visit on mount. It declares what
+  its bundle can render in `x-client-features` (`consts/shared.ts` `CLIENT_FEATURES`, sent by
+  `utils/http-interceptor`); `delivery-price-coupon` unlocks fixed-delivery-price coupons.
+  A merged change to that list reaches phones only with `eas update`.
 - **Key files**: `helpers/{get-supported-payment-methods,hyp-card,hyp-message-handler}.ts`,
   `hooks/checkout/use-hyp-tokenize.ts`, `stores/{creditCards,shoofi-admin}`,
   `screens/checkout/index.tsx`, `data/zcredit-config.ts`.

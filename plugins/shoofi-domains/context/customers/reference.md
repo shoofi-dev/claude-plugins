@@ -16,6 +16,9 @@ Also the **identity slice of the AI-helper taste profile** (§5a): owner resolut
 `services/ordering-intelligence/taste-profile.js` (`ownerFromRequest`, `deviceIdFromRequest`,
 `mergeDeviceIntoCustomer`) and `routes/ai-helper.js`. The rest of `ordering-intelligence/` —
 facts, avoid filtering, how a profile ranks suggestions — is menu-catalog's.
+Also **who a push campaign reaches** (§5b): `controllers/customerCampaignController.js`,
+`services/customer-campaigns/marketing-push-policy.js`, `routes/customer-marketing-preferences.js`,
+`utils/crons/scheduled-campaigns-cron.js`.
 **Not yours:** order history *content* (orders), coins/growth rewards (growth), driver
 coverage fields (delivery) — you own the identity record they hang off.
 
@@ -42,9 +45,16 @@ for **orders** (joined via `order.appName`).
 ## 2. Customer auth flow (phone + OTP)
 1. **Request** — `POST /api/customer/create` (`customer.js`): generates a 4-digit
    `authCode`, upserts the identity, sends SMS + WhatsApp (`user_verification` template).
-   Test phones (`config/test-phones.js`) skip SMS and accept a fixed code.
+   Test phones (`config/test-phones.js`) skip SMS and accept a fixed code. The reply never
+   carries the code. Until 2026-10-30 the new-customer branch echoed the whole new doc, code
+   included. The login screens read only `phone` and `isBlocked`.
 2. **Verify** — `POST /api/customer/validateAuthCode` (`customer.js`): compares `authCode`,
-   clears it on success, mints a JWT via `authService.toAuthJSON`.
+   "clears" it on success, mints a JWT via `authService.toAuthJSON`. "Clears" means writing
+   `authCode: undefined`, which the v3 driver stores as **null**. Prod 2026-10-30: null or missing
+   on 16,899 customers, 370 store users and 255 drivers. The compare is loose (`==`, number
+   stored vs string sent), so it runs only when **both** sides hold a code (`isCode`, CORE
+   invariant 15). Without that check, `null == undefined` let a request carrying only a phone
+   log in.
 3. **Token** — `utils/auth-service.js generateJWT`: HS256 `jwt.sign({phone, id, exp})`,
    expiry ≈ **4 years**; the token is **persisted onto the user doc** (`token` field).
 4. **Verification** — `routes/auth.js getTokenFromHeaders`: scheme `Authorization: Token <jwt>`;
@@ -55,6 +65,20 @@ for **orders** (joined via `order.appName`).
 
 Nothing else rides on verification. The AI-helper taste-profile merge is a **separate client
 call after `updateUserToken`** (§5a) — `validateAuthCode` does not know it exists.
+
+**`POST /api/customer/admin-create`** inserts `{phone, created}` into `shoofi.customers`
+(via `getCustomerAppName`) and sends no code. For a phone that already exists, it returns that
+customer's id, name, `isAdmin` and `isBlocked`.
+- Callers: the three RN login screens, which call it in place of `customer/create` when
+  `userDetailsStore.isAdmin()` is true. That is the monolith's "store admin orders for a
+  customer" branch. The login screen opens only when `!authStore.isLoggedIn()`, so in practice it
+  fires only from a stale `isAdmin` with no session. The partner's `deleteAccount` leaves that
+  state, and the flow is already stuck there, because no code is sent. The admin web does not
+  call it.
+- Prod on 2026-10-30 had no customer doc in the last year that holds only `{_id, phone,
+  created}`, which is what this route writes.
+- Gate (CORE invariant 14): `ADMIN_CREATE` takes a dashboard role, OR a mobile token whose
+  own record (routed by `app-type`) has `isAdmin`.
 
 ## 3. Admin auth (separate system)
 `utils/admin-auth-service.js` + `routes/shoofi-admin-users.js`: `shoofiAdminUsers` with
@@ -74,7 +98,8 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
   (`{name,street,city,cityId,location{Point},isDefault,…}`), **`orders[]` snapshot**,
   referral (`referralCode`, `referral{clickId,inviterCustomerId,…}`), flags
   (`isBlocked`, `isDeleted`+`deletedAt`, `cashRestricted`), location (`cityId`, `cityAreaId`),
-  `schoolProject{…}`. **No `tokenExpiry` field** — expiry lives only inside the JWT.
+  `schoolProject{…}`, marketing (`marketingPushOptOut` + `marketingPushOptOutUpdatedAt`; unset
+  = opted in, §5b). **No `tokenExpiry` field** — expiry lives only inside the JWT.
 - **`schoolProject{schoolId, classId, isActive, studentIds[]}`** (school-project / "مدارس"
   customers; all ids are strings). `isActive` alone puts the customer app into school mode
   (schools category, pickup-only cart, student card at checkout); the card / student picker
@@ -163,24 +188,45 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
     everywhere else.**
     - Server: the registration routes take `SCHOOL_SECTION_ROLES` = master/admin/manager/viewer;
       the sync-settings **write** takes master/admin/manager only (`SYNC_SETTINGS_WRITE_ROLES`).
-    - The older school routes have **no auth at all** today (known, parked — do not "fix" in
-      passing): `GET/POST /api/admin/schools`, `PUT/DELETE /api/admin/schools/:id`,
-      `GET/POST /api/admin/schools/:schoolId/classes`, `PUT/DELETE …/classes/:classId`,
-      `GET/POST /api/admin/school-settings` (hours **and** the #271 payment-methods deny-list),
-      `POST /api/customer/{school-students, add-student, create-school-project-batch,
-      delete-school-project-customer, delete-all-school-project-students,
-      toggle-school-project-active}`, `POST /api/payments/admin/school-students`; plus the
-      customer-app reads `GET /api/customer/schools`, `POST /api/customer/{school-classes,
-      get-students-by-ids}` and `GET /api/admin/check-order-time-valid`.
-      A viewer therefore already reaches them; nothing gates them by role.
+    - **The older school routes take the same list since 2026-10-30.** Before that they had
+      no auth at all. The guard is `SCHOOL_ADMIN` from shoofi-server
+      `services/customer/admin-access.js`, placed on each route. It covers:
+      - `GET/POST /api/admin/schools`, `PUT/DELETE /api/admin/schools/:id`,
+        `GET/POST /api/admin/schools/:schoolId/classes`, `PUT/DELETE …/classes/:classId`;
+      - `POST /api/admin/school-settings` (hours **and** the #271 payment-methods deny-list);
+      - `GET /api/customer/schools`, `POST /api/customer/{school-classes, school-students,
+        add-student, create-school-project-batch, delete-school-project-customer,
+        delete-all-school-project-students, toggle-school-project-active}`.
+
+      `POST /api/payments/admin/school-students` is gated by shoofi-server#352.
+    - Only the admin web calls those routes. Its interceptor sends `Bearer` + `app-type:
+      shoofi-admin` and overwrites the `shoofi-shopping` that the add-student and upload calls
+      set. `customer/schools` and `customer/school-classes` have had no caller since the admin
+      web moved to `/api/admin/schools` (delivery-web 8221ddf). No customer-app build ever
+      called them.
+    - The list is a copy of the registration router's, because that router opens Redis when
+      required. `test/integration/school-admin-auth.js` fails if the two drift. A token that is
+      only `accountant`, `senior`, `operator` or `editor` is refused. Prod has one
+      accountant-only account, and the sidebar never showed it the section.
+    - **Still open, on purpose:** two customer-app reads. `GET /api/admin/school-settings` is
+      read by the cart, and the same values are already public on `GET /api/store/get/shoofi`.
+      The other is `GET /api/admin/check-order-time-valid`.
+    - **Still open, not decided:** `POST /api/customer/get-students-by-ids`. School mode calls
+      it with the customer's token, and it returns name and phone for any student id it is
+      given. Scoping it to the caller's own `schoolProject.studentIds` is a separate change.
+    - The teacher routes (`/api/admin/teacher/{create,get-list}`, `routes/teacher.js`) take
+      every dashboard role (`DASHBOARD_ADMIN`). Nothing calls them, and prod has no `teachers`
+      collection.
     - Client (delivery-web): the sidebar is the only role gate (`components/Sidebar/menu-access.ts`:
       `SCHOOLS_MENU_ITEMS` carry admin/manager/viewer); routes are not role-guarded except the
       accountant redirect. School settings are read-only for a viewer in the UI
-      (`canEditSchoolSettings`) — client-side only for the hours / payment methods.
+      (`canEditSchoolSettings`) — client-side only for the hours / payment methods: the
+      server's `POST /api/admin/school-settings` takes the whole section list, viewer included.
     - Audit: school writes are in the admin-audit map (`category: "schools"`), including the
       student routes in `routes/customer.js` (names, phones and the uploaded list omitted). The
-      actor is the admin token's claims as **decoded, not verified** by the audit middleware —
-      on the unauthenticated routes it is only as trustworthy as the caller.
+      actor is the admin token's claims as **decoded, not verified** by the audit middleware.
+      Since 2026-10-30 these routes also run `auth.required`, so a forged token is refused
+      before the write; the audit row alone still proves nothing.
     - Roles are a free-form array on `shoofi.shoofiAdminUsers.roles`; the UI's list is
       admin/manager/senior/operator/viewer/editor/accountant (+ `master`, DB-only). There is no
       server-side canonical list. `checkAdminRole` is an OR with no hierarchy.
@@ -198,6 +244,8 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
   error anywhere saying why. The repo's own `find-test-users.js:37` has this bug and always
   reports "no store users found"; don't use it to check your work.
   One phone can map to **multiple** store docs → OTP is propagated with `updateMany`.
+  The only code path that inserts one is `POST /api/customer/store-users/:appName` (admin web,
+  §C4). Its `token` is the live session (CORE invariant 2), so no admin reply carries it.
 - **`delivery-company.customers`** (drivers) — `role`, `isActive`, `companyId`,
   `personalSupportedAreas` (delivery-owned field).
 - **`shoofi.shoofiAdminUsers`** — `phoneNumber`, `password`(bcrypt), `roles[]`, `refreshToken`,
@@ -228,6 +276,30 @@ addressing is unchanged. Guarded on a truthy token (an empty registration can't 
 siblings) and on the phone read off the *authenticated* doc, never the request body; a
 failure there is logged, never fails the registration.
 
+**Support reads customers through five admin-only routes** (CORE invariant 15, 2026-10-30), all
+`auth.required` + `checkAdminRole(CUSTOMER_ADMIN_ROLES)`:
+
+| Route | Admin web caller | Reply |
+|---|---|---|
+| `POST search-customer` | `CustomerSearch.tsx`, the coupon/draft customer pickers | rows + `status.{isLoggedIn, isTryingToLogin, authCode}`; no `token` |
+| `GET /:customerId` | `getCustomerDetailsApi`, `CouponForm` | name, phone, flags, `deletedAt`, addresses |
+| `GET /:customerId/status` | `getCustomerStatusApi` | `badges` |
+| `GET /:customerId/whatsapp-summary` | `getCustomerWhatsappSummaryApi` | the respond.io mirror's summary |
+| `POST /:customerId/update-address-to-current-location` | support's location fix | writes the order, the customer and the booking |
+
+- `status.authCode` is the customer's pending OTP. Support shows it on purpose ("מנסה להתחבר
+  (code)"), so the reply includes it only for a dashboard role (`mayReadPendingCode`). Prod
+  2026-10-30: 2,023 customers hold one. Of those with a WhatsApp send on record, 3 are under a
+  day old and 1,048 are over 30 days old.
+- The RN apps' legacy `search-customer` screens (`stores/admin-customer`) get 403. They
+  `.map` the reply as an array, and it has been `{ customers, pagination }` since 2025-06, so
+  they threw on every result already.
+- No app reads a customer by id (checked in the three RN apps and the website at origin/main,
+  2026-10-30). The customer app uses `GET /details` for itself, so a customer token gets 403
+  for its own id too.
+- `search-customer` is unaudited (a POST missing from `admin-audit-routes.js`). The address
+  fix is audited: 277 since 2026-04-14, 51 of them by viewer-only staff.
+
 ⚠️ **`getCustomerAppName(req, appName)` ignores both arguments and always returns the
 `shoofi` DB** (`utils/app-name-helper.js`) — it is a customer-only helper, so
 `getCustomerAppName(...).customers` resolves the identity doc **only** for
@@ -249,6 +321,91 @@ never fails the logout). Consequence for reasoning about sessions: a partner log
 one device ends that identity's sessions on **all** its stores and devices, and the push
 token mirrored across the sibling docs above dies with it — the sweep is what keeps the
 mirror from outliving the logout.
+
+## 5b. Push campaigns — who a send reaches, scheduling, the cap (`shoofi.customer-campaigns`)
+The admin's קמפייני פוש screen (shoofi-delivery-web `views/admin/customer-campaigns/`) creates
+campaigns, and `executeCampaign` sends them, one `sendNotification` per recipient. CORE
+invariants 10 and 11 hold the rules. This section has the depth.
+
+| Route | Auth | What |
+|---|---|---|
+| `POST /api/customer-campaigns/:id/execute` | `...adminOnly` | claim → audience → opt-out + cap filter → holdout → audience record (alongside) + send loop → `completed` |
+| `POST /api/customer-campaigns`, `PUT /:id` | `...adminOnly` | `holdout: { pct }` validated 0–50 (`normalizeHoldoutInput`), 400 outside, never clamped |
+| `POST /api/customer-campaigns/:id/schedule` | `...adminOnly` | future-date check, then `status: 'scheduled'` + Date `scheduledDate` (never from `in_progress`/`completed`) |
+| `POST /api/customer-campaigns/:id/unschedule` | `...adminOnly` | `scheduled` → `draft`, atomically; 400 once the cron has claimed it |
+| `PUT /api/customer-campaigns/:id` | `...adminOnly` | 409 while `in_progress` (the form saves its whole state, status included) |
+| `GET/PUT /api/customer-campaigns/push-cap-config` | `...adminOnly` | the cap; PUT validates (`LIMITS` maxPushes 1–50, windowDays 1–60, integers), no upsert, `updatedBy` from `req.auth.id` |
+| `GET/PUT /api/customer/marketing-preferences` | `auth.required`, customer app-type only | the customer's own `marketingPushOptOut` (boolean only) |
+
+**Scheduling, end to end.** In the admin form, status "פעיל" plus scheduling "מתוזמן" saves
+the campaign and then calls `/:id/schedule`. Only that call sets `status: 'scheduled'`, and
+before 2026-10-28 the admin never called it. The datetime-local value is sent as typed
+(`"2026-10-28T21:30"`, Israel wall clock) and `toScheduledDate` reads it with
+`moment.tz(value, 'Asia/Jerusalem')`. An ISO instant (what older clients sent, and what prod
+stores: 4 `scheduled`-type campaigns, all strings like `"2026-10-27T20:01:00.000Z"`) is kept as
+that instant. The cron (`*/5`, started in `app.js`'s `shouldRunCrons` block) takes the Redis
+lock `cron:scheduled-campaigns` for 4 minutes, finds `status: 'scheduled'` with
+`scheduledDate <= now`, and calls `executeCampaign` with that same filter as its claim. The
+lock only stops two instances scanning at once. The claim is what prevents a double send, and
+it still holds after the lock expires mid-run.
+
+**Run length.** An all-customers campaign runs about 50 minutes (sequential sends to ~18.9k
+customers, prod 2026-10-27), so it routinely outlives the lock. A deploy or crash mid-run
+leaves the campaign `in_progress` for good, partly sent. Prod had 11 such campaigns on
+2026-10-28, May–August 2026 plus one from 2025-10. Nothing resets them, and they can't be
+re-executed. That is an observation, not a reviewed verdict, so ask before acting on it.
+
+**The cap's count.** `countRecentMarketingPushes` makes ONE streamed scan:
+`{createdAt >= cutoff, "data.campaignId": {$exists: true}}` with projection `recipientId`,
+counted in memory against the audience set. It is served by a **partial index**,
+`campaign_createdAt_partial` = `{createdAt: 1}` over `{"data.campaignId": {$exists: true}}`
+(`CAMPAIGN_CREATED_AT_INDEX`), built in the background once per process by
+`ensureNotificationIndexOnce` and never awaited, so the first run after a deploy may still scan.
+Keep the `$exists` predicate in the query, or the planner can't use a partial index. Before
+2026-10-29 `shoofi.notifications` had **only the `_id` index in prod** (5.3M rows), and every
+campaign run read all of it. The other indexes in shoofi-server
+`utils/migrations/create-notifications-collection.js` were never applied, so a per-customer
+query (`recipientId`, e.g. `/api/notifications/stats`) is still a collection scan per call.
+Prod volume: ~2.65M campaign records all-time, ~67k in a week. A failed count fails the campaign (`status: 'failed'`), so it never sends
+uncapped.
+
+**What counts as marketing.** Only `customer-campaigns` sends. The admin's raw
+`/api/notifications/send*` and the coupon-campaign sends do not set `data.campaignId`: they
+neither count toward the cap nor get capped or opt-out filtered. Partner and driver campaigns
+(`appType` `shoofi-partner` / `shoofi-shoofir`) skip both rules (`isCustomerAudience`).
+
+**Preview ≠ reach.** `audience/preview` and `audience/users` still count the raw audience. The
+skips appear only in the execution result (`execution.skippedOptOut`, `skippedCapped`,
+`pushCap`, `holdoutCount`) and in the list's results column.
+
+**Holdout and the audience record (CORE invariant 13).** Why: prod sent ~66.7k campaign pushes
+to ~18.9k customers in the week to 2026-10-28, and last-touch attribution credits a push with
+orders that would have happened anyway. A holdout gives the baseline.
+- *Sizing (prod, read-only, 2026-10-28):* 216 executed campaigns, all `shoofi-app`; audience
+  median 14.9k, p10 4.3k, max 18.9k; 176 `all`, 40 `all` + city area, 7 `selected`, 4 `rules`.
+  The only campaigns under 2000 were 7 manual sends of < 50, hence `MIN_AUDIENCE = 200`: a 5%
+  holdout of the smallest real campaign (4.3k) is still ~215 customers.
+- *Assignment* is `assignHoldout(campaignId, policy.userIds, campaign, isCustomerAudience)` →
+  `{treatedIds, holdoutIds, pct, requestedPct, skippedReason}`. `applyMarketingPushPolicy` also
+  returns `optedOutIds` / `cappedIds` (the counts are their lengths), which become the
+  `opted_out` / `capped` rows.
+- *The write* is `recordAudience(shoofiDb, campaignId, {treated, holdout, capped, optedOut}, at)`
+  → `{rows, errors, error}`; started before the send loop, awaited after it (and in the
+  failure path), so it neither delays nor can fail the send. A duplicate-key write error is not
+  counted as lost (`lostWrites`); any other row error is, and a chunk-level error (network)
+  counts the whole chunk.
+- *Retries:* the only re-execution path is a `failed` campaign (claimable again; an
+  `in_progress` one stuck by a crash is not, see Run length). The second run re-sends to
+  everyone eligible. That is #335's behaviour, not changed here, and the cap counts the first
+  run's pushes. Row outcome: unchanged groups stay; capped/holdout → treated if this run pushed
+  them; treated stays treated with its first `at`.
+- *Storage:* ~67k rows a week, ~3.8M at the 400-day TTL steady state. No row is deleted with a
+  customer account (it holds two ids, a group and a date; the soft-deleted customer doc and the
+  campaign's `shoofi.notifications` records stay too). The TTL is what removes rows.
+- *Admin:* "קבוצת ביקורת %" on the campaign form (shoofi-delivery-web
+  `views/admin/customer-campaigns/HoldoutField.tsx`, `parseHoldoutPct` mirrors the 0–50 rule),
+  and `קבוצת ביקורת: N` / `ללא קבוצת ביקורת (קהל קטן)` / audience-record errors in the list's
+  results column.
 
 ## 5a. AI-helper taste profile — owner, merge, lifecycle (`shoofi.tasteProfiles`)
 The customer app's floating persona **شوفي / שופי** runs a short taste onboarding and keeps
@@ -330,6 +487,71 @@ body (test: "a client cannot set owner or inferred"). `inferred` is written only
   the account's profile across logout: it belongs to the account.
 - **Deletion:** `POST /api/customer/delete` leaves the `tasteProfiles` doc in place — §7 item 10.
 
+## 5c. Marketing content generation (`routes/marketing-generate.js`, CORE invariant 16)
+
+| Endpoint | Gate | Notes |
+|---|---|---|
+| `POST /api/admin/marketing/generate` | master / admin / manager | `{subject:{kind,id,appName?}, channel, what: copy\|image, tone?}`. copy → 200 `{variants, rejected, limits}`; image (banner / story / social only) → 202 the job. 400 bad channel, 404 no subject, 409 not promotable, 422 nothing passed the guard, 429 budget, 503 no AI backend |
+| `GET /api/admin/marketing/generate/:jobId` | same | `status` queued → generating → rendering → ready / failed (`errorCode`: `no_renderer`, `no_valid_copy`, `no_ai`); `copy`; `images[{id, lang ar\|he\|all, aspectRatio, status, url}]`. Reaps stale jobs and renders on read |
+| `GET /api/admin/marketing/generate/:jobId/images/:imageId` | same | the bytes of a rendered image, fetched server-side from our CDN only (the CDN sends no CORS) |
+| `POST /api/admin/marketing/generate/:jobId/revise` | same | `{notes?}` ≤ 600. No notes = re-render the same brief and words; notes = a new brief told what to change, through the guard. 202 the job; 400 notes too long / not an image job; 409 `busy` or not promotable; 429 image limit |
+| `POST /api/admin/marketing/generate/:jobId/versions/:versionId/restore` | same | 200 the job with that version current; the current result becomes a version. 404 no such version, 409 `busy` |
+
+Data: `shoofi.marketingGenerations` `{what: "image", channel, subject, facts:{lines,name}, status,
+copy, brief, assets[{id, lang, aspectRatio, status pending\|queued\|rendering\|rendered\|failed,
+prompt, references, imageUrl, imageKey, renderBridgeId, renderClaimedAt, generationId}],
+rejected, backend, error, errorCode, revision:{notes, previousPrompt, previousCopy, by, at},
+versions[{id, at, notes, copy, brief, assets}], renderCount, lastQueuedAt, createdBy, createdAt}`;
+TTL 30 days on `createdAt`. The jobs' public shape adds `notes` and `versions` (newest first). Images:
+`marketing-generate/<jobId>/<assetId>-<lang>-<ts>.<ext>` on the Spaces CDN.
+
+Admin client: `shoofi-delivery-web` `src/apis/admin/marketing-generate.ts`,
+`src/views/admin/marketing/components/ContentStep.tsx` (the step),
+`src/components/admin/image-generation/` (`ImageRevision` — "עוד אפשרות" / "בקש שינוי" / earlier
+versions — and `DesignGuidelines`, shared with the social posts screen), `content.ts` (what the form
+gets; `subjectFromLink` = a form's link → the subject), `use-prefill-image.ts` (the banner /
+story forms attach the image: the prefill, and `attachGeneratedImage` from the in-form bar),
+`components/FormGenerate.tsx` (the step with `mode="form"`, rendered above each channel form's
+`<form>` so Enter in it never submits the form). The prefill's
+`copy` keys: `title_*` = push / note / banner title, `body_*` = push / note body, banner
+description, story caption, social caption (`body_ar` only — posts are Arabic).
+
+Channel `social` (2026-10-31): copy = body only, ≤ 280; image = ONE 1:1 render, no words, the
+story's layout (`CANVAS` in `image.js`). No learned templates for it (the cron learns the in-app
+channels only). The social post form (`views/admin/marketing/social/SocialPostForm.tsx`) uses a
+story's 9:16 render when the post is a story.
+
+## 5d. Marketing templates (`routes/marketing-templates.js`, CORE invariant 18)
+
+| Endpoint | Gate | Notes |
+|---|---|---|
+| `GET /api/admin/marketing/templates?channel=&status=` | master / admin / manager | `{data: [{id, channel, status, name, summary, style, examples[{id, placement, imageUrl, words, rate}], uses, decidedBy, decidedAt}], limits}`; `status` is a comma list; 400 for an unknown channel |
+| `POST /api/admin/marketing/templates/:id/approve` \| `reject` \| `retire` | same | suggested → approved / rejected, approved → retired; 409 `state` or `full` (4 approved) |
+| `POST /api/admin/marketing/templates/run` | same | runs the daily job now; per-channel `{suggested, refreshed, dropped}` or `{skipped: too_few_sources \| too_few_images \| budget}`; 409 `locked` |
+
+Data: `shoofi.marketingTemplates {channel banner|story|note|push, status
+suggested|approved|rejected|retired, name, summary (Hebrew), style (English), examples, uses,
+createdAt, lastSeenAt, lastUsedAt, decidedBy, decidedAt}`, no TTL, no index. Admin client:
+`src/apis/admin/marketing-templates.ts`, `views/admin/marketing/components/TemplatePicker.tsx`
+("תבניות" in the "תוכן" step, which fetches nothing until clicked), and
+`views/admin/marketing-templates/MarketingTemplates.tsx` (`/admin/marketing/templates`).
+
+## 5e. Marketing social channel (`routes/marketing-social.js`, CORE invariant 17)
+
+| Endpoint | Gate | Notes |
+|---|---|---|
+| `GET /api/admin/marketing/social/config` | master / admin / manager | `{targets: {facebook, instagram: {ready, reason}}, maxCaption}` — the form warns before saving |
+| `GET /api/admin/marketing/social/:id` | same | the post for its form (`publicSocial`: `source`, `status`, `state`, caption, format, targets[], results, media, link, marketingItemId, approval) |
+| `POST /api/admin/marketing/social` | same | `{caption, format: post\|story, targets[], mediaType, mediaUrl, key?, mimetype?, bytes?, durationSec?, link?, marketingItemId?, ownPlan?, publishWhen?, publishAt?}` → 201 a draft. 400 `BAD_CAPTION` / `BAD_FORMAT` / `BAD_CONTENT` / `BAD_MEDIA` (not our manual-media CDN file) |
+| `PUT /api/admin/marketing/social/:id` | same | same fields, while nothing went out (409 `ALREADY_SENT`); an approved one records `previousCaption` in `history` |
+| `DELETE /api/admin/marketing/social/:id` | same | `status: "cancelled"` while nothing went out; it leaves the item |
+
+Approve / revert are the item's and the drafts routes' (`channel = social`). Audited
+`create_marketing_social_post`, `update_marketing_social_post`, `delete_marketing_social_post`.
+Admin client: `shoofi-delivery-web` `src/apis/admin/marketing-social.ts`,
+`src/views/admin/marketing/social/SocialPostForm.tsx`, the item card's social preview
+(`MarketingItemCard.tsx`, `socialState` in `utils/marketing-approval.ts`).
+
 ## 6. Referrals (`routes/customer-referrals.js`)
 8-char code (ambiguity-free alphabet) + TinyURL short link with `/r/:code` fallback. Config on
 `shoofi.store {id:1}.referralConfig` (reward amounts, `minFriendOrderAmount`, validity,
@@ -361,6 +583,10 @@ stories and app-logs, and the owner key of a visitor's taste profile (§5a). Sto
 `stores/auth` (login/logout/deleteAccount; `logOut` and `deleteAccount` also call
 `aiHelperStore.clear()`), `stores/user-details` (`customer/details`), `stores/address`,
 `stores/ai-helper` (the taste-profile copy, §5a).
+Profile → **"إشعارات العروض / התראות על מבצעים"** switch (`components/profile/MarketingPushToggle.tsx`,
+logged-in only): `GET/PUT customer/marketing-preferences` with `silent: true`. Hidden until the
+server answers, and reverts on a failed save. ON = receives campaigns. Its copy carries ar/he
+`defaultValue`s, because translations come from the DB.
 
 ### C2. shoofi-partner (store owner) — `app-type: shoofi-partner`
 **Same phone+OTP flow** (not admin creds). The partner-specific mechanism is
@@ -382,6 +608,62 @@ change. Token in `localStorage['@storage_userToken']` + `adminUser`, sent as
 **refresh-token flow** in the interceptor (guarded against loops) → retry, else logout+redirect.
 Roles/permissions: `contexts/AdminAuthContext`, `ProtectedRoute`, `RoleBasedAccess`,
 `RestrictedRoleGuard` (e.g. `accountant` limited to invoice screens).
+**`/api/analytics/*` is admin-token only** (shoofi-server `utils/analytics-access.js`,
+2026-10-29). Before that, all 43 routes in `routes/analytics.js`, `growth-analytics.js` and
+`weekly-status.js` answered with no token. That included revenue, coupons, customer
+locations, order details, a snapshot backfill and the paid AI weekly brief.
+- Every route carries `...adminAnalytics` = `["master", "admin"]`, matching the sidebar's
+  `["admin"]` on those screens.
+- `GET /api/analytics/order/:orderId` and `POST /api/analytics/deliveries` carry
+  `...dashboardAnalytics`, i.e. every dashboard role, viewer included. Live-ops, the ops
+  dashboard and the order modal read them, and prod has viewer-only staff.
+- No mobile app calls any of them. A new analytics route needs one of the two gates;
+  `test/integration/analytics-routes-auth.js` fails on a route without one.
+- `weekly-status/marketing-spend` was deleted. It read an unregistered
+  `weeklyKpiManualInputs` handle and 400'd on every call. CAC is the `acquisition-spend`
+  ledger (unit economics).
+**Store management `/api/shoofiAdmin/store/*` and `stores/*` is admin-token only**
+(shoofi-server `utils/admin-token-routes.js`, 2026-10-29). Before that, 23 routes took no token:
+the registry, add, update, delete, mock stores, the platform settings `store/update`, billing
+contacts and the download-link SMS.
+- It's a list, not middleware on each route: `adminTokenGuard` is mounted in `app.js` right
+  after `restrictedAdminGuard`, so a narrower restricted entry wins.
+- Every entry takes every dashboard role. It shuts out anonymous callers and
+  customer/partner/driver tokens without narrowing any staff member. Viewers edit stores
+  today, and whether they should is a product call.
+- `GET store/z-cr` stays open (`OPEN_ROUTES`): all three apps read it at startup, before
+  login. The apps' `shoofiAdminStore` otherwise only calls `available-stores`, and their
+  `store/update` is `/api/store/update`.
+- `test/integration/admin-token-routes.js` checks every entry against
+  `docs/routes-baseline.txt`, so a rename can't silently un-gate it.
+**Store users (partner accounts) are admin-token only** (shoofi-server `routes/customer.js`
+`identityListAdmin`, 2026-10-30; CORE invariant 2). The store form's "ניהול משתמשים" button opens
+`/admin/stores/:storeId/users` (`StoreUsersList`, `StoreUserForm`). They call
+`src/apis/admin/store-users.ts`:
+
+| Method | Path | Reply `data` |
+|---|---|---|
+| GET | `/api/customer/store-users/:appName` | the store's users |
+| GET | `/api/customer/store-users/:appName/:userId` | one user |
+| POST | `/api/customer/store-users/:appName` | 201, the new user (`isAdmin`/`roles` from the form) |
+| PUT | `/api/customer/store-users/:appName/:userId` | `fullName`, `isAdmin`, `roles` only |
+| DELETE | `/api/customer/store-users/:appName/:userId` | none |
+
+- All five, plus `POST new-customers` and `POST get-customers` (no live caller: `HeaderStats` is
+  commented out in `layouts/Admin.js`), take `auth.required` + every dashboard role. Prod
+  2026-10-30: viewer-only accounts created 13 and deleted 5 store users, so the writes are not
+  narrowed.
+- A store-users reply is whitelisted to `_id, phone, fullName, isAdmin, roles, appName, created`
+  (`toStoreUserResponse`), which is exactly what the screens read. The customer lists keep
+  their shape minus `token`, `authCode`, `notificationToken`, `refreshToken` and `password`.
+- Writes are audited (`create_store_user` / `update_store_user` / `delete_store_user` in
+  `services/audit/admin-audit-routes.js`). The audit middleware only logs an admin-token
+  write, so since the gate there is no unaudited way to create a partner account through the
+  API.
+Push campaigns (§5b): `views/admin/customer-campaigns/` has the list with the
+`PushCapSettings` panel, skip counts, the scheduled time and cancel-schedule. The form sends
+the schedule as an Israel wall-clock string and shows stored instants through
+`utils/jerusalem-time.ts`. It used to show them back in UTC, 2–3 hours off.
 
 ## 7. Known status (human-confirmed) — do NOT act without an explicit task
 All four items below were reviewed with the owner and are **KNOWN / accepted for now**.
@@ -396,11 +678,13 @@ Do not "fix" them opportunistically; they are scheduled work, not bugs to discov
    code**, and (b) let the user **choose WhatsApp vs SMS** as the delivery channel. Design
    changes here should keep both in mind.
 3. **KNOWN:** `search-customer` (`customer.js`) projects `token` + `authCode` and has no
-   `auth.required`. Accepted for now.
+   `auth.required`. Accepted for now. Verified still true on 2026-10-30: the reply carries the
+   pending OTP as `status.authCode`, and all three RN apps plus the admin web call it.
 4. **KNOWN — to handle later:** unauthenticated identity-adjacent endpoints — address CRUD
    , `search-customer`, storeUsers CRUD, `cash-restrict`, most `/api/shoofiAdmin/*`
    take IDs from the URL/body with no auth. **Never widen this surface further**; adding auth
-   is planned work.
+   is planned work. Flagged for a human (2026-10-30): storeUsers CRUD is gated (§C4), and
+   `cash-restrict` and the `/api/shoofiAdmin/store*` routes (§C4) already are.
 5. **Mass-assignment** — `POST /api/customer/update`  spreads `req.body` into `$set`,
    so `token`/`roles`/`isBlocked` could be overwritten by a caller.
 6. **`jwt.decode` without verification** — `admin/users/refresh-token`  and
@@ -418,7 +702,7 @@ Do not "fix" them opportunistically; they are scheduled work, not bugs to discov
    to route on `app-name`. **Remember: identity routing is by `app-type` throughout this domain.**
 9. **Dead/inherited (hands-off per §1c)** — the `AUTH_API`/`Authenticator` const block is
    imported in all three RN apps but **referenced 0 times** (legacy pre-`customer` surface);
-   admin web has an unused `AdminTokens` interface; `routes/user.js` is legacy expressCart admin.
+   admin web has an unused `AdminTokens` interface; `routes/user.js` (legacy expressCart admin) is deleted by shoofi-server#359.
 10. **KNOWN — not yet handled (AI helper; recorded in shoofi-server `docs/ai-helper.md`,
     2026-10-16):** `POST /api/customer/delete` soft-deletes the identity doc but leaves
     `shoofi.tasteProfiles {"owner.customerId": <id>}` in place; only the app's cached copy goes

@@ -30,7 +30,8 @@
         "services/ai/pricing.js",
         "routes/ai-helper.js",
         "utils/extras-required.js",
-        "services/menu/promotions.js"
+        "services/menu/promotions.js",
+        "services/translations/"
       ],
       "shoofi-partner": [
         "screens/admin/product",
@@ -76,7 +77,9 @@
         "routes/promotion.js",
         "services/promotions/",
         "utils/promotion-discount.js",
-        "services/twin-order/twin-promotions.js"
+        "services/twin-order/twin-promotions.js",
+        "services/twin-order/twin-delivery-price.js",
+        "routes/coins.js"
       ],
       "shoofi-app": [
         "screens/checkout",
@@ -114,7 +117,9 @@
         "routes/payment-methods.js",
         "utils/hyp-pay.js",
         "utils/invoice-mail.js",
-        "lib/schemas/creditCard.json"
+        "lib/schemas/creditCard.json",
+        "services/coupons/delivery-price-enforcement.js",
+        "services/coupons/public-coupon.js"
       ],
       "shoofi-app": [
         "components/credit-card/",
@@ -123,7 +128,10 @@
         "helpers/hyp-",
         "helpers/get-supported-payment-methods.ts",
         "stores/creditCards/",
-        "data/zcredit-config.ts"
+        "data/zcredit-config.ts",
+        "screens/coupon-detail",
+        "services/public-coupon.ts",
+        "helpers/coupon-page-copy.ts"
       ]
     },
     "accountant": {
@@ -139,14 +147,19 @@
         "utils/greeninvoice.js",
         "utils/invoice-provider.js",
         "services/compensations/",
-        "services/promotions/"
+        "services/promotions/",
+        "routes/admin/coupon-drafts.js",
+        "services/coupons/coupon-drafts.js",
+        "services/coupons/coupon-draft-assistant.js"
       ],
       "shoofi-delivery-web": [
         "src/views/admin/DriverPayments.tsx",
         "src/views/admin/DriverBonuses.tsx",
         "src/views/admin/CompensationManagement.tsx",
         "src/views/admin/driver-reports/",
-        "src/views/admin/generate-stores-summaries.tsx"
+        "src/views/admin/generate-stores-summaries.tsx",
+        "src/views/admin/coupon-drafts/",
+        "src/apis/admin/coupon-drafts.ts"
       ]
     },
     "delivery": {
@@ -197,7 +210,9 @@
         "utils/app-name-helper.js",
         "controllers/customerAddressController.js",
         "routes/ai-helper.js",
-        "services/ordering-intelligence/taste-profile.js"
+        "services/ordering-intelligence/taste-profile.js",
+        "services/customer/",
+        "routes/teacher.js"
       ],
       "shoofi-app": [
         "screens/login",

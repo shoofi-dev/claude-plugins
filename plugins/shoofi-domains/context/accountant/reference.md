@@ -34,7 +34,9 @@ before touching any settlement math.
 
 ## 2. Store settlement reports — `routes/payments/admin-reports.js`
 **Generate**: `POST /api/payments/admin/reports/generate`  — per store (or all
-`business_visible` stores). Pre-generate **guards** (all skip on failure):
+`business_visible` stores). Every `/api/payments/admin/reports*` route, the `accountant-file-number` PUTs, the two
+`greeninvoice` reads and every `/api/driver-reports` route take `settlementDashboard` (any
+dashboard role; aliased `reportsDashboard`), not `auth.required` alone (CORE invariant 17). Pre-generate **guards** (all skip on failure):
 1. exact-duplicate (same store+day-range) ; 2. **overlap vs reports of ANY status**
 (`checkOverlappingReports` — a sent report blocks too; CORE invariant 5); 3. **orders-closed** ( —
 no store `orders` in `{"1","6"}` in range; reads the store-DB `orders` collection, which HAS
@@ -61,7 +63,10 @@ totalForTransfer = creditCardRevenue + driveInCreditCard - totalOutcomes   ← t
 totalForInvoice  = creditCardRevenue + driveInCreditCard                    ← tax-invoice gross
 balance          = totalForTransfer   (no VAT adjustment for any businessType — CORE invariant 1)
 ```
-Revenue comes from an internal self-call to **`stores-export-new`** (§4, the real engine).
+Revenue comes from an internal self-call to **`stores-export-new`** (§4, the real engine). The
+POST forwards the generating admin's `authorization` + `app-type` (`selfCallHeaders`,
+`services/payments/settlement-access.js`), and a 401/403 from it throws (`throwIfSelfCallRefused`)
+instead of saving the report on ₪0 card revenue (CORE invariant 17).
 Commission base = the FINAL items price charged (CORE invariant 3). `vat = calculateVAT(totalCommission)` (`utils/vat.js`).
 
 **Windows** (`services/compensations/report-window.js`, CORE invariant 10): orders, coins,
@@ -70,7 +75,11 @@ coupons and delivery-only fees use `storeReportBounds` → `[start, end]` busine
 where `endExclusive` is the next day's business-day start — passed to the two
 `GET /api/shoofiAdmin/compensations` self-calls (`payers=['business']`,
 `recipients=['business']`) with `endExclusive=true`, and stored on the report as
-`reportData.compensationWindow`. Carry-over compensations
+`reportData.compensationWindow`. Those self-calls go out over HTTP to an **admin-only** route
+(CORE invariant 16). They forward the caller's `authorization` + `app-type`
+(`compensationSelfCallHeaders`), and a 401/403 throws (`throwIfCompensationFetchRefused`). That
+turns into a recorded `generation_error` on `POST /reports/generate`, or a flagged store on the
+financial overview, never a report with ₪0 compensations. Carry-over compensations
 (`appNameBackfill.pendingReportCarryover`) are deliberately NOT date-filtered.
 
 **Compensation lock** (`checkCompensationLock`, called from `rejectIfCompensationPeriodClosed`
@@ -80,6 +89,28 @@ compensation whose `createdAt` is inside an existing store report's window (by `
 driver report's window (by `deliveryCompanyId` = `item.deliveryCompany._id`). Delete +
 regenerate the report to reopen. The admin web (`CompensationManagement.tsx`,
 `CompensationModal.tsx`) shows generic error toasts and does not yet surface the 409 message.
+
+**Who may call the compensation API** (`services/compensations/access.js`, CORE invariant 16;
+every route is `auth.required` first):
+
+| Route | Admin roles | Partner (own) | Driver (own) | Client callers |
+|---|---|---|---|---|
+| `GET compensations` (list) | master/admin/manager | — | — | web ניהול פיצויים, יצירת סיכומי חנויות; the store report self-call |
+| `GET compensations/:id` | master/admin/manager | — | — | none found |
+| `POST approve-item` | master/admin/manager | — | — | web ניהול פיצויים |
+| `PUT compensations/:id` | master/admin/manager | — | — | none found |
+| `DELETE compensations/:id` | master/admin/manager | — | — | web ניהול פיצויים |
+| `POST edit/:id` | all except accountant-only | — | — | web ניהול פיצויים + order card `CompensationModal` |
+| `GET order/:orderId` | all except accountant-only | order in its store DB | its (or its company's) `bookDelivery`, by `_id` or `order._id` | web `CardOrder`, `CompensationModal`; shoofir `payments.tsx` |
+| `GET driver/:driverId` | master/admin/manager | — | its own id | web `DriverPayments` (master); shoofir `compensations.tsx` |
+| `GET business/:storeId` | master/admin/manager | its `store._id`; query uses the token's `appName`, not the header | — | partner `screens/admin/compensations` |
+| `POST add` | all except accountant-only | order in its store DB, recipient `business` | its delivery, recipient itself | web `CompensationModal`; partner `BusinessCompensationRequestModal`; shoofir `CompensationRequestModal` |
+
+A partner/driver `add` is stamped server-side (`stampMobileCompensation`): pending, ₪0 approved,
+no approval fields, and `createdBy`, `order.appName`/`storeData.appName` (partner) and
+`deliveryCompany._id` (driver) taken from the token. Admin `add`/`edit` keep taking status and
+`approvedAmount` from the body. The order card files approved compensations directly; 662 of the
+683 items filed in the 120 days to 2026-10-29 are status 1.
 
 **Lifecycle**: `draft →(approve)→ approved →(send: WhatsApp monthly_report to billingContacts)→
 sent`; `send-invoice`; `create-invoice` (§5); status toggles `reportSent/invoiceSent/
@@ -96,6 +127,12 @@ invoiceReceived/transferPerformed`. Carry-over comps marked collected only on **
 - **`effectiveDeliveryFee(delivery)`** (`calc.js`) = courier earning = `order.shippingPrice`;
   twin **single-mode primary** adds `combinationFeeBase` once (one driver, both pickups); split/secondary = base only.
 - **`couponDeliveryPortion`**  peels coupon-covered delivery out of cash/CC buckets.
+- **Fixed delivery price coupons** (`type: 'delivery_price'`) flow through `couponDeliveryPortion` /
+  `couponDeliverySplit` unchanged: `discountType: 'delivery'`, a non-`percentage` type, and shares
+  already resolved in shekels on the order. The discount math is `computeDeliveryPriceDiscount`
+  (`utils/coupon-discount.js`). The split is `resolveCouponSplit`, which moved from `routes/coupon.js`
+  to the same file. The creation guard is `services/coupons/delivery-price-enforcement.js`.
+  Worked numbers and the rules are in CORE invariant 15.
 - **`shoofiCouponCredit({shoofiDiscount, couponType, orderPrice, appliedAmount})`** (`calc.js`)
   = the per-order `couponsFromShoofi` credit for a customer-specific `order_items` coupon:
   `min(nominal, applied)`, nominal = `shoofiDiscount` (percentage → `/100 * orderPrice`),
@@ -109,6 +146,12 @@ invoiceReceived/transferPerformed`. Carry-over comps marked collected only on **
 - **Cost-bearers:** store bears commission+VAT+fees+its coupon share+store-paid comps; Shoofi
   bears customer coupons (reimburses store), Shoofi comps, driver min-guarantee, drive-in cut;
   driver/company earns delivery+combo fees+bonuses+comps.
+- **Who funds a global coupon (display only)** — `services/coupons/coupon-funder.js`
+  (`funderOf`, `funderFilter`, `activeNowFilter`) backs the admin coupons list's
+  `GET /api/admin/coupons?funder=shoofi|store|split&isActive=now` (any other `funder` → 400).
+  The store's share alone decides: `storePercent` for a percent split, otherwise
+  `storeDiscount` vs `value`. It is a restatement of settlement, never an input to it
+  (CORE invariant 14).
 
 ## 4. Financial dashboards + the revenue engine — `routes/payments/{admin,summaries}.js`
 Read-only aggregations: `admin.js` `/overview`, `/partners` (flat 15%), `/drivers`, `/analytics`.
@@ -118,8 +161,21 @@ commission base = the charged `orderPrice` (CORE invariant 3 — not pre-discoun
 (`orderPrice - coinsValue`), coupon split from per-source `couponUsages` docs. `summaries.js`
 serves partner/driver self-service views via `calc.js`.
 
+**Who may call them** (CORE invariant 17). `overview`, `partners`, `analytics`, `stores-export`,
+`drivers` and `delivery-company-drivers` are MASTER_ONLY on `utils/restricted-admin-routes.js`.
+`stores-export-new` and `school-students` are gated on their own lines: `settlementDashboard`, any
+dashboard role. They are not on that list on purpose. `stores-export-new` is also the store
+report's self-call, and reports are generated by `admin` accounts too. `school-students` serves the
+schools screens (sidebar `admin/manager/viewer`). `admin/drivers/summary` (`summaries.js`) is
+`companyAdminSelf`: a shoofir delivery-company admin's own company, with the admin taken from the
+token. `partner/{summary,daily-orders,details}` are `partnerEarningsAccess` (a dashboard role, or
+the partner token whose own `storeUsers.appName` is the `app-name` header) and
+`driver/{summary,details}` are `driverEarningsAccess` (a dashboard role, the driver's own token id
+as `driverId`, or his delivery-company admin), both `services/payments/earnings-access.js`.
+`GET /api/payments/delivery-companies` is `settlementDashboard` (admin web only).
+
 **Live financial overview (2026-09)** — `services/financial-overview/{compute,metrics,contract-charges}.js`
-+ `routes/financial-overview.js` (`GET /api/financial-overview?startDate&endDate`, roles master/admin/manager),
++ `routes/financial-overview.js` (`GET /api/financial-overview?startDate&endDate`, role `master` only — `ROLES = ["master"]`, owner-only since 2026-10-05),
 the admin screen "תמונת מצב כספית". It **runs `generateStoreReportData` and `generateDriverReportData`
 over any range without persisting**, so it cannot disagree with a report; the 26 owner metrics are a
 pure reshaping (`storeMetrics`/`driverMetrics`). Beside the engines it reads raw `compensations` by
@@ -151,6 +207,12 @@ royal-asado and crunchy-toost (₪4,111.92 owed, sent August reports) once they 
 
 ## 5. Store ↔ Shoofi tax invoices — `routes/hyp.js` / `utils/{hyp,greeninvoice,invoice-provider}.js`
 Provider = `amazonconfigs {app:"invoiceProvider"}.active` (`greeninvoice` default | `hyp`).
+**Who may call `/api/hyp/admin/*`** (CORE invariant 17): every route not on
+`utils/restricted-admin-routes.js` takes `settlementDashboard` (any dashboard role) on its own
+line — invoices, `config/switch`, the per-store/per-company HYP account routes; the 16 bulk /
+`send-oauth-link` / `update-email` routes are MASTER_ONLY via that list. The switch writes no
+actor (`amazonconfigs` keeps only `switchedAt`) and the audit log does not map `hyp` routes, so who
+switches or disconnects is unrecorded. `/api/hyp/oauth/callback` (HYP's OAuth redirect) stays open.
 - **Shoofi → store commission invoice**: amount = `totalOutcomes`. GreenInvoice type **320**
   (tax invoice+receipt, when `totalForTransfer>0`) else **305**; HYP always docType **305**, itemized.
 - **Store → Shoofi invoice (on behalf of store)** (`create-store-invoice`, `hyp.js`): amount =
@@ -175,7 +237,8 @@ Provider = `amazonconfigs {app:"invoiceProvider"}.active` (`greeninvoice` defaul
 - CREDITCARD → full `effectiveShippingPrice` (Shoofi captured the card).
 - CASH + `delivery`/`full_discount` coupon → the coupon-covered delivery amount (Shoofi pays).
 - **CASH, no coupon → 0** (driver already kept the cash). **A bug here double-pays a driver.**
-Plus: **bonuses** (`drivers-bonuses`), **compensations** (`shoofi.compensations`, `compensationFor:'driver'`;
+Plus: **bonuses** (`drivers-bonuses`, read straight from Mongo by `deliveryCompanyId` + `date`; written
+only by the dashboard-only `/api/shoofiAdmin/driver-bonuses*` routes, CORE invariant 17), **compensations** (`shoofi.compensations`, `compensationFor:'driver'`;
 `payingParty` decides direction), **min-hourly guarantee top-up** (`max(0, hours*minPerHour - earned)`,
 hours from `driverDailyHours` nightly cron w/ live fallback), exempt `÷1.18`.
 `netTotal = totalDriverPayment + bonuses + compensations + minGuaranteeTopUp - driverCharges`.
@@ -254,17 +317,29 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   appNameBackfill{pendingReportCarryover}, createdAt (BSON Date — the settlement clock)}`. Attributed to the
   report whose window contains `createdAt` (CORE invariant 10), locked once that report exists.
   `payingParty !== compensationFor` is enforced on add/edit
-  (`services/compensations/validate-parties.js`). `compensationFor:'shoofi'` = the store (or driver) owes
+  (`services/compensations/validate-parties.js`). `order._id` is the store order `_id` (admin web,
+  partner) or the `bookDelivery._id` (driver-filed). `createdBy` is an admin `_id` or, on mobile rows,
+  the store's or driver's name. `requestedByBusiness` / `requestedByDriver` flag mobile rows: 49 and
+  279 in prod, the newest driver row dated 2026-05-27. `compensationFor:'shoofi'` = the store (or driver) owes
   Shoofi — store report outcome `compensationsToShoofi`, driver report `totalDriverCharges`; no coupon.
 - **Store `accounting`** (store's own DB): `accountantFileNumber` (the accountant's מספר תיק = the
   Hashavshevet customer account the movein export debits; also on `delivery-company.store`),
   `bankAccount{bank,branch,accountNumber,companyId,
   businessType('exempt'|'licensed')}`, `billingContacts[]`, `contract{commissionTiers[],
   coinsCommissionPercent, monthlyPayments[], onetimePayments[]}`, `store.hyp{ua_uuid,api_key,access_token,status}`.
+  Who may write it: `POST /api/store/update` takes `accounting` (and `hyp`, `coinsSettings`) only from a
+  dashboard token. A partner token's write is cut to its store-management toggles (menu-catalog CORE
+  invariant 28). The billing-contacts screen saves through that route with the admin's own token.
 - **`shoofi.amazonconfigs`** — `{app:"greeninvoice"|"hyp"|"invoiceProvider"|"amazon"}` (provider creds/switch; never print).
   `{app:"hyp"}` also carries `CUSTOMER_DOC_UA_UUID` (customer-document sub-account; empty = don't send)
   and `USE_DEMO`/`API_ENDPOINT`/`DEMO_ENDPOINT`. **No admin UI edits this document** — prod changes are a manual Mongo write.
 - **`shoofi.couponUsages`** — per-source discount rows (store/shoofi × items/delivery).
+- **`shoofi.coupon-drafts`** (`db.couponDrafts`) — support's coupon drafts, central DB only:
+  `status draft → approving → created | discarded`, `templateId`, `params`, `funding{mode, shoofiPercent?}`
+  (always stored on the coupon as `splitType: 'percentage'`, CORE invariant 13), `approval{code, fields, at, by, translationKeys}`, `coupon{_id, code, at}`. Holds NO money
+  of its own — the coupon it produces is an ordinary `shoofi.coupons` doc written by
+  `POST /api/admin/coupon/create`, and settlement never reads the draft. Schema and lifecycle:
+  shoofi-server `docs/coupon-drafts.md`; money rules: CORE invariant 13.
 
 ## 9. Client — shoofi-delivery-web (admin) is the accountant's cockpit
 The reports/settlement/payout UI lives in the **admin** app: `views/admin/DriverPayments.tsx`,
@@ -301,6 +376,15 @@ approves, sends reports, and exports the MASAV Excel. (Full-stack: server comput
    and amount as the invoice our DB records for that store's June report (e.g. brixta 10576 and
    10580, both ₪545.04). Our DB knows only the later one. Unless cancelled at HYP, those stores were
    invoiced twice for June. Found 2026-09-27 — needs a human to check HYP and decide.
+
+9. **Percentage-split percentage coupons are billed as percent points** (`routes/payments/admin.js:1190-1191`,
+   CORE invariant 7 + Known status). Found 2026-10-26 while designing coupon drafts; ₪0 exposure in prod
+   today (2 coupons, both `storePercent: 0`). Drafts exclude `store_percentage_off`; the ordinary form
+   does not. Needs an owner ruling before either path makes one with a store share.
+10. **The #320 template picker's fixed default split** (`services/coupons/coupon-templates.js`
+    `SPLIT_FIELDS`) does not follow the amount. Too low → 422 (`COUPON_TEMPLATE_INVARIANT`); too high →
+    silently leaves part of the value unassigned (CORE invariant 13). Drafts replace it with a percent
+    split; the plain picker → CouponForm path still has this.
 
 ## 11. Definition of done
 Inherit `_shared-guardrails.md` §7. For accountant specifically: for ANY change to a payout or

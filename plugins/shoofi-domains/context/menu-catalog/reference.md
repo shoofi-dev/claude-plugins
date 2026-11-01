@@ -118,6 +118,28 @@ this per-store doc, NOT central `shoofi.stores`**), `hasGeneralCategories`,
 `mockStoreAppName`, `outOfStockExtras` (surfaced in the menu response),
 plus open/visibility flags.
 
+**Who writes it: `POST /api/store/update`** (CORE invariant 28, `services/catalog/store-update-access.js`).
+`$set` of each top-level key received (`req.body.data || req.body`, `_id` = the target), so a key
+left out keeps its stored value; a nested object (`coinsSettings`, `accounting`) is replaced whole.
+- **Dashboard** (`DASHBOARD_ROLES`, `Bearer` + `app-type: shoofi-admin`): any store, any key. Admin-web
+  callers: `views/admin/stores/StoreData.tsx`, `views/admin/accounting/{BankAccountDetails,ContractDetails}.tsx`
+  (both re-post the whole `GET /api/store/get/:appName` document), `apis/delivery/update-store.ts`
+  (`{ isStoreClose, _id }`, default `app-name: shoofi`). Server: the billing-contacts self-call
+  (`PUT /api/shoofiAdmin/stores/:storeId/billing-contacts`, forwards the admin's token).
+- **Partner** (`Token` + `app-type: shoofi-partner`, own store only): `PARTNER_STORE_FIELDS`, i.e.
+  `isStoreClose isOpen isBusy openHours creditcard_support cash_support takeaway_support
+  delivery_support isOrderLaterSupport drive_in_support invoicePrintCount ramadanSettings`.
+  The partner app posts `{ data: <its whole storeData> }` from `screens/admin/store-managment`
+  `onSave` and the header open/close/busy toggles. That copy is `POST /api/store`'s answer:
+  the stored keys minus `SENSITIVE_STORE_FIELDS`, plus `workingHours`, `isDeliveryOpen`,
+  `isTwoPhaseCaptureActive`, `isPartnerOrderAmendActive`, `isDeliveryOnlyActive`,
+  `walletPaymentProvider`, `googlePay*`, computed on every read and read from storage by
+  nothing. With no `coinsSettings` stored it carries the app's `defaultCoinsSettings`
+  (`enabled: false`); the coins toggle has been commented out of the screen since 2026-05-27.
+- `invoicePrintCount` missing or invalid in the request is written as `1`, for any caller.
+- `isStockManagment === true` in the write runs the stock backfill (§5), so only a dashboard save
+  can run it.
+
 ⚠️ **`hasGeneralCategories` lives in TWO documents and they drift.** `GET /api/menu`
 reads it from this per-store `store {id:1}` doc (`routes/menu.js`), but the admin
 store form writes it to central `shoofi.stores`
@@ -168,9 +190,76 @@ take `extraName`/`productName` from the app event (Arabic), `groupName`/`optionN
 Resolution: `utils/catalog-lint.js` (`displayName`), copied by `toLintRow`; the write boundary passes
 the product's category ids so its rows get `categoryName` too.
 
-### `translations` — i18n labels: `{ key, ar, he }`.
+### central `shoofi.translations` — i18n labels, one flat key space for every app
+_Verified 2026-10-26 against shoofi-server `routes/translations.js` and the feat/coupon-drafts worktree,
+with local Mongo for the counts. These are not prod counts._
+- **Shape:** one document per key, both languages on it:
+  `{ _id, key, ar, he, createdAt?, updatedAt?, seededBy?, owner? }`.
+  - `createdAt` and `updatedAt` are often missing on old rows (locally 235 and 285 of 1042 docs have them).
+  - `seededBy` names a seed script tag (e.g. `checkout-redesign-pr45`) or `'owned-translations'`.
+  - `owner: { type, id }` is set only by `writeOwnedTranslation` (e.g. `{ type: 'coupon-draft', id: <draftId> }`).
+- **One collection for everyone.** The customer, partner and driver apps all call
+  `GET /api/getTranslations`. There is no split by app or `app-type`, and the read ignores the
+  `app-name` the apps send. The admin web only edits rows (Translations panel); it does not use
+  them for its own UI.
+- **No unique index on `key`.** Only `_id_` exists, and nothing in
+  `DatabaseInitializationService.js` creates one. Locally 8 keys have duplicate rows (`price`,
+  `delete`, `store-is-closed`, `insert-customer-name`, …), so a unique index can't be built until
+  they are de-duplicated.
+- **Which duplicate wins:** `getTranslations` sorts `{ createdAt: -1, _id: 1 }` and the last row
+  written into the map wins. That is the OLDEST `createdAt`; a row with NO `createdAt` sorts last
+  and beats every dated row; a tie goes to the highest `_id`. So inserting a fresh row for an old
+  key shows nothing. An empty `ar`/`he` falls back to the key itself (`element.ar || element.key`).
+- **No cache anywhere on the server** (no Redis, in-memory, ETag or version). Every
+  `getTranslations` and every write re-reads the whole collection (~72 KB) and returns it as
+  `{ arTranslations, heTranslations }`. Nothing needs clearing after a write; the menu cache is
+  unrelated.
+- **When apps see a change: at boot.**
+  - Customer app (`stores/translations`): fetches in `prepare()` at cold start and on the
+    offline-dialog path. It has no AsyncStorage copy and does not refetch on foreground.
+  - Partner and driver apps (identical `utils/translations-boot.ts`): apply the AsyncStorage
+    `@storage_translations` copy first, then the server payload, retrying on backoff up to 6
+    times. They reload at boot and on `PREPARE_APP` / NetInfo.
+  - A missing key renders as its raw slug, unless the call site passes `t(key, { defaultValue })`.
+- **i18n settings:** all three apps run i18next 25.5.2 with default separators (`keySeparator '.'`,
+  `nsSeparator ':'`, `ignoreJSONStructure` true). A dotted flat key resolves through i18next's
+  `deepFind` fallback (prod precedent: `city_filter.title`). A `:` in a key is read as a
+  namespace and the lookup misses.
+- **Naming in the data (local):** mostly kebab-case (832/1033), plus `snake_case` (158), dotted
+  (31: `city_filter.*`, `filters.*`), some uppercase (`Bcool-free-delivery`), no `:`. Coupon
+  labels created by hand share the flat space: `free-delivery`, `delivery-free-100`,
+  `shoofi-will-pay`, `delivery-discount-checkout`.
+- **How coupons use it:** `nameForCheckout`, `nameForStore`, `subNameForStore`, `storeTagName`,
+  `nameForPartner` and `nameForShoofir` hold translation KEYS, and every app passes them through
+  `t()`.
+- **Writers:**
+  - **The panel routes** (`routes/translations.js`; see §7) are for people only.
+  - **`writeOwnedTranslation`** (`services/translations/owned-translations.js`; CORE invariant 24)
+    is for code. It uses the central DB, creates only if the key is absent (`$setOnInsert`
+    upsert), updates only rows of the same owner, and throws `TRANSLATION_KEY_COLLISION`
+    otherwise.
+    - First caller: the coupon-drafts approval (`routes/admin/coupon-drafts.js`
+      `/coupon-drafts/:id/approve`). It writes each custom label as
+      `coupon.<draftId>.<surface>` (surface `checkout|store|store-sub|store-tag`, guarded by
+      `LABEL_KEY_RE` in `services/coupons/coupon-drafts.js`), BEFORE the coupon is created, and
+      a collision answers 409. Partner and driver labels are never generated: they stay
+      `shoofi-will-pay`. Feature doc: shoofi-server `docs/coupon-drafts.md` "Labels and translations".
+  - **Seed scripts** `scripts/seed-*-translations.js` write the central DB directly with a
+    backup file; `scripts/rollback-translations.js` undoes a run.
 ### `images` — auxiliary image library: `{ data:{uri}, type, subType }`.
 ### central `shoofi.stores` — store registry (used by cross-store search & `initDb`).
+Also the document every **store list** is built from (`RestaurantAvailabilityService.getAvailableStores`
+→ explore v1/v2 and `available-stores`; `POST /api/menu/search`), so a field the store card needs
+can live here with no per-store propagation. `launchDate` (Date, Israel midnight; `null`/absent =
+not a new store) is one: written by the store form's "تاريخ الافتتاح", read only through the
+server-computed `store.isNew` (CORE invariant 25). The window is the platform setting
+`shoofi.store {id:1}.newStoreWindowDays` (default 30).
+It also holds staff-only data: `accounting` = `{ bankAccount: { bank, branch, accountNumber,
+companyId, email, phone, businessType? }, contract: { commissionTiers, monthlyPayments,
+onetimePayments } }` (22 visible stores on prod, 2026-10-30). A public store card must go through
+`toPublicStore` (`services/catalog/public-store.js`), which drops `accounting`, `hyp`, `credentials`
+and `fraudConfig`. Every customer-facing store list does: explore v1/v2, `available-stores` (and its
+delivery companies), `menu/search`, twin `eligible-stores`, For-you cards (CORE invariant 27).
 
 ### central `shoofi.suggestProductIndex` — the "For you" candidate index (derived, disposable)
 One document per suggestible product of every food-service store (CORE invariant 11):
@@ -301,7 +390,12 @@ fails the save). Admin callers: delivery-web `StoreCategoriesList.tsx` /
 A product's `extras` is an **array** of extras (stored verbatim from `JSON.parse(req.body.extras)`;
 shape not enforced on write). Every extra has `{ id, type, nameAR, nameHE, order?, groupId?,
 isGroupHeader?, freeCount? }`; group headers (`isGroupHeader:true`) are pseudo-extras that only
-title a group and carry `freeCount`. Real types:
+title a group and carry `freeCount`. In prod the member extras usually have an EMPTY `nameAR`
+and the group's name lives on its header (shawarma sample 2026-11-01: 141 of them) — name a group
+by its header, else the extra (`option-request.js optionsOf`, `helpers/chat-order.ts`). Option
+names carry trailing spaces («حمص  »), and some menus have negated options («بدون سلطة»). Defaults
+are seeded WITHOUT a stock check (`helpers/extras-defaults.ts`, the menu's `ExtrasSection`); the chat
+clears out-of-stock ones (`withoutOutOfStock`), the menu screen does not. Real types:
 - `single` — `options[{id,nameAR,nameHE,price}]`, `defaultOptionId`
 - `multi` — `options[]`, `maxCount`, `defaultOptionIds[]`
 - `counter` — `min,max,step,defaultValue,price` (price × value)
@@ -438,7 +532,8 @@ Three interacting product fields — keep them consistent:
 **human-confirmed, applies to ALL products, no exceptions:**
 `quantity <= 0  ⟺  { isInStore:false, outOfStockByQuantity:true }`.
 Enforced at: product edit (`product.js`), set-quantity
-(`product.js`), enable-stock backfill (`store.js`), and the
+(`product.js`), enable-stock backfill (`store.js`, dashboard saves only: a partner
+write cannot carry `isStockManagment`), and the
 order lifecycle via `utils/order-stock.js` (`decrementOrderStock` /
 `restoreOrderStock` — idempotent via `stockDecremented`/`stockRestored`; restore
 only re-enables products that were `outOfStockByQuantity`, never un-hides manual
@@ -498,13 +593,24 @@ the cache read.
 - `POST /api/menu/search` — cross-store product/store search (regex on `nameAR/nameHE`, geo via `delivery-company.cities`). See `docs/menu-search.md`.
 - `GET  /api/menu/mock` — template/mock store menu (dedup vs current store); never offers a combo.
 - `POST /api/menu/clear-cache[/:storeId]`, `GET /api/menu/cache-stats`
-- `POST /api/admin/product/insert | update | delete` — product CRUD (partial update). Insert/update run the combo validation chain (`400 COMBO_INVALID`); delete is `409 PRODUCT_REFERENCED_BY_COMBO` when a combo still points at a requested product (CORE invariant 10).
-- `POST /api/admin/product/update/{isInStore,quantity,isHidden,isInStore/byCategory,activeTastes}` — availability/stock/visibility
-- `POST /api/admin/product/{update/order,order-per-category,bulk-reorder,reset-order/:cat,migrate-orders}` — ordering
-- `GET  /api/admin/product/extras`, `GET /api/admin/product/:id`, `POST /api/admin/images/upload`
-- `POST /api/product/create-from-mock` (`400 COMBO_NOT_CLONEABLE` for a combo template), `GET /api/product/mock-store/:appName`, `POST /api/product/update-barcode`
-- `GET/POST/DELETE /api/store-category/*` — regular subcategory CRUD (in `store.js`)
-- `GET/POST/DELETE /api/category/general/*` — general category CRUD
+- **Product route auth** (`services/catalog/product-access.js`, CORE invariant 26). Each route below is tagged with its gate:
+  **[admin]** is `PRODUCT_ADMIN`, i.e. `auth.required` + `checkAdminRole(DASHBOARD_ROLES)`, any dashboard role.
+  **[admin|own store]** is `PRODUCT_ADMIN_OR_OWN_STORE`: a dashboard role, or a partner token whose `storeUsers.appName` equals `app-name`.
+  Without a token the answer is `401`. A customer or driver token gets `403`, and so does a partner on another store or on an **[admin]** route.
+- `POST /api/admin/product/insert | update | delete` **[admin|own store]** — product CRUD (partial update). Insert/update run the combo validation chain (`400 COMBO_INVALID`); delete is `409 PRODUCT_REFERENCED_BY_COMBO` when a combo still points at a requested product (CORE invariant 10).
+- `POST /api/admin/product/update/{isInStore,quantity,isHidden,isInStore/byCategory,activeTastes}` **[admin|own store]** — availability/stock/visibility
+- `POST /api/admin/product/update/order` **[admin|own store]** (the partner's products-order screen); `POST /api/admin/product/{update/order-per-category,bulk-reorder,reset-order/:cat,migrate-orders}` and `GET /api/admin/product/{order/:cat,orders}` **[admin]** — ordering
+- `GET  /api/admin/product/extras` **[admin|own store]**, `GET /api/admin/product/:id` **[admin]**, `GET /api/admin/product/import-index` **[admin]**, `POST /api/admin/images/upload` **[admin|own store]** (gated before multer), `POST /api/images` **[admin|own store]** (the image list by `type`)
+- `POST /api/product/create-from-mock` (`400 COMBO_NOT_CLONEABLE` for a combo template), `GET /api/product/mock-store/:appName`, `POST /api/product/update-barcode`, all **[admin]**
+- **Category and explore route auth** (`services/catalog/category-access.js`, CORE invariant 27). **[admin]** below is `CATALOG_ADMIN`: `auth.required` + `checkAdminRole(DASHBOARD_ROLES)`, any dashboard role, before multer. No token is `401`; a customer, partner or driver token is `403`. **[public]** is called by the customer app before login.
+- `/api/store-category/{all, add, update/:id, update-order, :id DELETE}` **[admin]** — regular subcategory CRUD (in `store.js`)
+- `/api/category/general/{add, update/:id, :id DELETE, all/by-store}` **[admin]** (`category.js`), `POST /api/category/general/update-order` **[admin]** (`store.js`), `GET /api/category/by-general/:id` **[admin]** — general category CRUD; `GET /api/category/general/all` **[public]** (the central home tiles)
+- `/api/shoofiAdmin/category/{GET list, add, GET :id, update/:id, update-order, :id DELETE}` **[admin]** — platform categories (central `shoofi.categories`); `POST /api/shoofiAdmin/category/list` **[public]** (same documents as the GET, the apps' boot read)
+- `GET /api/shoofiAdmin/explore/categories-with-stores-v2` and v1 **[public]** — the home, store cards through `toPublicStore` (no `accounting`); `/api/shoofiAdmin/explore/{clear-cache, clear-cache-keys, cache-stats, debug-area}` **[admin]**
+- `GET /api/store/get/:appName` **[admin]** — the whole per-store `store` document, payment credentials included (it had no auth). Admin web only; the server reads `db.store` directly instead of calling it.
+- `POST /api/store/update` — save the per-store `store` document (`$set` per key). Its own gate, not `CATALOG_ADMIN`: `auth.required` + `storeUpdateGate` — any dashboard role, any key; a partner token for its own `app-name` only, cut to `PARTNER_STORE_FIELDS`; customer/driver 403, no token 401. Answers `200 { message: "Successfully saved" }` either way (§2 `store`, CORE invariant 28).
+- Public store lists through `toPublicStore` (no `accounting`/`hyp`/`credentials`/`fraudConfig`): explore v1/v2, `POST /api/shoofiAdmin/available-stores` (store + each `deliveryCompanies[].company`), `POST /api/menu/search`, `POST /api/twin-order/eligible-stores`, `POST /api/for-you/suggest` cards.
+- `GET /api/admin/categories/:page?` — **no auth** still (delivery-web `get-categories.ts` sends no token). The legacy expressCart `GET /category/:cat/:pageNum?` is removed (2026-10-30).
 - `POST /api/admin/menu-import-issues` — record one import run's issues (whole run, one call)
 - `GET  /api/admin/menu-import-issues?status=open|resolved|all[&runId=]` — the store's worklist
 - `POST /api/admin/menu-import-issues/:id` — edit `reason` / tick `resolved` (writes only the keys it receives)
@@ -512,9 +618,18 @@ the cache read.
 - `GET  /api/admin/catalog-lint/summary` — open lint rows per store by severity (`{ totals, stores[] }`), admin token
 - `POST /api/admin/catalog-lint/run` — `{ appName }` for one store, else every store; admin token; returns the run stats
 - Menu spellcheck (`routes/admin/menu-spellcheck.js`; `auth.required` + `checkAdminRole(["master","admin","manager"])`, POSTs in the audit route map): `GET /api/admin/menu-spellcheck/issues?status=open|accepted|dismissed|resolved|stale&appName=&lang=ar|he` → `{ issues (≤2000), truncated, counts, lastRun }`; `POST /api/admin/menu-spellcheck/run [{ appName }]` → `202 { started, runId }` / `409 locked` / `503 no-api-key`; `POST /api/admin/menu-spellcheck/accept { ids, fixes? }` → `{ accepted, stale, failed, outOfStockKept, rows[] }`; `POST /api/admin/menu-spellcheck/dismiss { ids }` → `{ dismissed }` (§7e)
-- `GET  /api/getTranslations`, `POST /api/translations/{update,add,delete}`
+- `GET  /api/getTranslations` → `{ arTranslations, heTranslations }`. It reads the central DB through a header literally named `shoofi` that no client sends, so it is always `shoofi` (§9).
+- `POST /api/translations/{update,add,delete}` — the admin Translations panel (`shoofi-delivery-web` `src/views/admin/translations/TranslationsList.tsx`, body `{ key, ar, he }`, sends `app-name: 'shoofi'`). Every write answers with the whole re-read map.
+  - **These pick the DB from the `app-name` header** (default `shoofi`), not the `shoofi` header the read uses.
+  - **No auth** on any of the four routes, and they are not in the admin audit route map.
+  - `update` is `updateOne({ key }, { $set: { ar, he, updatedAt } })` with no upsert: a missing key is a silent no-op, and only one row of a duplicated key changes.
+  - `add` is `insertOne({ ...req.body, createdAt, updatedAt })` with no existence check.
+  - `delete` is `deleteOne({ key })`.
+  - Code must not call them (CORE invariant 24); use `writeOwnedTranslation`.
 - `POST /api/global-search` — central store name search
-- `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng}, history?, lang?, cart?: { appName, productIds }, onboarded?, conversationId?, surface?, seen?: string[] }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price, originalPrice?, discountPercent?, hasRequiredOptions }, dishType, reason:{ code, params }, confidence }], personalized, suggestionId }` (`routes/for-you.js`, `auth.optional`; `suggestionId` on every reply, CORE invariant 21). Modes `opener` (default), `usual`, `new`, `surprise`, `popular`, and the chat-ordering `drink`, `sweet`, `cross_sell` (§7f); reason codes `usual`, `ordered_before`, `liked_type`, `you_like`, `popular`, `match`. Only a customer `app-type` (`shoofi-shopping` or none) personalises; without a customer, a visitor's taste profile is read by the `device-id` header (CORE invariant 18). `cart` goes through `sanitizeCart` (a string `appName` ≤ 100 chars, ≤ 50 `productIds`); `onboarded` counts only when `=== true`. `forPerson` — an id from the profile's `people` (`[A-Za-z0-9_-]{1,40}`, else ignored, never a 400) — answers for that person: their `avoid` replaces the customer's, the customer's taste is not used, their tagged dishes first (`personMode`, reason `for_person` `{ name, count }`), then popular; `replyCode` `for_person` / `for_person_new` (none of theirs open). An id not on the profile → the customer's own reply; the served log carries `forPerson` (CORE invariant 18). `seen` — the card `id`s this chat already showed, newest first — goes through `sanitizeSeen` (strings ≤ 120 chars, deduplicated, the newest 40; anything else ignored, never a 400): `popular`, `surprise`, `new`, `drink`, `sweet`, `cross_sell` then answer from the dishes not shown yet (the same mode on the unseen candidates) and are topped up with the normal reply's other cards only when fewer than 2 unseen cards survive `applyLiveMenu` + `dropAtServe`; `usual`, the opener and typed text ignore it (CORE invariant 23). Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
+- `GET  /api/shoofiAdmin/store/all-stores[?search=][&isNew=true]` — the registry, every row with `isNew`. With `isNew=true`: only the stores inside their "new" window now (`business_visible !== false`, not `isMockStore`), newest `launchDate` first, each with `newUntil` (CORE invariant 25). Admin token with any dashboard role, like the rest of `/api/shoofiAdmin/store/*` except `store/z-cr` (shoofi-server `utils/admin-token-routes.js`, 2026-10-29; they had no auth before).
+- `store.isNew` (boolean) rides on every store-list response: explore v1/v2 (`storesMap`), `POST /api/shoofiAdmin/available-stores`, `POST /api/menu/search` (CORE invariant 25).
+- `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng}, history?, lang?, cart?: { appName, productIds }, onboarded?, conversationId?, surface?, seen?: string[] }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price, originalPrice?, discountPercent?, hasRequiredOptions }, dishType, reason:{ code, params }, confidence }], personalized, suggestionId }` (`routes/for-you.js`, `auth.optional`; `suggestionId` on every reply, CORE invariant 21). Modes `opener` (default), `usual`, `new`, `surprise`, `popular`, and the chat-ordering `drink`, `sweet`, `cross_sell` (§7f); reason codes `usual`, `ordered_before`, `liked_type`, `you_like`, `popular`, `match`. Only a customer `app-type` (`shoofi-shopping` or none) personalises; without a customer, a visitor's taste profile is read by the `device-id` header (CORE invariant 18). `cart` goes through `sanitizeCart` (a string `appName` ≤ 100 chars, ≤ 50 `productIds`); `onboarded` counts only when `=== true`. With options in the message («… مع حمص وسلطة», `option-request.js`): the reply carries `optionRequest: { wanted, without }` and each card `optionMatch: { matched, ambiguous, missing, outOfStock, deselect, noteWithout }` (option refs `{ extraId, optionId, index, nameAR, nameHE, price, group }`), cards with fewer unmet words first; «شو الإضافات؟ / מה התוספות» answers `replyCode: "extras_question"` (cards of the dish it names, or none). `store` (an appName, else ignored) limits the reply to that OPEN store, and with one store in play text mode drops the 2-per-store cap (CORE invariant 19). `forPerson` — an id from the profile's `people` (`[A-Za-z0-9_-]{1,40}`, else ignored, never a 400) — answers for that person: their `avoid` replaces the customer's, the customer's taste is not used, their tagged dishes first (`personMode`, reason `for_person` `{ name, count }`), then popular; `replyCode` `for_person` / `for_person_new` (none of theirs open). An id not on the profile → the customer's own reply; the served log carries `forPerson` (CORE invariant 18). `seen` — the card `id`s this chat already showed, newest first — goes through `sanitizeSeen` (strings ≤ 120 chars, deduplicated, the newest 40; anything else ignored, never a 400): `popular`, `surprise`, `new`, `drink`, `sweet`, `cross_sell` then answer from the dishes not shown yet (the same mode on the unseen candidates) and are topped up with the normal reply's other cards only when fewer than 2 unseen cards survive `applyLiveMenu` + `dropAtServe`; `usual`, the opener and typed text ignore it (CORE invariant 23). Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
 - `GET  /api/ai-helper/cuisines?lat=&lng=` — `{ cuisines: [{ key, label_ar, label_he, img, storeCount }] }` (`routes/ai-helper.js` → `ai-helper-service.js` `getCuisines`, `auth.optional`): the onboarding's cuisine tiles (§7f). `400` without a valid location; any other failure `200 { cuisines: [] }`. The other AI-helper routes — `GET`/`PUT /api/ai-helper/profile`, `POST /api/ai-helper/merge`, `GET /api/ai-helper/facts` — are the profile's side (`docs/ai-helper.md`; ownership and merge: customers domain).
 - Dish taxonomy / labels admin (`routes/admin/dish-taxonomy.js`; every route `auth.required` + `checkAdminRole(["master","admin","manager"])`):
   `GET /api/admin/dish-taxonomy` (seeds on first use), `POST /api/admin/dish-taxonomy/:key/approve` (→ active; its proposing labels get the type + `fromApprovedProposal`, `applied` at confidence ≥ 0.5 else `review`; admin labels untouched), `POST /api/admin/dish-taxonomy/:key/reject` (proposed only), `PATCH /api/admin/dish-taxonomy/:key`, `GET /api/admin/product-labels/review[?appName=]`, `POST /api/admin/product-labels/resolve { appName, productId, dishType }` (→ `status: "admin"`; `dishType` active or null), `GET /api/admin/product-labels/runs`, `POST /api/admin/product-labels/run [{ maxProducts, stores[] }]` — `startProductLabelsJob` (same `cron:product-labels` lock and locked index rebuild as the cron) answers as soon as it knows: `202 { started: true }` (running in the background), `409` a run already holds the lock, `503` no `ANTHROPIC_API_KEY`.
@@ -759,6 +874,16 @@ cross-sell pill, through `hooks/useChatAddToCart.ts` `quickAdd`:
    out-of-stock option cannot be picked. Closing it — an add, a dismiss, a fallback — only HIDES it
    (`hideSheet`); its content is cleared on the modal's `onModalHide` (`clearSheet`). Clearing both
    at once flashed an empty sheet (spinner, no photo, "₪0") for the length of the slide-out.
+- **An order from one message** (`startFromReply`, `helpers/chat-order.ts`; CORE invariant 19): the
+   chat's own lines `order_which_store` / `order_which_product` / `order_which_option` /
+   `order_which_group` (chips, answered chips echoed as the customer's bubble, a new question
+   scrolls into view), then `order_added` (+ `order_undo` / `order_edit`), `order_missing`,
+   `order_out_of_stock`, `order_over_cap`, `order_note`, `order_complete_choice` (sheet),
+   `order_open_store` (fallback). `applyOptionMatch` starts from the defaults minus out-of-stock
+   ones, unselects `deselect`, adds `matched` (`addOption`: a `single` replaces, a `multi` adds
+   within `maxCount ?? max`), applies an `ambiguous` word when the menu leaves one, else asks.
+   «شو الإضافات؟» → `extras_list` from the loaded menu product (`extrasListText`: one line per
+   group, prices when set, out-of-stock marked) with «اطلبها» (the normal "+").
 - **Commit**: `cartStore.addProductToCartForStore(line, storeData)` stamps an empty cart with the
    dish's store, never the browsed one (orders domain). A cart of another store is never mixed or
    silently emptied — the chat asks (`store_conflict`: empty the cart and add / keep the cart).
@@ -954,7 +1079,9 @@ note? }`, `POST …/review/run`.
   Shoofi employees only until the last is on; the mic is on-device speech-to-text in
   `hooks/useVoiceInput.ts`, shown only when the binary has the native module, and its transcript
   is sent as the same `text`); a card tap navigates to
-  `menuScreen` with `productId` (`hooks/useOpenStoreAtProduct.ts`), and the menu list opens the
+  `menuScreen` with `productId` (`utils/open-store-at-product.ts`, wrapped by the
+  `hooks/useOpenStoreAtProduct.ts` hook; marketing links — banner, story, push — use the same
+  function), and the menu list opens the
   sheet by matching `products[]._id`: `AllCategoriesList` searches `categoryList[].products`;
   for tile-grid stores (`store.hasGeneralCategories`) `GeneralCategoriesList` receives the
   general categories, which carry NO `products` of their own, so it searches
@@ -979,8 +1106,15 @@ note? }`, `POST …/review/run`.
   personal tag. With `isChatMinimizeEnabled` (§7g) the chat minimizes into the floating
   `ChatBubbleOverlay` (mounted in `components/layout/app-container/index.tsx`); a tap brings the same
   conversation back.
-- **Partner app** (`shoofi-partner`): product write + ordering endpoints; sends `app-type: shoofi-partner` to see hidden products; listens for `product_updated`.
-- **Admin web** (`shoofi-delivery-web`/`shoofi-admin`): category CRUD, product ordering/migration, translations CRUD, stock screen (`update/quantity`), store config toggles (`isStockManagment`, `hasGeneralCategories`). "סוגי מנות (בשבילך)" at `/admin/dish-types` (`src/views/admin/dish-types/DishTypes.tsx`, API wrappers `src/apis/admin/dish-taxonomy.ts`): approve/reject/edit dish types, the "מוצרים לבדיקה" review list, run history with token counts, and a manual run. Platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled` / `isChatSuggestForAll` ("For You — Open To All Customers"; off = Shoofi employees only) under Settings → Shoofi, and the AI helper's `isAiHelperEnabled` / `isAiHelperForAll` / `isAiHelperOnboardingEnabled` / `isChatOrderingEnabled` beside them (`src/views/admin/settings/ShoofiSettings.tsx`, §7f), then the chat's `isChatMinimizeEnabled` / `isChatMinimizeForAll` (§7g).
+  Store cards (`screens/stores/components/item.tsx`, used by home, the store lists and search)
+  render the server's `store.isNew` as a "جديد"/"חדש" badge (CORE invariant 25).
+  Categories and explore (verified 2026-10-30, all before login, the **[public]** routes of CORE
+  invariant 27): `POST shoofiAdmin/category/list` (`App.tsx` boot), `GET category/general/all` and
+  `GET shoofiAdmin/explore/categories-with-stores-v2` (`screens/explore.tsx`). `stores/shoofi-admin`
+  still defines v1 explore, `explore/clear-cache` and `explore/cache-stats` calls, but nothing calls
+  those methods.
+- **Partner app** (`shoofi-partner`): product write + ordering endpoints; sends `app-type: shoofi-partner` to see hidden products; listens for `product_updated`. The product calls are all in `stores/menu/index.ts`, made with `Authorization: Token` and `app-name` set to the current store (`@storage_storeDB`, set together with the token by `switchStore`). They are: `insert`/`update` (`screens/admin/product/add`), `delete` (`screens/menu/components/categoryItemsList.tsx`), `update/isInStore` (stock screen, product items, the order list), `update/isInStore/byCategory`, `update/quantity`, `update/activeTastes` (`screens/admin/stock-management`), `update/isHidden` (product items) and `update/order` (`screens/admin/products-order`). These are exactly the **[admin|own store]** routes (§7). `GET extras` is defined there but nothing calls it. Categories (verified 2026-10-30): only the two public reads, `POST shoofiAdmin/category/list` (`App.tsx` boot, `stores/shoofi-admin`) and `GET category/general/all` (`screens/explore.tsx`); it writes no category (CORE invariant 27).
+- **Admin web** (`shoofi-delivery-web`/`shoofi-admin`): category CRUD, product ordering/migration, translations CRUD, store config toggles (`isStockManagment`, `hasGeneralCategories`). "סוגי מנות (בשבילך)" at `/admin/dish-types` (`src/views/admin/dish-types/DishTypes.tsx`, API wrappers `src/apis/admin/dish-taxonomy.ts`): approve/reject/edit dish types, the "מוצרים לבדיקה" review list, run history with token counts, and a manual run. Platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled` / `isChatSuggestForAll` ("For You — Open To All Customers"; off = Shoofi employees only) under Settings → Shoofi, and the AI helper's `isAiHelperEnabled` / `isAiHelperForAll` / `isAiHelperOnboardingEnabled` / `isChatOrderingEnabled` beside them (`src/views/admin/settings/ShoofiSettings.tsx`, §7f), then the chat's `isChatMinimizeEnabled` / `isChatMinimizeForAll` (§7g). Product routes it calls, all through `utils/http-interceptor` (`Bearer`, `app-type: shoofi-admin`): `GET admin/product/:id`, `insert`, `update` (`views/admin/product.tsx`), the same three plus `import-index` (`views/admin/stores/ImportCategoriesProducts.tsx`), `delete`, `order/:categoryId`, `update/order-per-category`, `reset-order/:categoryId`, `migrate-orders` (`views/admin/Products.tsx`), and `product/mock-store/:x` + `product/create-from-mock` (`views/admin/stores/CreateProductFromMock.tsx`). It does NOT call `update/quantity` or the other availability toggles; those come from the partner app. `src/apis/admin/product/product-order.ts` (`bulk-reorder`, `update/order`) is imported by nothing. The store form's "تاريخ الافتتاح" (`launchDate`, `src/views/admin/stores/StoreForm.tsx`) and Settings → Shoofi → "New Stores" (`newStoreWindowDays`) drive the store card's "new" badge (CORE invariant 25). Category and explore routes (verified 2026-10-30, all through `axiosInstance`, the **[admin]** routes of CORE invariant 27): `views/admin/categories.tsx` + `AddCategory.tsx` (`shoofiAdmin/category/*`, `category/by-general/:id`), `CouponForm.tsx` / `CouponTemplatePicker.tsx` (`GET shoofiAdmin/category/list`), `general-categories/{GeneralCategoriesList,GeneralCategoryForm}.tsx` (`category/general/*`), `store-categories/{StoreCategoriesList,StoreCategoryForm}.tsx` (`store-category/*`), `stores/ImportCategoriesProducts.tsx` and `StoresList.tsx` (both families), `components/admin/MockProductSelector.tsx` (`all/by-store`), `ApiMonitor.tsx` (`explore/{cache-stats,clear-cache,clear-cache-keys}`). The exception: `apis/admin/category/get-categories.ts` (`GET admin/categories/:page`, `StoreForm.tsx`) uses plain `axios` with no token. `GET /api/store/get/:appName` (all through `axiosInstance`): `components/Navbars/AdminNavbar.js`, `DriverAvailabilityMonitor.tsx`, `settings/ShoofiSettings.tsx` (`shoofi`), `accounting/{AccountantFileNumber,BankAccountDetails,ContractDetails}.tsx`, `generate-stores-summaries.tsx`, `product.tsx`, `stores/StoreData.tsx`.
 
 ## 9. Known status (human-confirmed) — what's a bug vs. by-design
 Each item below was reviewed with the product owner. Respect these verdicts.
@@ -1003,6 +1137,11 @@ Each item below was reviewed with the product owner. Respect these verdicts.
 - **BY DESIGN — do NOT change:** `translations.js` reads a header literally
   named `shoofi` because **translations are global/platform-wide by design**, not
   per-store. This is intentional; leave it. (Do not "fix" it to `app-name`.)
+  _Note (2026-10-26, not a verdict change):_ only the READ uses that header. The three panel
+  WRITE routes pick the DB from `app-name` (default `shoofi`). The admin panel sends
+  `app-name: 'shoofi'`, so it lands correctly, but any other caller can write into a store DB
+  where nobody reads. Code writes go through `writeOwnedTranslation`, which is pinned to the
+  central DB (CORE invariant 24).
 - **FACT (not a bug) — `supportedCategoryIds` are strings**, compared via
   `{$toString:'$_id'}` (`menu.js`). Don't switch to ObjectId comparison
   without a data migration.

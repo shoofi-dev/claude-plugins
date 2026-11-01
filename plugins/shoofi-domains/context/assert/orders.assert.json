@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -35,7 +35,22 @@
         "services/promotions/promotion-service.js",
         "utils/promotion-discount.js",
         "services/twin-order/twin-promotions.js",
-        "docs/promotions.md"
+        "docs/promotions.md",
+        "services/coupons/delivery-price-enforcement.js",
+        "services/twin-order/twin-delivery-price.js",
+        "docs/fixed-delivery-price.md",
+        "test/integration/coupon-delivery-price.js",
+        "utils/marketing-touch.js",
+        "test/integration/order-marketing-touch.js",
+        "services/marketing/order-facts.js",
+        "services/marketing/reconcile.js",
+        "utils/crons/marketing-attribution-cron.js",
+        "docs/marketing-attribution.md",
+        "test/integration/marketing-attribution.js",
+        "services/orders/admin-access.js",
+        "test/integration/orders-admin-auth.js",
+        "routes/coins.js",
+        "test/integration/coins-admin-auth.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -66,7 +81,8 @@
           "loadPricedProducts",
           "calculateComboExtrasPrice",
           "COMBO_ISSUE",
-          "repricePromotions"
+          "repricePromotions",
+          "amendedDeliveryPriceDiscount"
         ],
         "routes/order-amend.js": [
           "repriceOrder",
@@ -92,9 +108,48 @@
         ],
         "services/twin-order/twin-promotions.js": [
           "enforceTwinSidePromotions"
+        ],
+        "services/coupons/delivery-price-enforcement.js": [
+          "enforceDeliveryPriceCoupon",
+          "MONEY_FIELDS"
+        ],
+        "services/twin-order/twin-delivery-price.js": [
+          "enforceTwinSideDeliveryPrice"
+        ],
+        "services/marketing/order-facts.js": [
+          "touchPrecedesCheckout",
+          "validTouches",
+          "recordCheckoutFactResult",
+          "scheduleOrderFact",
+          "recordCheckoutFact",
+          "normalizeOrderStatus",
+          "statusPatch",
+          "LEG_PROJECTION"
+        ],
+        "services/marketing/reconcile.js": [
+          "reconcileDueFacts",
+          "reconcileRecentFacts",
+          "backfillMissingFacts"
+        ],
+        "utils/marketing-touch.js": [
+          "sanitizeMarketingTouch",
+          "MARKETING_TOUCH_MAX_AGE_MS",
+          "MARKETING_TOUCH_FUTURE_SKEW_MS",
+          "MARKETING_TOUCH_MAX_STRING_LENGTH"
+        ],
+        "services/orders/admin-access.js": [
+          "storeMemberGate",
+          "isPartnerStoreMember",
+          "ORDERS_DASHBOARD",
+          "ORDERS_DASHBOARD_OR_STORE_MEMBER"
         ]
       },
       "patterns": [
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(req\\.body\\.isNotPrinted\\) \\{\\s*filterBy\\.isPrinted = false;",
+          "desc": "doc reference C3 Auto-print: isNotPrinted only adds isPrinted:false. The date window is built only `if (ordersDate)`, so a sweep that sends no date has no window at all; the partner sweep must send ordersDate"
+        },
         {
           "file": "consts/consts.js",
           "regex": "ORDER_STATUS",
@@ -329,7 +384,144 @@
           "file": "services/for-you-quality/events.js",
           "regex": "^  \"checkout_left\",$",
           "desc": "doc §Where an order that never happened lives: checkout_left is among the copied checkout events"
-        }
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const entitlement = await enforceCouponEntitlement\\((?:(?!const orderDoc = \\{)[\\s\\S])*?const conflict = resolveDeliveryConflict\\((?:(?!const orderDoc = \\{)[\\s\\S])*?const enforcedFixedPrice = await enforceDeliveryPriceCoupon\\(\\{(?:(?!router\\.|const orderDoc = \\{)[\\s\\S])*?\\n    const orderDoc = \\{",
+          "desc": "CORE invariant 14: in /api/order/create the fixed-delivery-price recompute runs AFTER coupon entitlement and AFTER the promotions block's deal-vs-coupon conflict, and BEFORE the orderDoc is built - move it and either the kept deal is unknown or the stored discount is the client's"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "deliveryDealDiscount: parsedBodey\\.promotions\\?\\.delivery\\?\\.discountAmount,\\s*resolveCeiling: \\(\\) =>\\s*resolveDeliveryTariffCeiling\\(",
+          "desc": "CORE invariant 14: the creation guard's fee is bounded by the area tariff (from the store's own document) and net of the delivery deal kept on the order"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(parsedBodey\\.appliedCoupon\\?\\.coupon\\?\\.type === \"delivery_price\"\\) \\{\\s*parsedBodey\\.appliedCoupon = null;",
+          "desc": "CORE invariant 14: a THROWN fixed-price check drops the delivery_price coupon (check-failed) - the one secondary check that does not keep the client's number"
+        },
+        {
+          "file": "services/coupons/delivery-price-enforcement.js",
+          "regex": "if \\(!\\(doc && doc\\.type === DELIVERY_PRICE_TYPE\\) && !claimsType\\) return null;",
+          "desc": "CORE invariant 14: the guard touches ONLY delivery_price coupons (by document or snapshot) - every other coupon stays client-trusted beyond enforceCouponEntitlement"
+        },
+        {
+          "file": "services/coupons/delivery-price-enforcement.js",
+          "regex": "const finalDiscount = round2\\(Math\\.min\\(postedDiscount, serverDiscount\\)\\);[\\s\\S]{0,200}?if \\(!\\(finalDiscount > 0\\)\\) \\{\\s*return \\{\\s*appliedCoupon: null,",
+          "desc": "CORE invariant 14: final = min(posted, server) - never above the quote - and a ₪0 result drops the coupon so no couponUsages row burns a redemption"
+        },
+        {
+          "file": "services/coupons/delivery-price-enforcement.js",
+          "regex": "for \\(const f of MONEY_FIELDS\\) coupon\\[f\\] = doc\\[f\\] === undefined \\? null : doc\\[f\\];\\s*const split = resolveCouponSplit\\(doc, finalDiscount\\);",
+          "desc": "CORE invariant 14: the snapshot's money fields come from the coupon DOCUMENT and the Shoofi/store split is re-resolved on the final discount"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "router\\.post\\('/api/twin-order/place'(?:(?!router\\.)[\\s\\S])*?await enforceTwinSidePromotions\\(\\{ req, sideBody: body\\.secondary, sideDB: secondaryDB, customerId, isPrimary: false \\}\\);\\s*(?://[^\\n]*\\s*)?await enforceTwinSideDeliveryPrice\\(\\{ req, sideBody: body\\.primary, sideDB: primaryDB, customerId, isPrimary: true \\}\\);\\s*await enforceTwinSideDeliveryPrice\\(\\{ req, sideBody: body\\.secondary, sideDB: secondaryDB, customerId, isPrimary: false \\}\\);",
+          "desc": "CORE invariant 14 / reference §4: /place re-prices fixed-delivery-price coupons per side right AFTER enforceTwinSidePromotions (primary real fee, secondary none)"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "router\\.post\\('/api/twin-order/digital-place-pending'(?:(?!router\\.)[\\s\\S])*?await enforceTwinSidePromotions\\(\\{ req, sideBody: body\\.secondary, sideDB: secondaryDB, customerId, isPrimary: false \\}\\);\\s*(?://[^\\n]*\\s*)?await enforceTwinSideDeliveryPrice\\(\\{ req, sideBody: body\\.primary, sideDB: primaryDB, customerId, isPrimary: true \\}\\);\\s*await enforceTwinSideDeliveryPrice\\(\\{ req, sideBody: body\\.secondary, sideDB: secondaryDB, customerId, isPrimary: false \\}\\);",
+          "desc": "CORE invariant 14 / reference §4: /digital-place-pending runs the same per-side re-price right AFTER enforceTwinSidePromotions"
+        },
+        {
+          "file": "services/twin-order/twin-delivery-price.js",
+          "regex": "receiptMethod: isPrimary \\? \\(sideBody\\.receiptMethod \\|\\| 'DELIVERY'\\) : 'NO_FEE_ON_SECONDARY',\\s*shippingPrice: isPrimary \\? sideBody\\.shippingPrice : 0,",
+          "desc": "CORE invariant 14: one ₪X per twin order - only the primary carries a fee; a fixed-price coupon on the secondary prices to ₪0 and comes off"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "if \\(wellFormed\\) return Math\\.min\\(kept, Math\\.max\\(0, Number\\(recomputed\\) \\|\\| 0\\)\\);\\s*return Math\\.min\\(kept, Math\\.max\\(0, Number\\(feeAfterDeal\\) \\|\\| 0\\)\\);",
+          "desc": "CORE invariant 14: amend never GROWS a fixed-price discount - min(kept, recomputed), or min(kept, fee after deal) for a snapshot missing deliveryPrice/maxDiscount"
+        },
+        {
+          "file": "utils/order-pricing.js",
+          "regex": "if \\(appliedCoupon\\?\\.coupon\\?\\.type === DELIVERY_PRICE_TYPE\\) \\{\\s*couponDiscount = amendedDeliveryPriceDiscount\\(",
+          "desc": "CORE invariant 14: calculateOrderPricing routes a delivery_price coupon through amendedDeliveryPriceDiscount"
+        },
+        {
+          "file": "routes/order-amend.js",
+          "regex": "if \\(!Number\\.isFinite\\(Number\\(pricing\\.total\\)\\)\\) \\{\\s*return res\\.status\\(409\\)\\.json\\(\\{[\\s\\S]{0,120}?code: \"AMEND_UNPRICEABLE\",[\\s\\S]*?const writeResult = await db\\.orders\\.updateOne\\(",
+          "desc": "CORE invariant 14: a non-finite amended total is refused (409 AMEND_UNPRICEABLE) BEFORE the order write - never written, never charged (any coupon type)"
+        },
+        {
+          "file": "routes/order-amend.js",
+          "regex": "order\\.appliedCoupon\\?\\.coupon\\?\\.type === DELIVERY_PRICE_TYPE\\s*\\? resolveCouponSplit\\(order\\.appliedCoupon\\.coupon, pricing\\.couponDiscount\\)[\\s\\S]*?\"appliedCoupon\\.coupon\\.shoofiDiscount\": deliveryPriceSplit\\.shoofiDiscount,\\s*\"appliedCoupon\\.coupon\\.storeDiscount\": deliveryPriceSplit\\.storeDiscount,",
+          "desc": "CORE invariant 14: amend writes the re-split Shoofi/store shares of a delivery_price coupon in the same $set as its discountAmount"
+        },
+        {
+          "file": "utils/coupon-discount.js",
+          "regex": "if \\(coupon\\.type === DELIVERY_PRICE_TYPE\\) return computeDeliveryPriceDiscount\\(\\{ coupon, deliveryFee \\}\\);",
+          "desc": "CORE invariant 14: computeCouponDiscount dispatches delivery_price to the ONE formula before any other branch - quote, creation guard and amend share it"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const marketingTouch = sanitizeMarketingTouch\\(parsedBodey\\.marketingTouch\\);\\s*delete parsedBodey\\.marketingTouch;[\\s\\S]*?const orderDoc = \\{\\s*\\.\\.\\.parsedBodey,[\\s\\S]*?\\.\\.\\.\\(marketingTouch \\? \\{ marketingTouch \\} : \\{\\}\\),",
+          "desc": "CORE invariant 15: /api/order/create sanitizes marketingTouch and DELETES the raw value before the ...parsedBodey spread, then re-adds only the sanitized one"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "const marketingTouch = sanitizeMarketingTouch\\(body\\.marketingTouch\\);",
+          "desc": "CORE invariant 15: the twin place routes sanitize the TOP-LEVEL body.marketingTouch once and stamp the same value on both legs"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "\\.\\.\\.\\(marketingTouch \\? \\{ marketingTouch \\} : \\{\\}\\),",
+          "desc": "CORE invariant 15: buildSkeletonOrder writes marketingTouch only when present (absent = not attributed)"
+        },
+        {
+          "file": "utils/marketing-touch.js",
+          "regex": "const MARKETING_TOUCH_MAX_STRING_LENGTH = 64;\\s*const MARKETING_TOUCH_MAX_AGE_MS = 24 \\* 60 \\* 60 \\* 1000;\\s*const MARKETING_TOUCH_FUTURE_SKEW_MS = 5 \\* 60 \\* 1000;",
+          "desc": "CORE invariant 15: 64-char string cap, 24h window, 5-minute future skew"
+        },
+        {"file": "routes/order.js", "regex": "const newDoc = await db\\.orders\\.insertOne\\(orderDoc\\);\\s*orderId = newDoc\\.insertedId;[\\s\\S]{0,600}?\\n      scheduleOrderFact\\(req, res, \\{ appName, orderObjectId: orderId \\}\\);", "desc": "CORE invariant 16: the create path schedules the marketing fact right AFTER the insert, un-awaited (it only registers res finish/close)"},
+        {"file": "routes/twin-order.js", "regex": "await twinGroupService\\.attachOrders\\([\\s\\S]{0,400}?scheduleOrderFact\\(req, res, \\{\\s*twinGroupId: group\\.groupId,", "desc": "CORE invariant 16: both twin place routes schedule ONE fact for the checkout after both legs are attached"},
+        {"file": "services/marketing/order-facts.js", "regex": "const CANCELLED_CODES = \\[\"4\", \"7\", \"8\", \"9\", \"-3\", \"cancelled\"\\];", "desc": "CORE invariant 16: the twin services' '-3' and 'cancelled' count as cancelled in the facts"},
+        {"file": "services/marketing/order-facts.js", "regex": "res\\.once\\(\"finish\", fire\\);\\s*res\\.once\\(\"close\", fire\\);", "desc": "CORE invariant 16: the fact is built after the response, never on the order path"},
+        {"file": "services/marketing/order-facts.js", "regex": "return `order:\\$\\{appName\\}:\\$\\{String\\(orderObjectId\\)\\}`;", "desc": "CORE invariant 16: deterministic fact _id (idempotent upserts; twin = twin:<groupId>)"},
+        {"file": "utils/crons/marketing-attribution-cron.js", "regex": "const RECONCILE_SCHEDULE = \"\\*/15 \\* \\* \\* \\*\";", "desc": "CORE invariant 16: the reconcile cron (the guarantee) runs every 15 minutes"},
+        {"file": "services/marketing/order-facts.js", "regex": "\\$or: \\[\\{ createdAt: \\{ \\$lt: new Date\\(created\\) \\} \\}, \\{ at: \\{ \\$lt: new Date\\(created\\) \\} \\}\\],", "desc": "CORE invariant 16: the event lookup only takes touches that happened before the checkout (received before, or tapped before) - a residual filter on the {viewerKey, kind, at} scan"},
+        {"file": "services/marketing/order-facts.js", "regex": "function touchPrecedesCheckout\\(t, createdAt\\) \\{[\\s\\S]{0,400}?if \\(t\\.source === \"client\"\\) return true;[\\s\\S]{0,300}?if \\(at < created\\) return true;[\\s\\S]{0,200}?return Number\\.isFinite\\(received\\) && received < created;", "desc": "CORE invariant 16: the touch-precedence rule - client touches always, else tapped before, else received before; no forward skew"},
+        {"file": "services/marketing/reconcile.js", "regex": "const healed = facts\\.validTouches\\(fact\\.touches, fact\\.createdAt\\);", "desc": "CORE invariant 16: reconcile re-applies the rule to stored touches (heals facts credited with a later tap)"},
+        {"file": "services/marketing/reconcile.js", "regex": "const \\{ inserted \\} = await facts\\.recordCheckoutFactResult\\(", "desc": "CORE invariant 16: backfill counts only real inserts (upsertedCount)"},
+        {"file": "services/orders/admin-access.js", "regex": "const ORDERS_DASHBOARD = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];", "desc": "CORE invariant 18: the dashboard-only gate (any DASHBOARD_ROLES seat)"},
+        {"file": "services/orders/admin-access.js", "regex": "const ORDERS_DASHBOARD_OR_STORE_MEMBER = \\[auth\\.required, storeMemberGate\\];", "desc": "CORE invariant 18: the partner-polled gate - a dashboard role, or a partner of the app-name store"},
+        {"file": "services/orders/admin-access.js", "regex": "const user = await storeUsers\\.findOne\\(\\{ _id: getId\\(req\\.auth\\.id\\) \\}\\);[\\s\\S]{0,120}?if \\(user\\.appName === appName\\) return true;[\\s\\S]{0,80}?await storeUsers\\.findOne\\(\\{ phone: user\\.phone, appName \\}", "desc": "CORE invariant 18: membership = the token's own storeUsers doc's appName, or a same-phone storeUsers doc on that store (the switch-store check). Not exact-match: switchStore persists the store before the token"},
+        {"file": "routes/order.js", "regex": "router\\.get\\(\"/api/order/admin/not-viewd\", \\.\\.\\.ORDERS_DASHBOARD_OR_STORE_MEMBER, async", "desc": "CORE invariant 18: the new-order feed (partner without the all role / before details load) - dashboard or store member, never a role-only gate"},
+        {"file": "routes/order.js", "regex": "router\\.get\\(\"/api/order/admin/not-printed\", \\.\\.\\.ORDERS_DASHBOARD_OR_STORE_MEMBER, async", "desc": "CORE invariant 18: not-printed - dashboard or store member"},
+        {"file": "routes/order.js", "regex": "router\\.get\\(\"/api/order/admin/future-orders-count\", \\.\\.\\.ORDERS_DASHBOARD, async", "desc": "CORE invariant 18: future-orders-count - admin web only (sidebar badge)"},
+        {"file": "routes/order.js", "regex": "router\\.post\\(\"/api/order/admin/coupon-orders\", \\.\\.\\.ORDERS_DASHBOARD, async", "desc": "CORE invariant 18: coupon-orders - admin web only"},
+        {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/shoofiAdmin/external-order-providers\", \\.\\.\\.ORDERS_DASHBOARD, async", "desc": "CORE invariant 18: external-order-providers - admin web only (StoreForm)"},
+        {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/admin/check-order-time-valid\", async", "desc": "CORE invariant 18: check-order-time-valid stays PUBLIC (customer cart on submit, maybe logged out; school window only)"},
+        {"file": "routes/calander.js", "regex": "router\\.post\\(\"/api/admin/calander/disable/hour/insert\", \\.\\.\\.ORDERS_DASHBOARD_OR_STORE_MEMBER, async", "desc": "CORE invariant 18: calendar write - dashboard or store member"},
+        {"file": "routes/calander.js", "regex": "router\\.post\\(\"/api/admin/calander/disable/hour/insert/multi\", \\.\\.\\.ORDERS_DASHBOARD_OR_STORE_MEMBER, async", "desc": "CORE invariant 18: calendar write - dashboard or store member"},
+        {"file": "routes/calander.js", "regex": "router\\.post\\(\"/api/admin/calander/enable/hour\", \\.\\.\\.ORDERS_DASHBOARD_OR_STORE_MEMBER, async", "desc": "CORE invariant 18: calendar write - dashboard or store member"},
+        {"file": "routes/calander.js", "regex": "router\\.post\\(\"/api/admin/calander/enable/hour/multi\", \\.\\.\\.ORDERS_DASHBOARD_OR_STORE_MEMBER, async", "desc": "CORE invariant 18: calendar write - dashboard or store member"},
+        {"file": "routes/calander.js", "regex": "router\\.get\\(\"/api/admin/calander/disabled/hours/:date\", async[\\s\\S]{0,400}?\\.find\\(\\{ date: date \\}, \\{ projection: \\{ date: 1, hour: 1 \\} \\}\\)", "desc": "CORE invariant 18: the disabled-hours read stays PUBLIC and is projected to {_id, date, hour} - never an order"},
+        {"file": "routes/order.js", "regex": "router\\.get\\(\"/api/order/admin/all/not-viewd\", \\.\\.\\.ORDERS_DASHBOARD_OR_STORE_MEMBER, async", "desc": "CORE invariant 18: the partner's LIVE new-order feed (every prod store user has roles all) - dashboard or store member; never role-only, never exact-match (switchStore window)"},
+        {"file": "routes/order.js", "regex": "router\\.post\\(\\s*\"/api/order/admin/orders/:page\\?\",\\s*\\.\\.\\.ORDERS_DASHBOARD_OR_STORE_MEMBER,", "desc": "CORE invariant 18: admin/orders (partner list + auto-print sweep) - dashboard or store member"},
+        {"file": "routes/order.js", "regex": "\"/api/order/admin/school-project-orders-for-print\",\\s*\\.\\.\\.ORDERS_DASHBOARD_OR_STORE_MEMBER,", "desc": "CORE invariant 18: school print - dashboard or store member"},
+        {"file": "routes/order.js", "regex": "router\\.get\\(\"/api/order/future-orders-ready\", \\.\\.\\.ORDERS_DASHBOARD_OR_STORE_MEMBER, async", "desc": "CORE invariant 18: future-orders-ready (FutureOrderReminderGlobal) - dashboard or store member"},
+        {"file": "routes/order.js", "regex": "router\\.post\\(\"/api/order/get-custom-delivery\", \\.\\.\\.ORDERS_DASHBOARD_OR_STORE_MEMBER, async", "desc": "CORE invariant 18: get-custom-delivery (partner book-delivery list, store bookDelivery) - dashboard or store member"},
+        {"file": "routes/order.js", "regex": "router\\.post\\(\"/api/order/admin/all-orders/:page\\?\", \\.\\.\\.ORDERS_DASHBOARD, async", "desc": "CORE invariant 18: admin/all-orders (admin web cross-store list) - dashboard only"},
+        {"file": "routes/order.js", "regex": "router\\.post\\(\"/api/order/byDate\", \\.\\.\\.ORDERS_DASHBOARD, async", "desc": "CORE invariant 18: byDate (no caller) - dashboard only"},
+        {"file": "routes/order.js", "regex": "router\\.post\\(\"/api/order/statistics/new-orders/:page\\?\", \\.\\.\\.ORDERS_DASHBOARD, async", "desc": "CORE invariant 18: statistics/new-orders (admin web HeaderStats) - dashboard only"},
+        {"file": "routes/order.js", "regex": "\"/api/order/admin/my-stores/new-orders-count\",\\s*auth\\.required,\\s*async \\(req, res\\) => \\{[\\s\\S]{0,200}?const me = await shoofiDB\\.storeUsers\\.findOne\\(\\{ _id: getId\\(req\\.auth\\.id\\) \\}\\);", "desc": "CORE invariant 18: the ONE login-only admin route - token-scoped (phone -> storeUsers), ignores app-name, counts only"},
+        {"file": "test/integration/orders-admin-auth.js", "regex": "test\\(\"no /api/order/admin/\\* route is login-only or ungated\"", "desc": "CORE invariant 18: the static check that fails for any login-only /api/order/admin route"},
+        {"file": "routes/coins.js", "regex": "const COINS_ADMIN_ROLES = DASHBOARD_ROLES;\\s*const COINS_ADMIN = \\[auth\\.required, checkAdminRole\\(COINS_ADMIN_ROLES\\)\\];", "desc": "CORE invariant 19: the coins admin gate is auth.required + every dashboard role (auth.required alone passes customer tokens)"},
+        {"file": "routes/coins.js", "regex": "const COINS_EXPIRE_ROLES = \\[\"master\"\\];\\s*const COINS_EXPIRE_ADMIN = \\[auth\\.required, checkAdminRole\\(COINS_EXPIRE_ROLES\\)\\];", "desc": "CORE invariant 19: the expiry sweep gate is master-only (the only code that permanently deletes coins; no caller)"},
+        {"file": "routes/coins.js", "regex": "router\\.post\\(\"/api/admin/coins/expire\", \\.\\.\\.COINS_EXPIRE_ADMIN,", "desc": "CORE invariant 19: the expiry sweep's only trigger is master-only"},
+        {"file": "services/audit/admin-audit-routes.js", "regex": "pattern: '/api/admin/coins/expire', method: 'POST', action: 'expire_coins'", "desc": "CORE invariant 19: a coin expiry run records its actor in the admin audit log"},
+        {"file": "routes/coins.js", "regex": "router\\.get\\(\"/api/admin/coins/customer/:customerId\", \\.\\.\\.COINS_ADMIN,", "desc": "CORE invariant 19: a customer's coin wallet is dashboard-only"},
+        {"file": "routes/coins.js", "regex": "\"/api/admin/coins/customer/:customerId/earned\",\\s*\\.\\.\\.COINS_ADMIN,", "desc": "CORE invariant 19: the customer modal's coins tab is dashboard-only"},
+        {"file": "routes/coins.js", "regex": "router\\.get\\(\"/api/admin/coins/store/:storeAppName/stats\", \\.\\.\\.COINS_ADMIN,", "desc": "CORE invariant 19: a store's coin totals are dashboard-only"},
+        {"file": "routes/shoofi-admin.js", "regex": "const \\{ DASHBOARD_ROLES: COINS_SETTINGS_ROLES \\} = require\\(\"\\.\\./utils/analytics-access\"\\);\\s*const COINS_SETTINGS_ADMIN = \\[coinsSettingsAuth\\.required, coinsSettingsRoleCheck\\(COINS_SETTINGS_ROLES\\)\\];", "desc": "CORE invariant 19: the coin-settings gate is auth.required + every dashboard role, built inside the Coins Settings block"},
+        {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/admin/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,[\\s\\S]*?router\\.post\\(\"/api/admin/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,", "desc": "CORE invariant 19: reading and flipping the platform-wide coins switch is dashboard-only"},
+        {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/admin/store/:appName/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,[\\s\\S]*?router\\.post\\(\"/api/admin/store/:appName/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,", "desc": "CORE invariant 19: a store's earn rate / coin value is dashboard-only (no mobile caller; the partner toggle is commented out)"},
+        {"file": ["services/promotions/promotion-assistant.js", "routes/promotion.js"], "regex": "(?:const FEATURE = \"promotion-assistant\";|previewPromotionQuote\\(\\{)", "desc": "CORE §promotions: the deal assistant is its own service, services/promotions/promotion-assistant.js - valid-before leg is the admin promotions route still reading the one ranking through previewPromotionQuote; drop routes/promotion.js from this file list once shoofi-server#377 has merged"},
+        {"file": ["services/promotions/promotion-assistant.js", "routes/promotion.js"], "regex": "(?:runPromotionAssistant|previewPromotionQuote\\(\\{)", "desc": "CORE §promotions: runPromotionAssistant is the entry point POST /api/admin/promotions/assist calls - valid-before leg is previewPromotionQuote in the admin promotions route; drop routes/promotion.js from this file list once shoofi-server#377 has merged"},
+        {"file": ["services/promotions/promotion-assistant.js", "routes/promotion.js"], "regex": "(?:applyPromotionProposal|previewPromotionQuote\\(\\{)", "desc": "CORE §promotions: applyPromotionProposal keeps only what the deal form can hold (known type/config keys, ids from THIS store) - valid-before leg is previewPromotionQuote in the admin promotions route; drop routes/promotion.js from this file list once shoofi-server#377 has merged"}
       ]
     },
     "shoofi-app": {
@@ -340,9 +532,12 @@
         "components/checkout/FutureOrderPicker.tsx",
         "hooks/checkout/use-checkout-validate.ts",
         "screens/cart/cart.tsx",
-        "helpers/for-you-attribution.ts"
+        "helpers/for-you-attribution.ts",
+        "services/marketing-events.ts"
       ],
       "patterns": [
+        {"file": "stores/cart/index.ts", "regex": "const marketingTouch = await prepareMarketingForOrder\\(\\);", "desc": "CORE invariant 15/16: submitOrder sends the queued taps (<=1.5s, never throws) before reading the touch for the body"},
+        {"file": "screens/checkout/index.tsx", "regex": "const marketingTouch = await prepareMarketingForOrder\\(\\);", "desc": "CORE invariant 16: digital-place-pending flushes the queue first"},
         {
           "file": "hooks/checkout/use-checkout-validate.ts",
           "regex": "checkout_validation_failed",
@@ -441,7 +636,16 @@
         "stores/orders/index.tsx",
         "hooks/use-notifications.ts",
         "stores/new-order-alerts/index.ts",
-        "utils/notification/index.ts"
+        "utils/notification/index.ts",
+        "App.tsx",
+        "helpers/printer/print.ts",
+        "helpers/printer/index.ts",
+        "utils/print-outcome.ts",
+        "utils/print-attempts.ts",
+        "utils/print-queue.ts",
+        "utils/print-batch.ts",
+        "stores/auth/index.ts",
+        "utils/http-interceptor/index.ts"
       ],
       "symbols": {
         "utils/notification/index.ts": [
@@ -452,6 +656,25 @@
           "takeNewOrders",
           "takeNewOrdersOnRefresh",
           "seedSeen"
+        ],
+        "utils/print-outcome.ts": [
+          "classifyPrintError",
+          "sendDataTimeoutMs",
+          "sendDataWrapperTimeoutMs",
+          "printCopyWithRetry",
+          "outcomeCountsAsPrinted"
+        ],
+        "utils/print-attempts.ts": [
+          "autoPrintSweepStatuses",
+          "ordersUnderPrintAttemptCap",
+          "recordUnprintedAttempt",
+          "clearPrintAttempts"
+        ],
+        "utils/print-queue.ts": [
+          "captureAlignedToQueue"
+        ],
+        "helpers/printer/index.ts": [
+          "printImagesWithOutcome"
         ]
       },
       "patterns": [
@@ -479,7 +702,82 @@
           "file": "hooks/use-notifications.ts",
           "regex": "addNotificationReceivedListener\\([\\s\\S]{0,80}?fetchUnviewedOrdersCount\\(\\)",
           "desc": "STABILITY PIN, not a regression detector - green both before and after shoofi-partner#22, which did not introduce it. Every notification the device receives while the app runs (including the server's store.wav creation push) runs the badge refresh. This is the ONLY reason that path sees a new order ~30s before the poll, which is the whole premise of the two assertions above and of the C3 warning; drop this wiring and the doc's explanation stops being true"
-        }
+        },
+        {
+          "file": "helpers/printer/print.ts",
+          "regex": "printer\\.sendData\\(nativeTimeout\\)",
+          "desc": "doc CORE invariant 17: sendData gets the height-scaled timeout. A bare sendData() falls back to the library's 5000ms, which is what timed out on super-abu-shaqra 6370-3519 (2026-10-28)"
+        },
+        {
+          "file": "helpers/printer/print.ts",
+          "regex": "const timeoutDuration = sendDataWrapperTimeoutMs\\(nativeTimeout\\);",
+          "desc": "doc CORE invariant 17: our JS ceiling sits ABOVE the native timeout, so Epson reports its own result first"
+        },
+        {
+          "file": "utils/print-outcome.ts",
+          "regex": "export const EPSON_PRINT_TIMEOUT_MESSAGE = \"Print timeout occurred\\.\";",
+          "desc": "doc CORE invariant 17: the exact library message for CODE_ERR_TIMEOUT. If the library rewords it, the unconfirmed path silently becomes a failure again"
+        },
+        {
+          "file": "utils/print-outcome.ts",
+          "regex": "if \\(fromSendData && error\\.message === EPSON_PRINT_TIMEOUT_MESSAGE\\) return \"unconfirmed\";",
+          "desc": "doc CORE invariant 17: only Epson's sendData completion timeout is unconfirmed; every other error stays a failure"
+        },
+        {
+          "file": "utils/print-outcome.ts",
+          "regex": "outcome === \"printed\" \\|\\| outcome === \"unconfirmed\";",
+          "desc": "doc CORE invariant 17: an unconfirmed send is marked printed. Treating it as a failure is the loop"
+        },
+        {
+          "file": "utils/print-outcome.ts",
+          "regex": "if \\(outcome !== \"failed\"\\) return outcome;",
+          "desc": "doc CORE invariant 17: printCopyWithRetry never retries an unconfirmed send (the retry printed a second ticket)"
+        },
+        {
+          "file": "utils/print-outcome.ts",
+          "regex": "export const SEND_DATA_TIMEOUT_FLOOR_MS = 30000;",
+          "desc": "doc reference C3 Auto-print: 30s floor on the native sendData timeout"
+        },
+        {
+          "file": "utils/print-outcome.ts",
+          "regex": "export const SEND_DATA_TIMEOUT_CEILING_MS = 60000;",
+          "desc": "doc reference C3 Auto-print: 60s ceiling (the print lock is held for the whole wait)"
+        },
+        {
+          "file": "utils/print-attempts.ts",
+          "regex": "export const MAX_AUTO_PRINT_ATTEMPTS = 2;",
+          "desc": "doc CORE invariant 17: per-order, per-session cap on sweep attempts that did not get the order marked"
+        },
+        {
+          "file": "utils/print-attempts.ts",
+          "regex": "ORDER_STATUS\\.IN_PROGRESS,\\s*ORDER_STATUS\\.COMPLETED,\\s*ORDER_STATUS\\.WAITING_FOR_DRIVER,\\s*ORDER_STATUS\\.PENDING,\\s*\\];",
+          "desc": "doc CORE invariant 17: the sweep's statuses are 1,2,3,6 only, never cancelled/rejected/left-the-store"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "ordersUnderPrintAttemptCap\\(\\s*await ordersStore\\.getOrders\\(\\s*true,\\s*autoPrintSweepStatuses\\(forceStatuses\\),\\s*moment\\(\\)\\.format\\(\\),\\s*true,",
+          "desc": "doc CORE invariant 17: the first sweep (printNotPrinted) sends the business day and filters by the attempt cap"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "ordersUnderPrintAttemptCap\\(\\s*await ordersStore\\.getOrders\\(\\s*true,\\s*autoPrintSweepStatuses\\(printContext\\.forceStatuses\\),\\s*moment\\(\\)\\.format\\(\\),\\s*true,",
+          "desc": "doc CORE invariant 17: the post-batch sweep (forLoop) is bounded the same way"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "const images = await captureAlignedToQueue\\(queue,",
+          "desc": "doc CORE invariant 17: one capture slot per queued order, so image i prints and marks queue[i]"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "await printCopy\\(\\s*orderImage,",
+          "desc": "doc CORE invariant 17: the regular print loop goes through the outcome-aware printCopy (no retry on unconfirmed)"
+        },
+        {"file": "stores/auth/index.ts", "regex": "await shoofiAdminStore\\.setStoreDBName\\(appName\\);\\s*await this\\.updateUserToken\\(newToken\\);", "desc": "CORE invariant 18: switchStore persists the new store BEFORE the new token, so a poll can carry B with A's token - why the server gate is membership, not exact match"},
+        {"file": "stores/orders/index.tsx", "regex": "isAdminAll\\s*\\?\\s*ORDER_API\\.GET_ADMIN_ALL_NOT_VIEWD_ORDERS_API\\s*:\\s*ORDER_API\\.GET_ADMIN_NOT_VIEWD_ORDERS_API", "desc": "CORE invariant 18 / ref C3: the feed is all/not-viewd when isAdmin(ROLES.all) (every prod store user), not-viewd otherwise"},
+        {"file": "utils/http-interceptor/index.ts", "regex": "config\\.headers\\[\"Authorization\"\\] = \"Token \" \\+ token;[\\s\\S]{0,600}?config\\.headers\\[\"app-type\"\\] = \"shoofi-partner\";", "desc": "ref C3: partner requests send Token auth + app-type shoofi-partner (what storeMemberGate keys on)"},
+        {"file": "utils/http-interceptor/index.ts", "regex": "if \\(error\\?\\.message\\?\\.includes\\(\"401\"\\)\\) \\{\\s*DeviceEventEmitter\\.emit\\(`OPEN_GENERAL_SERVER_ERROR_DIALOG`, \\{\\s*show: true,\\s*isSignOut: true,", "desc": "CORE invariant 18: any 401 signs the store out (resetAppState + restart) - a partner-polled route must never 401 a logged-in terminal"},
+        {"file": "stores/orders/index.tsx", "regex": "const storeDB = await AsyncStorage\\.getItem\\(\"@storage_storeDB\"\\);\\s*return axiosInstance\\s*\\.get\\(api, \\{\\s*headers: \\{\\s*\"app-name\": storeDB,", "desc": "CORE invariant 18: the feed's app-name is @storage_storeDB (the token's store or a membership) - what storeMemberGate accepts"}
       ]
     }
   }

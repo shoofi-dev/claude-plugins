@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@561e3ca / 2026-07-28
+last-verified: shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -48,6 +48,9 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 5. **Client-trusts-totals:** the server charges `orderDoc.total` from the client body — it does
    **NOT** recompute the cart in the charge path. The only checks are the mismatch backstop and
    the zero-total→CASH downgrade. **Never weaken this without explicit sign-off.**
+   ONE coupon type is the exception at order CREATION (not in the charge path): a
+   `delivery_price` coupon's discount is recomputed server-side before the charge, because it
+   grows with the client-posted fee. See "Coupons between quote and charge" below.
 6. **Coins/coupons settle only AFTER payment success**; failures log CRITICAL for manual
    reconciliation — never roll back an irreversible capture.
 7. **Order dedup lock** (Redis `SET NX` + fallback + recent-order window) prevents double charges.
@@ -114,6 +117,27 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    Reach: wallet orders always (unconditionally manual), card orders only where the flag is
    on — a gateway-issued document cannot take a `ua_uuid`, and `EZ.*` is an undocumented
    pass-through that can reject the whole charge, so do not try `EZ.ua_uuid`.
+11. **Only admin-dashboard users may call the per-order invoice queue routes, and only
+   owners may write to the queue.** `/api/admin/invoices/{pending,retry,process-all,webhook}`
+   (`routes/admin.js`) drive the `utils/invoice-mail.js` Gmail-fetch queue. No client, cron,
+   bridge or server self-call reaches them, so customer, partner and driver tokens get 403.
+   - `GET pending` (a count): `auth.required` + `checkAdminRole(DASHBOARD_ROLES)`
+     (`invoiceQueueAdmins`).
+   - `POST retry`, `process-all`, `webhook`: `auth.required` +
+     `checkAdminRole(INVOICE_QUEUE_WRITE_ROLES)`, which is `["master", "admin"]`
+     (`invoiceQueueWriters`). They run Gmail searches and public-read Spaces uploads, so
+     viewer, accountant and the other dashboard roles get 403. They never worked before, so
+     the narrower list took nothing away from anyone.
+   - The webhook also keeps its body `INVOICE_WEBHOOK_SECRET` check. No provider calls it.
+   - **Only a numeric docId may reach the Gmail fetch** (`isFetchableInvoiceDocId`):
+     retry and webhook answer 400 otherwise, and process-all skips (`skippedNonNumericDocId`).
+     HYP orders under manual invoicing carry `docId: "EZ"` (2,894 stuck at `pending` in prod,
+     2026-08-10..09-22). Their documents are in `invoices[]`, not Gmail. A fetch for `"EZ"`
+     would search `subject:EZ`, publish an arbitrary customer's mail at the public key
+     `invoices/doc-EZ.pdf` and mark one arbitrary order completed.
+   ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
+   throws inside an async middleware and the request **hangs with no response**. Until
+   2026-10-30 that is what `pending`, `retry` and `process-all` did.
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
@@ -138,6 +162,107 @@ icons. Filters run in this order, and each one can only remove methods:
 ⚠️ **Hiding a method is UI-only.** `/api/order/create` does not check the payment method
 against any of these rules, for any order, school or not. A stale or tampered client can still
 send CASH. Enforcing the rules at order creation is a `routes/order.js` change and needs sign-off.
+
+## Coupons between quote and charge (money-in view)
+The server computes every coupon discount; the app only displays `discountAmount` and posts it
+back in `appliedCoupon` with a client-computed `total` (`components/total-price`). There is ONE
+formula module, `utils/coupon-discount.js` (`computeCouponDiscount`), used by
+`/api/coupons/apply`, the auto-apply scorer (`routes/coupon.js`), amend and shadow pricing
+(`utils/order-pricing.js`). Creation re-checks ownership and partial-use balances only
+(`enforceCouponEntitlement`) — **except** for the fixed-delivery-price type.
+Creation does NOT notice a total lower than items + fee − coupon − deals − coins with nothing to
+explain it (shadow pricing records the drift and the order is kept), so the app must send the
+coupon its total took off: TotalPrice is its only writer (reference.md, "Coupons").
+
+**What is advertised** — `GET /api/coupons/active` feeds the store-page carousel AND the home
+store-card tag (shoofi-app `couponsStore.activeCoupons`, label `t(storeTagName)`). It lists public,
+auto-apply coupons **running at this hour** (`isWithinActiveHours`, same check as apply and
+auto-apply) and **includes public `isFreeDelivery` campaigns** — only `isForNewUser`,
+customer-specific and purchased coupons are left out. Both were wrong until 2026-10-27: a
+12:00–18:00 coupon was shown all morning while checkout applied the 08:00–12:00 free-delivery one,
+which was never shown at all. The home screen reloads the list on focus. A public coupon needs a
+`storeTagName` or its card tag is an icon with no text; coupon drafts fill it from `nameForStore`.
+
+**What a marketing coupon link shows** — `GET /api/coupons/:id/public`
+(`services/coupons/public-coupon.js`, 2026-10-30) backs the customer app's coupon page, which
+every marketing `coupon` link opens (customers CORE invariant 11). It is a READ: nothing is
+claimed, applied or recorded, and checkout applies coupons exactly as before.
+- **No auth, on purpose.** Banners, stories and popups reach guests. That is safe only because the
+  reply is built field by field: `_id`, `title`/`description` (`{ar,he}` resolved from the coupon's
+  `nameForStore`→`storeTagName`→`nameForCheckout` / `subNameForStore` keys in
+  `shoofi.translations`; a key with no row is dropped, plain text kept), `type`, `discountType`,
+  `value` (null for `free_delivery` / `delivery_price`: not an amount off), `maxDiscount`,
+  `deliveryPrice`, `minOrderAmount`, `delivery` (`none|free|discount|fixed_price|included`),
+  `start`, `end`, `status` (`active|upcoming`), `activeHours`, `isForNewUser`, `redemption`
+  (`{mode:'auto'}` with NO code, or `{mode:'code', code}`), `allStores`, `stores[]`
+  (`_id, appName, name_ar, name_he, logoUri, coverUri, isOpen, isBusy, isComingSoon`) and
+  `restrictions` (categories / products / areas as booleans only). Never spread the coupon
+  document into it: no customer, usage, split, funding or admin-name field.
+- **Only a promotable coupon** (`isPromotableCoupon`): not `isCustomerSpecific`,
+  `isPurchasedCoupon`, `onlyForOneCustomer`, nor `claimedByUserId`. The first two are the #325
+  definition the حملات row also reads, written inline in `lib/campaign-category-sync.js`
+  (menu-catalog CORE invariant 18; a shared constant was tried and removed, shoofi-server
+  9a07c2fb). Plus `isActive`, not expired, and started or starting within
+  `UPCOMING_WINDOW_DAYS` (30). Anything else, an unknown or malformed id included, is the SAME
+  404 `{code:'COUPON_NOT_AVAILABLE'}`, so a personal coupon cannot be told from a missing one.
+- **Where it works = checkout's store rule**: a non-empty `applicableTo.stores` limits
+  `/api/coupons/apply` and the auto-apply scorer to those stores; an empty one is every store
+  (`allStores: true`). The list drops stores customers cannot see (`business_visible`); a
+  store-scoped coupon none of whose stores is visible is a 404. Open status is the home's
+  (`isStoreOpenNow(openHours) && !isStoreClose`, `isBusy`, `isCoomingSoon`), open stores first.
+- **`delivery: 'free'`** for `free_delivery`, or `isFreeDelivery` on an AUTO-applied delivery
+  coupon (the scorer gives the whole fee). A TYPED `isFreeDelivery` code is priced by
+  `computeCouponDiscount` (`value` off), so the page calls it a `discount`.
+- Residual exposure: a code-entered public coupon's code is readable by anyone holding its id.
+  Accepted: the coupon is public by definition, and `/api/coupons/active` already returns whole
+  public auto-apply documents without auth.
+
+**Fixed delivery price** — `type: 'delivery_price'`, `discountType: 'delivery'`,
+`deliveryPrice: X` (what the customer pays for delivery), `value` = `maxDiscount` = the cap
+(required, > 0), always `splitType: 'percentage'`, never `allowPartialUse` / `isFreeDelivery`
+(admin create/update refuse those shapes).
+- Discount = `min(cap, max(0, fee − X))`, rounded to 2dp — `computeDeliveryPriceDiscount`.
+  `computeCouponDiscount` dispatches on the TYPE first, before partial use or the generic cap;
+  anything malformed (missing price/cap, fee ≤ 0) is ₪0.
+- **It is its own type so it FAILS CLOSED:** any reader that does not know it falls to
+  `default: return 0`, and `isCashValuedCoupon` is false (never a wallet cash balance).
+  Do not re-model it as `fixed_amount` — every un-updated reader would then compute
+  `min(cap, fee)` or show ₪cap as money.
+- Auto-apply calls the shared formula for this type (the scorer's own branches are for the
+  other types) and **drops a ₪0 result**, so a fee ≤ X never wins as a ₪0 "coupon applied".
+- **Client-feature gate:** it is shown only to bundles sending
+  `x-client-features: delivery-price-coupon` (`utils/client-features.js`; OTA-safe, unlike
+  `app-version`, which is the binary). Without it the coupon is filtered from active,
+  available, customer-available, wallet and auto-apply; app-type `shoofi-admin` is exempt.
+  Older bundles would be CHARGED correctly (the server computes the discount) — the gate is
+  about what they would show.
+- `/api/coupons/apply` errors: **400 `APP_UPDATE_REQUIRED`** (bundle lacks the feature) and
+  **400 `COUPON_NO_DISCOUNT`** (₪0 on this order — fee ≤ X, or takeaway). The response carries
+  `deliveryPrice` on the coupon; that snapshot is what lands on `order.appliedCoupon.coupon`
+  and what amend re-prices from, so never drop it from the hand-listed response.
+- **Why creation recomputes it, and only it:** every other delivery coupon is bounded by its
+  own value, but this discount grows with `shippingPrice`, which the client posts and nothing
+  else validates. An inflated fee costs the customer nothing (they pay X either way) and the
+  difference lands on Shoofi/store funding and, on cash, the courier reimbursement.
+  `enforceDeliveryPriceCoupon` (`services/coupons/delivery-price-enforcement.js`, called in
+  `/api/order/create` after promotions) re-reads the coupon DOCUMENT, bounds the fee by
+  `resolveDeliveryTariffCeiling`, subtracts a kept store delivery deal, and keeps
+  `min(posted, server)`; ₪0 drops the coupon (no `couponUsages` row). A failed check drops it
+  too. Twin: `enforceTwinSideDeliveryPrice` — one ₪X on the primary's fee, none on the
+  secondary.
+- **Correct, never reject — the charge consequence.** The guard only ever lowers the discount,
+  so it RAISES `total` by `removed` and records `deliveryPriceCouponEntitlement`.
+  - Card / HYP token / HYP native wallet: charged after the guard, so the corrected total is
+    what is charged. Twin card capture sums the persisted side totals (`computeCombinedTotal`),
+    so it charges the corrected amount too.
+  - ZCredit Apple/Google Pay (sheet amount fixed before create): `finalizeApplePayOrder`'s
+    mismatch backstop sees charged < total → **FRAUD_REVIEW**. That is invariant 3 working;
+    do not "fix" it by skipping the guard for wallets.
+  - ⚠️ Flagged, no verdict: the HYP hosted page (`paymentProvider: 'HYP'`, paid before create)
+    and twin digital placement have **no** amount backstop (twin is exempt), so a correction
+    there leaves charged < `order.total` silently — only `deliveryPriceCouponEntitlement`
+    records it. A legitimate current client posts the server's number, so this fires on a
+    tampered or stale fee, or where the tariff ceiling disagrees with the app's area price.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.

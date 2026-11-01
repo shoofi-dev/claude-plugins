@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@92b1c8c4 (feat/school-payment-methods) / 2026-10-03",
+  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -18,7 +18,13 @@
         "services/twin-order/twin-payment-service.js",
         "routes/twin-order.js",
         "routes/store.js",
-        "utils/school-payment-methods.js"
+        "utils/school-payment-methods.js",
+        "utils/coupon-discount.js",
+        "services/coupons/delivery-price-enforcement.js",
+        "services/twin-order/twin-delivery-price.js",
+        "utils/client-features.js",
+        "services/coupons/public-coupon.js",
+        "routes/coupon.js"
       ],
       "symbols": {
         "utils/hyp-pay.js": [
@@ -53,9 +59,80 @@
           "filterSchoolPaymentMethods",
           "validateSupportedPaymentMethods",
           "SCHOOL_PAYMENT_METHOD_KEYS"
+        ],
+        "utils/coupon-discount.js": [
+          "DELIVERY_PRICE_TYPE",
+          "computeDeliveryPriceDiscount",
+          "computeCouponDiscount",
+          "isCashValuedCoupon",
+          "resolveCouponSplit"
+        ],
+        "services/coupons/delivery-price-enforcement.js": [
+          "enforceDeliveryPriceCoupon",
+          "MONEY_FIELDS"
+        ],
+        "services/twin-order/twin-delivery-price.js": [
+          "enforceTwinSideDeliveryPrice"
+        ],
+        "utils/client-features.js": [
+          "hasClientFeature"
+        ],
+        "services/coupons/public-coupon.js": [
+          "UPCOMING_WINDOW_DAYS",
+          "isPromotableCoupon",
+          "couponTiming",
+          "couponStoreScope",
+          "couponBenefit",
+          "loadPublicCoupon",
+          "business_visible"
         ]
       },
       "patterns": [
+        {
+          "file": "routes/admin.js",
+          "regex": "const invoiceQueueAdmins = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",
+          "desc": "CORE invariant 11: GET invoices/pending takes any dashboard role"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "const INVOICE_QUEUE_WRITE_ROLES = \\[\"master\", \"admin\"\\];",
+          "desc": "CORE invariant 11: the invoice queue writes (Gmail searches, public-read uploads) are owners only"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "const invoiceQueueWriters = \\[auth\\.required, checkAdminRole\\(INVOICE_QUEUE_WRITE_ROLES\\)\\];",
+          "desc": "CORE invariant 11: the write guard is auth.required + the owners-only role list"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "router\\.get\\(\"/api/admin/invoices/pending\", \\.\\.\\.invoiceQueueAdmins,",
+          "desc": "CORE invariant 11: GET invoices/pending is gated (it carried lib/auth restrict, which hangs the request)"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "router\\.post\\(\"/api/admin/invoices/retry\", \\.\\.\\.invoiceQueueWriters,",
+          "desc": "CORE invariant 11: POST invoices/retry is master/admin only (it carried lib/auth restrict, which hangs the request)"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "router\\.post\\(\"/api/admin/invoices/process-all\", \\.\\.\\.invoiceQueueWriters,",
+          "desc": "CORE invariant 11: POST invoices/process-all is master/admin only (it carried lib/auth restrict, which hangs the request)"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "router\\.post\\(\"/api/admin/invoices/webhook\", \\.\\.\\.invoiceQueueWriters,",
+          "desc": "CORE invariant 11: POST invoices/webhook is master/admin only; it had nothing in front of its body secret"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "const isFetchableInvoiceDocId = \\(docId\\) => /\\^\\\\d\\+\\$/\\.test",
+          "desc": "CORE invariant 11: only a numeric docId may reach the Gmail fetch (HYP manual-invoice orders carry docId \"EZ\")"
+        },
+        {
+          "file": "routes/admin.js",
+          "regex": "secret !== process\\.env\\.INVOICE_WEBHOOK_SECRET",
+          "desc": "reference §5: the webhook still checks its body secret behind the admin guard"
+        },
         {
           "file": "routes/order.js",
           "regex": "CommitFullTransaction",
@@ -110,6 +187,106 @@
           "file": "routes/shoofi-admin.js",
           "regex": "schoolSettings\\.supportedPaymentMethods\\.\\$\\{key\\}",
           "desc": "school-settings POST writes each method key with a dotted $set, so saving the hours never wipes the methods"
+        },
+        {
+          "file": "utils/coupon-discount.js",
+          "regex": "if \\(coupon\\.type === DELIVERY_PRICE_TYPE\\) return computeDeliveryPriceDiscount\\(",
+          "desc": "computeCouponDiscount dispatches the fixed-delivery-price type FIRST, before partial use or the generic cap (CORE Coupons between quote and charge)"
+        },
+        {
+          "file": "utils/coupon-discount.js",
+          "regex": "Math\\.min\\(cap, Math\\.max\\(0, fee - price\\)\\)",
+          "desc": "fixed delivery price discount = min(cap, max(0, fee − deliveryPrice))"
+        },
+        {
+          "file": "utils/coupon-discount.js",
+          "regex": "if \\(coupon\\.type === DELIVERY_PRICE_TYPE\\) return false",
+          "desc": "isCashValuedCoupon: a fixed-delivery-price coupon is never a cash balance"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "coupon\\.type === DELIVERY_PRICE_TYPE\\) \\{[\\s\\S]{0,120}discountAmount = computeCouponDiscount\\(",
+          "desc": "auto-apply scorer prices this type with the shared formula, ahead of its isFreeDelivery branch"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "\\.filter\\(\\(c\\) => !\\(c\\.type === DELIVERY_PRICE_TYPE && !\\(c\\.discountAmount > 0\\)\\)\\)",
+          "desc": "auto-apply never lets a ₪0 fixed-delivery-price coupon win"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "DELIVERY_PRICE_FEATURE = 'delivery-price-coupon'",
+          "desc": "x-client-features token that unlocks fixed-delivery-price coupons (OTA-safe gate)"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "coupons\\.filter\\(\\(c\\) => c\\.type !== DELIVERY_PRICE_TYPE\\)",
+          "desc": "visibleToClient hides the type from bundles without the feature (lists, wallet, auto-apply)"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "code: 'APP_UPDATE_REQUIRED'",
+          "desc": "apply gate: 400 for a bundle that cannot render a fixed-delivery-price coupon"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "code: 'COUPON_NO_DISCOUNT'",
+          "desc": "apply: 400 instead of attaching a ₪0 fixed-delivery-price coupon"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "deliveryPrice: coupon\\.deliveryPrice,",
+          "desc": "apply response carries deliveryPrice on the coupon snapshot that amend re-prices from"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "await enforceDeliveryPriceCoupon\\(\\{",
+          "desc": "order creation recomputes the fixed-delivery-price discount before the charge (correct, never reject)"
+        },
+        {
+          "file": "services/coupons/delivery-price-enforcement.js",
+          "regex": "Math\\.min\\(postedDiscount, serverDiscount\\)",
+          "desc": "creation keeps min(posted, server) — never more than quoted, never more than the server's number"
+        },
+        {
+          "file": "routes/twin-order.js",
+          "regex": "enforceTwinSideDeliveryPrice\\(\\{",
+          "desc": "twin placement runs the per-side fixed-delivery-price guard"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "Apple Pay AMOUNT MISMATCH",
+          "desc": "finalizeApplePayOrder backstop: a creation correction on a pre-charged ZCredit wallet order lands in FRAUD_REVIEW (CORE invariant 3)"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "router\\.get\\('/api/coupons/:id/public', async \\(req, res\\) =>",
+          "desc": "CORE 'What a marketing coupon link shows': the coupon page read is public (no auth middleware) - guests tap banners too"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "return res\\.status\\(404\\)\\.json\\(\\{ message: 'Coupon not available', code: 'COUPON_NOT_AVAILABLE' \\}\\)",
+          "desc": "CORE: personal, expired and unknown coupons are one identical 404"
+        },
+        {
+          "file": "services/coupons/public-coupon.js",
+          "regex": "if \\(isFlagOn\\(coupon\\.onlyForOneCustomer\\)\\) return false;\\s*if \\(coupon\\.claimedByUserId\\) return false;",
+          "desc": "CORE: a one-customer-only or claimed coupon is never promotable"
+        },
+        {
+          "file": "services/coupons/public-coupon.js",
+          "regex": "redemption: isAutoApply \\? \\{ mode: 'auto' \\} : \\{ mode: 'code', code: coupon\\.code \\}",
+          "desc": "CORE: an auto-applied coupon's code is not part of the page"
+        },
+        {
+          "file": "services/coupons/public-coupon.js",
+          "regex": "return \\{ allStores: appNames\\.length === 0, appNames \\};",
+          "desc": "CORE: where it works = checkout's applicableTo.stores rule (empty = every store)"
+        },
+        {
+          "file": "services/coupons/public-coupon.js",
+          "regex": "const UPCOMING_WINDOW_DAYS = 30;",
+          "desc": "CORE: an upcoming coupon shows only within 30 days of its start"
         }
       ]
     },
@@ -119,7 +296,10 @@
         "helpers/get-supported-payment-methods.ts",
         "stores/creditCards/index.ts",
         "data/zcredit-config.ts",
-        "helpers/hyp-card.ts"
+        "helpers/hyp-card.ts",
+        "screens/coupon-detail/index.tsx",
+        "services/public-coupon.ts",
+        "helpers/coupon-page-copy.ts"
       ],
       "patterns": [
         {
@@ -136,6 +316,21 @@
           "file": "helpers/get-supported-payment-methods.ts",
           "regex": "\"school-project\"",
           "desc": "the app sends its school mode as the school-project header to GET payment-methods"
+        },
+        {
+          "file": "consts/shared.ts",
+          "regex": "CLIENT_FEATURES = '[^']*delivery-price-coupon",
+          "desc": "the app bundle declares it can render fixed-delivery-price coupons (x-client-features)"
+        },
+        {
+          "file": "components/total-price/index.tsx",
+          "regex": "couponsStore\\.setAppliedCoupon\\(couponApp\\)",
+          "desc": "TotalPrice is the one writer of the coupon submit sends, in the same step as the total it prices"
+        },
+        {
+          "file": "services/public-coupon.ts",
+          "regex": "axiosInstance\\.get\\(`coupons/\\$\\{encodeURIComponent\\(couponId\\)\\}/public`, \\{ silent: true \\}",
+          "desc": "CORE: the coupon page reads the public coupon silently (its own 404/error states, never the app-wide dialog)"
         }
       ]
     },
