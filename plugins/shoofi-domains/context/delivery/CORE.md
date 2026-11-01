@@ -110,6 +110,38 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
 - The store's list is filtered **server-side**: default = active work queue (`1,2,3,5`),
   عرض الكل = no status filter at all (not a date toggle), newest 200, `appName`-scoped.
 
+## "The courier has not accepted" — `status "1"`, never `!approvedAt`
+An unaccepted assignment is **invisible in the courier's own app**:
+`POST /api/delivery/list` appends `status: { $ne: DELIVERY_STATUS.WAITING_FOR_APPROVE }` for
+`role: "driver" | "employe"` (`routes/delivery/orders.js`), and that later `status` key
+overwrites the `$in` status list set above it. So his only route in is the push notification
+itself — which is why the action on such a row is **reassign, never "phone him and ask him to
+approve"**: there is no button on his screen to describe. Nothing re-offers or expires one
+either: the atomic claim in `createPendingDelivery`'s dispatch clears `isPendingAssignment` in
+the same `$set` that writes `"1"` (`services/delivery/delayed-assignment.js`), so
+`processPendingAssignments` never looks at it again, and
+`utils/crons/delivery-pickup-checker.js` only *notifies* (`type: 'pickup_delayed'`).
+
+**Three sibling paths land a reassign on three different statuses.** Never infer one from
+another:
+- `POST /api/delivery/admin/reassign` (`routes/delivery/admin.js`) → back to **`"1"`**. So the
+  admin web's own reassign does **not** clear this state — it re-enters it with a fresh
+  `reassignedAt`, and the new courier still has to accept.
+- `POST /api/delivery/admin/assign` onto a pending booking (`routes/delivery/admin.js`) →
+  **`"2"` APPROVED with no `approvedAt` written at all**.
+- the shoofir company-admin reassign (`routes/delivery/driver.js`) → **`"2"` + `approvedAt`**,
+  deliberately, and its own comment explains why: a regular driver "never receive[s] status
+  '1' orders", so leaving it at `"1"` would make the order unapprovable for him.
+
+Which makes **`!approvedAt` the wrong test** — the second path produces an APPROVED delivery
+that has none. The only honest one is `status === "1"` **plus `!unassigned`**, because `"1"` is
+also the status of a booking that was never dispatched (see the queue-token invariant below).
+The server's own `unresponsive_driver` alert (`routes/delivery/admin.js`) omits both halves: it
+queries `{status: "1", created: {$lte: twoMinutesAgo}}` with no driver term — so it counts every
+undispatched booking as a non-responding courier — and it measures from `created`, the
+partner-accept instant, which sits a median of 195 s before a courier is attached. Its 2-minute
+threshold is still the platform's number for this fact; its clock and its population are not.
+
 ## Invariants — never weaken
 1. **`DELIVERY_STATUS` is authoritative in `consts/consts.js`**: `1` waiting-approve → `2`
    approved → `3` collected/pickup → `4` delivered; `5` waiting-in-store; cancels `-1` driver,

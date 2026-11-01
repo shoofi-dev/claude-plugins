@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@2026-11-01 (CORE: \"The courier has not accepted\" — status \"1\" is invisible to the courier, and the three reassign paths land on three different statuses); rest shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -638,6 +638,31 @@
           "file": "services/delivery/response-redaction.js",
           "regex": "key === \"company\" && \\(isPerson \\|\\| isDelivery\\)",
           "desc": "company secrets are removed only where a company is EMBEDDED in a delivery or a person; a company doc on its own keeps hyp/accounting for the admin web (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "\"driver\\._id\": ObjectId\\(customerId\\),\\s*\\n\\s*status: \\{ \\$ne: DELIVERY_STATUS\\.WAITING_FOR_APPROVE \\}",
+          "desc": "an unaccepted assignment is invisible in the courier's own app — POST /api/delivery/list excludes status \"1\" for role driver/employe, so the action on such a row is reassign, not a phone call (CORE: \"The courier has not accepted\")"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "driver: driver,\\s*\\n\\s*status: DELIVERY_STATUS\\.WAITING_FOR_APPROVE,",
+          "desc": "POST /api/delivery/admin/reassign puts the booking BACK to WAITING_FOR_APPROVE — the admin web's reassign does not clear the unaccepted state, it re-enters it (CORE: \"The courier has not accepted\")"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "status: DELIVERY_STATUS\\.APPROVED,\\s*\\n\\s*approvedAt: moment\\(\\)",
+          "desc": "the shoofir company-admin reassign lands at APPROVED + approvedAt, deliberately, because a regular driver never receives a status \"1\" order (CORE: \"The courier has not accepted\")"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "status: DELIVERY_STATUS\\.APPROVED,\\s*\\n\\s*isPendingAssignment: false,\\s*\\n\\s*assignedAt:",
+          "desc": "admin assign-to-pending writes APPROVED with NO approvedAt, which is why !approvedAt is not the test for \"the courier has not accepted\" (CORE: \"The courier has not accepted\")"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "status: DELIVERY_STATUS\\.WAITING_FOR_APPROVE, // Pending\\s*\\n\\s*created: \\{ \\$lte: twoMinutesAgo \\},",
+          "desc": "the unresponsive_driver alert still has no driver term and still measures from `created`, so it counts undispatched bookings and is minutes early (CORE: \"The courier has not accepted\")"
         }
       ]
     },
