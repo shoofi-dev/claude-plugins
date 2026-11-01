@@ -931,8 +931,10 @@ add carried the chosen extras and the server's shadow pricing showed drift 0. Te
 ACTIVE `meal` dish types (`loadActiveDishTypes`) that occur in the given index rows, ranked by
 distinct stores then summed `qty30d`, at most `MAX_CUISINES` (9), each
 `{ key, label_ar, label_he, img, storeCount }`. The rows widen until a tier yields at least
-`MIN_CUISINES` (4) types: (1) the area's OPEN stores (`getAreaStores`), (2) open + closed stores of
-the area (closed = not open now: closed, busy or coming soon), (3) the whole catalog — one
+`MIN_CUISINES` (4) types: (1) ALL the area's stores, open + closed (`getAreaStores`; closed = not
+open now: closed, busy or coming soon) — there is no open-only tier: the onboarding builds a
+standing taste profile, so the hour it is answered must not hide a cuisine; only the chat's cards
+are limited to open stores — (2) the whole catalog — one
 `aggregate` over `suggestProductIndex` (`$match` meal types, `$sort` by `qty30d` descending,
 `$group` per dish type × store with that store's best seller's `img` and summed `qty30d`),
 returned whatever its size. So `storeCount` can
