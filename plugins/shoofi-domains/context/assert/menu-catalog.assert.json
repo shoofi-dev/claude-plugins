@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -2644,6 +2644,36 @@
           "file": "hooks/useChatAddToCart.ts",
           "regex": "if \\(Object\\.keys\\(defaults\\)\\.length === 0 && selectionsValid\\(prepared, \\{\\}\\)\\)",
           "desc": "doc CORE invariant 19 / reference §7f: straight into the cart only with no defaults and nothing to choose — a priced default is shown in the sheet, never added silently"
+        },
+        {
+          "file": "helpers/chat-cart-line.ts",
+          "regex": "return reason === \"combo\" \\|\\| reason === \"unsupported\" \\? \"store\" : \"menu\";",
+          "desc": "doc CORE invariant 19 / reference §7f: only a combo or an unknown type is a store dish; counters, pizza, free-count and weight render in the chat's sheet"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "const support = raw && chatSheetMode\\(raw\\) === \"store\" \\? chatSheetSupport\\(raw\\) : \\{ ok: true as const \\};",
+          "desc": "doc CORE invariant 19: prepareCard stops only for a store dish"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "const showSheet = opts\\.show \\|\\| chatSheetMode\\(prepared\\) !== \"chips\";",
+          "desc": "doc reference §7f: a card tap or a menu-controls dish always opens the sheet, never a straight add"
+        },
+        {
+          "file": "hooks/useChatAddToCart.ts",
+          "regex": "\\[\\{ id: `open_store:\\$\\{card\\.id\\}`, key: \"for_you_open_store\", primary: true \\}\\]",
+          "desc": "doc CORE invariant 19: the chat says why and OFFERS the store — it never opens it by itself"
+        },
+        {
+          "file": "components/for-you/ChatProductSheet.tsx",
+          "regex": "menuStore: Object\\.create\\(stores\\.menuStore, \\{ outOfStockExtras: \\{ value: outOfStockExtras \\|\\| \\[\\] \\} \\}\\)",
+          "desc": "doc CORE invariant 19 / reference §7f: the menu's controls in the chat see the DISH's store's out-of-stock list, never the browsed store's"
+        },
+        {
+          "file": "screens/for-you/ForYouScreen.tsx",
+          "regex": "chatCart\\.quickAdd\\(card, \\{ show: true \\}\\);",
+          "desc": "doc reference §7f: with chat ordering on, a card tap opens the dish in the chat's sheet"
         },
         {
           "file": "hooks/useChatAddToCart.ts",

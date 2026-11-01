@@ -870,14 +870,21 @@ sheet at once (loading) while the menu loads; the decision is made on the full m
 **Quick add** (app only, no server change; `isChatOrderingEnabled`; built 2026-10-17) — the "+" on a
 card (a stepper once the dish is in the cart; "−" removes the dish's last line at zero) or on a
 cross-sell pill, through `hooks/useChatAddToCart.ts` `quickAdd`:
-- **Open the store instead** (the card tap, `openStoreAtProduct`; logged as
-   `for_you_quick_add_fallback` with the reason) for twin orders or a twin cart, a school cart, a
-   failed load, an age-checked store not yet approved (`isCheckAge`), extras that are not an
-   array, and whatever `chatSheetSupport` refuses: chips exist for `single` and `multi` ONLY, so a
-   combo, `soldByWeight`, a `weight` extra or a legacy `categoryId: "weight"` one (priced at menu
-   load), `pizza-topping`, `counter`, a group header with `freeCount > 0` (free toppings — the
-   pricer applies them to `pizza-topping` only, §4), or any other type goes to the store's own
-   product screen.
+- **The card tap** opens the same sheet (`quickAdd(card, { show: true })`: the dish, its description
+   and choices; never a straight add). Flag `isChatOrderingEnabled` off: the card still opens the store.
+- **Which sheet** (`chatSheetMode`, `helpers/chat-cart-line.ts`): `chips` — every extra a `single` /
+   `multi`; `menu` — `soldByWeight`, a `weight` extra or a legacy `categoryId: "weight"` one,
+   `pizza-topping`, `counter`, a group header with `freeCount > 0` (free toppings — the pricer applies
+   them to `pizza-topping` only, §4): `ChatProductSheet` renders the menu's `ExtrasSection`
+   (controlled; `onChange` through `setExtraSelection` = `extrasStore.setSelection`'s rule) under a
+   `StoreContext` whose `menuStore` is `Object.create(menuStore, { outOfStockExtras: <the dish's
+   store's list> })`, and a weight stepper (`getWeightExtra`, step/min/max, `roundWeight`,
+   `formatWeight`) replaces the quantity; never a straight add. `store` — a combo or an unknown type.
+- **Say why and offer the store — never open it by itself** (`fallback`; logged as
+   `for_you_quick_add_fallback` with the reason) for a `store` dish, twin orders or a twin cart, a
+   school cart, a failed load, an age-checked store not yet approved (`isCheckAge`) and extras that
+   are not an array: lines `open_store_page` / `_twin` / `_school` / `_age` / `_failed` with the chip
+   «افتح المحل» (`open_store:<cardId>` → `openStoreAtProduct`, logged `for_you_open_store`).
 - **Load** the dish's store and menu with the fetch-only calls —
    `storeDataStore.getStoreDataFromServer(appName)` and `menuStore.getMenuFromServer(appName,
    false)` (`app-name: <the dish's store>`, `isSchoolProject=false`; cached 2 min per store in the
@@ -982,8 +989,8 @@ its own header sits right under the status bar.
 the PHYSICAL left end; on the right the 36 px persona, the name `ai_helper_name` and the subtitle
 `for_you_header_sub`, no divider; laid out `direction: "ltr"` so Arabic and Hebrew match; no grab
 handle, no ×; flag off: today's back arrow and title), a header swipe down (released past 120 px or at over 600 px/s), back
-or the edge swipe, or a card tap (it still opens the store; with the flag the chat minimizes instead
-of closing). Back and the edge swipe minimize a USED chat — a turn of the customer's own
+or the edge swipe, or a card tap with `isChatOrderingEnabled` off (it opens the store; with the flag the
+chat minimizes instead of closing — with ordering on, a card tap stays in the chat). Back and the edge swipe minimize a USED chat — a turn of the customer's own
 (`forYouStore.customerTurns`) or items in the cart — and just close an unused one (`leaveAction`).
 They arrive through a `beforeRemove` listener that acts only on the customer's own back
 (`isUserBack`: `GO_BACK` / `POP`) — a reset after an order, a replace or a navigate always goes

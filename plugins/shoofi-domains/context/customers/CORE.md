@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -370,6 +370,19 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       `scheduled` campaign that is published (invariant 17). A lost claim throws `code: 'CAMPAIGN_NOT_CLAIMABLE'`, and the cron
       skips it without marking it failed, because that would overwrite a run that is sending.
       The admin's `PUT /:id` refuses an `in_progress` campaign (409) for the same reason.
+    - **A click sends in the background; the cron waits.** Approve "now" (both approve routes)
+      and `POST /:id/execute` call `startCampaign`: the claim is awaited, so a lost claim still
+      answers the click, then `sendClaimed` runs on after the response. Never await the whole
+      send inside a request: one recipient at a time took ~200ms, a 10,145-customer push ran 33
+      minutes (2026-11-01), the gateway dropped the request with no body, and the admin read
+      "האישור נכשל" for a push every customer got. The cron still awaits `executeCampaign`
+      (claim + `sendClaimed`). The loop runs `CAMPAIGN_SEND_CONCURRENCY` recipients at a time
+      (default 20; the Expo SDK itself caps at 6 HTTP requests in flight), keeps
+      `execution.results` in recipient order, and writes `execution.progress {total, sent,
+      failed}` at the start, every 250 sends and at the end. A failed background send marks the
+      campaign `failed` and is logged; it never rejects unhandled. A restart mid-send leaves it
+      `in_progress` (as it always did for the cron). The list (`GET /api/customer-campaigns`)
+      never returns `execution.results`.
     - **`scheduling.scheduledDate` is a Date.** A wall-clock string without an offset is read in
       the campaign's timezone (`Asia/Jerusalem`). The cron queries `$lte: <Date>`, and a stored
       string never matches it. That is why no scheduled campaign ever sent before 2026-10-28,
@@ -598,8 +611,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
         published with `publishAt` null or ≤ now. Each channel's own `startDate` / `publishedAt`
         and end dates keep their old meaning. A note's reads ignore its dates, so a scheduled
         note is held back by this clause alone.
-      - Push: an immediate draft runs the existing `executeCampaign` (invariants 12–13
-        unchanged); a scheduled one runs the existing `scheduleCampaign` and cron for its
+      - Push: an immediate draft is claimed and sent in the background (`startCampaign`,
+        invariants 12–13 unchanged): the approve answers `sending: {started, startedAt}`, not
+        the send's counts. A scheduled one runs the existing `scheduleCampaign` and cron for its
         `scheduledDate`, and goes back to draft if arming fails.
     - **Back to draft** = `POST …/:channel/:id/revert`. Customers stop seeing it on their next
       read, the draft keeps its plan, and a grandfathered item can be reverted too. A push reverts only while nothing was
