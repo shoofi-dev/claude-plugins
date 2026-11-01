@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -95,7 +95,20 @@
         "routes/admin/coupon-drafts.js",
         "services/catalog/category-access.js",
         "services/catalog/public-store.js",
-        "test/integration/catalog-admin-auth.js"
+        "test/integration/catalog-admin-auth.js",
+        "utils/extras-icons/normalize.js",
+        "utils/extras-icons/match.js",
+        "utils/extras-icons/map.js",
+        "utils/extras-icons/spaces.js",
+        "utils/extras-icons/classify.js",
+        "utils/extras-icons/seed.js",
+        "services/catalog/extras-catalog.js",
+        "services/catalog/extras-icons-sync.js",
+        "utils/crons/extras-icons-sync-cron.js",
+        "routes/admin/extras-catalog.js",
+        "scripts/seed-extras-catalog.js",
+        "docs/extras-icons.md",
+        "test/integration/extras-icons.js"
       ],
       "symbols": {
         "services/catalog/category-access.js": ["CATALOG_ADMIN", "DASHBOARD_ROLES"],
@@ -385,6 +398,62 @@
           "newStoresQuery",
           "getNewStoreWindowDays",
           "validateNewStoreWindowDays"
+        ],
+        "utils/extras-icons/normalize.js": [
+          "extraIconKey",
+          "normAR",
+          "normHE",
+          "rekey"
+        ],
+        "utils/extras-icons/match.js": [
+          "collectExtraNames",
+          "ruleMatch",
+          "hasNegator",
+          "NON_INGREDIENT_KINDS",
+          "KEY_RE"
+        ],
+        "utils/extras-icons/map.js": [
+          "buildMap",
+          "resolveIcon",
+          "MAX_PARENT_DEPTH"
+        ],
+        "utils/extras-icons/spaces.js": [
+          "putMap",
+          "putIcon",
+          "MAP_KEY",
+          "ICON_CACHE_CONTROL"
+        ],
+        "utils/extras-icons/classify.js": [
+          "decide",
+          "AUTO_CONFIDENCE",
+          "PROMPT_VERSION",
+          "parseReply"
+        ],
+        "utils/extras-icons/seed.js": [
+          "buildSeed"
+        ],
+        "services/catalog/extras-catalog.js": [
+          "noteProductExtrasInBackground",
+          "noteProductExtras",
+          "resolveQueueItem",
+          "rebuildAndPublish",
+          "schedulePublish",
+          "uploadEntryIcon",
+          "coverage",
+          "MIN_KEEP_RATIO",
+          "MIN_FIRST_PUBLISH_NAMES"
+        ],
+        "services/catalog/extras-icons-sync.js": [
+          "runExtrasIconsSync",
+          "MAX_CLASSIFY",
+          "MAX_ATTEMPTS"
+        ],
+        "utils/crons/extras-icons-sync-cron.js": [
+          "startExtrasIconsSyncCron",
+          "startExtrasIconsSyncJob",
+          "readSyncFlags",
+          "SCHEDULE",
+          "LOCK_KEY"
         ]
       },
       "patterns": [
@@ -2137,6 +2206,66 @@
           "file": "routes/admin/for-you-quality.js",
           "regex": "if \\(req\\.query\\.flagged === \"1\"\\) filter\\.flagged = true;",
           "desc": "reference §7h: the queue API filters the testing team's flags"
+        },
+        {
+          "file": "utils/extras-icons/normalize.js",
+          "regex": "\\.replace\\(/ة/g, \"ه\"\\)",
+          "desc": "doc CORE invariant 29: the name key folds ة to ه exactly like the app's extraIconKey"
+        },
+        {
+          "file": "utils/extras-icons/normalize.js",
+          "regex": "return he \\? `he:\\$\\{he\\}` : \"\";",
+          "desc": "doc CORE invariant 29: Arabic wins; the Hebrew key is prefixed he:"
+        },
+        {
+          "file": "utils/extras-icons/spaces.js",
+          "regex": "const MAP_KEY = `\\$\\{PREFIX\\}map\\.json`;",
+          "desc": "doc CORE invariant 29: map.json is the only object overwritten"
+        },
+        {
+          "file": "utils/extras-icons/spaces.js",
+          "regex": "if \\(await objectExists\\(s3, objectKey\\)\\) \\{",
+          "desc": "doc CORE invariant 29: a PNG is never overwritten (HEAD first)"
+        },
+        {
+          "file": "utils/extras-icons/classify.js",
+          "regex": "const AUTO_CONFIDENCE = 0\\.9;",
+          "desc": "doc CORE invariant 29: a model match is applied only at confidence >= 0.9"
+        },
+        {
+          "file": "utils/extras-icons/classify.js",
+          "regex": "if \\(\\(v\\.modifier === \"without\"\\) !== negated\\) return \\{ action: \"review\", why: \"modifier_mismatch\" \\};",
+          "desc": "doc CORE invariant 29: 'without' must agree with the text before a model match is applied"
+        },
+        {
+          "file": "services/catalog/extras-catalog.js",
+          "regex": "const MIN_KEEP_RATIO = 0\\.9;",
+          "desc": "doc CORE invariant 29: publish refuses a map that lost more than 10% of its names"
+        },
+        {
+          "file": "utils/crons/extras-icons-sync-cron.js",
+          "regex": "enabled: doc\\?\\.isExtrasIconsSyncEnabled === true",
+          "desc": "doc CORE invariant 29: the nightly sync is off unless the platform flag is true"
+        },
+        {
+          "file": "utils/crons/extras-icons-sync-cron.js",
+          "regex": "const SCHEDULE = \"45 4 \\* \\* \\*\";",
+          "desc": "reference §7i: the nightly sync runs at 04:45"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "^      extrasCatalog\\.noteProductExtrasInBackground\\(req\\.app\\.db, appName, \\{ \\.\\.\\.doc, _id: newId \\}\\);",
+          "desc": "doc CORE invariant 29: the insert's save hook is not awaited"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "^        extrasCatalog\\.noteProductExtrasInBackground\\(req\\.app\\.db, appName, \\{ \\.\\.\\.productDoc, _id: product\\._id \\}\\);",
+          "desc": "doc CORE invariant 29: the update's save hook is not awaited"
+        },
+        {
+          "file": "routes/admin/extras-catalog.js",
+          "regex": "const ADMIN = \\[auth\\.required, checkAdminRole\\(\\[\"master\", \"admin\", \"manager\"\\]\\)\\];",
+          "desc": "reference §7: the extras catalog admin API is master|admin|manager"
         }
       ]
     },

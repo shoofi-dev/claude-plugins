@@ -372,6 +372,25 @@ suggestions read ONLY `stated`, `confirmed` and — with `forPerson` — that on
 customer id, else — only when there is no customer — by the `device-id` header; any error → no
 profile. What they do: CORE invariant 18, §7f.
 
+### central `shoofi.extras-catalog` + `extras-catalog-aliases` — the shared extras list (CORE invariant 29)
+One list for every store, seeded once from the 2026-10-25 prod build (`scripts/seed-extras-catalog.js`,
+`$setOnInsert` only, dry run by default; `docs/extras-icons.md` › Seeding).
+- `extras-catalog`: `{ _id: key, key, nameAR, nameHE, category, parent, iconFile, aliasesAR[], aliasesHE[], usage, source: seed|admin }`.
+  `key` is stable snake_case and never renamed. `iconFile` is the PNG under `extras-icons/v1/`
+  without `.png`, from the designer map, and several keys share one (`cherry_tomato`'s is
+  `tomato`). A key with `iconFile: null` shows its `parent`'s. 767 of the 768 seeded entries have
+  one (`tofu` does not).
+- `extras-catalog-aliases`: `{ _id: extraIconKey, kind, key, modifier, also[], source }` — kind
+  `ingredient` (with `key`) or `size quantity nonfood preparation level color doneness unclear`
+  (`key: null`, known but no icon); modifier `none without extra on_side` (only `without` shows,
+  as `|w` in the map); source `seed` (voted from every prod option) / `seed-name` (an entry's own
+  Arabic/Hebrew name) / `rule` / `claude` / `admin`. ~4.7k rows after the seed.
+- `extras-catalog-queue`: `{ _id: extraIconKey, name, nameAR, nameHE, status: pending|review|auto|resolved,
+  stores[], options, lastSample{appName,productId,extraId,optionId}, suggestion, why, attempts,
+  resolution, decidedBy, decidedAt, source: save|nightly }`.
+- `extras-catalog-runs`: `type: "sync"` (stats, `preview` on a dry run) and `type: "publish"`
+  (`ok, hash, names, icons, url, trigger`). The last `ok` publish is the shrink guard's baseline.
+
 ## 3. Category → product hierarchy & ordering
 Two levels: `general-categories` → `categories` (linked by
 `category.supportedGeneralCategoryIds`) → `products` (linked by
@@ -387,6 +406,8 @@ fails the save). Admin callers: delivery-web `StoreCategoriesList.tsx` /
 `GeneralCategoriesList.tsx` drag-and-drop, which renumbers every item 0..n-1.
 
 ## 4. Product options / extras / pricing
+Option icons are NOT stored on the product: the app looks each option's `nameAR`/`nameHE` up in
+the published `extras-icons/v1/map.json` (CORE invariant 29, §7i).
 A product's `extras` is an **array** of extras (stored verbatim from `JSON.parse(req.body.extras)`;
 shape not enforced on write). Every extra has `{ id, type, nameAR, nameHE, order?, groupId?,
 isGroupHeader?, freeCount? }`; group headers (`isGroupHeader:true`) are pseudo-extras that only
@@ -631,6 +652,14 @@ the cache read.
 - `store.isNew` (boolean) rides on every store-list response: explore v1/v2 (`storesMap`), `POST /api/shoofiAdmin/available-stores`, `POST /api/menu/search` (CORE invariant 25).
 - `POST /api/for-you/suggest` — `{ mode?, text?, location:{lat,lng}, history?, lang?, cart?: { appName, productIds }, onboarded?, conversationId?, surface?, seen?: string[] }` → `{ replyCode, replyParams, cards[{ id: "<appName>:<productId>", appName, store, product:{ _id, nameAR, nameHE, img, price, originalPrice?, discountPercent?, hasRequiredOptions }, dishType, reason:{ code, params }, confidence }], personalized, suggestionId }` (`routes/for-you.js`, `auth.optional`; `suggestionId` on every reply, CORE invariant 21). Modes `opener` (default), `usual`, `new`, `surprise`, `popular`, and the chat-ordering `drink`, `sweet`, `cross_sell` (§7f); reason codes `usual`, `ordered_before`, `liked_type`, `you_like`, `popular`, `match`. Only a customer `app-type` (`shoofi-shopping` or none) personalises; without a customer, a visitor's taste profile is read by the `device-id` header (CORE invariant 18). `cart` goes through `sanitizeCart` (a string `appName` ≤ 100 chars, ≤ 50 `productIds`); `onboarded` counts only when `=== true`. With options in the message («… مع حمص وسلطة», `option-request.js`): the reply carries `optionRequest: { wanted, without }` and each card `optionMatch: { matched, ambiguous, missing, outOfStock, deselect, noteWithout }` (option refs `{ extraId, optionId, index, nameAR, nameHE, price, group }`), cards with fewer unmet words first; «شو الإضافات؟ / מה התוספות» answers `replyCode: "extras_question"` (cards of the dish it names, or none). `store` (an appName, else ignored) limits the reply to that OPEN store, and with one store in play text mode drops the 2-per-store cap (CORE invariant 19). `forPerson` — an id from the profile's `people` (`[A-Za-z0-9_-]{1,40}`, else ignored, never a 400) — answers for that person: their `avoid` replaces the customer's, the customer's taste is not used, their tagged dishes first (`personMode`, reason `for_person` `{ name, count }`), then popular; `replyCode` `for_person` / `for_person_new` (none of theirs open). An id not on the profile → the customer's own reply; the served log carries `forPerson` (CORE invariant 18). `seen` — the card `id`s this chat already showed, newest first — goes through `sanitizeSeen` (strings ≤ 120 chars, deduplicated, the newest 40; anything else ignored, never a 400): `popular`, `surprise`, `new`, `drink`, `sweet`, `cross_sell` then answer from the dishes not shown yet (the same mode on the unseen candidates) and are topped up with the normal reply's other cards only when fewer than 2 unseen cards survive `applyLiveMenu` + `dropAtServe`; `usual`, the opener and typed text ignore it (CORE invariant 23). Any failure is `200 { replyCode: "unavailable", cards: [] }`. Text mode may answer `craving_unavailable` with `replyParams.craving` (CORE invariant 13). Reads `shoofi.suggestProductIndex` (§2), never the menu cache.
 - `GET  /api/ai-helper/cuisines?lat=&lng=` — `{ cuisines: [{ key, label_ar, label_he, img, storeCount }] }` (`routes/ai-helper.js` → `ai-helper-service.js` `getCuisines`, `auth.optional`): the onboarding's cuisine tiles (§7f). `400` without a valid location; any other failure `200 { cuisines: [] }`. The other AI-helper routes — `GET`/`PUT /api/ai-helper/profile`, `POST /api/ai-helper/merge`, `GET /api/ai-helper/facts` — are the profile's side (`docs/ai-helper.md`; ownership and merge: customers domain).
+- Extras catalog admin (`routes/admin/extras-catalog.js`; every route `auth.required` + `checkAdminRole(["master","admin","manager"])`; writes audited; no admin screen calls them yet):
+  `GET /api/admin/extras-catalog/queue[?status=review|pending|auto|resolved]` (most stores first, + counts),
+  `POST /api/admin/extras-catalog/queue/resolve { name, action: assign|create|not_ingredient, key?, modifier?, kind?, entry? }`
+  (404 `NOT_FOUND`/`UNKNOWN_KEY`, 400 `BAD_*`/`UNKNOWN_PARENT`, 409 `KEY_EXISTS`; schedules a 30-s debounced publish),
+  `GET /api/admin/extras-catalog/entries`, `GET /api/admin/extras-catalog/coverage`,
+  `POST /api/admin/extras-catalog/entries/:key/icon` (multipart `icon`, PNG ≤ 512KB; 409 `ICON_ALREADY_SET` / `ICON_EXISTS`),
+  `POST /api/admin/extras-catalog/run { dryRun?, appName? }` (202 `{ runId }`, 409 locked; ignores the flag),
+  `POST /api/admin/extras-catalog/publish { dryRun? }` (`{ published, reason: unchanged|shrunk|dry_run }`).
 - Dish taxonomy / labels admin (`routes/admin/dish-taxonomy.js`; every route `auth.required` + `checkAdminRole(["master","admin","manager"])`):
   `GET /api/admin/dish-taxonomy` (seeds on first use), `POST /api/admin/dish-taxonomy/:key/approve` (→ active; its proposing labels get the type + `fromApprovedProposal`, `applied` at confidence ≥ 0.5 else `review`; admin labels untouched), `POST /api/admin/dish-taxonomy/:key/reject` (proposed only), `PATCH /api/admin/dish-taxonomy/:key`, `GET /api/admin/product-labels/review[?appName=]`, `POST /api/admin/product-labels/resolve { appName, productId, dishType }` (→ `status: "admin"`; `dishType` active or null), `GET /api/admin/product-labels/runs`, `POST /api/admin/product-labels/run [{ maxProducts, stores[] }]` — `startProductLabelsJob` (same `cron:product-labels` lock and locked index rebuild as the cron) answers as soon as it knows: `202 { started: true }` (running in the background), `409` a run already holds the lock, `503` no `ANTHROPIC_API_KEY`.
 
@@ -1071,6 +1100,30 @@ takes `flagged=1` and returns `flaggedOpen`.
 `GET …/reviews?day=&severity=&status=&verdict=&limit=&skip=` (+ `bySeverity`, `byVerdict`,
 `calibration`, `lastRun`), `GET …/reviews/:id`, `POST …/reviews/:id/decision { action, verdict?,
 note? }`, `POST …/review/run`.
+
+## 7i. Extras icons — the save hook, the nightly sync and map.json (CORE invariant 29)
+Full detail: shoofi-server `docs/extras-icons.md`.
+- **Slots read** (`collectExtraNames`, `utils/extras-icons/match.js`): every option of a non-header
+  extra, and the extra's own name when it has no options (a counter). Group headers are skipped. The
+  same slots the app draws icons on.
+- **Save hook** (`noteProductExtrasInBackground`, `services/catalog/extras-catalog.js`): one aliases
+  `find({_id:{$in}})`, one queue upsert per unknown name (`$setOnInsert` status, `$addToSet` stores).
+  Not awaited by the route; any error is logged and swallowed.
+- **Nightly** (`runExtrasIconsSync`, `services/catalog/extras-icons-sync.js`; cron
+  `utils/crons/extras-icons-sync-cron.js`, `SCHEDULE = "45 4 * * *"`, lock `cron:extras-icons-sync`
+  1 h, gated by `readSyncFlags` → `isExtrasIconsSyncEnabled` / `extrasIconsSyncDryRun` on
+  `shoofi.store {id:1}`): scan every non-`isMockStore` store → queue unknown → `ruleMatch` → Haiku
+  (`MODELS.fast`, `backend: "api"`, `temperature: 0`, no `effort`, 40 names a call, 2 parallel,
+  `maxTokens` 6000, halve on cut-off/unreadable, `MAX_CLASSIFY` 600 a run, label `extras-icons`) →
+  `classify.decide` → `rebuildAndPublish`. Unanswered names retry; after `MAX_ATTEMPTS` (3) they go to
+  `review`. No API key: scan, rules and publish still run (`classifySkipped: "no-api-key"`).
+- **map.json** (`buildMap`, `utils/extras-icons/map.js`): `{ v: 1, generatedAt, n: { key: file | "file|w" } }`,
+  keys sorted, own `iconFile` else `parent` chain (≤ 4). `putMap` writes only
+  `extras-icons/v1/map.json` (`max-age=3600`); `putIcon` HEADs first and never overwrites
+  (`immutable`). Checked 2026-10-30: the seed reproduces all 3,191 names it shares with the live
+  map, except `xl`. The size "XL" (90 options) now wins over the energy drink "xl" (5 options).
+- Tests: `test/integration/extras-icons.js` (app parity, rule, seed vote, map, publish guard, decide,
+  sync/dry run, save hook never blocks, admin auth).
 
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":
