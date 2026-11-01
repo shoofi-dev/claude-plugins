@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -516,9 +516,26 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       render with NO text, because a story has one media file and the viewer prints
       `caption.ar` / `caption.he`. Social (2026-10-31, a marketing item's Facebook / Instagram
       post, invariant 17) 1:1, ONE render with NO text and the story's layout — the caption
-      goes under it. A product's photo is the `subject` reference; a store logo
-      is never sent.
-    - **Renders reuse the bridge's social loop.** `render-service.js claimOnce` hands out a
+      goes under it.
+    - **References: the store's logo and dishes** (2026-11-02, `services/marketing/generate/references.js`).
+      Every subject with ONE store (store, new store, deal, product, a single-store coupon) sends
+      the store's logo (`stores.storeLogo`, `{uri}` or a bare path) as a `logo` reference and up
+      to 3 dishes as `subject` references — the product alone; else the deal's `scope`, the best
+      sellers (`services/menu/best-sellers.js`), the menu order; drinks / sides / desserts and
+      repeats (same photo, or "חצי X" after "X") skipped. The admin may drop the logo or pick up
+      to 4 dishes, but sends **product IDs only** (`references: {logo, productIds}`); the server
+      rebuilds the URLs from the DB (sellable dishes only) — never accept a URL from the body.
+      `GET /api/admin/marketing/generate/options` lists the models, the logo and the dishes.
+    - **The model is a choice, never a silent swap** (`image-models.js`): Nano Banana 2
+      (default, 130 credits), GPT Image 2 (the ChatGPT model, resold by Artlist — no OpenAI key,
+      150), Seedream 5 (100); all Artlist, all through the bridge. Claude draws nothing. The other
+      two are offered only while a bridge heartbeats `render-models`; asking for one otherwise
+      is 409 `model_unavailable`. The bridge reports the group it drew with; the render records
+      `renderedModel` (absent = Nano Banana 2) and logs that model's credits.
+    - **Renders reuse the bridge's social loop** (the claim also carries `modelGroupId`,
+      `settings`, `maxReferences`; the bridge runs `RENDER_CONCURRENCY` = 2 at once, so a
+      banner's two languages draw side by side; the bytes are stored as a JPEG ≤ 2048 px,
+      `renders.js compress`). `render-service.js claimOnce` hands out a
       `shoofi.marketingGenerations` render (same job shape, `postId` = the job) when no social
       render is queued, and `finishRender` routes a non-social id to
       `services/marketing/generate/renders.js`. Social renders go first. The Spaces key stays on
@@ -527,13 +544,13 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       `DatabaseInitializationService` (`social-posts-collections.js` scans the folder).
     - **Every call is logged and priced** (menu-catalog invariant 16): `MODELS.marketing`
       (`claude-opus-5-5`), features `marketing copy` / `marketing image brief`; each finished
-      render is a `marketing image render` row (backend `artlist`, `costUsd: 0`,
-      `meta.credits: 130`). A daily guard (`budget.js`) refuses with 429 past
+      render is a `marketing image render` row (model `artlist:<id>`, backend `artlist`,
+      `costUsd: 0`, `meta.credits` = that model's credits). A daily guard (`budget.js`) refuses with 429 past
       `shoofi.store {id:1}.marketingAiDailyBudgetUsd` (default $3) or
       `marketingImageDailyLimit` (default 20 renders).
     - **Revising a picture keeps every guarantee** (2026-10-31). `POST /:jobId/revise` with no
       notes ("עוד אפשרות") re-renders the same brief and words (`image.js rerender`, no Claude
-      call); with notes ("בקש שינוי") Claude gets the previous brief, its words and the fenced
+      call) — with `model` ("צייר שוב עם…", 2026-11-02), drawn by that model, same references; with notes ("בקש שינוי") Claude gets the previous brief, its words and the fenced
       notes (`revisionBlock`, "the rules win") and the new words go through the SAME guard —
       notes asking for "50% off" fail the job `no_valid_copy`, they never render. The facts are
       reloaded (an expired coupon is a 409 here too), the renders count against

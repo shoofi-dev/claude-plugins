@@ -446,9 +446,9 @@ boundary and say so in the PR.
      model call. A server-side refusal fallback can serve a call on another model; the row logs the
      model that actually answered (`res.model`).
    - **Not every row is a Claude call.** A finished marketing render is logged as feature
-     `marketing image render`, `model: "artlist:nano-banana-2"`, `backend: "artlist"`, `costUsd: 0`
-     (Artlist is prepaid) and `meta.credits` (130 per 2k image). Count credits from `meta`, not
-     `costUsd`.
+     `marketing image render`, `model: "artlist:<id>"` (`nano-banana-2` 130 credits, `gpt-image-2`
+     150, `seedream-5` 100 — customers CORE invariant 16), `backend: "artlist"`, `costUsd: 0`
+     (Artlist is prepaid) and `meta.credits`. Count credits from `meta`, not `costUsd`.
 17. **SPELLCHECK PROPOSES; A NAME CHANGES ONLY ON A PERSON'S ACCEPT, AND ONLY IF UNCHANGED**
    (`services/catalog/menu-spellcheck.js`, `docs/menu-spellcheck.md`). A monthly cron
    (`15 3 1 * *`, lock `cron:menu-spellcheck`, shared with the admin "run now") asks Claude
