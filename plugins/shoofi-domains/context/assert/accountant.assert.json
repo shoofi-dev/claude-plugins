@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-invoice-seller-company-id / 2026-11-02 (invariant 4: accounting.bankAccount.companyId lives on the per-tenant store doc, the shoofi.stores copy is stale; the label is מספר עוסק, not ח\"פ); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -185,6 +185,11 @@
           "file": "routes/coupon.js",
           "regex": "router\\.post\\('/api/admin/coupon/create', \\.\\.\\.couponWriters,",
           "desc": "the admin coupon create is gated — it had no auth at all before 2026-10-28"
+        },
+        {
+          "file": "services/payments/order-invoices.js",
+          "regex": "companyId:\\s*(getStoreCompanyId\\(store, shoofiStore\\)|shoofiStore\\?\\.accounting\\?\\.bankAccount\\?\\.companyId)",
+          "desc": "CORE invariant 4: the customer document's seller line resolves accounting.bankAccount.companyId from the per-tenant store doc first — the shoofi.stores copy is a stale subset (0 of 262 stores carry it alone). Alternation is TRANSITIONAL: narrow to getStoreCompanyId once fix/HIGH-RISK-invoice-seller-company-id is on shoofi-server main"
         },
         {
           "file": "routes/payments/admin-reports.js",

@@ -116,6 +116,24 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    **Exempt is no longer a settlement-only concern:** since 2026-08-09 the per-order
    CUSTOMER document follows it too (zero VAT on both gateways) — that half belongs to the
    `payments` domain, invariant 9. A change to what `exempt` means now moves two systems.
+   **Its sibling field in the same block reads the OPPOSITE way.** A store's business number
+   `accounting.bankAccount.companyId` lives on the per-tenant `store {id:1}` doc — that is
+   what the admin's `BankAccountDetails.tsx` saves through `POST /api/store/update` — and
+   **nothing writes `accounting` to the `shoofi.stores` registry entry**. Measured over all
+   262 stores on 2026-11-02: 178 have it only on the per-tenant doc, 23 on both (identical),
+   **0 on the registry alone**, 58 nowhere. So the registry copy is a stale subset, and a
+   reader that consults only it silently gets `""` for ~89% of stores. That is not
+   hypothetical: `services/payments/order-invoices.js` and `utils/hyp-pay.js`
+   (`buildStoreInvoiceComment`) both did exactly that, so the customer document's
+   "עבור רכישה מ-X" line named the shop and dropped the number on roughly half the documents
+   issued platform-wide (EZcount 49103, order `0860-9020`, 2026-10-12). Ask through
+   `getStoreCompanyId(store, shoofiStore)` (`utils/seller-details.js`), per-tenant first,
+   never by inlining either path. **And the label is `מספר עוסק`, not `ח"פ`:** 52 live stores
+   are an עוסק מורשה trading on a person's number and have no ח"פ at all
+   (`businessType` in prod is `authorized_dealer` 52 / `company` 8 / `exempt` 11 / absent or
+   empty 40 — note `licensed` does **not** exist in production). 10 of the 106 numbers on
+   file begin with a zero, so the field is a string and any numeric coercion prints an
+   8-digit number on a tax document.
 5. **Report guards must stay on:** duplicate + **overlap across ALL statuses** (a sent report
    blocks a new overlapping one), orders-closed, and compensations-approved.
    **Delete is deliberately NOT status-gated** — a report can be sent and only then found
