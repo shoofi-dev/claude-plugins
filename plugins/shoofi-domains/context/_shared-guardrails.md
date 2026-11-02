@@ -66,6 +66,10 @@ decide this" (a draft, a proposal, a pending approval, an alert someone must act
 source there in the same PR: the queue's own "waiting" rule, a Hebrew title, the admin
 link where it is decided, and `urgent: true` only for money a customer is waiting for or
 something that stops orders now. Without it the item exists but nobody is told.
+Leave out what waits for nobody: an item about a store customers never see
+(`stores.business_visible: false` or `isMockStore: true` — hidden and template stores) and a
+"failure" that only says the thing already exists. The owner can put items away from HQ
+(`decision` on `hq-inbox-state`), but a source that floods the list is still a bug.
 
 ### Where the human's merge happens, and what that asks of your PR
 The human merges either on GitHub or from the admin's **"מיזוג PRs"** screen
