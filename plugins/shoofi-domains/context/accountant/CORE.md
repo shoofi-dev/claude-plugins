@@ -631,6 +631,45 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     the test walks the three routers.
     Tests: shoofi-server `test/integration/settlement-admin-auth.js` and
     `test/integration/earnings-reports-admin-auth.js`.
+18. **On a per-order customer document, only the STORE leg names a seller — and it names it in
+    free text, because Shoofi is the issuer.** Every per-order document is issued from Shoofi's
+    own EZcount sub-account (`utils/hyp.js` `createCustomerInvoice` has `customer_*` fields and
+    a free-text `comment`, and **no seller tax-id field**), so the business that actually made
+    the sale reaches the document only through `sellerComment` →
+    `buildSellerPurchaseLine(name, companyId)` (`utils/seller-details.js`): one line,
+    `עבור רכישה מ-<name>, מספר עוסק <N>`, and just `עבור רכישה מ-<name>` when the store has no
+    number on file — an unknown number must never render as a blank label on a tax document.
+    Four things in the per-order set must **never** gain that line, each for its own reason:
+    - **The DELIVERY document, single and twin** — `comment: ""` in both
+      `planSingleOrderInvoices` and `planTwinInvoices` (`services/payments/order-invoices.js`).
+      That leg is Shoofi's own revenue and Shoofi is the issuer, so there is no other business
+      to name. The twin **combination fee** rides on it for exactly that reason.
+    - **The line items** (`item.details`, and ZCredit's `itemDescription`). A business number is
+      not a description of what was bought, and the residual-rounding absorber writes into the
+      last document's items.
+    - **The store→Shoofi settlement invoice** (`createInvoiceOnBehalf`, `routes/hyp.js`
+      `create-store-invoice`): there the STORE is the issuer, on its own HYP `api_key`, so its
+      number comes from the sub-account. A free-text copy would be a second, unreconciled
+      statement of the same fact.
+    - **Credit notes (docType 330)**: they reverse an existing document and must mirror it, not
+      restate the seller independently.
+    The label is **`מספר עוסק`, never `ח"פ`** — 52 live stores are an עוסק מורשה trading on a
+    person's number and have no ח"פ, and `routes/driver-reports.js` already uses this wording.
+    Nothing in the repo re-parses the comment; cancellation goes by `docUuid`.
+    `getStoreCompanyId` reads the **per-tenant `store {id:1}` doc first**, registry second —
+    measured 2026-11-02 over all 262 registry stores: per-tenant only 178, both-and-identical 23
+    (0 disagree), registry-only 0, neither 61. So the order is about coverage, not authority, and
+    the pre-2026-11 registry-only read returned `""` for 178 of the 201 stores that have a
+    number. **Deliberately the opposite reading order from `isVatExempt`** (invariant 4), which
+    accepts either doc — do not "harmonise" them. The value is a **string** and must stay one:
+    36 of the 201 begin with a zero (all 201 are 9-char strings), so any numeric coercion prints
+    an 8-digit number on a tax document. Never `.trim()` inside `getStoreCompanyId` — the same
+    raw value is compared against HYP's `u_comp_crn` in `routes/hyp.js`.
+    Tests: shoofi-server `test/integration/invoice-seller-company-id.js`.
+    ⚠️ **Both store readers swallow a lookup failure** (`loadStoreFacts`,
+    `loadStoreInvoiceProfile`) and return `{name: appName, companyId: ""}`. A test whose fake
+    `req.app.db` is keyed on a different `appName` than the order therefore measures that
+    fallback and not the path it is named for — green for the wrong reason.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized

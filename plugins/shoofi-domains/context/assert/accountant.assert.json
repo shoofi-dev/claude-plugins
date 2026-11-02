@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-invoice-seller-company-id / 2026-11-02 (invariant 18: only the STORE leg of a per-order document names a seller, in free text; מספר עוסק not ח\"פ; per-tenant companyId first); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -890,6 +890,16 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "router\\.get\\(\"/api/payments/admin/greeninvoice/customers\", \\.\\.\\.reportsDashboard,",
           "desc": "CORE invariant 17: the GreenInvoice customer list needs a dashboard role"
+        },
+        {
+          "file": "services/payments/order-invoices.js",
+          "regex": "kind: INVOICE_KIND\\.DELIVERY,[\\s\\S]*?comment: \"\",",
+          "desc": "CORE invariant 18: the delivery leg of a per-order document carries NO seller line — it is Shoofi's own revenue and Shoofi is the issuer"
+        },
+        {
+          "file": "services/payments/order-invoices.js",
+          "regex": "kind: INVOICE_KIND\\.STORE,[\\s\\S]*?comment: sellerComment\\(facts\\),",
+          "desc": "CORE invariant 18: only the STORE leg names the seller, and it does so through sellerComment"
         }
       ]
     }
