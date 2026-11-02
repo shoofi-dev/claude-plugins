@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -346,8 +346,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
        a banner disappears at 00:00 UTC of its end date: `banner_end_day_excluded`); stories need
        `business_visible: true` on the store (`story_store_hidden`) and a 50-year expiry reads as
        none (`story_never_expires`); notes are live on `isActive` alone because `/notes/valid`
-       ignores their dates, and only the newest is shown; a push `in_progress` over an hour is
-       `push_stuck_in_progress`. Badges are computed, never written (menu-catalog invariant 18):
+       ignores their dates, and only the newest is shown; a push `in_progress` with no start and
+       no `execution.progress` for an hour is `push_stuck_in_progress`
+       (`services/customer-campaigns/stuck-sending.js` — the send died; see invariant 17 delete). Badges are computed, never written (menu-catalog invariant 18):
        the card shows the newest running deal and a public coupon beats it. Never "fix" a status
        here to match the stored dates; fix the channel, then this follows.
    Pinned by `test/integration/marketing-links.js`, `test/integration/marketing-attribution.js` and
@@ -644,7 +645,13 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       read, the draft keeps its plan, and a grandfathered item can be reverted too. A push reverts only while nothing was
       sent (not `in_progress`/`completed` and `execution.startedAt` unset). That check is in the
       atomic filter, and the push is disarmed to `status: "draft"` in the same write. **Delete**
-      is each channel's existing `DELETE` route.
+      is each channel's existing `DELETE` route. A push that is sending can't be deleted (409
+      `CAMPAIGN_SENDING`; the rule is in the `deleteOne` filter, and a send running in this process
+      always counts), but one **stuck "sending"** can — `in_progress` with no start and no progress
+      for an hour (`stuck-sending.js`). A restart before sends ran in the background left 11 in
+      prod, May–Aug 2026, 0 recipients recorded; nothing will ever finish them. The hub row
+      (`ActiveMarketingTab`) offers מחק on `push_stuck_in_progress`, the push form shows it in place
+      of the lock, and an unknown id is 404 (it was a 500).
     - **Grandfathering:** a doc with no `approval` (or `approval: null`) is published. In prod on
       2026-10-30, none of the 78 ads, 148 stories, 6 notes or 227 campaigns had the field. So the
       5 live banners, 86 live stories and 4 live popups stayed live, and no legacy campaign could
