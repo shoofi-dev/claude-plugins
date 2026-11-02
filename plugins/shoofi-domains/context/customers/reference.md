@@ -229,7 +229,8 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
       before the write; the audit row alone still proves nothing.
     - Roles are a free-form array on `shoofi.shoofiAdminUsers.roles`; the UI's list is
       admin/manager/senior/operator/viewer/editor/accountant (+ `master`, DB-only). There is no
-      server-side canonical list. `checkAdminRole` is an OR with no hierarchy.
+      server-side canonical list. `checkAdminRole` is an OR over the list, except that `master`
+      passes every gate (`hasAdminRole`, since 2026-11-02).
   - Prod read-only dry run: `scripts/school-registrations-dry-run.js --env <abs path>` (runs the
     real sync against an in-memory copy). 2026-10-04: 60 rows → 4 added, 29 already enrolled,
     21 review (17 `class_ambiguous`), 3 invalid phones, 3 duplicates ignored.

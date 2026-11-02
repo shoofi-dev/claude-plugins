@@ -154,8 +154,8 @@ code rather than assumed.
 **Both middlewares are load-bearing, and the second is the one that is easy to miss.** Admin
 and customer tokens are signed with the same secret, so `auth.required` alone passes a plain
 logged-in customer; only admin tokens carry `roles`, which is what `checkAdminRole` reads
-(`utils/admin-role.js`). The check is an OR with no hierarchy, so `master` is named
-explicitly. `test/integration/social-media-ideas-auth.js` mutation-tests both halves.
+(`utils/admin-role.js`). The check is an OR over the list, and `master` passes every gate
+(`hasAdminRole`, since 2026-11-02). `test/integration/social-media-ideas-auth.js` mutation-tests both halves.
 
 `SOCIAL_ROLES` is written out rather than imported from `AI_TASK_ROLES`: the lists agree
 today and are separate decisions.
