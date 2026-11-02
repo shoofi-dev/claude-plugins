@@ -33,8 +33,23 @@ or areas without deliveries) reach the owner's phone at once, through the bridge
 So an operator's draft or proposal reaches the owner **by landing in its existing queue** —
 not by a message. If you design a NEW queue that waits for a human, it needs a source in
 shoofi-server `services/hq/inbox-sources.js` (its own "waiting" rule, a link, whether it is
-urgent), or the owner will never see it. `bizops-brief` (the Chief of Staff) will write
-that brief once it exists; today the server writes it from data.
+urgent), or the owner will never see it. The brief itself is written by the server from data.
+
+### Runs from the HQ office
+
+The office (**משרד**, shoofi-server `services/hq/agents.js` + `agent-runs.js`) runs the
+operators as read-only bridge sessions (an `ask` task with `task.hq`), three ways:
+- **the Chief of Staff** — not an agent file but a prompt the server writes: the owner's only
+  conversation partner, who hands work to you with the Agent tool and puts the answers
+  together. This is the role planned as `bizops-brief`;
+- **"run now"** from the office, with your default job (the `job` in the HQ roster);
+- **a daily job** the owner switches on per operator (off by default).
+
+What that asks of an operator: **your answer's first line is the headline** the office and
+the morning brief show, so make it the finding in one sentence; then a few short bullets.
+Stay read-only — the run cannot change code or data, and anything for a person goes to its
+own queue. Bridge slots load this plugin (`shoofi-operators@shoofi`); a new operator joins
+the office by being added to the HQ roster in the same change as its agent file.
 
 Invoke namespaced: **`shoofi-operators:marketing-manager`**, **`shoofi-operators:competitive-intel`**,
 **`shoofi-operators:social-marketing`**.
