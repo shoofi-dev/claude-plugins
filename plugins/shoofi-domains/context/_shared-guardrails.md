@@ -59,13 +59,16 @@ Two hard rules:
 - If a change is large or risky, say so in the PR body and offer to split it.
 
 ### A new queue that waits for a human must reach HQ
-The owner sees what waits for them in one place: the admin's **מטה → צריך אותך**
+The owner sees what waits for them in one place: the admin's **Office HQ → צריך אותך**
 (shoofi-server `docs/hq.md`), built from one read-only source per queue in
 `services/hq/inbox-sources.js`. When your change adds a state that means "a person must
 decide this" (a draft, a proposal, a pending approval, an alert someone must act on), add a
 source there in the same PR: the queue's own "waiting" rule, a Hebrew title, the admin
 link where it is decided, and `urgent: true` only for money a customer is waiting for or
-something that stops orders now. Without it the item exists but nobody is told.
+something that stops orders now. A source holding more than one kind of thing gives each item
+`topic: { key, label }` (the inbox shows one line per topic); a job that re-writes the same
+alert every night (growth alerts) is read from its latest run, one item per subject, with a
+stable id so the owner's decision on it survives the next night. Without it the item exists but nobody is told.
 Leave out what waits for nobody: an item about a store customers never see
 (`stores.business_visible: false` or `isMockStore: true` — hidden and template stores) and a
 "failure" that only says the thing already exists. The owner can put items away from HQ
