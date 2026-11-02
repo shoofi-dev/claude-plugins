@@ -27,7 +27,8 @@ a morning brief at the time they set, and **צריך אותך** ("Needs you") �
 for a human decision, read live from the queues that already exist (marketing and coupon
 drafts, social posts, skills, compensations, competitor links, merge groups, alerts…). HQ
 decides nothing itself: each item links to the screen where it is decided, and leaves the
-list when its queue says it is done. Urgent items (money a customer is waiting for, stores
+list when its queue says it is done — or when the owner puts it away from HQ (ידוע: hidden
+for a week; טופל: until it comes again; התעלם: for good). Urgent items (money a customer is waiting for, stores
 or areas without deliveries) reach the owner's phone at once, through the bridge's Slack.
 
 So an operator's draft or proposal reaches the owner **by landing in its existing queue** —

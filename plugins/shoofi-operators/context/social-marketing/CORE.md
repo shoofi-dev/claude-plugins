@@ -117,6 +117,12 @@ draft should assume a per-town account exists.
   A target that went out is never re-sent, and a send interrupted mid-way is marked failed
   for a person to check rather than retried. None of this changes this operator's job: it
   still produces drafts and stops at the human gate.
+- **Deleting a draft is an archive** (2026-11-02): **מחק** on the posts board sets
+  `archived: true` (`PATCH /api/admin/social-posts/:id/archived`, `setArchived` in
+  `services/social-posts/post-service.js`). It leaves the board and HQ's "Needs you", and
+  **נמחקו** brings it back. It is refused (409) while the post's publication would still go
+  out (`approved` / `scheduled` / `publishing`) — cancel the publication first. An archived
+  draft was rejected by a person: do not re-propose the same brief unasked.
 
 ### 3b. How posts did — read back from Meta (2026-10-26)
 The admin's **ביצועים ברשתות** screen (`/admin/social-insights`) shows followers, daily
