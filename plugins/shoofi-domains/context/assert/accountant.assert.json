@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-settle-hidden-stores-that-traded / 2026-11-02 (invariant 9: the settlement BATCH population is getSettlementStores, not today's business_visible); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -290,6 +290,16 @@
           "file": "services/financial-overview/compute.js",
           "regex": "metrics\\.storeHasData\\(rd, \\{ live: s\\.live \\}\\)",
           "desc": "CORE invariant 9: inclusion is decided on the engine output (not all zeros), with contract charges counting only for live stores"
+        },
+        {
+          "file": ["services/payments/settlement-stores.js", "routes/payments/admin-reports.js"],
+          "regex": "getSettlementStores|stores\\.find\\(\\{\\s*business_visible: true,",
+          "desc": "CORE invariant 9: the settlement BATCH population (POST /reports/generate and GET /reports/failed-stores) comes from getSettlementStores — every live store plus every non-live store that traded in the period — never today's business_visible, which lost 34 hidden stores and 152 orders for 2026-10. TRANSITIONAL: the `stores.find({ business_visible: true` leg is the pre-fix shape, kept only so this pin can land before the code. Drop it once shoofi-server's fix/HIGH-RISK-settle-hidden-stores-that-traded is on main."
+        },
+        {
+          "file": ["services/payments/settlement-stores.js", "services/exec-dashboard/store-registry.js"],
+          "regex": "isMockStore: \\{ \\$ne: true \\} \\}, \\{ isMockStore: \\{ \\$exists: false \\} \\}",
+          "desc": "CORE invariant 9: a widened store population excludes mock stores EXPLICITLY. business_visible: true was doing it by accident (all three mock stores are hidden), so a population without this leg walks the template stores — real store DBs with real orders — into settlement"
         },
         {
           "file": "utils/order-pricing.js",

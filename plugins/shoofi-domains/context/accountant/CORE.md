@@ -244,16 +244,40 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    a term added to `totalOutcomes` and not to that list shows up as a non-zero
    `billingReconciliationDelta`, which is the point of the list.
 
-9. **The live overview's store population is by DATA, never by today's `business_visible`.**
-   `services/financial-overview/compute.js` enumerates every non-mock store
-   (`getAllNonMockStores`) and keeps those whose live report is not all zeros
-   (`storeHasData` in `services/financial-overview/metrics.js`). The range is usually in the
-   past, and a store hidden after it traded is still owed for that period — filtering on
-   visibility silently shrank the liability total (08/2026: four hidden stores, ₪4,111.92 on
-   sent reports, gone from the screen). Contract charges alone keep only a LIVE store (the
-   generator never bills a hidden one); derived totals never decide inclusion. Do not
-   "optimise" back to `getLiveStores` — narrow the non-live PROBE instead, and only towards
-   over-selection. Details: reference §4.
+9. **EVERY store population for a past period is by DATA, never by today's
+   `business_visible`.** The range is usually in the past, and a store hidden after it
+   traded is still owed for that period. This holds in three places, and all three had to
+   learn it separately:
+   - **The live overview** — `services/financial-overview/compute.js` enumerates every
+     non-mock store (`getAllNonMockStores`) and keeps those whose live report is not all
+     zeros (`storeHasData` in `services/financial-overview/metrics.js`). Filtering on
+     visibility silently shrank the liability total (08/2026: four hidden stores, ₪4,111.92
+     on sent reports, gone from the screen). Contract charges alone keep only a LIVE store;
+     derived totals never decide inclusion. Details: reference §4.
+   - **The batch generator** `POST /api/payments/admin/reports/generate` **and** the
+     `GET …/reports/failed-stores` screen — both take their list from
+     **`getSettlementStores`** (`services/payments/settlement-stores.js`). Until 2026-11
+     both filtered on `{ business_visible: true, isCoomingSoon: { $ne: true } }`, so a store
+     closed mid-month vanished from the run leaving **no trace at all** — no report, and no
+     `store-report-failures` row either, because generation was never attempted; and the
+     screen whose job is "who is missing a report" rebuilt the same filter and so was blind
+     to exactly those stores. Measured 2026-11-02: **34 hidden non-mock stores, 152 orders,
+     ₪18,678 in 2026-10, none settled**, plus two `payingParty: "business"` compensations
+     Shoofi therefore ate.
+   A live store runs unconditionally; a non-live store runs only when the period holds
+   orders (any status), a compensation, a completed delivery-only booking, or an
+   overlapping report. Two things must not be "simplified" away:
+   - **A non-live store with nothing is skipped SILENTLY** — not recorded as a failure. No
+     guard in the generate loop refuses an empty period, so dropping the filter without
+     this gate inserts an all-zero `draft` report plus a PDF upload for each of the ~116
+     stores that never traded.
+   - **`isMockStore` must be excluded EXPLICITLY.** `business_visible: true` was doing it
+     by accident (all three mock stores are hidden), so widening a population without the
+     `isMockStore` leg walks the template stores — real store DBs with real order documents
+     — into settlement.
+   Do not "optimise" either population back to `getLiveStores`. Narrow the non-live PROBE
+   instead, and only towards over-selection: a false positive costs one engine run, a false
+   negative loses a month of settlement.
 
 10. **A compensation belongs to the report whose period contains its `createdAt` — never the
     month it was approved in — and the windows tile with no overlap and no gap.**

@@ -33,8 +33,16 @@ ALL outcomes** (commission on cash orders included). A mostly-cash store can hav
 before touching any settlement math.
 
 ## 2. Store settlement reports — `routes/payments/admin-reports.js`
-**Generate**: `POST /api/payments/admin/reports/generate`  — per store (or all
-`business_visible` stores). Every `/api/payments/admin/reports*` route, the `accountant-file-number` PUTs, the two
+**Generate**: `POST /api/payments/admin/reports/generate`  — per store (`storeId` in the body,
+no visibility filter at all, which is how a hidden store gets settled by hand), or the batch:
+**`getSettlementStores`** (`services/payments/settlement-stores.js`) = every live store plus
+every non-live store that traded in the period, mock stores excluded explicitly. Until 2026-11
+the batch was `{ business_visible: true, isCoomingSoon: { $ne: true } }` and a store hidden
+mid-month silently lost its month — see CORE invariant 9, which also governs
+`GET …/reports/failed-stores`, whose list has to stay the same population or the screen is
+blind to exactly the stores it is meant to find. The response carries `skipped[]` (non-live,
+nothing to settle — deliberately NOT a `store-report-failures` row).
+Every `/api/payments/admin/reports*` route, the `accountant-file-number` PUTs, the two
 `greeninvoice` reads and every `/api/driver-reports` route take `settlementDashboard` (any
 dashboard role; aliased `reportsDashboard`), not `auth.required` alone (CORE invariant 17). Pre-generate **guards** (all skip on failure):
 1. exact-duplicate (same store+day-range) ; 2. **overlap vs reports of ANY status**
