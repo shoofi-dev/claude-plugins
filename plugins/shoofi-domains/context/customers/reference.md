@@ -492,22 +492,25 @@ body (test: "a client cannot set owner or inferred"). `inferred` is written only
 
 | Endpoint | Gate | Notes |
 |---|---|---|
-| `POST /api/admin/marketing/generate` | master / admin / manager | `{subject:{kind,id,appName?}, channel, what: copy\|image, tone?}`. copy → 200 `{variants, rejected, limits}`; image (banner / story / social only) → 202 the job. 400 bad channel, 404 no subject, 409 not promotable, 422 nothing passed the guard, 429 budget, 503 no AI backend |
+| `POST /api/admin/marketing/generate` | master / admin / manager | `{subject:{kind,id,appName?}, channel, what: copy\|image, tone?, templateId?, model?, references?:{logo, productIds}}` (model: `nano-banana-2` default / `gpt-image-2` / `seedream-5`; 400 unknown, 409 `model_unavailable` when no bridge has `render-models`). copy → 200 `{variants, rejected, limits}`; image (banner / story / social only) → 202 the job. 400 bad channel, 404 no subject, 409 not promotable, 422 nothing passed the guard, 429 budget, 503 no AI backend |
+| `GET /api/admin/marketing/generate/options?kind=&id=&appName=` | same | `{models[{id,label,maker,credits}], defaultModel, references:{logo:{url}\|null, dishes[{id,name,url}], menu[...]}}` — declared before `/:jobId` |
 | `GET /api/admin/marketing/generate/:jobId` | same | `status` queued → generating → rendering → ready / failed (`errorCode`: `no_renderer`, `no_valid_copy`, `no_ai`); `copy`; `images[{id, lang ar\|he\|all, aspectRatio, status, url}]`. Reaps stale jobs and renders on read |
 | `GET /api/admin/marketing/generate/:jobId/images/:imageId` | same | the bytes of a rendered image, fetched server-side from our CDN only (the CDN sends no CORS) |
-| `POST /api/admin/marketing/generate/:jobId/revise` | same | `{notes?}` ≤ 600. No notes = re-render the same brief and words; notes = a new brief told what to change, through the guard. 202 the job; 400 notes too long / not an image job; 409 `busy` or not promotable; 429 image limit |
+| `POST /api/admin/marketing/generate/:jobId/revise` | same | `{notes?, model?}` ≤ 600; `model` without notes = the same brief drawn by another model. No notes = re-render the same brief and words; notes = a new brief told what to change, through the guard. 202 the job; 400 notes too long / not an image job; 409 `busy` or not promotable; 429 image limit |
 | `POST /api/admin/marketing/generate/:jobId/versions/:versionId/restore` | same | 200 the job with that version current; the current result becomes a version. 404 no such version, 409 `busy` |
 
 Data: `shoofi.marketingGenerations` `{what: "image", channel, subject, facts:{lines,name}, status,
 copy, brief, assets[{id, lang, aspectRatio, status pending\|queued\|rendering\|rendered\|failed,
-prompt, references, imageUrl, imageKey, renderBridgeId, renderClaimedAt, generationId}],
+model, renderedModel, prompt, references, imageUrl, imageKey, bytes, renderBridgeId, renderClaimedAt, renderedAt, generationId}],
+model,
 rejected, backend, error, errorCode, revision:{notes, previousPrompt, previousCopy, by, at},
-versions[{id, at, notes, copy, brief, assets}], renderCount, lastQueuedAt, createdBy, createdAt}`;
+versions[{id, at, notes, copy, brief, model, assets}], renderCount, lastQueuedAt, createdBy, createdAt}`;
 TTL 30 days on `createdAt`. The jobs' public shape adds `notes` and `versions` (newest first). Images:
 `marketing-generate/<jobId>/<assetId>-<lang>-<ts>.<ext>` on the Spaces CDN.
 
 Admin client: `shoofi-delivery-web` `src/apis/admin/marketing-generate.ts`,
-`src/views/admin/marketing/components/ContentStep.tsx` (the step),
+`src/views/admin/marketing/components/ContentStep.tsx` (the step), `ImageSetup.tsx` (the model
+picker and the logo / dish references, before a picture),
 `src/components/admin/image-generation/` (`ImageRevision` — "עוד אפשרות" / "בקש שינוי" / earlier
 versions — and `DesignGuidelines`, shared with the social posts screen), `content.ts` (what the form
 gets; `subjectFromLink` = a form's link → the subject), `use-prefill-image.ts` (the banner /

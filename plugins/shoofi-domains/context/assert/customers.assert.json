@@ -1,6 +1,6 @@
 {
   "doc": "customers",
-  "lastVerified": "shoofi-server@feat/marketing-hub-ux + shoofi-delivery-web@feat/marketing-hub-ux / 2026-11-01 (CORE invariant 11: the active list reads the approval record first - draft / approved-later; invariant 17: the approval queue is the hub's tab); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (CORE invariant 12: a click sends in the background, several at a time); shoofi-server@feat/marketing-social + shoofi-delivery-web@feat/marketing-social / 2026-10-31 (CORE invariant 17: the social channel of a marketing item, reference 5c + 5e); shoofi-delivery-web@feat/marketing-generate-in-forms / 2026-10-31 (CORE invariant 16: generation inside every channel form, create and edit); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (CORE invariant 11 active list); shoofi-server@feat/marketing-templates + shoofi-delivery-web@feat/marketing-templates / 2026-10-31 (CORE invariant 18 learned templates, reference 5d); shoofi-server@feat/marketing-image-revise / 2026-10-31 (CORE invariant 16 revise + design guidelines); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
+  "lastVerified": "shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models / 2026-11-02 (CORE invariant 16: logo + dishes as references by ID, the image model choice); shoofi-server@feat/marketing-hub-ux + shoofi-delivery-web@feat/marketing-hub-ux / 2026-11-01 (CORE invariant 11: the active list reads the approval record first - draft / approved-later; invariant 17: the approval queue is the hub's tab); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (CORE invariant 12: a click sends in the background, several at a time); shoofi-server@feat/marketing-social + shoofi-delivery-web@feat/marketing-social / 2026-10-31 (CORE invariant 17: the social channel of a marketing item, reference 5c + 5e); shoofi-delivery-web@feat/marketing-generate-in-forms / 2026-10-31 (CORE invariant 16: generation inside every channel form, create and edit); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (CORE invariant 17 marketing drafts: the draft holds now/schedule, approve follows it); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (CORE invariant 11 active list); shoofi-server@feat/marketing-templates + shoofi-delivery-web@feat/marketing-templates / 2026-10-31 (CORE invariant 18 learned templates, reference 5d); shoofi-server@feat/marketing-image-revise / 2026-10-31 (CORE invariant 16 revise + design guidelines); shoofi-server@feat/marketing-generate / 2026-10-30 (CORE invariant 16, reference 5c marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (CORE invariant 15, reference 2 + 5 search / by-id / OTP); shoofi-server@fix/schools-auth / 2026-10-30 (CORE invariant 14, reference 2 + 4 school / teacher / admin-create gates); shoofi-server@fix/analytics-routes-auth / 2026-10-29 (reference C4 analytics gate, 5b cap index); shoofi-server@feat/campaign-impact / 2026-10-29 (CORE invariant 11 campaign impact); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 11 events->facts); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -67,7 +67,10 @@
         "docs/marketing-templates.md",
         "test/integration/marketing-templates.js",
         "docs/marketing-generate.md",
-        "test/integration/marketing-generate.js"
+        "test/integration/marketing-generate.js",
+        "services/marketing/generate/image-models.js",
+        "services/marketing/generate/references.js",
+        "test/integration/marketing-image-models.js"
       ],
       "symbols": {
         "routes/marketing-generate.js": ["GENERATE_ROLES", "loadSubjectFacts", "checkBudget", "images/:imageId", "CDN_BASE"],
@@ -79,7 +82,9 @@
         "services/marketing/templates.js": ["learnChannel", "runTemplates", "templateForGeneration", "hasFacts", "MAX_APPROVED", "MAX_PENDING", "marketing templates"],
         "routes/marketing-templates.js": ["TEMPLATE_ROLES", "runMarketingTemplates"],
         "utils/crons/marketing-templates-cron.js": ["cron:marketing-templates", "acquireLock"],
-        "services/marketing/generate/renders.js": ["claimOnce", "notMine", "marketing image render", "CREDITS_PER_RENDER"],
+        "services/marketing/generate/renders.js": ["claimOnce", "notMine", "marketing image render", "CREDITS_PER_RENDER", "modelFromGroup", "renderedModel", "compress"],
+        "services/marketing/generate/image-models.js": ["IMAGE_MODELS", "DEFAULT_MODEL", "MODELS_CAPABILITY", "resolveModel", "availableModels"],
+        "services/marketing/generate/references.js": ["candidates", "chosenReferences", "computeBestSellers", "MAX_DISHES"],
         "services/marketing/generate/budget.js": ["marketingAiDailyBudgetUsd", "marketingImageDailyLimit", "UNPRICED_BUDGET_PRICE"],
         "services/marketing/generate/voice.js": ["HEBREW_VOICE", "ARABIC_VOICE"],
         "services/customer-campaigns/marketing-push-policy.js": [
@@ -551,6 +556,11 @@
         {"file": "routes/marketing-generate.js", "regex": "const facts = await loadSubjectFacts\\(req\\.app\\.db, job\\.subject\\);", "desc": "CORE invariant 16: a revision reloads the facts from the DB by the job's subject"},
         {"file": "services/marketing/generate/image.js", "regex": "buildImageBriefPrompt\\(\\{ facts, channel: job\\.channel, tone: job\\.tone, direction, feedback, revision: job\\.revision, template: job\\.template \\}\\)", "desc": "CORE invariant 16 + 18: a revision with notes is briefed in runImageJob, so its words pass the same guard - and the job's own template snapshot rides into that same brief, never a style from the request"},
         {"file": "services/marketing/generate/image.js", "regex": "\"cleanly aligned\\. Never invent characters, and add no other words, numbers or prices\\.\"", "desc": "CORE invariant 16: the words-exactly rule stays in code, not in an editable direction field"},
+        {"file": "routes/marketing-generate.js", "regex": "facts\\.images = await references\\.chosenReferences\\(req\\.app\\.db, facts, body\\.references\\);", "desc": "CORE invariant 16: the reference pictures are rebuilt on the server from the subject's store - the body names product ids, never URLs"},
+        {"file": "services/marketing/generate/references.js", "regex": "const all = new Map\\(\\[\\.\\.\\.c\\.dishes, \\.\\.\\.c\\.menu\\]\\.map\\(\\(d\\) => \\[d\\.id, d\\]\\)\\);", "desc": "CORE invariant 16: a picked id is honoured only if it is one of the store's sellable dishes"},
+        {"file": "routes/marketing-generate.js", "regex": "code: \"model_unavailable\"", "desc": "CORE invariant 16: a model no bridge can draw with is refused, never swapped for the default"},
+        {"file": "services/marketing/generate/image-models.js", "regex": "const DEFAULT_MODEL = \"nano-banana-2\";\n(?:.*\n)?const MODELS_CAPABILITY = \"render-models\";", "desc": "CORE invariant 16: Nano Banana 2 is the default; other models need a bridge advertising render-models"},
+        {"file": "services/marketing/generate/renders.js", "regex": "const renderedModel = modelFromGroup\\(modelGroupId\\);", "desc": "CORE invariant 16: the render records the model the bridge says it drew with"},
         {"file": "services/marketing/generate/budget.js", "regex": "Math\\.max\\(j\\.renderCount \\|\\| 0, \\(j\\.assets && j\\.assets\\.length\\) \\|\\| 0\\)", "desc": "CORE invariant 16: revision renders count against the daily image limit"},
         {"file": "services/marketing/templates.js", "regex": "const published = \\(doc\\) => !doc\\.approval \\|\\| doc\\.approval\\.status === \"published\";", "desc": "CORE invariant 18: templates learn from published items only, never drafts"},
         {"file": "services/marketing/templates.js", "regex": "status: \"suggested\",\\n      name,", "desc": "CORE invariant 18: the daily job only ever writes suggested templates"},
@@ -638,10 +648,16 @@
         "src/views/admin/marketing/components/TemplatePicker.tsx",
         "src/views/admin/marketing-templates/MarketingTemplates.tsx",
         "src/views/admin/marketing/components/FormGenerate.tsx",
+        "src/views/admin/marketing/components/ImageSetup.tsx",
         "src/views/admin/marketing/social/SocialPostForm.tsx",
         "src/apis/admin/marketing-social.ts"
       ],
       "patterns": [
+        {
+          "file": "src/views/admin/marketing/components/ImageSetup.tsx",
+          "regex": "references: hasStore \\? \\{ logo, productIds: dishes\\.map\\(\\(d\\) => d\\.id\\) \\} : null",
+          "desc": "CORE invariant 16: the AI box sends the store pictures as product ids only - never a URL"
+        },
         {
           "file": "src/views/admin/marketing/components/TemplatePicker.tsx",
           "regex": "if \\(!next \\|\\| list\\) return;\\n    try \\{\\n      const out = await listTemplatesApi\\(\\{ channel, status: \"approved\" \\}\\);",
