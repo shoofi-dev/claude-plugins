@@ -527,6 +527,45 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests: `test/integration/coins-admin-auth.js` (static gate check on every route plus every
       `/api/admin/*` route in `routes/coins.js`, 401/403 matrix, every dashboard role on seven
       routes, master-only on expire, the audit entry, refused writes write nothing).
+20. **A TAKEAWAY ORDER HAS NO TERMINAL SIGNAL — `"2"` IS WHERE IT STOPS.** For delivery,
+    arrival is written on `bookDelivery` (invariant 1). Takeaway and drive-in have no
+    `bookDelivery` row at all, so the only "this order is over" transition is `"2"` → `"10"`
+    (PICKED_UP) — and in practice nobody sends it. **Never assume `"10"` means "not collected
+    is impossible", and never treat a takeaway order at `"2"` as still awaiting the customer.**
+    - **One writer, half-hidden.** The only code anywhere that writes `"10"` is the partner
+      app, `shoofi-partner/stores/orders/index.tsx:272-277` (`COMPLETED` → `PICKED_UP` when
+      `receipt_method != shipping`), posting a plain `POST /api/order/update`, which has no
+      transition guard on `"10"`. The live orders screen is `index.v2.tsx`
+      (`FEATURE_FLAGS.ORDERS_LIST_V2`), and it **suppresses the advance button on the
+      collapsed row** for its own `readyStatuses = ["2","3"]` (`:440-443`, `:2880-2883`); the
+      "استلمت" button exists only on the **expanded** card (`:3164-3165`), on a **day-scoped**
+      list. So pressing it on a two-day-old order means walking the weekday strip back.
+      The admin web cannot send it at all — `ORDER_STATUS_HEBREW_SHORT`
+      (`shoofi-delivery-web/src/components/Cards/order-actions/useOrderActions.tsx:39-49`) is
+      `6,1,2,3,7,13,5` with no `"10"` — and the driver app writes `bookDelivery` only.
+    - **Measured 2026-11-02, GCP:** 1,181 of 7,702 takeaway orders ever reached `"10"`;
+      **6,521 are still at `"2"`**. Across all 259 live store DBs, 149 non-delivery orders
+      (141 TAKEAWAY + 8 DRIVEIN) were sitting at `"2"` inside the active-orders window, and
+      none at any other status — `"2"` is the whole of it.
+    - **`fix-stuck-orders.js` feeds this, it does not drain it.** The daily 07:00 cron moves a
+      stale TAKEAWAY `"1"` to `"2"` (`utils/crons/fix-stuck-orders.js:116-118`) and nothing
+      advances `"2"` onward. `order-overdue-checker.js` only notifies, on `"1"` only.
+    - **So the customer's active list needs its own clock.** `GET
+      /api/order/customer-active-orders` (`routes/order.js:8508`) windows on **`orderDate`**,
+      a 48h offset STRING — and `orderDate` is the *promised ready time*, pushed forward again
+      by store accept (`routes/order.js:6256-6261`) and by delay (`:7131`), not creation. That
+      window alone left a collected takeaway order in طلبيات حاليه for two calendar days
+      (order `4520-7379`, GCP, ready `2026-10-31T17:22+02:00`, still "جاهزة" on 2026-11-02
+      08:18). `utils/active-orders.js` now carries both halves: `filterOutDeliveredOrders`
+      joins `bookDelivery` for DELIVERY, and **`filterOutStaleCollectionOrders`** drops a
+      non-delivery order at `"2"` once `COLLECTION_WINDOW_HOURS` (6) have passed since its
+      **parsed** `orderDate`. A scheduled order is safe by construction (ready time ahead of
+      now); a missing or unparsable `orderDate` keeps the order, the same degrade-rather-than-
+      hide rule the delivery join uses. The order stays in `customer-orders-history`, which
+      carries `"2"` and `"10"` for two months — the customer loses the shortcut, not the order.
+    - Tests: `test/integration/customer-active-orders-collected.js` (stale takeaway dropped,
+      fresh one kept, drive-in follows, scheduled survives, delivery untouched, no-`orderDate`
+      kept) alongside `customer-active-orders-delivered.js` for the delivery half.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
