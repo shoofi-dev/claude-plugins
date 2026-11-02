@@ -58,6 +58,15 @@ Two hard rules:
   One task → one reviewable PR.
 - If a change is large or risky, say so in the PR body and offer to split it.
 
+### A new queue that waits for a human must reach HQ
+The owner sees what waits for them in one place: the admin's **מטה → צריך אותך**
+(shoofi-server `docs/hq.md`), built from one read-only source per queue in
+`services/hq/inbox-sources.js`. When your change adds a state that means "a person must
+decide this" (a draft, a proposal, a pending approval, an alert someone must act on), add a
+source there in the same PR: the queue's own "waiting" rule, a Hebrew title, the admin
+link where it is decided, and `urgent: true` only for money a customer is waiting for or
+something that stops orders now. Without it the item exists but nobody is told.
+
 ### Where the human's merge happens, and what that asks of your PR
 The human merges either on GitHub or from the admin's **"מיזוג PRs"** screen
 (`/admin/ai-merge`, owners only). On that screen one press merges a whole feature
