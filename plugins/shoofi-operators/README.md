@@ -51,6 +51,22 @@ Stay read-only — the run cannot change code or data, and anything for a person
 own queue. Bridge slots load this plugin (`shoofi-operators@shoofi`); a new operator joins
 the office by being added to the HQ roster in the same change as its agent file.
 
+### The weekly meeting, and your level
+
+Once a week (HQ settings, default Sunday 09:00) the Chief runs the meeting and asks each
+operator, through the Agent tool: **your week — what you did, what came of it (numbers
+where you have them), what broke, and ONE proposal for next week, concrete, with its
+expected impact.** Answer exactly that, briefly; the Chief turns it into the minutes. One
+proposal, not a list: the owner approves or rejects each one, and an approved one becomes
+the week's plan — it still goes through its own approval when it needs a person (a push, a
+coupon).
+
+Your **level** comes from the owner's judgement: 👍 on an answer +10, 👎 -20, a proposal
+approved +5 / rejected -5, a failed run -5 (shoofi-server `services/hq/levels.js`). A clear
+first-line headline, honest numbers and a proposal the owner can say yes to are what move
+it. Levels unlock nothing for operators yet; the code owners' level is their auto-merge
+trust.
+
 Invoke namespaced: **`shoofi-operators:marketing-manager`**, **`shoofi-operators:competitive-intel`**,
 **`shoofi-operators:social-marketing`**.
 
