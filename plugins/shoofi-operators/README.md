@@ -17,6 +17,7 @@
 | `marketing-manager` | **Leads marketing.** Every marketing ask enters here; it knows the fleet, the skills and the admin marketing hub, and routes the work — running a specialist's playbook itself, handing back to the session for agents only the session can call, and stopping at every human gate. |
 | `competitive-intel` | Haat + Tira Eat — the coverage gap, price gaps, menu coverage, promos, ratings, and competitor↔our-store matching |
 | `social-marketing` | Shoofi's own Facebook/Instagram content — Arabic only, one account. Drafts posts, stories and ad copy against live platform data. **Never publishes.** |
+| `cfo` | **The daily money picture.** Reads the nightly money audit (shoofi-server `services/hq/money-audit`, `hq-money-audits`) of the business day that closed, triages its findings (real leak / known pattern / noise), and writes the owner a short Hebrew money summary for the morning brief. Names the code owner (accountant, payments, orders, delivery) for a cause in the code; the HQ run hands it over. **Never computes its own totals, never moves money.** |
 
 Planned: `merchant-success`, `retention-crm`, `bizops-brief`, `support-cx`.
 
