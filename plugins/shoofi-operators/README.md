@@ -22,13 +22,15 @@ Planned: `merchant-success`, `retention-crm`, `bizops-brief`, `support-cx`.
 
 ### Where an operator's output reaches the owner: HQ
 
-The admin's **מטה** (HQ, master only; shoofi-server `docs/hq.md`) is the owner's single view:
+The admin's **Office HQ** (one sidebar entry, tabs inside; master only; shoofi-server `docs/hq.md`) is the owner's single view:
 a morning brief at the time they set, and **צריך אותך** ("Needs you") — everything waiting
 for a human decision, read live from the queues that already exist (marketing and coupon
 drafts, social posts, skills, compensations, competitor links, merge groups, alerts…). HQ
 decides nothing itself: each item links to the screen where it is decided, and leaves the
 list when its queue says it is done — or when the owner puts it away from HQ (ידוע: hidden
-for a week; טופל: until it comes again; התעלם: for good). Urgent items (money a customer is waiting for, stores
+for a week; טופל: until it comes again; התעלם: for good). The list is one line per topic
+("ירידה בהזמנות · 30") that opens to its items, so a queue with many similar items still
+reads as one thing. Urgent items (money a customer is waiting for, stores
 or areas without deliveries) reach the owner's phone at once, through the bridge's Slack.
 
 So an operator's draft or proposal reaches the owner **by landing in its existing queue** —
