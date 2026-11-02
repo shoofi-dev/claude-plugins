@@ -272,6 +272,21 @@
           "desc": "every term of totalOutcomes must be a BILLING_COMPONENT, or the dashboard's reconciliation delta lies"
         },
         {
+          "file": "routes/driver-reports.js",
+          "regex": "totalEarningsByCash \\+= dp\\.actualEarningsByCash",
+          "desc": "reference §6 name trap: the COMPANY-level earningsByCash is Shoofi's payment on cash orders (Σ actualEarningsByCash), not the cash collected"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "feesByCash \\+= dp\\.earningsByCash",
+          "desc": "reference §6 name trap: the company GROSS cash fee is feesByCash (per-driver earningsByCash is the gross)"
+        },
+        {
+          "file": "services/financial-overview/metrics.js",
+          "regex": "const cashGross = num\\(rd\\.feesByCash\\)",
+          "desc": "reference §4: the overview's D1 gross is the company feesByCash; reading earningsByCash made מזומן נטו ₪0 for every company (10/2026)"
+        },
+        {
           "file": "services/financial-overview/compute.js",
           "regex": "generateStoreReportData",
           "desc": "the live overview runs the store report ENGINE over the range — it must never re-derive settlement math"

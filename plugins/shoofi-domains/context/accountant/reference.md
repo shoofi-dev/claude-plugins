@@ -184,6 +184,10 @@ PAYER×recipient (the report fields are recipient-filtered), F1–F3 per company
 the contract dropdown label. Each figure carries the stored report's value for the SAME range with a
 delta (`compareWithStoredReport`; no report = null, never 0). Cached 5 min per range, Redis-locked,
 202 while another process computes. See shoofi-server `docs/financial-overview.md`.
+*Courier cash/card rows.* D1 "מזומן נטו" = `feesByCash − earningsByCash` (company level: gross cash
+fees minus what Shoofi pays on cash orders = what the courier kept at the door); D2's gross is
+`feesByCreditCard`. Per driver the gross is `earningsByCash` and the payment `actualEarningsByCash` —
+see §6 for why the names flip. D1 has no stored-report field, so its trust column is "—" by design.
 
 *Store population (2026-09) — by DATA, not by today's visibility.* Candidates are every non-mock
 store (`getAllNonMockStores` in `services/exec-dashboard/store-registry.js`; `isMockStore` is the
@@ -243,6 +247,17 @@ only by the dashboard-only `/api/shoofiAdmin/driver-bonuses*` routes, CORE invar
 hours from `driverDailyHours` nightly cron w/ live fallback), exempt `÷1.18`.
 `netTotal = totalDriverPayment + bonuses + compensations + minGuaranteeTopUp - driverCharges`.
 Cash fees are reported as receipts but are **NOT** in the transfer (already in the driver's pocket).
+**⚠️ Field names change meaning by level (trap, 2026-11).** In `generateDriverReportData`, **per
+driver** (`driverPayments[]`) `earningsByCash` / `earningsByCreditCard` are the **GROSS** fees
+(`effectiveShippingPrice`) on CASH / CREDITCARD orders. At **company level** the SAME names are
+`totalEarningsByCash` / `totalEarningsByCreditCard` = Σ `actualEarningsByCash` /
+`actualEarningsByCreditCard` — what Shoofi **PAYS** on those orders. On cash that is only the
+coupon-covered part + a store delivery deal (`promotionDeliveryPayment`), so a company's
+`earningsByCash` equals `earningsByCoupons` whenever no deal applied (all 60 most recent stored
+reports, 2026-11-02). The company **gross** fees are **`feesByCash` / `feesByCreditCard`** (the PDF's
+"מזומן" line reads `feesByCash`). Card is the same number either way (Shoofi pays the full card fee);
+cash is not. Never read the company `earningsByCash` as "cash collected": the financial overview did,
+and showed "מזומן נטו" = ₪0 for 10/2026 (real ₪97,716).
 
 ## 7. MASAV bank payouts — `routes/admin/masav.js`
 `POST /api/admin/masav/generate`  — **decoupled from the reports**: consumes a
