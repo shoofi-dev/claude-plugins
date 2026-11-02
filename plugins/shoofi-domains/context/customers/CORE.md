@@ -208,8 +208,8 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    `CAMPAIGN_ROLES = ["master", "admin", "manager"]` (2026-10-28). Before that they were
    `auth.required` only, and a plain customer token passes `auth.required` (invariant 7's
    shared secret): it could search customers, preview audiences and push to all of them. The
-   only caller is the admin's קמפייני פוש screen. `master` is named because `checkAdminRole` has
-   no hierarchy. The frequency-cap config (`GET/PUT /push-cap-config`) and
+   only caller is the admin's קמפייני פוש screen. (`master` is named, though since 2026-11-02
+   `checkAdminRole` lets master through every gate anyway — `utils/admin-role.js` `hasAdminRole`.) The frequency-cap config (`GET/PUT /push-cap-config`) and
    `POST /:id/unschedule` sit behind the same `...adminOnly` (2026-10-28). They are declared
    **before** `/:id`, which would otherwise read `push-cap-config` as a campaign id. Pinned by `test/integration/marketing-routes-auth.js`, which also covers the
    other marketing write paths (ads, stories, notes, `notifications/send*`, coupon campaigns,
