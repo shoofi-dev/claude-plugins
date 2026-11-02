@@ -1,0 +1,71 @@
+# CFO — CORE
+
+> Last verified: 2026-11-02 against shoofi-server `services/hq/money-audit/` (first prod dry run
+> of business day 2026-11-01: 364 orders, 56 stores, 215 bookings, 19 findings, 13 s).
+
+## 1. What the audit is
+Every night at **07:10 Israel** the server audits the **business day** that closed at 07:00
+(07:00 → 07:00, `utils/business-day.js`; an overnight store's 01:00 order belongs to the evening
+before). It is deterministic code — no model computes a number. Result: one doc per day in
+`shoofi.hq-money-audits`:
+
+| Field | What |
+|---|---|
+| `totals` | `orders` (completed), `gmv`, `card`, `cash`, `cancelled`, `unpaid` (status "0"), `coupons`, `couponOrders`, `couponStore` / `couponShoofi` (who funded them), `deals`, `coinsRedeemed` (₪), `coinsEarned` (coins), `deliveryFees` (customers paid), `compensations` { payer: ₪ approved that day }, `deliveries` (status 4), `courierPay` (what couriers are owed for them), `companies`, `deliveryOnly*` |
+| `checks[]` | `{ id, area, label, severity, count, amount }` — every check, found or not |
+| `findings[]` | `{ key, check, severity, appName, orderId, title, detail, amount, link }`, leaks first |
+| `leak` | `{ count, amount }` |
+| `errors[]` | what could not be read — **say it first** if not empty |
+
+Severity: **leak** = money lost or paid twice; **mismatch** = two records disagree; **odd** =
+worth a look. Leaks of the last 7 audits also appear in the owner's "צריך אותך" (source
+`money`, one topic per check); the brief shows the totals and the checks.
+
+The audit reads only our DB. **Providers have no transaction list**: a refund done by hand in the
+HYP portal leaves no trace on the order, so `cancelled-not-refunded` can be a hand refund.
+
+## 2. The checks (area → owner to hand a code cause to)
+**money-in → `shoofi-domains:payments`**: `charge-vs-total`, `charged-not-placed`,
+`card-not-charged`, `double-charge`, `cancelled-not-refunded` (7-day lookback),
+`refund-anomaly`, `j5-hold`, `receipt-missing`.
+**orders → `shoofi-domains:orders`**: `total-arithmetic`, `coins-not-redeemed`,
+`coins-refund-twice`, `coins-cancel-not-reversed`, `coins-overspent`, `coupon-over-cap`,
+`coupon-no-usage`, `coupon-usage-on-cancelled`, `coupon-wrong-customer`, `uncancel-leftovers`,
+`stuck-at-day-end`, `twin-captured-leg-cancelled`, `facts-vs-order`.
+**settlement → `shoofi-domains:accountant`**: `unknown-payment-method`, `no-commission`,
+`coupon-missing`, `coupon-funding`, `deal-and-delivery-coupon`, `gift-card-sales`,
+`hidden-store-orders`, `test-orders-settled`, `compensation-integrity`.
+**delivery → `shoofi-domains:delivery`** (courier pay → accountant): `delivery-fee-vs-tariff`,
+`delivery-fee-absurd`, `booking-vs-order-fee`, `delivered-without-booking`,
+`cancelled-order-booking-live`, `double-booking`, `twin-delivery-billing`,
+`delivery-company-copies`, `delivery-only-fee`, `delivery-integrity`.
+
+## 3. Known patterns and noise (first dry run, 2026-11-01)
+- **₪0 delivery fee on a delivery order** (`delivery-fee-vs-tariff`, 5 on the first day): no
+  coupon, no deal, tariff ₪20–25. The courier is paid on the snapshot fee, so on ₪0. Cause
+  **unverified** (suspected: the client quote reusing another store's price at the same address).
+  Real money; a pattern — report the count and total, not each order.
+- **Coins recorded but not taken off the total** (`total-arithmetic` with detail "הקוינז נרשמו
+  אבל לא הורדו"): the customer paid in full AND lost the coins. Real; small ₪; customer harm.
+- **`uncancel-leftovers` with `cancelMoneyDecision: refund`**: an order went back to active after a
+  refund decision — the customer may be refunded AND the store paid. Confirm on the order.
+- **`STACKED_FULL_DISCOUNT`** is a stack of coupons, not a missing coupon — already excluded.
+- **`cancelled-not-refunded`** can be a hand refund in the HYP portal (no DB trace) — say so.
+- Commission is tiered on the **month's** revenue: a day has no exact commission; never present
+  one as fact.
+
+## 4. What you may read (read-only)
+- `shoofi.hq-money-audits` (this day and the 7 before for patterns).
+- Store orders: database = the store's `appName`, collection `orders`, find by `orderId`.
+  **Never print** `ccPaymentRefData.payload` or `paymentAuth.ccToken` (card secrets) — project
+  only the fields you need.
+- `shoofi.marketingOrderFacts`, `shoofi.coupons`, `shoofi.couponUsages`, `shoofi.compensations`,
+  `shoofi.customer-coins`; `delivery-company.book-delivery` (exclude `area.geometry`).
+
+## 5. The summary
+Hebrew. First line: one sentence — the day's money and whether anything leaked
+("אתמול: ₪37,320 ב-330 הזמנות · 3 דליפות, ₪165"). Then at most 8 bullets, most money first:
+- each **real** leak or pattern: what, how much, since when, what to do (and the screen);
+- a code cause → "לבדיקת <owner>: <one finding>";
+- noise you dismissed: one bullet total ("2 ממצאים הם רעש: …").
+No tables, no PII, no numbers you did not read.
