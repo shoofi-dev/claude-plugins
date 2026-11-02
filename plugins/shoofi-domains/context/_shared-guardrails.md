@@ -76,6 +76,18 @@ What that means for the PR you open:
   contains `HIGH-RISK`, or a PR is a draft. A money or identity change therefore
   carries `HIGH-RISK` in its branch name or title, not only in the body.
   The body alone is invisible to that check.
+- **Risk is also computed from your files, and that is what auto-merge reads.**
+  The server gives every group a tier from the files it changes (shoofi-server
+  `services/ai-tasks/risk-policy.js`; `docs/ai-tasks.md`, *Auto-merge (shadow
+  mode)*): **red** for money, `routes/order.js`, auth / OTP / roles, production
+  data writes, infra and dependencies, native app config, app checkout, and the
+  merge/safety system itself; **amber** for other code; **green** for tests, docs
+  and small admin-web UI. Writing `HIGH-RISK` can only raise the tier; leaving it
+  out never lowers it. Amber merges on its own only when the area's trust level
+  allows it (earned from merges that were not reverted or followed by a fix) **and
+  a test changed**. So: change a test with every code change, keep PRs small, and
+  do not split one change to slip under a line limit. It runs in **shadow mode**
+  for now: the screen shows the verdict, and nothing merges without a press.
 - **Grouping comes from your cross-links, in both directions.** Give every PR of one
   change the **same branch name** in each repo, or link the PRs **both ways** as
   `shoofi-dev/<repo>#N` or by full URL: each PR names the others, and they name it

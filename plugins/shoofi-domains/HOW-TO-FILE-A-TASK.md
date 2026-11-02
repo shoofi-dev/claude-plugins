@@ -16,7 +16,10 @@ automatic.
    **"מיזוג PRs"** screen (owners only). That screen merges a feature's PRs across
    repos together once CI is green. A PR whose title or branch says HIGH-RISK, or a
    draft, needs its branch name typed before it merges. If the screen had to resolve a
-   merge conflict, it pauses until the owner has read the resolution.
+   merge conflict, it pauses until the owner has read the resolution. Each group also
+   shows whether it **would merge on its own** — the risk worked out from the files it
+   changes, and the trust the area has earned — and why not when it needs you. For now
+   that is a forecast (shadow mode): every merge is still a press.
 6. Once merged into `main`, the work appears on the admin's **"הערות שחרור"** screen
    (admin, master, manager), one line per feature. App changes there are marked as
    waiting for an app update: a merge doesn't put them on phones until an
