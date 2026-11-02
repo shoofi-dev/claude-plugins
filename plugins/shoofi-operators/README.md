@@ -20,6 +20,22 @@
 
 Planned: `merchant-success`, `retention-crm`, `bizops-brief`, `support-cx`.
 
+### Where an operator's output reaches the owner: HQ
+
+The admin's **מטה** (HQ, master only; shoofi-server `docs/hq.md`) is the owner's single view:
+a morning brief at the time they set, and **צריך אותך** ("Needs you") — everything waiting
+for a human decision, read live from the queues that already exist (marketing and coupon
+drafts, social posts, skills, compensations, competitor links, merge groups, alerts…). HQ
+decides nothing itself: each item links to the screen where it is decided, and leaves the
+list when its queue says it is done. Urgent items (money a customer is waiting for, stores
+or areas without deliveries) reach the owner's phone at once, through the bridge's Slack.
+
+So an operator's draft or proposal reaches the owner **by landing in its existing queue** —
+not by a message. If you design a NEW queue that waits for a human, it needs a source in
+shoofi-server `services/hq/inbox-sources.js` (its own "waiting" rule, a link, whether it is
+urgent), or the owner will never see it. `bizops-brief` (the Chief of Staff) will write
+that brief once it exists; today the server writes it from data.
+
 Invoke namespaced: **`shoofi-operators:marketing-manager`**, **`shoofi-operators:competitive-intel`**,
 **`shoofi-operators:social-marketing`**.
 
