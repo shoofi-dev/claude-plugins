@@ -104,15 +104,26 @@ What that means for the PR you open:
   a test changed**. So: change a test with every code change, keep PRs small, and
   do not split one change to slip under a line limit. It runs in **shadow mode**
   for now: the screen shows the verdict, and nothing merges without a press.
-- **Grouping comes from your cross-links, in both directions.** Give every PR of one
-  change the **same branch name** in each repo, or link the PRs **both ways** as
+- **Grouping comes from your branch names and your cross-links in both directions.**
+  Give every PR of one change the **same branch name** in each repo. Only the type prefix
+  may differ: `docs/stuck-push` in claude-plugins groups with `fix/stuck-push` in the
+  server, and that is the usual way a docs PR joins its code. Otherwise link the PRs
+  **both ways** as
   `shoofi-dev/<repo>#N` or by full URL: each PR names the others, and they name it
   back. Edit the earlier PR's body once the later one exists. A one-way mention
   joins nothing, on purpose; across a month of history, "found while building #X"
   lines chained unrelated features together. A linked set merges together and in a
   safe order: server first, the clients next, claude-plugins after them, and
-  shoofi-bridge last. A docs PR whose code PR doesn't link back, or that names it
-  only in prose ("links to follow"), lands in a group of its own.
+  shoofi-bridge last. A docs PR with a different branch name, and whose code PR doesn't link
+  back or names it only in prose ("links to follow"), lands in a group of its own.
+- **A docs PR never merges ahead of its code.** claude-plugins has no CI, so the merge
+  job checks a docs PR itself before merging it. It runs docs-check from the PR against
+  the `main` of every code repo. If a pin fails where claude-plugins `main` passes, the
+  pin describes code that isn't on `main` yet, so the PR is not merged. The screen names
+  the code PR to merge first. On 2026-11-02 claude-plugins#197 went in alone, ahead of
+  server#399 and web#312, and every server and admin web PR went red. If your docs PR
+  describes code in an open PR, give them the same branch name, and say "merge **after**
+  <PR>" in the body.
 - **Stacked PRs are handled.** A child whose base is another PR's head is retargeted
   to `main` before that head branch is deleted.
 
@@ -149,7 +160,11 @@ The rules:
 The merge job doesn't refuse a red PR. First it checks whether **`main` is red too**: it
 runs docs-check against the repo's `main`, or reads (and, if stale, re-runs) main's own CI.
 If `main` fails the same way, the job stops that PR with a "main is red too" note and no
-session at all, because a PR can't fix a problem it didn't cause. Otherwise it re-runs the
+session at all, because a PR can't fix a problem it didn't cause. The note names a
+claude-plugins PR as the fix only after checking it **merged onto claude-plugins `main`**.
+A docs PR branched before the breaking pin passes on its own and still fixes nothing.
+A PR whose docs-check passes against **today's** claude-plugins `main` is re-run, not
+stopped: its CI read older docs. Otherwise it re-runs the
 failed jobs once (a flaky test needs no code). If the PR is still red, it may start a
 session on the PR's branch with the failing logs:
 - **Fix the cause, never the gate.** The bridge rejects a fix that:
