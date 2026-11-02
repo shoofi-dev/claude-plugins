@@ -577,7 +577,7 @@
         {
           "file": "routes/twin-order.js",
           "regex": "res\\.json\\(\\{ enabled: true, config, stores: eligible\\.map\\(toPublicStore\\) \\}\\);",
-          "desc": "doc CORE invariant 27: twin eligible-stores strips the cards only after eligibility read businessType"
+          "desc": "doc CORE invariant 27: twin eligible-stores strips the cards at the route response, after filterEligibleStores"
         },
         {
           "file": "routes/for-you.js",

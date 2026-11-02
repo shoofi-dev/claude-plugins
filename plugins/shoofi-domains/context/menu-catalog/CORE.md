@@ -896,9 +896,12 @@ boundary and say so in the PR.
       `available-stores` also strips each `deliveryCompanies[].company`: on prod 138
       `delivery-company.store` docs carry `hyp` OAuth tokens (`access_token`, `refresh_token`,
       `api_key`) and 180 carry `accounting`, and the apps read only the company's `price` and
-      `eta`. The stripping never happens in `getAvailableStores`, because twin eligibility
-      (`isVatExempt`) reads `accounting.bankAccount.businessType` from its result in-process. So
-      `eligible-stores` strips after `filterEligibleStores`. The explore cache (Redis) still holds
+      `eta`. The stripping happens at the route response, never in `getAvailableStores`, so an
+      in-process reader of its result still sees the whole doc (twin eligibility read
+      `businessType` there until its VAT check was removed on 2026-11-02). `eligible-stores`
+      strips after `filterEligibleStores`. Since 2026-11-02 no registry doc carries
+      `accounting` (the stale copies were unset); the strip stays so a copy that comes back
+      does not leak. The explore cache (Redis) still holds
       the raw docs, and For you reads it, so a card is safe only once its route has stripped it.
       Any new public read that returns a store or company doc must go through `toPublicStore`, or
       build its card from a positive projection that never selects the four keys — which is what

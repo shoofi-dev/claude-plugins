@@ -110,9 +110,11 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `calculateVAT`, `withoutVAT`, `withoutVATIfExempt`, `isVatExempt`). **Never re-introduce
    a `0.18`/`1.18` literal** — divergent rounding points silently skew payouts.
    `isVatExempt(...storeDocs)` is the one way to ask whether a business is עוסק פטור: it
-   reads `accounting.bankAccount.businessType` off **either** the per-tenant `store {id:1}`
-   doc or the `shoofi.stores` registry entry, because production stores are inconsistent
-   about which one carries it. Do not re-inline the `businessType === 'exempt'` comparison.
+   reads `accounting.bankAccount.businessType` off any store doc it is given. The per-tenant
+   `store {id:1}` doc is the only copy: the admin UI writes it there and the settlement
+   reports read it there. The `shoofi.stores` registry carries no `accounting` since
+   2026-11-02 (verified on prod that day). Do not re-inline the `businessType === 'exempt'`
+   comparison.
    **Exempt is no longer a settlement-only concern:** since 2026-08-09 the per-order
    CUSTOMER document follows it too (zero VAT on both gateways) — that half belongs to the
    `payments` domain, invariant 9. A change to what `exempt` means now moves two systems.
