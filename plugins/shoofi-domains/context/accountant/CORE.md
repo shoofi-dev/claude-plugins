@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -65,6 +65,9 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 2. **`actualDriverPayment` cash-vs-card branch** (`routes/driver-reports.js`): CARD → full
    `effectiveDeliveryFee`; CASH + coupon → the coupon-covered amount; **CASH, no coupon → 0**.
    A bug here **double-pays a driver who already pocketed the cash**.
+   **Name trap:** at COMPANY level the report's `earningsByCash` is this payment summed (Σ
+   `actualEarningsByCash` — coupon part + store delivery deal), NOT the cash collected; per driver
+   the same name is the gross. The company gross cash fee is `feesByCash` (reference §6).
 3. **Commission base is the FINAL items price actually charged** — `order.orderPrice`,
    after the store's own product discounts. Store commission is **tiered**
    (`calculateCommissionTiered`, from `store.accounting.contract.commissionTiers`); the flat
