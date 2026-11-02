@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 misheard dish name, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -56,6 +56,7 @@
         "services/ai/complete.js",
         "services/ordering-intelligence/store-mention.js",
         "services/ordering-intelligence/store-focus.js",
+        "services/ordering-intelligence/sounds-alike.js",
         "services/ordering-intelligence/ai-chat.js",
         "services/ai/usage-log.js",
         "services/ai/pricing.js",
@@ -257,6 +258,11 @@
           "backReference",
           "resolveStoreScope",
           "withStoreScope"
+        ],
+        "services/ordering-intelligence/sounds-alike.js": [
+          "soundKey",
+          "soundMatch",
+          "soundRegexSource"
         ],
         "services/ordering-intelligence/ai-chat.js": [
           "aiChatTurn",
@@ -1444,6 +1450,26 @@
           "desc": "doc CORE invariant 14: one store asked about, nothing there → store_no_match with no cards, never another store's dish"
         },
         {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(!scored\\.length && query\\) \\{",
+          "desc": "doc CORE invariant 14: the sound skeleton is tried ONLY when the normal search scored nothing"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest.js",
+          "regex": "if \\(soundsLike\\) return \\{ replyCode: \"text_results\", replyParams: \\{ soundsLike \\}, cards: picker\\.cards \\};",
+          "desc": "doc CORE invariant 14 / reference §7: a guess by sound says the name it understood (soundsLike)"
+        },
+        {
+          "file": "services/ordering-intelligence/suggest-service.js",
+          "regex": "const sound = soundRegexSource\\(soundKey\\(query\\)\\);",
+          "desc": "doc CORE invariant 14: candidateQuery fetches skeleton hits, so an unsold misheard dish is reachable"
+        },
+        {
+          "file": "services/ordering-intelligence/sounds-alike.js",
+          "regex": "const SOUND_MIN_KEY = 5;",
+          "desc": "doc CORE invariant 14: skeletons shorter than 5 letters are never guessed from"
+        },
+        {
           "file": "services/ordering-intelligence/suggest-service.js",
           "regex": "const stores = onlyStore\\.length \\? onlyStore : area\\.open\\.filter\\(\\(s\\) => s\\.appName !== otherThan\\);",
           "desc": "doc CORE invariant 14 / reference §7: otherThan leaves that store out"
@@ -2419,6 +2445,11 @@
           "file": "helpers/for-you-copy.ts",
           "regex": "for_you_reply_craving_unavailable",
           "desc": "doc CORE invariant 13: the app renders the craving_unavailable reply code"
+        },
+        {
+          "file": "helpers/for-you-copy.ts",
+          "regex": "if \\(reply\\.replyCode === \"text_results\" && reply\\.replyParams\\?\\.soundsLike\\) return \"text_sounds_like\";",
+          "desc": "doc CORE invariant 14: the app says the name a sound guess understood («قصدك «…»؟»)"
         },
         {
           "file": "screens/explore.tsx",
