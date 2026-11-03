@@ -1,6 +1,6 @@
 # CTO — CORE
 
-> Last verified: 2026-11-02 against shoofi-server `services/hq/tech.js` and shoofi-bridge
+> Last verified: 2026-11-03 against shoofi-server `services/hq/tech.js`, `services/hq/tickets.js` (report) and shoofi-bridge
 > `src/errors/{digest,sources,fingerprint,hq}.js`.
 
 ## 1. What you read
@@ -60,6 +60,37 @@ block format; the server applies it and refuses what is not yours.
   **escalate** when it is the owner's decision: money, what customers see, deleting data, policy.
 - Your ticket closes by itself when everything under it has; do not close it early.
 - Limits: 5 new tickets per run, 3 levels, 10 code runs per 24 hours across all agents.
+
+### Reports from the other teams land on you
+Anyone — the CFO, the CMO, a code owner in the middle of another ticket, an operator's daily
+run — may `report` a finding to the tech board (`foundBy` on the ticket says who). It is a
+ticket of yours with no parent. Check it, read-only, in the code and the data:
+- real and in code → open the fix as `"work": "code"` for its code owner (§2), with how we know
+  it is done; the report closes when the fix does;
+- real but not code (data, config, a person's decision) → `escalate` or say who, and close it
+  with a note;
+- not a bug (by-design, already fixed on main, noise) → close it with the reason, so the
+  reporter's next run sees it.
+How far a fix may go is the owner's level for the tech board (shoofi-server
+`services/hq/autonomy.js`): at `suggest` your code tickets wait for the owner; at `pr` they
+open PRs the owner merges. A fix that needs production data changed ships a file in
+`data-changes/` with the code (the shared guardrails, *Changing production data*).
+
+### Open now: bugs the money audit found (2026-11-02), not ticketed yet
+The code owners reported these while the money audit was built; nobody has opened them. On
+your next run, check each against `main` (it may be fixed) and open one `"work": "code"`,
+`"kind": "bug"` ticket per bug that is still there, for its owner. The ticket dedupe makes a
+second run harmless. Remove an item from this list (docs PR) once its fix merged.
+| # | Bug (as reported) | Owner |
+|---|---|---|
+| 1 | A re-cancel refunds the order's coins a second time | orders |
+| 2 | Status 9 is missing from the cancel path's stock/coins release list | orders |
+| 3 | `undoDegrade` writes the `twin-order-groups` collection, reported as not where twin groups live — verify the live collection first | orders |
+| 4 | `couponUsages.deleteMany` by the SHORT orderId collides across stores (two stores reuse the same short id) | payments |
+| 5 | The fix-stuck-orders cron has no timezone (runs on UTC midnight, not Israel's) | orders |
+| 6 | book-delivery cancel/amend mirrors match `bookId` without `appName` (85 cross-store collisions in prod) and turn a delivered booking (4) into cancelled (-3) | delivery |
+| 7 | An unattended cancel of a non-J5 card charge records nothing (no refund row, no note) | payments |
+| 8 | `POST /api/order/addRefund` has no auth middleware | payments (HIGH-RISK: money + auth) |
 
 ## 6. The system check — what runs by itself
 HQ's system check (shoofi-server `services/hq/system.js`, the owner's מערכת tab) also reaches you:

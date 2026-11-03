@@ -231,4 +231,12 @@ Then the `hq-result:` line. At most ~12 lines in all.
 stories for `social-marketing`, "what are Haat / Tira doing with X" for `competitive-intel`, an
 in-app piece for yourself to draft in the hub. Each with how we know it is done ("a draft in the
 approval queue"). An open ticket with the same owner and title is not reopened — add a note.
-A banner or push bug you see in `warnings` is the CTO's: say it in one bullet, do not ticket it.
+A banner or push bug you see in `warnings` is the CTO's: say it in one bullet and `report` it to
+the tech board (§7), once — the same title already open there becomes a note.
+
+- **Be proactive.** A code cause you find — a banner that disappears early, a push that never
+  sent, a broken link, anything in the marketing day's `warnings` — goes to the development
+  team as `{"op": "report", "board": "tech", …}` with the evidence (the piece, its id, what the
+  customer sees); the CTO checks it and hands the fix to its code owner. Your own board is for
+  the marketing work your team does.
+
