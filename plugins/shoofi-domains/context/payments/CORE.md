@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/HIGH-RISK-update-cc-payment-route / 2026-11-03 (updateCCPayment removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -23,8 +23,16 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 **Yours:** `routes/payments.js`, `routes/payments/validate-card.js`, `routes/creditCard.js`,
 `routes/hyp-pay.js` (HYP charge/tokenize), `routes/payment-methods.js`, `utils/hyp-pay.js`,
 `utils/invoice-mail.js` (per-order receipt), and the payment functions inside `routes/order.js`
-(`processCreditCardPayment`, `processHypTokenPayment`, `finalizeApplePayOrder`,
-`updateCCPayment`). Client: the payment UI in `shoofi-app`.
+(`processCreditCardPayment`, `processHypTokenPayment`, `finalizeApplePayOrder`).
+Client: the payment UI in `shoofi-app`.
+**`POST /api/order/updateCCPayment` no longer exists** (removed 2026-11-03,
+`fix/HIGH-RISK-update-cc-payment-route`). It had no auth and set any order to paid on any valid
+ZCredit ReferenceID, with no amount or ownership check. No client called it (the
+`cartStore.UpdateCCPayment` wrappers in shoofi-app / partner / shoofir have no call site, and
+`chargeCC` is a no-op stub); no server code or ZCredit CallbackUrl pointed at it. Do not bring
+it back: a "confirm a payment by reference" endpoint must check the caller, compare the reference
+with the order's OWN stored transaction, and compare the amount with `order.total`.
+Pinned absent by `test/integration/order-update-cc-payment-removed.js`.
 **Not yours:** settlement/reports/store invoices/MASAV = **`accountant`**; order lifecycle =
 `orders`. `lib/payments/calc.js` lives with accountant.
 
@@ -287,6 +295,9 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
 - **Flagged, needs verdict:** `updateCCPayment` references an undefined `orderId` in its
   background block; `refundPartial`'s ZCredit field shape is unverified across terminals
   (sandbox first).
+  *Note 2026-11-03 (agent, not a verdict):* the `updateCCPayment` half is moot once
+  `fix/HIGH-RISK-update-cc-payment-route` merges, which removes the route. The `refundPartial`
+  half still stands.
 - **RESOLVED by manual invoicing:** the exempt document's TITLE used to be unfixable —
   neither gateway publishes a per-transaction document-type parameter, so `EZ.type` and
   ZCredit's `Type` were guesses that could reject a live charge. Issuing the document

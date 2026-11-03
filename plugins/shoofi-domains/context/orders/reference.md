@@ -25,7 +25,7 @@ Primary files: `routes/order.js` (~7k lines), `routes/twin-order.js`,
 **⚠️ HIGH-RISK code (change via draft PR flagged HIGH-RISK; never merge):**
 - `POST /api/order/create` — the creation pipeline (`order.js`)
 - Any **status-transition** code: `/api/order/update` (`4174`), `/update/viewd`
-  (`4706`), `/start-preparing` (`5854`), `/updateCCPayment` (`1817`), Apple Pay /
+  (`4706`), `/start-preparing` (`5854`), Apple Pay /
   ZCredit finalize & callbacks (`2509`, `2583`, `finalizeApplePayOrder` `2234`),
   twin `place`/`pay`/`digital-*`/`cancel`/`degrade` (`twin-order.js`)
 - Anything the shared guardrails mark payments/invoicing (🔒 never modify — those
@@ -295,7 +295,7 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   `clearPersistentAlert` (on `isViewd`) is what stops it, and it is the `persistentAlerts`
   collection — not `notifications` — that holds the pending state.
   ⚠️ **The alert never holds a customer response.** Every create path (cash / inline
-  Apple Pay, ZCredit token, HYP_TOKEN, HYP wallets), `/api/order/updateCCPayment` and
+  Apple Pay, ZCredit token, HYP_TOKEN, HYP wallets) and
   `finalizeApplePayOrder` call `fireStoreOwnerNotifications`, which starts
   `sendStoreOwnerNotifications` and returns; its `.catch` (and the helper's own catches)
   log `[STORE_ALERT_FAILED]` with `orderNumber`/`appName`/`stage`. Each call sits after the

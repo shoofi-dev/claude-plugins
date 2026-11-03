@@ -68,7 +68,7 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    try/caught and swallowed. Never let one throw into the order path. **Notifications must
    also never HOLD it:** the store-owner new-order alert is fired with
    `fireStoreOwnerNotifications` (`routes/order.js`) and **not awaited** on every create
-   path, `updateCCPayment` and `finalizeApplePayOrder`, always after the order is persisted
+   path and `finalizeApplePayOrder`, always after the order is persisted
    at its final status. try/catch is not enough: a push that hangs never throws, and on
    brixta 2026-10-03 an awaited one held the create response 128s/257s → app timeout →
    customer resubmitted → duplicate orders. Push sends themselves have a hard timeout
@@ -492,7 +492,7 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `update/viewd`, `printed`, `update-delay`, `start-preparing`, `update-start-preparing`,
       `update-item-collected`, `book-delivery`, `book-custom-delivery`, `update-custom-delivery`,
       `drive-in-arrival(-confirm)`, `update/all`). These are status transitions, so any change
-      is high-risk. Ungated money paths `addRefund` and `updateCCPayment` belong to payments.
+      is high-risk. Ungated money path `addRefund` belongs to payments (`updateCCPayment` was removed 2026-11-03).
 
 19. **THE COINS ADMIN ROUTES ARE DASHBOARD-ONLY, GATED ON THE ROUTE ITSELF.** Coins have no
     domain of their own; orders owns their order-side wiring and, since 2026-10-30, who may call

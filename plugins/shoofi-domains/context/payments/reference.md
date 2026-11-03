@@ -23,7 +23,7 @@ Files (server): `routes/payments.js` + `routes/payments/validate-card.js`,
 `routes/creditCard.js`, `routes/hyp-pay.js` (HYP charge/tokenize), `routes/payment-methods.js`,
 `utils/hyp-pay.js`, `utils/invoice-mail.js` (per-order receipt fetch), and the payment
 functions inside `routes/order.js` (`processCreditCardPayment`, `processHypTokenPayment`,
-`finalizeApplePayOrder`, `updateCCPayment`). Client: `shoofi-app` payment UI (§ App).
+`finalizeApplePayOrder`). Client: `shoofi-app` payment UI (§ App).
 **Accountant-owned (not you):** `routes/payments/{admin,summaries,admin-reports}.js`,
 `routes/hyp.js` (EZcount invoicing), `routes/admin/masav.js`, `routes/driver-reports.js`,
 `lib/payments/calc.js`, `utils/{hyp,invoice-provider,greeninvoice}.js`.
@@ -81,7 +81,7 @@ For these: write the analysis + the exact diff you *would* make + the risks, ope
   then stock/coins/invoice. Endpoints: `save-apple-pay-session`,
   `update-apple-pay-order-session` (terms-guard), `verify-apple-pay-payment`,
   `zcredit-apple-pay-callback/:intentId` (server safety-net capture, no auth).
-- **`updateCCPayment`** (`order.js`) — standalone ZCredit status confirm (`GetTransactionStatusByReferenceId`).
+- **`updateCCPayment`** — REMOVED 2026-11-03 (`fix/HIGH-RISK-update-cc-payment-route`). It was an unauthenticated ZCredit `GetTransactionStatusByReferenceId` confirm that set any order paid on any valid reference; it had no caller. See CORE "Scope".
 
 ## 3b. Coupons between quote and charge (map)
 Where a coupon's discount is computed, re-computed or trusted on the way to a charge. Fixed
@@ -252,6 +252,8 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
 - **Still needs a verdict (flag, don't fix):** `updateCCPayment` undefined `orderId` in its
   background block (`order.js:~1950`); `refundPartial` ZCredit field shape unverified across
   terminals (sandbox-first). *(MASAV auth moved to the `accountant` doc.)*
+  *Note 2026-11-03 (agent, not a verdict):* the `updateCCPayment` half is moot once the route
+  removal (`fix/HIGH-RISK-update-cc-payment-route`) merges; `refundPartial` still stands.
 - **By design (prior review):** `verifiedAppName` pass-through (`order.js`).
 
 ## 10b. Payments agent — starter backlog (human-confirmed, remove-only)

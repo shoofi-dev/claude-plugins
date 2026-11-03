@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-update-cc-payment-route / 2026-11-03 (updateCCPayment removed); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -257,6 +257,11 @@
           "file": "routes/order.js",
           "regex": "Apple Pay AMOUNT MISMATCH",
           "desc": "finalizeApplePayOrder backstop: a creation correction on a pre-charged ZCredit wallet order lands in FRAUD_REVIEW (CORE invariant 3)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*router\\.(?:post|get|put|all)\\(\\s*[\"'`]/api/order/updateCCPayment)",
+          "desc": "CORE Scope: POST /api/order/updateCCPayment stays removed (2026-11-03) - it was unauthenticated and marked any order paid on any valid ZCredit reference"
         },
         {
           "file": "routes/coupon.js",
