@@ -145,10 +145,14 @@ Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restric
 hangs the request (CORE invariant 11), so none of them answered.
 
 ## 6. Refunds (customer-side — you own these)
-- **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
-  `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.
-  Since HQ #1a2f9e (2026-11-03) **no client calls it** — its only caller was the removed
-  client-side refund dialog — and no store DB holds a `refundData` row. The route has no auth.
+- **`POST /api/order/addRefund` is REMOVED** (HQ #7e2d32, shoofi-server
+  `fix/HIGH-RISK-remove-addrefund-route`): it answers 404. It was bookkeeping only (it pushed
+  `refundData[]`, no provider reversal) and had no auth. Its only caller was the client-side
+  refund dialog removed under HQ #1a2f9e. On 2026-11-03, 0 of 262 store DBs held a `refundData`
+  row, and nothing in shoofi-server reads the field. A customer refund is the cancel flow's
+  (`paymentAuth.refundedAmount` / `refundRequired`, `services/payments/order-authorization.js`).
+  Pinned by `test/integration/order-addrefund-route-removed.js`. Do not re-add a refund-recording
+  route without auth.
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,
