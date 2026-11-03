@@ -11,15 +11,17 @@ automatic.
    delivery, customers — from what you wrote.
 3. That agent loads its context doc, does the work, runs the checks.
 4. It opens a **pull request and stops. It never merges.**
-5. A human reviews and merges. **That review is the only gate**, so nothing reaches
-   production unseen. The human merges either on GitHub or from the admin's
+5. A human reviews and merges. **That review is the only gate** unless the owner
+   has switched auto-merge on (below). The human merges either on GitHub or from the admin's
    **"מיזוג PRs"** screen (owners only). That screen merges a feature's PRs across
    repos together once CI is green. A PR whose title or branch says HIGH-RISK, or a
    draft, needs its branch name typed before it merges. If the screen had to resolve a
    merge conflict, it pauses until the owner has read the resolution. Each group also
    shows whether it **would merge on its own** — the risk worked out from the files it
-   changes, and the trust the area has earned — and why not when it needs you. For now
-   that is a forecast (shadow mode): every merge is still a press.
+   changes, and the trust the area has earned — and why not when it needs you. By
+   default that is a forecast (shadow mode) and every merge is a press; when the owner
+   switches auto-merge on, such a group merges by itself. After a server deploy HQ can
+   watch it for 30 minutes and revert the feature if it breaks.
 6. Once merged into `main`, the work appears on the admin's **"הערות שחרור"** screen
    (admin, master, manager), one line per feature. App changes there are marked as
    waiting for an app update: a merge doesn't put them on phones until an

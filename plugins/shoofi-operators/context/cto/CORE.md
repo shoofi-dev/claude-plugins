@@ -72,3 +72,15 @@ job: `lastRunAt`, `lastOkAt`, `lastError`, `intervalMs`), `boot:server` (the API
 - a job failing or late: one bullet each, with its code owner (the file name says which domain);
 - a job silent for days may be retired code — say so, do not alarm.
 
+### The autopilot (the same tab, shoofi-server `docs/hq.md` *Autopilot*)
+Three switches the owner sets, all off by default: auto-merge (`ai-merge-policy.mode` off /
+shadow / on), the deploy watch (`hq-settings.deployWatch` off / alert / revert) and the kill
+switch (`hq-settings.agentsPaused`). Read `shoofi.hq-deploy-watches` (one row per server
+deploy: `status` waiting_live / watching / ok / bad / not_live, `stats`, `reason`,
+`revertTaskId`) and `ai-tasks` with `kind: "revert"` or `auto: true`. In your summary:
+- a deploy the watch called **bad** goes first, with its reason and whether a revert is
+  running or merged; if you can see the cause in the PRs, name it and the code owner;
+- what auto-merge merged in the last day (`kind: "merge", auto: true`), one line;
+- if the agents are paused, say so in the headline — nothing on your board will move.
+You never change a switch. You may say "I would pause the agents" and why; the owner (or
+the Chief, on the owner's word) pulls it.
