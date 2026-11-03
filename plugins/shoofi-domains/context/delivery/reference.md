@@ -415,6 +415,15 @@ colour pairing (`getOrderColor(bookId)`, a hash into a fixed 15-slot palette) li
 The live-ops board (`views/admin/live-ops/`) reads `POST analytics/deliveries` like the delivery
 list, resolves `pickupTime` (bare `"HH:mm"`, wraps at midnight) against `expectedDeliveryAt`,
 and re-assigns through `delivery/admin/reassign` with the same 409 `needsConfirmation` handshake.
+`analytics/deliveries` projects **`isFutureOrder`** (`bookDelivery.isFutureOrder`, written by
+`services/delivery/book-delivery.js`). The board uses it for a sixth delivery group,
+**`future`** (הזמנות עתידיות): a future booking with no courier whose pickup is further away than
+`futureEscalateMinutes` (default 60, server-stored in `shoofi.liveOpsSettings`) parks there
+instead of reading as hours of "pending allocation". Inside that window it escalates to
+"at risk"; once a courier holds it, it follows the normal groups. A server without the
+projection reads `false`, which keeps the old behaviour. Future orders are joined to their
+booking by `bookDelivery.bookId = order.orderId` in `GET /api/admin/live-ops/upcoming`, which
+shows "booked / courier" inside the 6 h booking window.
 Its **couriers-per-zone** chips (`live-ops/components/ZoneBar.tsx`, `logic/zones.ts`) re-implement
 the navbar zone bar (`components/Navbars/AdminNavbar.js`, inline, not exported) with the SAME reads
 and rules: `GET delivery/city-areas`, then per region `delivery/company/employees?cityAreaId=`
