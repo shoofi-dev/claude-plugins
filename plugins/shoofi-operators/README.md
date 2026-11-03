@@ -20,6 +20,12 @@
 | `cfo` | **The daily money picture.** Reads the nightly money audit (shoofi-server `services/hq/money-audit`, `hq-money-audits`) of the business day that closed, triages its findings (real leak / known pattern / noise), and writes the owner a short Hebrew money summary for the morning brief. Names the code owner (accountant, payments, orders, delivery) for a cause in the code; the HQ run hands it over. **Never computes its own totals, never moves money.** |
 | `cto` | **The daily technical picture, in charge of the six code owners.** Reads the last day of the bridge's error digest (`hq-tech-digests`) and the PR queue (`ai-pr-snapshots`), triages faults by customers hit, and writes the owner a short Hebrew summary with one code owner per problem; the HQ run hands each to its owner. **Never writes code, never merges.** |
 
+**Tickets.** The department heads (cto, cfo, marketing-manager) each head a board of the agents'
+own tickets in HQ (shoofi-server `services/hq/tickets.js`, `hq-tickets`, apart from the people's
+Team Tasks). The Chief opens a ticket for a head, the head splits it for his team (code work starts
+a run that opens PRs), a team's question goes to its head first and to the owner only on escalation.
+Runs stay read-only; they end with an `hq-tickets` block the server applies. See each head's CORE.
+
 Planned: `merchant-success`, `retention-crm`, `bizops-brief`, `support-cx`.
 
 ### Where an operator's output reaches the owner: HQ
