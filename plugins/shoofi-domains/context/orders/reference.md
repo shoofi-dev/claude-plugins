@@ -486,7 +486,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   store user without `all`, and before user details load), **`update/viewd` = ACCEPT** (→ `6→1`, future `14→1`,
   sends `readyMinutes` — not persisted, §2), `update` (forward/back status + note), `update-item-collected`,
   `start-preparing` / `update-start-preparing`, `update-delay`, `printed`,
-  `book-delivery`, `*-custom-delivery`, `addRefund`, `future-orders-ready`, `drive-in-arrival-confirm`.
+  `book-delivery`, `*-custom-delivery`, `future-orders-ready`, `drive-in-arrival-confirm`.
+  (`addRefund` was on this list until its refund dialog was removed, HQ #1a2f9e; the server
+  route is gone too, HQ #7e2d32.)
 - **Transition rule**: ACCEPT goes through **`order/update/viewd`** (NOT `order/update`);
   all other forward/back transitions use `order/update` with an explicit `status` the
   client computes (`1→3` delivery / `1→2` takeaway; `3→11`; `2→11|10`; `15→1`).
@@ -631,7 +633,8 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   and `admin/coins/customer/{id}/earned` (`src/apis/admin/customers/customer-details.ts`, the
   customer modal's coins tab). Nothing calls `admin/coins/expire`, `admin/coins/customer/{id}` or
   `admin/coins/store/{appName}/stats`.
-- **Refunds**: `order/addRefund` is **NOT** used here — admin refunds surface via twin
+- **Refunds**: there is no refund-recording route (`order/addRefund` is removed, HQ #7e2d32, and
+  was never used here) — admin refunds surface via twin
   `degrade`/`cancel` (`refundOwed`/`refundBreakdown`) and `shoofiAdmin/compensations/*`.
 - **Twin admin**: full lifecycle control (degrade / undo / cancel / assign single|split)
   + the twin-order-config screen (`degradeAutoRefund`, timeouts, enable switch).

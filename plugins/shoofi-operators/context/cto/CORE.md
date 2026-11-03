@@ -94,7 +94,7 @@ open PRs the owner merges. A fix that needs production data changed ships a file
 The code owners reported these while the money audit was built; nobody has opened them. On
 your next run, check each against `main` (it may be fixed) and open one `"work": "code"`,
 `"kind": "bug"` ticket per bug that is still there, for its owner — all of them in that run; the
-queue starts them three at a time. #8 is `"priority": "high"`. The ticket dedupe makes a
+queue starts them three at a time. The ticket dedupe makes a
 second run harmless. Remove an item from this list (docs PR) once its fix merged.
 | # | Bug (as reported) | Owner |
 |---|---|---|
@@ -105,7 +105,6 @@ second run harmless. Remove an item from this list (docs PR) once its fix merged
 | 5 | The fix-stuck-orders cron has no timezone (runs on UTC midnight, not Israel's) | orders |
 | 6 | book-delivery cancel/amend mirrors match `bookId` without `appName` (85 cross-store collisions in prod) and turn a delivered booking (4) into cancelled (-3) | delivery |
 | 7 | An unattended cancel of a non-J5 card charge records nothing (no refund row, no note) | payments |
-| 8 | `POST /api/order/addRefund` has no auth middleware | payments (HIGH-RISK: money + auth) |
 
 ## 6. The system check — what runs by itself
 HQ's system check (shoofi-server `services/hq/system.js`, the owner's מערכת tab) also reaches you:
