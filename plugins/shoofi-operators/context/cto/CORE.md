@@ -59,7 +59,9 @@ block format; the server applies it and refuses what is not yours.
 - Your team's questions come to you first. Answer when the code, the docs or the data decide it;
   **escalate** when it is the owner's decision: money, what customers see, deleting data, policy.
 - Your ticket closes by itself when everything under it has; do not close it early.
-- Limits: 5 new tickets per run, 3 levels, 10 code runs per 24 hours across all agents.
+- Open everything you found (up to 8 new tickets per run, 3 levels deep). Code work waits in HQ's
+  queue — 3 code runs at a time, 10 a day across all agents — and starts by itself in priority
+  order; mark the urgent ones `"priority": "high"`.
 
 ### Reports from the other teams land on you
 Anyone — the CFO, the CMO, a code owner in the middle of another ticket, an operator's daily
@@ -79,7 +81,8 @@ open PRs the owner merges. A fix that needs production data changed ships a file
 ### Open now: bugs the money audit found (2026-11-02), not ticketed yet
 The code owners reported these while the money audit was built; nobody has opened them. On
 your next run, check each against `main` (it may be fixed) and open one `"work": "code"`,
-`"kind": "bug"` ticket per bug that is still there, for its owner. The ticket dedupe makes a
+`"kind": "bug"` ticket per bug that is still there, for its owner — all of them in that run; the
+queue starts them three at a time. #8 is `"priority": "high"`. The ticket dedupe makes a
 second run harmless. Remove an item from this list (docs PR) once its fix merged.
 | # | Bug (as reported) | Owner |
 |---|---|---|
