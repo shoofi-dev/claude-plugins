@@ -148,20 +148,22 @@ hangs the request (CORE invariant 11), so none of them answered.
 - **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
   `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.
   - **Gate** (since 2026-11-03, `services/payments/refund-record.js` `REFUND_RECORD_ACCESS`):
-    `auth.required` + a dashboard role, OR a partner token of the `app-name` store, OR a
-    customer/driver token whose own record has `isAdmin`. No token is 401, others 403. Before
-    that it had no auth and pushed the body verbatim.
-  - **Callers:** the `refund-confirm` dialog in shoofi-app and shoofi-shoofir (inherited in-app
-    admin, `admin-orders` screen — live) and shoofi-partner (button commented out). The admin
-    web has no caller. Grep the two live apps before narrowing the gate: a 403 there is silent.
+    `auth.required` + a dashboard role (`DASHBOARD_ROLES`) only. Partner, customer and driver
+    tokens are 403 whatever their record says; no token is 401. Before that it had no auth and
+    pushed the body verbatim.
+  - **Callers: none.** The legacy in-app refund (`components/dialogs/refund-confirm` →
+    `ordersStore.addOrderRefund`, after a client-side ZCredit call in
+    `components/credit-card/api/refund.ts`) was removed from shoofi-app, shoofi-shoofir AND
+    shoofi-partner on 2026-11-03 (CTO decision, HQ ticket #1a2fa1). It was dead already:
+    `refund.ts` needed `credentials_terminal_number`/`password` that `GET
+    /api/shoofiAdmin/store/z-cr` no longer serves (only `zcredit_api_key`), and the dialog
+    recorded the attempt before checking `HasError`. The admin web has no caller either. The
+    read-only "-₪N" display of old `refundData` stays in the apps.
   - **`HasError` is load-bearing.** The three apps' order screens sum `amount` over entries with
     `!HasError` and show "-₪N", so an entry without it reads as a successful refund. The server
     now requires it (boolean) and rebuilds the record field by field (`amount` > 0 and
     ≤ `order.total`; `ReturnCode`/`ReturnMessage`/`ReferenceNumber`; server-set `created`,
     `recordedBy`).
-  - The client attempts the refund itself first (legacy `refund.ts`, using `GET
-    /api/shoofiAdmin/store/z-cr` creds). `z-cr` now serves only `zcredit_api_key`, so that call
-    most likely fails and records `HasError: true` (unverified against a sandbox).
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,
@@ -262,8 +264,9 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
 - **CONFIRMED — REMOVE (backlog #1):** `hyp-test-soft` debug endpoint (`hyp-pay.js`)
   that charges 1 NIS with a token. It should not be in prod.
 - **CONFIRMED — REMOVE (backlog #2):** the legacy client-side ZCredit charge/refund in the
-  customer app — `components/credit-card/api/payment.ts` + `refund.ts` (terminal number +
-  password in client state). Deprecated; remove after confirming no live references.
+  customer app — `components/credit-card/api/payment.ts` (terminal number + password in client
+  state). Deprecated; remove after confirming no live references. `refund.ts` was removed from
+  all three mobile apps on 2026-11-03.
 - **Still needs a verdict (flag, don't fix):** `updateCCPayment` undefined `orderId` in its
   background block (`order.js:~1950`); `refundPartial` ZCredit field shape unverified across
   terminals (sandbox-first). *(MASAV auth moved to the `accountant` doc.)*
@@ -273,7 +276,7 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
 1. **Remove `hyp-test-soft`** (`routes/hyp-pay.js`) — money-guardrail file, so a **draft
    HIGH-RISK PR**: minimal diff, confirm nothing calls it, note the rollback.
 2. **Remove the legacy client-side charge/refund** in shoofi-app
-   (`components/credit-card/api/payment.ts` + `refund.ts`; sweep the deprecated
+   (`components/credit-card/api/payment.ts`; `refund.ts` is already gone; sweep the deprecated
    `use-checkout-charge-cc.ts` no-op and manual `validate-card` add-card UIs if unused) —
    **verify zero live references first**, then delete.
 - Both align with the ZCredit→HYP migration direction (§2).

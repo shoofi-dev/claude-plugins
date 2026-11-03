@@ -282,8 +282,10 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
   (charges 1 NIS with a saved token) should not exist in prod. Money file → draft HIGH-RISK PR,
   confirm nothing calls it.
 - **CONFIRMED — remove (backlog):** legacy client-side ZCredit charge/refund in `shoofi-app`
-  (`components/credit-card/api/payment.ts`, `refund.ts`) — terminal number + password in client
-  state. Verify zero live references first, then delete.
+  (`components/credit-card/api/payment.ts`) — terminal number + password in client
+  state. Verify zero live references first, then delete. (`refund.ts` and the `refund-confirm`
+  dialog were removed from app, shoofir and partner on 2026-11-03; `addRefund` is
+  dashboard-only.)
 - **Flagged, needs verdict:** `updateCCPayment` references an undefined `orderId` in its
   background block; `refundPartial`'s ZCredit field shape is unverified across terminals
   (sandbox first).
