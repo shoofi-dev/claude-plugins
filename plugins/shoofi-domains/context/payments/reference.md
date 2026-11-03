@@ -145,8 +145,13 @@ Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restric
 hangs the request (CORE invariant 11), so none of them answered.
 
 ## 6. Refunds (customer-side — you own these)
-- **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
-  `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.
+- **`POST /api/order/addRefund` was REMOVED (2026-11-03, HQ #1a30a0).** It had no auth and
+  `$push`-ed a raw `body.refundObj` onto any store's `orders.refundData`. No client reached it
+  with a real refund (partner's refund buttons are commented out; the app/shoofir legacy dialog
+  calls ZCredit client-side with credentials `store/z-cr` no longer serves). Old `refundData[]`
+  entries stay on orders and are display-only, with no server reader. A real refund is
+  manual/deferred by default. If one must be recorded again, use a NEW gated route that builds the entry
+  server-side. Pinned by `test/integration/order-add-refund-removed.js`.
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,

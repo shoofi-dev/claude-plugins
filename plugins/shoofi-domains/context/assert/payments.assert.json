@@ -24,7 +24,8 @@
         "services/twin-order/twin-delivery-price.js",
         "utils/client-features.js",
         "services/coupons/public-coupon.js",
-        "routes/coupon.js"
+        "routes/coupon.js",
+        "test/integration/order-add-refund-removed.js"
       ],
       "symbols": {
         "utils/hyp-pay.js": [
