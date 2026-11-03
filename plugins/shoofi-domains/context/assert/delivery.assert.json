@@ -39,9 +39,14 @@
         "services/delivery/assignment-provenance.js",
         "lib/delivery/helpers.js",
         "services/delivery/admin-access.js",
-        "services/delivery/response-redaction.js"
+        "services/delivery/response-redaction.js",
+        "services/delivery/availability.js"
       ],
       "symbols": {
+        "services/delivery/availability.js": [
+          "checkStoreDeliveryAvailability",
+          "isDeliveryPaused"
+        ],
         "services/delivery/assignDriver.js": [
           "findBestAreaForLocation",
           "personalSupportedAreas",
@@ -659,6 +664,50 @@
           "file": "services/delivery/response-redaction.js",
           "regex": "key === \"company\" && \\(isPerson \\|\\| isDelivery\\)",
           "desc": "company secrets are removed only where a company is EMBEDDED in a delivery or a person; a company doc on its own keeps hyp/accounting for the admin web (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/availability.js",
+          "regex": "isDeliveryPaused: true,\\s*area: pausedArea,|isDeliveryPaused: true,\\s*reason: \"Delivery to this area is temporarily switched off\\.\"",
+          "desc": "CORE 'Paused ≠ out of zone': the paused branch returns the paused area itself (isAreaSupported/available stay false), because every app version prices the fee as availableDrivers?.area?.price || 0 and scheduled orders still go through into a paused area. TRANSITIONAL: the second alternative is the pre-fix form (no area → ₪0 scheduled orders) — drop it once shoofi-server fix/paused-area-quote-price is on main"
+        },
+        {
+          "file": "services/delivery/availability.js",
+          "regex": "findBestAreaForLocation\\(\\s*appDb,\\s*location,\\s*storeLocation,\\s*\\{ ignoreAreaActive: true \\}",
+          "desc": "CORE 'Paused ≠ out of zone': after the active-only lookup misses, the probe looks again ignoring areas.isActive — that second lookup is what tells a paused area from no area"
+        },
+        {
+          "file": "services/delivery/availability.js",
+          "regex": "isAreaSupported: false,\\s*area,\\s*reason: \"No delivery companies support this area\\.\"",
+          "desc": "CORE 'Paused ≠ out of zone': the no-company branch also returns area with isAreaSupported:false, so 'area present' never means 'supported' — consumers gate on isAreaSupported/available"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "async function createPendingDelivery\\([\\s\\S]{0,6000}?findBestAreaForLocation\\([\\s\\S]{0,300}?\\{ ignoreAreaActive: true \\}",
+          "desc": "CORE 'Paused ≠ out of zone': booking a scheduled order resolves its area ignoring areas.isActive, so a scheduled order placed into a paused area is still dispatched — the reason the paused quote must carry the area's price"
+        }
+      ]
+    },
+    "shoofi-app": {
+      "files": [
+        "hooks/checkout/use-checkout-validate.ts",
+        "helpers/delivery-availability.ts",
+        "screens/checkout/index.tsx"
+      ],
+      "patterns": [
+        {
+          "file": "hooks/checkout/use-checkout-validate.ts",
+          "regex": "if\\(!isAvailableDrivers && !isScheduledOrder\\)",
+          "desc": "CORE 'Paused ≠ out of zone': validateAdress rejects a delivery with no available driver only for a NOW order — a scheduled order passes into a paused area"
+        },
+        {
+          "file": "helpers/delivery-availability.ts",
+          "regex": "const blocksCta = quoteReady && !availableDrivers!\\.available && !isScheduled;",
+          "desc": "CORE 'Paused ≠ out of zone': the checkout CTA is blocked for no-driver only when not scheduled"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "availableDrivers\\?\\.area\\?\\.price \\|\\| 0",
+          "desc": "CORE 'Paused ≠ out of zone': the delivery fee posted as shippingPrice is the quoted area's price, 0 when the quote has no area"
         }
       ]
     },

@@ -164,7 +164,22 @@ store-availability audit cron, which reads only `available`) returns
   area exists but `isActive` is off — a second lookup with `ignoreAreaActive:true`; `false` when
   none exists). Customer app: `helpers/delivery-availability.ts` `getDeliveryZoneState` →
   `isDeliveryPaused` vs `isOutOfZone`.
-- area found, no company covers it → `isAreaSupported:false`, no `isDeliveryPaused`.
+  - **paused** (`isDeliveryPaused:true`) → also returns `area` = the paused area, the same
+    `findBestAreaForLocation` document (with `geometry`) the active branch returns, so `area.price`
+    is its own tariff. No `companies`, no `distanceKm`. It is there for the **fee**: a scheduled
+    order still goes through into a paused area (CORE "Paused ≠ out of zone"), and every app
+    version reads `availableDrivers?.area?.price || 0`. Before `fix/paused-area-quote-price`
+    there was no `area` here and those orders were placed at `shippingPrice: 0`.
+  - **no area** (`isDeliveryPaused:false`) → no `area`.
+- area found, no company covers it → `isAreaSupported:false`, `area`, no `isDeliveryPaused`.
+- So **`area` present ≠ supported** (two of the three `isAreaSupported:false` answers carry one).
+  Consumers (verified 2026-11-03): shoofi-app reads `area.price` (fee: checkout + total-price +
+  the menu's deal quote), `area.minETA/maxETA` (ETA lines, shown only when `available` or in the
+  checkout "now" subtitle), `area._id` (coupon `areaIds`); every allow/block decision reads
+  `available`/`isAreaSupported`/`isDeliveryPaused`. Partner/shoofir carry the same inherited
+  customer checkout (fee from `area.price`, gating on `available`). delivery-web's driver
+  availability monitor reads `available`/`companies`/`reason`. Server: only the route and the
+  store-availability cron (`available`) call it.
 - area + companies → `isAreaSupported:true`, `available` = any company has an eligible driver
   ("no drivers now", not out of zone).
 
@@ -465,8 +480,12 @@ copy of the shoofir driver UI — no `isAdmin`, no reassign, no `DriverReassignM
 navigation entry point despite being registered in `navigation/MainStackNavigator.tsx`),
 customer-app city/address remnants, `screens/menu/menu.tsx.backup`.
 
-### C4. shoofi-app — CUSTOMER (ETA + courier status only)
-`app-type: shoofi-shopping`, `Token`. The app's one delivery call is
+### C4. shoofi-app — CUSTOMER (quote + ETA + courier status)
+`app-type: shoofi-shopping`, `Token`. **Before the order:** `POST /delivery/available-drivers`
+(`stores/shoofi-admin` `fetchAvailableDrivers` → `shoofiAdminStore.availableDrivers`) is the
+delivery quote. `area.price` is the fee posted as `shippingPrice`, `area.minETA/maxETA` the ETA
+lines, and `available`/`isAreaSupported`/`isDeliveryPaused` the coverage decisions (see §4 `POST /api/delivery/available-drivers`;
+`area` present ≠ supported). **After the order:**
 `delivery/book/:bookId` with `order.orderId` (`ordersStore.getDeliveryByBookId`). It is used by
 the `order-timer.tsx` in `screens/order/{active,history,item}` and by
 `twin-active-order-header.tsx`, both polling every 30 s, and it reads only `status` and
