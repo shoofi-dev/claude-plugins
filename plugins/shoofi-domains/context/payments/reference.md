@@ -147,6 +147,30 @@ hangs the request (CORE invariant 11), so none of them answered.
 ## 6. Refunds (customer-side — you own these)
 - **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
   `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.
+  The refund itself was made by the caller's client-side ZCredit `RefundTransaction` (the legacy
+  `refund-confirm` dialog in all three RN apps). The apps show Σ `refundData[].amount` of the
+  records without `HasError` as the order's "-₪".
+  Gate, validation and record shape: `services/payments/refund-record.js` (2026-11-03):
+  - `REFUND_RECORD_ACCESS` = `auth.required` + `refundRecordGate`. It admits three audiences:
+    an admin-web token (`app-type: shoofi-admin`) with a `DASHBOARD_ROLES` role; a partner of
+    the `app-name` store (`isPartnerStoreMember`); or a shoofi-app / shoofir token whose OWN
+    record has `isAdmin`. Those two apps open the inherited `admin-orders` screen only for
+    that user. No token is 401, anyone else 403. Never role-only: every app caller sends
+    `Token` and no `roles`.
+  - 400 for a malformed `orderId`, or an `amount` that is not a number > 0 or exceeds the
+    refundable balance. 404 for an unknown order, 409 when a concurrent refund changes the
+    array length between the read and the write.
+  - **Refundable balance** = charged − refunded. Charged = `paymentAuth.capturedAmount` ||
+    `ccPaymentRefData.payload.TransactionSum` || `ccPaymentRefData.Total` || `total` (the
+    money-audit `refund-anomaly` ceiling). Refunded = Σ `refundData[].amount` without
+    `HasError`, + `paymentAuth.refundedAmount`. A `HasError` record skips the balance check
+    and uses up nothing.
+  - The record is built field by field: `amount`, `created` (server clock, ISO string),
+    `HasError`, `ReturnCode`, `ReturnMessage`, `ReferenceNumber`, and `createdBy {kind, id,
+    appType}` from the token. Records written before 2026-11-03 are whatever the client sent.
+  - shoofi-partner's dialog no longer posts a record when ZCredit answered `HasError`, and it
+    caps the amount at total − earlier refunds BEFORE calling ZCredit. The shoofi-app and
+    shoofir copies still post `HasError` records, which the server keeps as failed attempts.
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,

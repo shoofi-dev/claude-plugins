@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-addrefund-validation-auth / 2026-11-03 (reference 6 addRefund gate + validation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -24,7 +24,8 @@
         "services/twin-order/twin-delivery-price.js",
         "utils/client-features.js",
         "services/coupons/public-coupon.js",
-        "routes/coupon.js"
+        "routes/coupon.js",
+        "services/payments/refund-record.js"
       ],
       "symbols": {
         "utils/hyp-pay.js": [
@@ -85,9 +86,29 @@
           "couponBenefit",
           "loadPublicCoupon",
           "business_visible"
+        ],
+        "services/payments/refund-record.js": [
+          "REFUND_RECORD_ACCESS",
+          "refundRecordGate",
+          "isPartnerStoreMember",
+          "refundableBalance",
+          "validateRefundAmount",
+          "buildRefundRecord",
+          "capturedAmount",
+          "refundedAmount"
         ]
       },
       "patterns": [
+        {
+          "file": "routes/order.js",
+          "regex": "router\\.post\\(\"/api/order/addRefund\", \\.\\.\\.REFUND_RECORD_ACCESS,",
+          "desc": "reference 6: addRefund is gated (no token 401; admin / own-store partner / isAdmin app user, never role-only)"
+        },
+        {
+          "file": "services/payments/refund-record.js",
+          "regex": "const REFUND_RECORD_ACCESS = \\[auth\\.required, refundRecordGate\\];",
+          "desc": "reference 6: the addRefund gate is auth.required + the per-audience refundRecordGate"
+        },
         {
           "file": "routes/admin.js",
           "regex": "const invoiceQueueAdmins = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",

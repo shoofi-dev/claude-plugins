@@ -492,7 +492,9 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `update/viewd`, `printed`, `update-delay`, `start-preparing`, `update-start-preparing`,
       `update-item-collected`, `book-delivery`, `book-custom-delivery`, `update-custom-delivery`,
       `drive-in-arrival(-confirm)`, `update/all`). These are status transitions, so any change
-      is high-risk. Ungated money paths `addRefund` and `updateCCPayment` belong to payments.
+      is high-risk. Money paths belong to payments: `addRefund` is gated and validated by
+      `services/payments/refund-record.js` (payments reference §6); `updateCCPayment` is
+      still ungated.
 
 19. **THE COINS ADMIN ROUTES ARE DASHBOARD-ONLY, GATED ON THE ROUTE ITSELF.** Coins have no
     domain of their own; orders owns their order-side wiring and, since 2026-10-30, who may call
