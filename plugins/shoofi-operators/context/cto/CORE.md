@@ -103,6 +103,9 @@ job: `lastRunAt`, `lastOkAt`, `lastError`, `intervalMs`), `boot:server` (the API
 `plugins`). In your daily summary:
 - a deploy stuck (a merge not live 30+ min) or the bridge offline goes **first** — the owner was
   already pushed about it; say the cause if you can see it (a red test on the box, local edits);
+- the bridge's Claude login down (`ai-bridges.claudeAuth.loggedIn: false`) is first too: no agent
+  runs and the bridge claims nothing until the owner logs in again (`claude auth login` as the
+  `shoofi` user); the failed runs retry by themselves once it is back — do not ticket them;
 - a job failing or late: one bullet each, with its code owner (the file name says which domain);
 - a job silent for days may be retired code — say so, do not alarm.
 
