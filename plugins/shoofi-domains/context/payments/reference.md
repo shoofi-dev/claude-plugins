@@ -147,6 +147,11 @@ hangs the request (CORE invariant 11), so none of them answered.
 ## 6. Refunds (customer-side — you own these)
 - **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
   `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.
+  Gated by `ORDERS_DASHBOARD_OR_STORE_MEMBER` (no token 401; customer/driver 403; partner
+  only for its own store) — `shoofi-server/routes/order.js` addRefund route. It does **not**
+  check that the order exists or that the amount ≤ the charge; an unknown `orderId` still
+  answers 200. Every client call site lives in inherited admin screens (partner button
+  commented out). `updateCCPayment` (same file) is still ungated.
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,
