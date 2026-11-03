@@ -310,6 +310,13 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   input-VAT accounts and ref prefix are unknown → `DRIVER_INVOICE_ACCOUNTS` all `null` →
   **422 `missing-config`** until the accountant supplies them. The purchase layout (debit expense
   net + input VAT, credit company gross) is the credit-note layout and is unverified.
+  The "חשבונית חברה" (invoice 1) amounts come from `companyCreditInvoiceLinePrices`. When the
+  report's deductions exceeded its additions, the document carried two lines, the credit row
+  plus a negative `פיצויים מהשליח` row (CORE invariant 18), and the route stored them as
+  `hypCompanyInvoiceItems`. The export reads those lines exactly as sent. Otherwise it uses the one
+  credit line (`withoutVATIfExempt(earningsByCreditCard)`). Invoice 2 comes from
+  `companyAdditionsLinePrices`, a mirror of the route's builder. The merged document is booked
+  whole to `expenseAccount`.
 - **It is not the full HYP ledger.** Documents issued by hand in HYP (receipts, manual invoices,
   manual credit notes) and any HYP document whose number never reached our DB are absent — the
   accountant's May–June file had 26 such records out of 285.
@@ -324,7 +331,13 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   invoiceSent, invoiceReceived, transferPerformed, pdfUrl, greenInvoice*, hyp*Invoice*}`.
 - **`shoofi.driverReports`** (collection `driver-reports`) — `{deliveryCompanyId (string), dateRange, reportData{totalDeliveries,
   totalDriverPayment, earningsBy*, totalBonuses, totalCompensations, totalDriverCharges,
-  totalMinGuaranteeTopUp, netTotal, driverPayments[]}, status, transferPerformed, pdfUrl}`.
+  totalDeliveryBookingDriverFees, totalMinGuaranteeTopUp, netTotal, driverPayments[]}, status,
+  transferPerformed, pdfUrl, hypCompanyInvoice{PdfLink,DocId,DocNumber,DocUuid,CreatedAt,Items},
+  hypCompanyAdditionsInvoice{PdfLink,DocId,DocNumber,DocUuid,CreatedAt},
+  hypCompanyInvoiceHistory[]}`. Company → Shoofi documents (CORE invariant 18):
+  `hypCompanyInvoiceItems` is written only when invoice 1 carried the negative deductions row. Both the
+  admin web (`DriverReportDetail.tsx`, `DriverReportsList.tsx`) and `send-invoice` show whichever
+  link exists, so a report with only invoice 1 displays correctly.
 - **`delivery-company.driverDailyHours`** — `{driverId, date, activeMinutes, inShiftMinutes,
   inWorkingHoursMinutes, …}` (nightly cron; live fallback from `driverStatusHistory`+`driverShifts`).
 - **`shoofi.compensations`** — `{order, items:[{status(0|1|2), compensationFor('business'|'customer'|

@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -905,6 +905,26 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "router\\.get\\(\"/api/payments/admin/greeninvoice/customers\", \\.\\.\\.reportsDashboard,",
           "desc": "CORE invariant 17: the GreenInvoice customer list needs a dashboard role"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "\\{ details: `פיצויים מהשליח`, amount: '1', price: String\\(additionsAmount\\) \\}|if \\(additionsAmount > 0\\) \\{",
+          "desc": "CORE invariant 18: negative company additions become ONE פיצויים מהשליח row on invoice 1 (no invoice 2), never silently dropped. Second alternative = the pre-fix form, kept so this pin holds on shoofi-server main until fix/company-invoice-negative-additions merges; drop it then."
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "if \\(Math\\.abs\\(issuedTotal - netTotal\\) >= 0\\.01\\)|if \\(deliveryBookingFees > 0 && Math\\.abs\\(invoicedTotal - \\(reportData\\.netTotal \\|\\| 0\\)\\) >= 0\\.01\\)",
+          "desc": "CORE invariant 18: the company-invoice reconcile guard runs on every report and checks the sum of the invoices actually issued against netTotal. Second alternative = the pre-fix form, kept so this pin holds on shoofi-server main until fix/company-invoice-negative-additions merges; drop it then."
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "if \\(invoiceTotal <= 0\\)|if \\(creditCardAmount <= 0 && additionsAmount <= 0\\)",
+          "desc": "CORE invariant 18: credit + additions <= 0 is a 400 with nothing issued (the company owes Shoofi). Second alternative = the pre-fix form, kept so this pin holds on shoofi-server main until fix/company-invoice-negative-additions merges; drop it then."
+        },
+        {
+          "file": "services/accountant-export/movein.js",
+          "regex": "companyCreditInvoiceLinePrices\\(report, isExempt\\)|\\[String\\(amount\\)\\], accounts\\.expenseAccount, \"company-invoice\"",
+          "desc": "CORE invariant 18 / reference §7b: the export books company invoice 1 from the stored hypCompanyInvoiceItems when present, else the single credit line. Second alternative = the pre-fix form, kept so this pin holds on shoofi-server main until fix/company-invoice-negative-additions merges; drop it then."
         }
       ]
     }
