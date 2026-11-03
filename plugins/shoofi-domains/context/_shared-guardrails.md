@@ -82,6 +82,11 @@ stack. The AI bridge does the merge as plain code: it brings each branch up to d
 waits for green CI on the exact head SHA, and merges that SHA. It is not a session,
 and it is not you.
 Neither route lets an agent merge. `gh pr merge` stays denied to every session.
+When the owner switches auto-merge **on** (shoofi-server `services/ai-tasks/auto-merge.js`),
+the server also starts that same merge job by itself for a group it judged safe; it is still
+plain code on the bridge, never a session. And a merged feature can be **reverted** in one
+tap, or by itself after a broken server deploy (HQ's deploy watch, `docs/hq.md` *Autopilot*):
+the whole feature group, so the same grouping rules below decide what is undone together.
 
 What that means for the PR you open:
 - **No `shoofi-dev` repo has branch protection.** GitHub would merge a red PR. CI
@@ -102,8 +107,12 @@ What that means for the PR you open:
   out never lowers it. Amber merges on its own only when the area's trust level
   allows it (earned from merges that were not reverted or followed by a fix) **and
   a test changed**. So: change a test with every code change, keep PRs small, and
-  do not split one change to slip under a line limit. It runs in **shadow mode**
-  for now: the screen shows the verdict, and nothing merges without a press.
+  do not split one change to slip under a line limit. By default it runs in
+  **shadow mode** (the screen shows the verdict, nothing merges without a press);
+  the owner can switch it **on**, and then a green-CI group judged `auto`, not
+  HIGH-RISK or draft, ready for 10 minutes, merges with no press — one at a time,
+  10 a day, never while the agents are paused or a server deploy is being watched.
+  So assume your green or amber PR may reach production with nobody reading it.
 - **Grouping comes from your branch names and your cross-links in both directions.**
   Give every PR of one change the **same branch name** in each repo. Only the type prefix
   may differ: `docs/stuck-push` in claude-plugins groups with `fix/stuck-push` in the
