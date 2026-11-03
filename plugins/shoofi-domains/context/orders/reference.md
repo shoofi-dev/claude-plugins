@@ -629,7 +629,26 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   `ORDER_STATUS_TEXT_HEBREW`; a "⚡ תאום" pill on both sides of a twin pair (orders:
   `twinGroup.{groupId,role,peerOrderId,pickupSequence}`; deliveries: `twinGroupId`,
   `twinPickupSequence`, `twinPeer.orderId`; none once degraded) opens the unchanged
-  `TwinOrderCard` in an overlay, seeded with the whole order,
+  `TwinOrderCard` in an overlay, seeded with the whole order.
+  **"מה מתקרב"** (`live-ops/components/Upcoming.tsx`, rules in `logic/upcoming.ts`) puts on
+  the board the two kinds of order nothing else surfaces:
+  - **future orders**: `isFutureOrder`, not in a terminal status, `orderDate` from today
+    through 3 days, grouped by Israel day. Status `6` is awaiting the store. Status `14` is
+    accepted, with prep at `startPreparingAt`; it becomes "prep due" once that has passed;
+  - **school orders**: `isSchoolProject`; created as `1` with `isViewd:true`, so they skip
+    every approval queue and the reminder / overdue / stuck crons. They are grouped by
+    service day, then store → school → class.
+  One cross-store read feeds it, `GET /api/admin/live-ops/upcoming` (shoofi-server
+  `routes/admin/live-ops.js`, `services/live-ops/`, `docs/live-ops-upcoming.md`; any dashboard
+  role; read-only over orders). Two server-stored ticks per store and service day,
+  "store confirmed" and "courier dispatched", are written to `shoofi.liveOpsChecks` with who
+  and when (`PUT …/school-checks`). School couriers are dispatched by hand, so the courier
+  tick is a person's word. Thresholds are in `shoofi.liveOpsSettings` (`PUT …/settings`,
+  master / admin / manager): school deadline 10:00 and T-90/45/30 before ready-by.
+  ⚠️ **School service day is INFERRED**: `orderDate` when it is a later Israel day than
+  `created`, else the day after `created`. `orderDate` on a school order comes from the
+  client body and its meaning is unverified in production. Check with
+  `db.orders.find({isSchoolProject:true}).sort({created:-1}).limit(20)`.
   `src/components/OrderMonitoring/OrderFlowDashboard.tsx`,
   `src/views/admin/settings/DeliverySettings.tsx`, `src/views/admin/fraud/FraudReview.tsx`.
 - **⚠️ Cross-repo consistency flags (candidate bugs — human verdict):**
