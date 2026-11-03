@@ -110,6 +110,14 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 (`services/twin-order/twin-group-service.js`): `pending_payment` →
 `primary_dispatched` → `secondary_dispatched` → `completed`; plus `cancelled`,
 `degraded_to_single`. Key facts:
+- **Eligibility** (`filterEligibleStores`, `services/twin-order/twin-eligibility.js`, called
+  by `/eligible-stores`): a candidate within `storeRadiusM` of the primary OR
+  `customerRadiusM` of the customer, never a coupon or test store; the route first keeps only
+  open, not-busy stores that deliver. **VAT status is not a criterion.** An exempt (עוסק פטור)
+  store may pair with a regular one, and neither placement route checks it: manual
+  invoicing documents each store under its own status (payments CORE invariant 9). The old
+  `rejectMixedVatPair` guard was removed on 2026-11-02. Do not bring it back without that
+  invariant changing.
 - **Place** (`twin-order.js`) validates BOTH sides' coins before inserting
   either; inserts a skeleton order into each store with
   `twinGroup:{groupId, role, peerAppName, peerOrderId, ...}`; pushes both snapshots.

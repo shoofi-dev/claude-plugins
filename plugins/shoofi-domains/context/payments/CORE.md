@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -67,15 +67,25 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 9. **The per-order customer document follows the STORE's VAT status.** A store that is
    עוסק פטור (`accounting.bankAccount.businessType === 'exempt'`) charges no VAT, so its
    sale may not be documented with any. The flag is read with `isVatExempt`
-   (`utils/vat.js`), which checks **both** the per-tenant `store {id:1}` doc and the
-   `shoofi.stores` registry entry because production stores are inconsistent about which
-   one carries it. **Never make an exempt lookup able to fail a charge** — it swallows its
-   errors and falls back to "not exempt", which errs toward a visible, correctable VAT
+   (`utils/vat.js`). It lives ONLY on the per-tenant `store {id:1}` doc: the admin UI writes
+   it there and the settlement reports read it there. The `shoofi.stores` registry carries no
+   `accounting` at all since 2026-11-02 (stale copies on 27 registry docs were unset by hand).
+   `isVatExempt` still takes several docs and the invoice paths still pass the registry doc
+   too, which is harmless. **Never make an exempt lookup able to fail a charge** — it swallows
+   its errors and falls back to "not exempt", which errs toward a visible, correctable VAT
    document rather than an under-declared one.
-   Consequence: **a twin group may not mix an exempt store with a regular one** — enforced
-   in `twin-eligibility.js` at discovery and `rejectMixedVatPair` in `routes/twin-order.js`
-   at place time, which is the one that protects the charge since eligibility is never
-   re-run.
+   **A twin group MAY pair an exempt store with a regular one.** With manual invoicing
+   (invariant 10) each store's document follows its OWN status (`planTwinInvoices` in
+   `services/payments/order-invoices.js`), so a mixed pair is documented correctly. Neither
+   eligibility (`twin-eligibility.js`) nor `/place` / `/digital-place-pending` checks VAT
+   status. The guard that used to (`rejectMixedVatPair`, 2026-08-10) was removed on
+   2026-11-02 by decision of the owner: it read `accounting` off the registry, so it never
+   fired, and 76 mixed groups (48 of them since 2026-08-10) were placed without a problem.
+   ⚠️ Only the gateway fallback is still wrong for a mixed pair: when manual invoicing is
+   off for the PRIMARY store (`MANUAL_INVOICES_KILL`, the global flag off, or the primary's
+   `isManualInvoicesEnabled: false`), `twin-payment-service.js` prints ONE combined
+   document under the PRIMARY's VAT status. Turning manual invoicing off re-opens that
+   case, and nothing blocks the pairing any more.
 10. **Invoicing is MANUAL and split per revenue owner — behind a flag.**
    Historically each gateway issued the document itself during the charge (HYP
    `SendHesh`/`EZ.*`, ZCredit `ZCreditInvoiceReceipt`), giving one document per charge for

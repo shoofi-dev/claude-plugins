@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -65,6 +65,9 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 2. **`actualDriverPayment` cash-vs-card branch** (`routes/driver-reports.js`): CARD → full
    `effectiveDeliveryFee`; CASH + coupon → the coupon-covered amount; **CASH, no coupon → 0**.
    A bug here **double-pays a driver who already pocketed the cash**.
+   **Name trap:** at COMPANY level the report's `earningsByCash` is this payment summed (Σ
+   `actualEarningsByCash` — coupon part + store delivery deal), NOT the cash collected; per driver
+   the same name is the gross. The company gross cash fee is `feesByCash` (reference §6).
 3. **Commission base is the FINAL items price actually charged** — `order.orderPrice`,
    after the store's own product discounts. Store commission is **tiered**
    (`calculateCommissionTiered`, from `store.accounting.contract.commissionTiers`); the flat
@@ -110,9 +113,11 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `calculateVAT`, `withoutVAT`, `withoutVATIfExempt`, `isVatExempt`). **Never re-introduce
    a `0.18`/`1.18` literal** — divergent rounding points silently skew payouts.
    `isVatExempt(...storeDocs)` is the one way to ask whether a business is עוסק פטור: it
-   reads `accounting.bankAccount.businessType` off **either** the per-tenant `store {id:1}`
-   doc or the `shoofi.stores` registry entry, because production stores are inconsistent
-   about which one carries it. Do not re-inline the `businessType === 'exempt'` comparison.
+   reads `accounting.bankAccount.businessType` off any store doc it is given. The per-tenant
+   `store {id:1}` doc is the only copy: the admin UI writes it there and the settlement
+   reports read it there. The `shoofi.stores` registry carries no `accounting` since
+   2026-11-02 (verified on prod that day). Do not re-inline the `businessType === 'exempt'`
+   comparison.
    **Exempt is no longer a settlement-only concern:** since 2026-08-09 the per-order
    CUSTOMER document follows it too (zero VAT on both gateways) — that half belongs to the
    `payments` domain, invariant 9. A change to what `exempt` means now moves two systems.
