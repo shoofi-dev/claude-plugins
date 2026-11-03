@@ -550,7 +550,7 @@ createdAt, lastSeenAt, lastUsedAt, decidedBy, decidedAt}`, no TTL, no index. Adm
 | `GET /api/admin/marketing/social/:id` | same | the post for its form (`publicSocial`: `source`, `status`, `state`, caption, format, targets[], results, media, link, marketingItemId, approval) |
 | `POST /api/admin/marketing/social` | same | `{caption, format: post\|story, targets[], mediaType, mediaUrl, key?, mimetype?, bytes?, durationSec?, link?, marketingItemId?, ownPlan?, publishWhen?, publishAt?}` → 201 a draft. 400 `BAD_CAPTION` / `BAD_FORMAT` / `BAD_CONTENT` / `BAD_MEDIA` (not our manual-media CDN file) |
 | `PUT /api/admin/marketing/social/:id` | same | same fields, while nothing went out (409 `ALREADY_SENT`); an approved one records `previousCaption` in `history` |
-| `DELETE /api/admin/marketing/social/:id` | same | `status: "cancelled"` while nothing went out; it leaves the item |
+| `DELETE /api/admin/marketing/social/:id` | same | `status: "cancelled"` while nothing went out; it leaves the item. Once it went out: archived (`archivedAt`), off the hub and its item, still on the page |
 
 Approve / revert are the item's and the drafts routes' (`channel = social`). Audited
 `create_marketing_social_post`, `update_marketing_social_post`, `delete_marketing_social_post`.
