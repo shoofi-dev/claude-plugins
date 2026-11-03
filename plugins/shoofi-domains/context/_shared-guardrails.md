@@ -57,6 +57,34 @@ Two hard rules:
 - This is not step-by-step approval — you are not to interrupt the human mid-task.
   One task → one reviewable PR.
 - If a change is large or risky, say so in the PR body and offer to split it.
+- **How far your PR goes without a person is the owner's dial, per team** (shoofi-server
+  `services/hq/autonomy.js`, HQ's system tab): `suggest` — a code ticket waits for the
+  owner's run before you write anything; `pr` (the default) — you open the PR and it never
+  auto-merges; `merge` — a low-risk PR may auto-merge when the merge policy is on; `data` —
+  your data changes also run by themselves after merge. Work the owner started directly
+  (board tasks, Slack) is not gated by it. Write every PR as if a person reads it — at
+  `merge` nobody may.
+
+### Changing production data: a file in `data-changes/`, never by hand
+You never write to a production database — not from your session, not with a script you
+run on the droplet. A data change (a backfill, a fix to bad rows, a flag on some stores)
+ships as **one file in shoofi-server `data-changes/`** inside your PR, following
+`data-changes/README.md`: `description`, `targets` (the only collections it may write, and the
+documents backed up first — the filter must cover everything it touches or inserts),
+`plan()` (read-only: what would change, with counts and a small sample, no customer data)
+and `apply()`. After the merge HQ runs `plan()` on production and the owner sees it and
+presses Run; at autonomy `data` HQ runs it by itself. Every target is backed up before it
+runs and Undo restores it. A file runs once — a fix to one that ran is a new file. At most
+20,000 documents per change; split a bigger one. `migrations/` and `scripts/` hold older
+one-off scripts — nothing new goes there. These PRs are always red for auto-merge.
+
+### Be proactive: report what you find
+Anything wrong you notice outside the task in hand — a bug in another domain, a number that
+does not add up, a doc that lies — goes on a ticket, not only in your PR body: end your
+HQ run with an `hq-tickets` block `{"op": "report", "board": "tech", "title", "body"}` (the
+exact format is in your run's prompt). On the tech board the CTO checks it and hands the fix
+to its code owner. One report per finding, with the evidence (file and line, an example id,
+how often). The same title already open becomes a note on it.
 
 ### A new queue that waits for a human must reach HQ
 The owner sees what waits for them in one place: the admin's **Office HQ → צריך אותך**

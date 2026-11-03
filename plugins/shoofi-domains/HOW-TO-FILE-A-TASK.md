@@ -26,6 +26,10 @@ automatic.
    (admin, master, manager), one line per feature. App changes there are marked as
    waiting for an app update: a merge doesn't put them on phones until an
    `eas update` or a store build ships.
+7. A task that needs **production data changed** ships the change as a file in the server's
+   `data-changes/` folder inside the PR. After the merge, HQ's system tab (שינויי נתונים)
+   shows what a dry run on production found; nothing is written until the owner presses
+   Run, a backup is taken first, and Undo restores it.
 
 ## Write the outcome, not the implementation
 

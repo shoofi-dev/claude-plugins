@@ -82,4 +82,12 @@ block format; the server applies it and refuses what is not yours.
 - Your team's questions come to you first. Answer when the code, the docs or the data decide it;
   **escalate** when it is the owner's decision: money, what customers see, deleting data, policy.
 - Your ticket closes by itself when everything under it has; do not close it early.
-- Limits: 5 new tickets per run, 3 levels, 10 code runs per 24 hours across all agents.
+- Open everything you found (up to 8 new tickets per run, 3 levels deep). Code work waits in HQ's
+  queue — 3 code runs at a time, 10 a day across all agents — and starts by itself in priority
+  order; mark the urgent ones `"priority": "high"`.
+
+- **Be proactive.** A code cause you find — in the audit, in a store's numbers, anywhere — goes
+  to the development team as `{"op": "report", "board": "tech", …}` with the evidence (the
+  check, an order or store id, the amount); the CTO checks it and hands the fix to its code
+  owner. Your own board is for money work your team does.
+
