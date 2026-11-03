@@ -173,3 +173,11 @@ session only has to work out the fixture data its own feature needs — delegate
   `ssh-agent` / a token with read access. A public repo is simplest.
 - **Editing the skill**: change files under `plugins/shoofi-testing/skills/…` and
   push. Local sessions pick it up on refresh; cloud runs on next clone.
+
+## CI
+
+Every PR runs `.github/workflows/validate.yml`: `node scripts/ci-check.js` (every
+JSON parses; every agent has `name` + `description`, unique per plugin; every
+`context/….md` an agent or skill reads exists in its plugin; every marketplace
+entry has its folder and `plugin.json`) and `claude plugin validate` on the
+marketplace and each plugin. Run the first locally before pushing.

@@ -1,0 +1,28 @@
+# claude-plugins had no CI. HQ runs these agents by name every morning; a broken
+# manifest, agent file or context path showed up as a run answering "not
+# available" (2026-11-03). This fails the PR instead.
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Agents, context paths, JSON
+        run: node scripts/ci-check.js
+      # Claude Code's own validator: the marketplace, then each plugin. Warnings
+      # (no semver, no install line) are allowed; errors fail.
+      - name: claude plugin validate
+        run: |
+          npm install -g @anthropic-ai/claude-code --no-audit --no-fund
+          claude plugin validate .
+          for p in plugins/*/; do claude plugin validate "$p"; done
