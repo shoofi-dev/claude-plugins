@@ -18,6 +18,7 @@
 | `competitive-intel` | Haat + Tira Eat — the coverage gap, price gaps, menu coverage, promos, ratings, and competitor↔our-store matching |
 | `social-marketing` | Shoofi's own Facebook/Instagram content — Arabic only, one account. Drafts posts, stories and ad copy against live platform data. **Never publishes.** |
 | `cfo` | **The daily money picture.** Reads the nightly money audit (shoofi-server `services/hq/money-audit`, `hq-money-audits`) of the business day that closed, triages its findings (real leak / known pattern / noise), and writes the owner a short Hebrew money summary for the morning brief. Names the code owner (accountant, payments, orders, delivery) for a cause in the code; the HQ run hands it over. **Never computes its own totals, never moves money.** |
+| `cto` | **The daily technical picture, in charge of the six code owners.** Reads the last day of the bridge's error digest (`hq-tech-digests`) and the PR queue (`ai-pr-snapshots`), triages faults by customers hit, and writes the owner a short Hebrew summary with one code owner per problem; the HQ run hands each to its owner. **Never writes code, never merges.** |
 
 Planned: `merchant-success`, `retention-crm`, `bizops-brief`, `support-cx`.
 

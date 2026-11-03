@@ -1,6 +1,6 @@
 {
   "name": "shoofi-operators",
-  "description": "Operator ('department head') subagents for the Shoofi platform — Class B. They own a BUSINESS FUNCTION rather than a slice of code: they feed on data and the outside world and ship decisions, alerts, briefs and drafts, never product code. Their gate is human approval, not tests. marketing-manager (leads marketing, routes every ask), competitive-intel (Haat / Tira Eat coverage and price gaps) and social-marketing (Arabic-only Facebook/Instagram drafts in a voice derived from real customer messages; never publishes) and cfo (the daily money summary from the nightly money audit; never moves money). Skill: guided-reel (Shadi explainer reels).",
+  "description": "Operator ('department head') subagents for the Shoofi platform — Class B. They own a BUSINESS FUNCTION rather than a slice of code: they feed on data and the outside world and ship decisions, alerts, briefs and drafts, never product code. Their gate is human approval, not tests. marketing-manager (leads marketing, routes every ask), competitive-intel (Haat / Tira Eat coverage and price gaps) and social-marketing (Arabic-only Facebook/Instagram drafts in a voice derived from real customer messages; never publishes) cfo (the daily money summary from the nightly money audit; never moves money) and cto (the daily technical summary from the error digest and the PR queue; in charge of the code owners). Skill: guided-reel (Shadi explainer reels).",
   "author": {
     "name": "shoofi-dev"
   },
@@ -21,6 +21,9 @@
     "video",
     "cfo",
     "finance",
-    "money-audit"
+    "money-audit",
+    "cto",
+    "errors",
+    "tech"
   ]
 }
