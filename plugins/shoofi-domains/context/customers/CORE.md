@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -644,14 +644,30 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
     - **Back to draft** = `POST …/:channel/:id/revert`. Customers stop seeing it on their next
       read, the draft keeps its plan, and a grandfathered item can be reverted too. A push reverts only while nothing was
       sent (not `in_progress`/`completed` and `execution.startedAt` unset). That check is in the
-      atomic filter, and the push is disarmed to `status: "draft"` in the same write. **Delete**
-      is each channel's existing `DELETE` route. A push that is sending can't be deleted (409
-      `CAMPAIGN_SENDING`; the rule is in the `deleteOne` filter, and a send running in this process
-      always counts), but one **stuck "sending"** can — `in_progress` with no start and no progress
-      for an hour (`stuck-sending.js`). A restart before sends ran in the background left 11 in
-      prod, May–Aug 2026, 0 recipients recorded; nothing will ever finish them. The hub row
-      (`ActiveMarketingTab`) offers מחק on `push_stuck_in_progress`, the push form shows it in place
-      of the lock, and an unknown id is 404 (it was a 500).
+      atomic filter, and the push is disarmed to `status: "draft"` in the same write.
+    - **End and remove** (owner, 2026-11-03: "remove them, or end them — but keep the history
+      for tracking performance"). **Nothing marketed is hard-deleted any more.**
+      - **End** = `POST …/:channel/:id/end` (banner, story, popup, note — `approval.end`).
+        Customers stop seeing it now through the channel's OWN field: banner `endDate` = now ISO
+        (the app compares strings), story/popup `expiresAt` = now, note `isActive: false`; plus
+        `endedAt`/`endedBy`. It stays listed as ended with its results (an ended note shows as
+        `ended_recently` for 7 days). A draft is 409 `NOT_PUBLISHED`, one already over 409
+        `ALREADY_ENDED`, a push or social post 400 `NOT_ENDABLE`.
+      - **Remove** = `POST …/:channel/:id/archive` AND every channel's `DELETE` route (ads,
+        stories, notes, customer-campaigns, marketing/social): `archivedAt`/`archivedBy`, images
+        kept. `visibleQuery` (every customer read), the admin lists, the active list, the drafts
+        queue, HQ's inbox and a marketing item's channels (`PIECE_FILTER`) skip it; performance,
+        campaign impact and templates still read it, so results keep their names. Any action on
+        it is 404 (`loadItem`, `loadItemDoc`). An emptied marketing item is archived too.
+      - **Push:** not while sending (409 `CAMPAIGN_SENDING`; a send running in this process always
+        counts), but one **stuck "sending"** can go — `in_progress` with no start and no progress
+        for an hour (`stuck-sending.js`; a restart before sends ran in the background left 11 in
+        prod, May–Aug 2026, 0 recipients). An armed push is disarmed (`status: "draft"`) in the same
+        write; the claim and the cron add `archivedAt: null`.
+      - **Social:** unsent = withdrawn (`cancelled`, leaves its item); once it went to Meta it is
+        archived here and stays on the page (delete it there).
+      - Admin: one `EndRemoveActions` control (סיים / מחק) on the hub row, every channel form
+        (`MarketingFormStatus`) and the קידום page; the confirm says the results stay.
     - **Grandfathering:** a doc with no `approval` (or `approval: null`) is published. In prod on
       2026-10-30, none of the 78 ads, 148 stories, 6 notes or 227 campaigns had the field. So the
       5 live banners, 86 live stories and 4 live popups stayed live, and no legacy campaign could
