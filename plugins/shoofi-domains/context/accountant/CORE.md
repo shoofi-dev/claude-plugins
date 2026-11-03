@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -636,6 +636,43 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     the test walks the three routers.
     Tests: shoofi-server `test/integration/settlement-admin-auth.js` and
     `test/integration/earnings-reports-admin-auth.js`.
+18. **A delivery company's invoices add up to its transfer: what is issued tiles `netTotal`**
+    (`create-company-invoice`, `routes/hyp.js`, 2026-11). The company issues the documents to
+    Shoofi from its own HYP account. Invoice 1 "אשראי" = `withoutVATIfExempt(earningsByCreditCard)`.
+    `additionsAmount` = compensations + bonuses − driverCharges − deliveryBookingFees + coupons +
+    minGuarantee. Shoofi transfers `reportData.netTotal`, which equals credit + additions.
+    - **additions > 0** → two invoices: invoice 1 is the single credit line, and invoice 2 lists
+      one row per component. Unchanged by the fix.
+    - **additions < 0** → **one** invoice. Invoice 1 gets a second row, `פיצויים מהשליח` = additionsAmount
+      (negative), and there is no invoice 2. The route stores the lines it sent as
+      `hypCompanyInvoiceItems`. Cancel clears them and copies them into the history entry. Before
+      the fix, invoice 1 went out for the full credit amount whenever additions were negative, so
+      it overstated the transfer. Three issued prod documents still carry that overstatement: report
+      `6a6e104a…` (July, doc 10041, +49), report `6abe840b…` (Sept, exempt, doc 90010, +18) and report
+      `6abe8424…` (Sept, doc 10014: 28 invoiced on a −32 net). They were left as they are; cancelling
+      and re-issuing them is a human decision.
+    - **credit + additions ≤ 0** → **400** and nothing is issued: the company owes Shoofi for the period.
+    - **Reconcile guard, on every report:** if the sum of the invoices about to be issued differs from
+      `netTotal` by 0.01 or more, the route returns 400. It used to run only when
+      `deliveryBookingFees > 0`, and it compared credit + additions even when the additions were
+      skipped, so the negative case reconciled on paper. Prod 2026-11-03: 676 of 697 reports
+      reconcile. Of the other 21, 19 are already issued. The remaining 2 are uninvoiced Jan–Feb 2026
+      reports whose company's exempt status changed after the report was generated, and refusing
+      them is correct.
+    - **VAT:** `createInvoiceOnBehalf` gives every line the same `vat_type`: `INC` for a licensed
+      company (305 — the prices include VAT) and `NON` for an exempt one (300). The credit row is
+      VAT-stripped for exempt companies and the additions never are, which matches `netTotal`. The
+      fix adds no rounding: prices are sent as `String(number)`, as invoice 1 always was.
+    - **EZcount accepts negative lines** when the document total is positive. Prod has 36 additions
+      invoices with a negative row, on both 305 and 300 documents.
+    - **Hashavshevet export:** invoice 1 is booked from `hypCompanyInvoiceItems` when present
+      (`companyCreditInvoiceLinePrices`), and from the single credit line otherwise. Never rebuild it
+      from today's rule: the three legacy documents above were single-line.
+    - **Flagged, not fixed:** `utils/driver-invoice-status.js` (the "missing invoice" badge) leaves
+      `totalDeliveryBookingDriverFees` out of its additions expression, and it still expects a credit
+      invoice when credit + additions ≤ 0.
+    Tests: shoofi-server `test/integration/hyp-company-invoice-negative-additions.js` (licensed and
+    exempt, with HYP mocked at `axios.post`) and `test/integration/hashavshevet-movein.js`.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
