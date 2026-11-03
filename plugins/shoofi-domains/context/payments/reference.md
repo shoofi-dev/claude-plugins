@@ -147,6 +147,8 @@ hangs the request (CORE invariant 11), so none of them answered.
 ## 6. Refunds (customer-side — you own these)
 - **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
   `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.
+  Since HQ #1a2f9e (2026-11-03) **no client calls it** — its only caller was the removed
+  client-side refund dialog — and no store DB holds a `refundData` row. The route has no auth.
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,
@@ -249,6 +251,8 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
 - **CONFIRMED — REMOVE (backlog #2):** the legacy client-side ZCredit charge/refund in the
   customer app — `components/credit-card/api/payment.ts` + `refund.ts` (terminal number +
   password in client state). Deprecated; remove after confirming no live references.
+  `refund.ts` + the `refund-confirm` dialog removed from all three apps (HQ #1a2f9e);
+  `payment.ts` (all 3) and `validate-card.ts` (partner, shoofir) remain.
 - **Still needs a verdict (flag, don't fix):** `updateCCPayment` undefined `orderId` in its
   background block (`order.js:~1950`); `refundPartial` ZCredit field shape unverified across
   terminals (sandbox-first). *(MASAV auth moved to the `accountant` doc.)*

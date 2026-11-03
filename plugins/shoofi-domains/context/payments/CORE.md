@@ -284,6 +284,13 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
 - **CONFIRMED — remove (backlog):** legacy client-side ZCredit charge/refund in `shoofi-app`
   (`components/credit-card/api/payment.ts`, `refund.ts`) — terminal number + password in client
   state. Verify zero live references first, then delete.
+  **Refund half done (HQ #1a2f9e, 2026-11-03):** `refund.ts`, the `refund-confirm` dialog, the
+  admin "ارجع المبلغ" button and the store's `addOrderRefund` were removed from **all three**
+  apps (shoofi-app, shoofi-shoofir, shoofi-partner — not only shoofi-app). It never worked: it
+  read `credentials_terminal_number`/`credentials_password`, which `/api/shoofiAdmin/store/z-cr`
+  never returns (only `zcredit_api_key`), and recorded the result before checking `HasError`.
+  0 `orders.refundData` rows existed in any store DB. `payment.ts` (all 3) and `validate-card.ts`
+  (partner, shoofir) remain and read the same missing fields. Refunds are server-side only.
 - **Flagged, needs verdict:** `updateCCPayment` references an undefined `orderId` in its
   background block; `refundPartial`'s ZCredit field shape is unverified across terminals
   (sandbox first).
