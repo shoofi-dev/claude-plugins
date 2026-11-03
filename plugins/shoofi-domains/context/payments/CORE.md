@@ -252,7 +252,7 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
   and what amend re-prices from, so never drop it from the hand-listed response.
 - **Why creation recomputes it, and only it:** every other delivery coupon is bounded by its
   own value, but this discount grows with `shippingPrice`, which the client posts and nothing
-  else validates. An inflated fee costs the customer nothing (they pay X either way) and the
+  else validates (a fee BELOW the area tariff is only logged — orders CORE invariant 20). An inflated fee costs the customer nothing (they pay X either way) and the
   difference lands on Shoofi/store funding and, on cash, the courier reimbursement.
   `enforceDeliveryPriceCoupon` (`services/coupons/delivery-price-enforcement.js`, called in
   `/api/order/create` after promotions) re-reads the coupon DOCUMENT, bounds the fee by

@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -23,7 +23,8 @@ Server: `routes/order.js`, `routes/twin-order.js`, `routes/order-fraud-*.js`,
 (order-side marketing attribution, invariant 15), `services/marketing/order-facts.js` +
 `services/marketing/reconcile.js` (one marketing fact per checkout, kept true by a cron —
 invariant 16), who may call the coins admin routes (`routes/coins.js` `/api/admin/coins/*` and the
-Coins Settings block of `routes/shoofi-admin.js`, invariant 19), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
+Coins Settings block of `routes/shoofi-admin.js`, invariant 19), `services/orders/shipping-price-check.js`
+(the log-only delivery-fee check, invariant 20), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
 (shoofir), monitoring/twin-admin (delivery-web).
 
 **Not yours:** payment internals (`payments`), settlement/payouts (`accountant`), driver
@@ -297,8 +298,9 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       For ANY order, a non-finite `pricing.total` is `409 AMEND_UNPRICEABLE` and is never written.
     - **Unchanged for every other coupon type:** `discountAmount` and the snapshot stay
       client-trusted at creation, except `enforceCouponEntitlement` (ownership + partial-use
-      balance). `shippingPrice` is still validated nowhere (the tariff ceiling only BOUNDS a
-      derived discount). Twin side coupons are still stored as posted.
+      balance). `shippingPrice` is still never corrected or rejected (the tariff ceiling only
+      BOUNDS a derived discount; a fee BELOW the area tariff is only logged and flagged —
+      invariant 20). Twin side coupons are still stored as posted.
     - Readers on the order side need no change: the partner invoice, shoofir `order-payment.ts`,
       admin `CardOrder`/`CardTwinOrder` and the app's `order-header` all read `discountAmount`,
       so a delivery coupon prints `shippingPrice − discountAmount` = ₪X.
@@ -527,6 +529,74 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests: `test/integration/coins-admin-auth.js` (static gate check on every route plus every
       `/api/admin/*` route in `routes/coins.js`, 401/403 matrix, every dashboard role on seven
       routes, master-only on expire, the audit entry, refused writes write nothing).
+
+20. **`shippingPrice` IS OBSERVED, NEVER ENFORCED: A DELIVERY FEE BELOW THE AREA TARIFF IS LOGGED
+    `[shippingPriceCheck]` AND FLAGGED, NOTHING ELSE** (`services/orders/shipping-price-check.js`,
+    shoofi-server#407). The app posts `shippingPrice = availableDrivers.area.price || 0`
+    (`shoofi-app screens/checkout/index.tsx`), so a quote with no `area` posts ₪0. Scheduled
+    orders into a staff-PAUSED area did exactly that: 5 known orders, June to October 2026, where
+    the customer paid no fee and the courier was paid ₪0 (fresh-cafe 9637-4325, flora-boutique
+    9149-1898 / 5277-5921 / 6732-6168, abuissa-grills 1251-2881). The quote fix belongs to
+    delivery (`services/delivery/availability.js`). This check is the net that catches the next
+    one.
+    - **Where and when:** in `/api/order/create` only, right after `db.orders.insertOne(orderDoc)`
+      and `scheduleOrderFact`, as `runShippingPriceCheck({...}).catch(() => {})`, **never
+      awaited**. It never rejects and never changes `shippingPrice` or `total`. A lookup that
+      throws or never answers leaves the order and its response untouched (invariant 6). Twin
+      `/place` / `/digital-place-pending` do not call it.
+    - **Comparison:** the posted `Number(shippingPrice) || 0` against the area's `price`, with
+      ₪0.01 tolerance. Only a fee BELOW the tariff is flagged. `shippingPrice` is already the
+      PRE-discount fee: a coupon rides on `discountAmount`, a store delivery deal on `total`
+      (invariants 13, 14). So there is no separate pre-discount field to read, and none is needed.
+    - **Area:** the store point comes from the store's own `store {id:1}.location`, never from the
+      client's `storeData`. The customer point is `order.geo_positioning`. `findBestAreaForLocation`
+      runs on ACTIVE areas first, then again with `{ ignoreAreaActive: true }`. That is the same
+      two-step as `checkStoreDeliveryAvailability`, so a PAUSED area still gives its tariff
+      (`paused: area.isActive !== true`). It deliberately does NOT use
+      `resolveDeliveryTariffCeiling`, which returns a ceiling with store-zone / ₪100 fallbacks and
+      skips paused areas. An unmatched area here is `unresolved`, never a mismatch.
+    - **Exempt (no lookup, no flag):** receipt method ≠ `DELIVERY`; `isDeliveryOnly`; twin
+      (`twinGroup.groupId`, or a booking's `twinGroupId`); an `appliedCoupon.coupon` with
+      `type: 'delivery_price'`, `discountType: 'full_discount'`, `isFreeDelivery`, or
+      `isDeliveryCoupon` (`discountType: 'delivery'` / `type: 'free_delivery'`); `promotions.delivery`.
+      These are belt and braces: current bundles never lower `shippingPrice` for them.
+    - **Output:** one `logger.warn` line, `"[shippingPriceCheck] submitted delivery fee is below
+      the area tariff"`, with `appName, orderId, orderObjectId, status, paymentMethod,
+      paymentProvider, timing (now|future|ramadan-iftar), isFutureOrder, submitted, expected,
+      areaId, paused`. On a mismatch ONLY, it also does `$set order.shippingPriceCheck =
+      { expected, submitted, areaId, paused, checkedAt }`, so `$exists` means flagged. A failure
+      logs `"[shippingPriceCheck] check failed — order unaffected"`. The field is a named `$set`
+      after the insert, so like `marketingTouch` (invariant 15) it survives every payment path.
+      A `book-delivery.order` snapshot taken before it lands does not carry it. It is not in
+      `customers.orders[]`, nothing reads it, and it has no index.
+    - **Measured before shipping** (2026-11-03). A read-only dry run of this module over
+      `book-delivery` status `"4"`, reading each booking's `order` snapshot:
+      - **October 2026, 8,713 bookings.** 1,215 were exempt (twin 545, delivery coupon 488,
+        full_discount 78, fixed-price 49, delivery-only 42, isFreeDelivery 10, not DELIVERY 3).
+        7,487 were at the tariff. 0 were unresolved and 0 errored. **2 would be flagged live,
+        both the ₪0 paused-area orders** (fresh-cafe 9637-4325, flora-boutique 9149-1898).
+      - **9 more October bookings mismatched only in the dry run.** Support's
+        `update-address-to-current-location` (`routes/customer.js`) rewrites the order's and the
+        booking's coordinates AFTER creation, and never the fee. So a later lookup sees a point
+        the creation-time check never saw.
+      - **September 2026, 8,221 bookings.** 3 would be flagged live: flora-boutique 5277-5921
+        (₪0), and two ₪20-for-₪25 orders from one shawerma-alarz customer, quoted on
+        coordinates that support had already corrected. Those two are real under-quotes. The
+        25 dry-run-only mismatches were 10 relocations and 15 tariffs raised since the order.
+      - **June 2026.** abuissa-grills 1251-2881 and flora-boutique 6732-6168 are caught. The
+        store copy of 6732-6168 was later patched to ₪20, but the booking snapshot keeps the
+        creation-time ₪0. June also has 10 more live flags (₪20 against ₪25–38) that are NOT
+        root-caused. They predate the 2026-06-27 change that made relocations rewrite order
+        coordinates, so they are not relocation artifacts, and no exemption rule covers them.
+      - Of the October exempt rows below the booking-time tariff, 269 were twin and 42
+        delivery-only. Only 2 were coupon orders, and both were relocations. Coupons do not
+        lower `shippingPrice` in practice.
+    - **Turning it into enforcement is a product decision**, not a follow-up. With Apple Pay /
+      HYP the money is already taken when the order reaches the route, which is the same reason
+      every other creation check corrects and never rejects.
+    - Tests: `test/integration/order-shipping-price-check.js`. It covers each exemption, active
+      and paused areas, unresolved cases, a throwing lookup, a lookup that never answers (the
+      create response is not held), and a failed flag write.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
