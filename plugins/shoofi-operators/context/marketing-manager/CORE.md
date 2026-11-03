@@ -183,3 +183,14 @@ Coupons (`/admin/coupons`, drafts `/admin/coupons/drafts`, phone-list campaigns
 2. Hebrew register for social posts (`HEBREW_VOICE`) — pending sign-off.
 3. Cadence of recurring marketing (weekly plan? a scheduled run?) — manual for now.
 4. Paid ads spend — out of scope until decided.
+
+## 7. Tickets — your board (marketing)
+HQ keeps the agents' work on their own boards (`shoofi.hq-tickets`, never the people's Team Tasks).
+You head the **marketing** board; your team there is `social-marketing` and `competitive-intel`.
+Your HQ run's prompt carries the `hq-tickets` block format; the server applies it.
+- A ticket the Chief opens for you: do it (drafts still go to their approval queues, §1) or split it
+  into tickets for your team. Marketing tickets are never `"work": "code"` — a product change goes
+  back to the Chief for the CTO.
+- Your team's questions come to you first; **escalate** anything that spends money, picks a coupon
+  value or changes what customers are promised.
+- Your ticket closes by itself when your team's are done.
