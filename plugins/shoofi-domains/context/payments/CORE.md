@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/HIGH-RISK-updateccpayment-require-auth / 2026-11-03 (invariant 12 — updateCCPayment is the order's own customer only); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/HIGH-RISK-retire-updateccpayment / 2026-11-03 (invariant 12 — updateCCPayment removed, no traffic); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -23,8 +23,8 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 **Yours:** `routes/payments.js`, `routes/payments/validate-card.js`, `routes/creditCard.js`,
 `routes/hyp-pay.js` (HYP charge/tokenize), `routes/payment-methods.js`, `utils/hyp-pay.js`,
 `utils/invoice-mail.js` (per-order receipt), and the payment functions inside `routes/order.js`
-(`processCreditCardPayment`, `processHypTokenPayment`, `finalizeApplePayOrder`,
-`updateCCPayment`). Client: the payment UI in `shoofi-app`.
+(`processCreditCardPayment`, `processHypTokenPayment`, `finalizeApplePayOrder`). Client: the
+payment UI in `shoofi-app`.
 **Not yours:** settlement/reports/store invoices/MASAV = **`accountant`**; order lifecycle =
 `orders`. `lib/payments/calc.js` lives with accountant.
 
@@ -148,14 +148,19 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.
-12. **`POST /api/order/updateCCPayment` is the order's OWN customer only** (`routes/order.js`).
-   It asks ZCredit `GetTransactionStatusByReferenceId` with the platform credentials and writes
-   the order's `status` "1" (paid) or "0". Until 2026-11-03 it had no auth, so anyone with an
-   `app-name` + order id could mark an order paid. Now: `auth.required` (no token → 401), a
-   missing order → 404, and `String(orderDoc.customerId) !== String(req.auth.id)` → 403. Never
-   gate it with `ORDERS_DASHBOARD_OR_STORE_MEMBER`: that 403s customers. No live client calls it
-   (`UpdateCCPayment` in the three apps' `stores/cart/index.ts` is never invoked). Pinned by
-   `test/integration/order-update-cc-payment-auth.js`.
+12. **`POST /api/order/updateCCPayment` was REMOVED on 2026-11-03 — the legacy ZCredit status
+   sync has no server entry point anymore.** It asked ZCredit `GetTransactionStatusByReferenceId`
+   with the platform credentials and wrote the order's `status` "1" (paid) or "0". It had no auth
+   (anyone with an `app-name` + order id could mark an order paid); #417 gated it to the order's
+   own customer, then it was deleted on the CTO's "retire it if there is no traffic":
+   0 hits in the OpenSearch request logs 2026-10-28 → 2026-11-03 (`api/order/create`: 2590), and
+   0 orders in all 262 store DBs with `ccPaymentRefData.payload.orderId`, which every write it
+   ever made carried. The dead `UpdateCCPayment` method and `ORDER_API.UPDATE_CCPAYMENT_API` were
+   removed from shoofi-app, shoofi-partner and shoofi-shoofir too. **Do not bring it back:** an
+   order becomes paid only through the charge paths (CC / HYP token / digital wallet) and their
+   callbacks. `ccPaymentRefData` on orders is still written by those paths. Pinned by
+   `test/integration/order-update-cc-payment-removed.js` (router stack has no such route, POST
+   is a 404 with no provider call, the routes baseline does not list it).
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
@@ -294,7 +299,9 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
   state. Verify zero live references first, then delete.
 - **Flagged, needs verdict:** `updateCCPayment` references an undefined `orderId` in its
   background block; `refundPartial`'s ZCredit field shape is unverified across terminals
-  (sandbox first).
+  (sandbox first). *(Agent note 2026-11-03: the `updateCCPayment` half looks obsolete — the
+  route is deleted by shoofi-server `fix/HIGH-RISK-retire-updateccpayment`, CTO decision, see
+  invariant 12. A human should drop that half once it merges; the `refundPartial` half stands.)*
 - **RESOLVED by manual invoicing:** the exempt document's TITLE used to be unfixable —
   neither gateway publishes a per-transaction document-type parameter, so `EZ.type` and
   ZCredit's `Type` were guesses that could reject a live charge. Issuing the document

@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-retire-updateccpayment / 2026-11-03 (CORE invariants 6 + 18 updateCCPayment removed); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -168,7 +168,7 @@
         {
           "file": "routes/order.js",
           "regex": "(?<![\\s\\S])(?![\\s\\S]*await sendStoreOwnerNotifications\\((?:orderDoc|updatedOrder),)",
-          "desc": "NO create path, updateCCPayment or finalizeApplePayOrder awaits the store-owner alert - an awaited alert on a stalled push socket held the create response 128s/257s and the customer resubmitted. Only the fraud-approval call (argument `order`) may await it"
+          "desc": "NO create path or finalizeApplePayOrder awaits the store-owner alert - an awaited alert on a stalled push socket held the create response 128s/257s and the customer resubmitted. Only the fraud-approval call (argument `order`) may await it"
         },
         {
           "file": "services/notification/notification-service.js",

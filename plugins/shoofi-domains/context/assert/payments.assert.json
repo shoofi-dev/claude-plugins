@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@fix/HIGH-RISK-updateccpayment-require-auth / 2026-11-03 (CORE invariant 12 updateCCPayment own customer only); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-retire-updateccpayment / 2026-11-03 (CORE invariant 12 updateCCPayment removed); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -24,8 +24,7 @@
         "services/twin-order/twin-delivery-price.js",
         "utils/client-features.js",
         "services/coupons/public-coupon.js",
-        "routes/coupon.js",
-        "test/integration/order-update-cc-payment-auth.js"
+        "routes/coupon.js"
       ],
       "symbols": {
         "utils/hyp-pay.js": [
@@ -136,13 +135,13 @@
         },
         {
           "file": "routes/order.js",
-          "regex": "router\\.post\\(\"/api/order/updateCCPayment\", auth\\.required, async",
-          "desc": "CORE invariant 12: updateCCPayment requires a token (it had no auth and could mark any order paid)"
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*/api/order/updateCCPayment)|router\\.post\\(\"/api/order/updateCCPayment\", auth\\.required, async[\\s\\S]*?if \\(String\\(orderDoc\\.customerId\\) !== String\\(req\\.auth\\.id\\)\\) \\{\\s*res\\.status\\(403\\)",
+          "desc": "CORE invariant 12: routes/order.js registers no /api/order/updateCCPayment (removed 2026-11-03). The second leg (the #417 auth + own-customer 403) only keeps this green on shoofi-server main until fix/HIGH-RISK-retire-updateccpayment merges - DROP IT then. The old ungated route fails both legs"
         },
         {
-          "file": "routes/order.js",
-          "regex": "if \\(String\\(orderDoc\\.customerId\\) !== String\\(req\\.auth\\.id\\)\\) \\{\\s*res\\.status\\(403\\)",
-          "desc": "CORE invariant 12: updateCCPayment is the order's own customer only (another customer is 403)"
+          "file": ["test/integration/order-update-cc-payment-removed.js", "test/integration/order-update-cc-payment-auth.js"],
+          "regex": "t\\.is\\(res\\.status, 404\\);\\s*t\\.is\\(providerCalls, 0\\)|t\\.is\\(handles\\[0\\], auth\\.required\\)",
+          "desc": "CORE invariant 12: the removal test asserts POST updateCCPayment is a 404 with no provider call. The auth-test file and its leg only cover shoofi-server main until the retire PR merges - DROP them then"
         },
         {
           "file": "routes/order.js",

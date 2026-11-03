@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/HIGH-RISK-retire-updateccpayment / 2026-11-03 (invariants 6 + 18 — updateCCPayment removed); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -68,7 +68,7 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    try/caught and swallowed. Never let one throw into the order path. **Notifications must
    also never HOLD it:** the store-owner new-order alert is fired with
    `fireStoreOwnerNotifications` (`routes/order.js`) and **not awaited** on every create
-   path, `updateCCPayment` and `finalizeApplePayOrder`, always after the order is persisted
+   path and `finalizeApplePayOrder`, always after the order is persisted
    at its final status. try/catch is not enough: a push that hangs never throws, and on
    brixta 2026-10-03 an awaited one held the create response 128s/257s → app timeout →
    customer resubmitted → duplicate orders. Push sends themselves have a hard timeout
@@ -492,7 +492,8 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `update/viewd`, `printed`, `update-delay`, `start-preparing`, `update-start-preparing`,
       `update-item-collected`, `book-delivery`, `book-custom-delivery`, `update-custom-delivery`,
       `drive-in-arrival(-confirm)`, `update/all`). These are status transitions, so any change
-      is high-risk. Ungated money paths `addRefund` and `updateCCPayment` belong to payments.
+      is high-risk. The ungated money path `addRefund` belongs to payments (`updateCCPayment`
+      was removed 2026-11-03, payments CORE invariant 12).
 
 19. **THE COINS ADMIN ROUTES ARE DASHBOARD-ONLY, GATED ON THE ROUTE ITSELF.** Coins have no
     domain of their own; orders owns their order-side wiring and, since 2026-10-30, who may call

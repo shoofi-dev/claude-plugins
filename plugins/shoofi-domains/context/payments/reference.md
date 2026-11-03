@@ -23,7 +23,7 @@ Files (server): `routes/payments.js` + `routes/payments/validate-card.js`,
 `routes/creditCard.js`, `routes/hyp-pay.js` (HYP charge/tokenize), `routes/payment-methods.js`,
 `utils/hyp-pay.js`, `utils/invoice-mail.js` (per-order receipt fetch), and the payment
 functions inside `routes/order.js` (`processCreditCardPayment`, `processHypTokenPayment`,
-`finalizeApplePayOrder`, `updateCCPayment`). Client: `shoofi-app` payment UI (§ App).
+`finalizeApplePayOrder`). Client: `shoofi-app` payment UI (§ App).
 **Accountant-owned (not you):** `routes/payments/{admin,summaries,admin-reports}.js`,
 `routes/hyp.js` (EZcount invoicing), `routes/admin/masav.js`, `routes/driver-reports.js`,
 `lib/payments/calc.js`, `utils/{hyp,invoice-provider,greeninvoice}.js`.
@@ -81,8 +81,10 @@ For these: write the analysis + the exact diff you *would* make + the risks, ope
   then stock/coins/invoice. Endpoints: `save-apple-pay-session`,
   `update-apple-pay-order-session` (terms-guard), `verify-apple-pay-payment`,
   `zcredit-apple-pay-callback/:intentId` (server safety-net capture, no auth).
-- **`updateCCPayment`** (`order.js`) — standalone ZCredit status confirm (`GetTransactionStatusByReferenceId`).
-  `auth.required` + the order's own customer only since 2026-11-03 (CORE invariant 12). No live caller.
+- **`updateCCPayment` — REMOVED 2026-11-03** (was `POST /api/order/updateCCPayment`, a standalone
+  ZCredit status confirm via `GetTransactionStatusByReferenceId`). No traffic in the request logs
+  and no order it ever wrote; the legacy ZCredit status-sync has no server entry point anymore
+  (CORE invariant 12).
 
 ## 3b. Coupons between quote and charge (map)
 Where a coupon's discount is computed, re-computed or trusted on the way to a charge. Fixed
@@ -252,7 +254,9 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
   password in client state). Deprecated; remove after confirming no live references.
 - **Still needs a verdict (flag, don't fix):** `updateCCPayment` undefined `orderId` in its
   background block (`order.js:~1950`); `refundPartial` ZCredit field shape unverified across
-  terminals (sandbox-first). *(MASAV auth moved to the `accountant` doc.)*
+  terminals (sandbox-first). *(MASAV auth moved to the `accountant` doc.)* *(Agent note
+  2026-11-03: the `updateCCPayment` half looks obsolete — the route is deleted, CORE invariant
+  12; a human should drop it once that merges.)*
 - **By design (prior review):** `verifiedAppName` pass-through (`order.js`).
 
 ## 10b. Payments agent — starter backlog (human-confirmed, remove-only)
