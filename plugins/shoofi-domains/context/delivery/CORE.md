@@ -54,9 +54,20 @@ apart. Anything reasoning about whether an area was serving must use `isActive =
 `checkStoreDeliveryAvailability` (`services/delivery/availability.js`, behind
 `POST /api/delivery/available-drivers`) then looks again with `ignoreAreaActive: true` and
 returns `isDeliveryPaused: true` (area exists, switched off) or `false` (no area). `isAreaSupported`
-stays `false` for a paused area on purpose — old app bundles keep their behaviour and no
-scheduled order opens into it. The customer app shows "delivery not available right now" for
-paused and "outside the delivery area" only for `isDeliveryPaused: false`.
+stays `false` and `available` stays `false` for a paused area on purpose: old app bundles keep
+their behaviour, and a "now" delivery is blocked. The customer app shows "delivery not available
+right now" for paused and "outside the delivery area" only for `isDeliveryPaused: false`.
+**A paused area does NOT stop a SCHEDULED order.** The app's availability gate
+(`hooks/checkout/use-checkout-validate.ts` `validateAdress`, and `blocksCta` in
+`helpers/delivery-availability.ts`) is skipped for `future`/`ramadan-iftar` timing, and booking
+resolves the area with `ignoreAreaActive: true` (`delayed-assignment.js` `createPendingDelivery`),
+so a driver is dispatched into the paused area. That is why the paused branch **also returns the
+paused `area`** (the same `findBestAreaForLocation` document as the active branch): every app
+version prices the fee as `availableDrivers?.area?.price || 0`, and before shoofi-server
+`fix/paused-area-quote-price` the paused branch returned no `area`, so those orders went out at
+`shippingPrice: 0` and the courier was paid ₪0 (5 of 123 scheduled orders since June 2026, all
+5 at ₪0). **"`area` present" never means "supported"**: the no-company branch also returns
+`area` with `isAreaSupported: false`. Gate on `isAreaSupported`/`available`, never on `area`.
 
 ## Driver identity on the wire — `fullName` is the record, `name` is the response
 In `delivery-company.customers` the driver's name is **`fullName`**; the `name` field is
