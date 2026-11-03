@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/HIGH-RISK-updateccpayment-require-auth / 2026-11-03 (invariant 12 — updateCCPayment is the order's own customer only); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -148,6 +148,14 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.
+12. **`POST /api/order/updateCCPayment` is the order's OWN customer only** (`routes/order.js`).
+   It asks ZCredit `GetTransactionStatusByReferenceId` with the platform credentials and writes
+   the order's `status` "1" (paid) or "0". Until 2026-11-03 it had no auth, so anyone with an
+   `app-name` + order id could mark an order paid. Now: `auth.required` (no token → 401), a
+   missing order → 404, and `String(orderDoc.customerId) !== String(req.auth.id)` → 403. Never
+   gate it with `ORDERS_DASHBOARD_OR_STORE_MEMBER`: that 403s customers. No live client calls it
+   (`UpdateCCPayment` in the three apps' `stores/cart/index.ts` is never invoked). Pinned by
+   `test/integration/order-update-cc-payment-auth.js`.
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds

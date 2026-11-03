@@ -82,6 +82,7 @@ For these: write the analysis + the exact diff you *would* make + the risks, ope
   `update-apple-pay-order-session` (terms-guard), `verify-apple-pay-payment`,
   `zcredit-apple-pay-callback/:intentId` (server safety-net capture, no auth).
 - **`updateCCPayment`** (`order.js`) — standalone ZCredit status confirm (`GetTransactionStatusByReferenceId`).
+  `auth.required` + the order's own customer only since 2026-11-03 (CORE invariant 12). No live caller.
 
 ## 3b. Coupons between quote and charge (map)
 Where a coupon's discount is computed, re-computed or trusted on the way to a charge. Fixed

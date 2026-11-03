@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-updateccpayment-require-auth / 2026-11-03 (CORE invariant 12 updateCCPayment own customer only); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -24,7 +24,8 @@
         "services/twin-order/twin-delivery-price.js",
         "utils/client-features.js",
         "services/coupons/public-coupon.js",
-        "routes/coupon.js"
+        "routes/coupon.js",
+        "test/integration/order-update-cc-payment-auth.js"
       ],
       "symbols": {
         "utils/hyp-pay.js": [
@@ -132,6 +133,16 @@
           "file": "routes/admin.js",
           "regex": "secret !== process\\.env\\.INVOICE_WEBHOOK_SECRET",
           "desc": "reference §5: the webhook still checks its body secret behind the admin guard"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "router\\.post\\(\"/api/order/updateCCPayment\", auth\\.required, async",
+          "desc": "CORE invariant 12: updateCCPayment requires a token (it had no auth and could mark any order paid)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(String\\(orderDoc\\.customerId\\) !== String\\(req\\.auth\\.id\\)\\) \\{\\s*res\\.status\\(403\\)",
+          "desc": "CORE invariant 12: updateCCPayment is the order's own customer only (another customer is 403)"
         },
         {
           "file": "routes/order.js",
