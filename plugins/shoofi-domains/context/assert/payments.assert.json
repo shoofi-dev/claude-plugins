@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-addrefund-auth / 2026-11-03 (reference 6 addRefund gate); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -24,7 +24,8 @@
         "services/twin-order/twin-delivery-price.js",
         "utils/client-features.js",
         "services/coupons/public-coupon.js",
-        "routes/coupon.js"
+        "routes/coupon.js",
+        "services/payments/refund-record.js"
       ],
       "symbols": {
         "utils/hyp-pay.js": [
@@ -85,6 +86,13 @@
           "couponBenefit",
           "loadPublicCoupon",
           "business_visible"
+        ],
+        "services/payments/refund-record.js": [
+          "REFUND_RECORD_ACCESS",
+          "refundRecordGate",
+          "parseRefundBody",
+          "checkAgainstOrder",
+          "buildRefundRecord"
         ]
       },
       "patterns": [
@@ -287,6 +295,21 @@
           "file": "services/coupons/public-coupon.js",
           "regex": "const UPCOMING_WINDOW_DAYS = 30;",
           "desc": "CORE: an upcoming coupon shows only within 30 days of its start"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "router\\.post\\(\"/api/order/addRefund\", \\.\\.\\.refundRecord\\.REFUND_RECORD_ACCESS,",
+          "desc": "reference 6: addRefund is gated (auth.required + refundRecordGate); it had no auth until 2026-11-03"
+        },
+        {
+          "file": "services/payments/refund-record.js",
+          "regex": "const REFUND_RECORD_ACCESS = \\[auth\\.required, refundRecordGate\\];",
+          "desc": "reference 6: no token is 401 before the role/store/isAdmin gate"
+        },
+        {
+          "file": "services/payments/refund-record.js",
+          "regex": "typeof HasError !== \"boolean\"",
+          "desc": "reference 6: HasError is required - readers count an entry without it as a successful refund"
         }
       ]
     },

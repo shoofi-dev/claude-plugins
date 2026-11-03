@@ -147,6 +147,21 @@ hangs the request (CORE invariant 11), so none of them answered.
 ## 6. Refunds (customer-side — you own these)
 - **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
   `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.
+  - **Gate** (since 2026-11-03, `services/payments/refund-record.js` `REFUND_RECORD_ACCESS`):
+    `auth.required` + a dashboard role, OR a partner token of the `app-name` store, OR a
+    customer/driver token whose own record has `isAdmin`. No token is 401, others 403. Before
+    that it had no auth and pushed the body verbatim.
+  - **Callers:** the `refund-confirm` dialog in shoofi-app and shoofi-shoofir (inherited in-app
+    admin, `admin-orders` screen — live) and shoofi-partner (button commented out). The admin
+    web has no caller. Grep the two live apps before narrowing the gate: a 403 there is silent.
+  - **`HasError` is load-bearing.** The three apps' order screens sum `amount` over entries with
+    `!HasError` and show "-₪N", so an entry without it reads as a successful refund. The server
+    now requires it (boolean) and rebuilds the record field by field (`amount` > 0 and
+    ≤ `order.total`; `ReturnCode`/`ReturnMessage`/`ReferenceNumber`; server-set `created`,
+    `recordedBy`).
+  - The client attempts the refund itself first (legacy `refund.ts`, using `GET
+    /api/shoofiAdmin/store/z-cr` creds). `z-cr` now serves only `zcredit_api_key`, so that call
+    most likely fails and records `HasError: true` (unverified against a sandbox).
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,
