@@ -97,6 +97,8 @@ ownership + partial-use balance only) → store promotions + the delivery deal-v
 conflict (`enforcePromotions`, `resolveDeliveryConflict`) → **fixed-delivery-price coupon
 recompute** (`enforceDeliveryPriceCoupon`, CORE invariant 14). Each one corrects `total`
 and never rejects → build `orderDoc` → **insert into store `orders`** (authoritative) →
+`[shippingPriceCheck]` fired and **never awaited** (log-only; a DELIVERY fee below the area
+tariff → one warn line + `order.shippingPriceCheck`, CORE invariant 20) →
 **stock decrement if status≠"0"** → first-order attribution → Apple Pay session
 self-heal → fraud persistence → **push `customers.orders[]` snapshot (central)** →
 notify store owner (**a repeating alert, not one push**, **fired in the background and
@@ -151,6 +153,12 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   server-side; `surcharge`, `extrasPrice` and the names are ticket snapshots. `comboIssues`
   is never persisted on an item (amend strips it); creation keeps them under
   `serverPricing.comboIssues`. CORE invariants 11–12.
+- **`orders.shippingPriceCheck`** = `{ expected, submitted, areaId, paused, checkedAt }`,
+  `$set` after the insert ONLY when a DELIVERY order's posted `shippingPrice` is below its
+  area's tariff (paused areas included). Absent on every other order, so
+  `find({ shippingPriceCheck: { $exists: true } })` lists the flagged ones. Diagnostic only:
+  no reader, no index, money unchanged. A `book-delivery.order` snapshot taken before the `$set`
+  lands does not carry it. CORE invariant 20.
 - **`shoofi.customers.orders[]`** = a **write-once snapshot with NO status field.**
   `{ orderId(ObjectId→orders._id), appName, created, total, orderIdNumber(=orders.orderId),
   originalOrderId, ... }`. **NEVER infer status/completion/revenue from it** — join
@@ -380,6 +388,9 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
   `produtsAdapter`) via `hooks/checkout/use-checkout-submit.ts` from
   `screens/checkout/index.tsx`. **Client computes the totals** (`total`, `orderPrice`,
   `shippingPrice`) and the server trusts them (matches the server doc's pricing note).
+  `shippingPrice` = `availableDrivers.area.price || 0` (the PRE-discount tariff; coupons ride on
+  `discountAmount`, deals on `total`), so a quote with no `area` posts ₪0 — the paused-area
+  bug. The server only logs and flags a fee below the tariff (CORE invariant 20).
   Initial status is `"0"` (CC) or `"6"` (digital success), decided client-side. **The target
   store is the cart's stamp:** checkout passes `storeData: cartStoreData || storeDataStore.storeData`
   and `submitOrder` sends `app-name: order.storeData?.appName` — so whatever stamps an empty
