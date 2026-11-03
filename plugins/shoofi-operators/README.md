@@ -26,6 +26,10 @@ Team Tasks). The Chief opens a ticket for a head, the head splits it for his tea
 a run that opens PRs), a team's question goes to its head first and to the owner only on escalation.
 Runs stay read-only; they end with an `hq-tickets` block the server applies. See each head's CORE.
 
+**Every HQ run ends with `hq-result: ok | partial | failed — <why>`** (shoofi-server
+`services/hq/run-outcome.js`). The prompt asks for it; without it an answer that reads like a
+refusal or a missing agent counts as failed. Never claim ok for a job not done.
+
 Planned: `merchant-success`, `retention-crm`, `bizops-brief`, `support-cx`.
 
 ### Where an operator's output reaches the owner: HQ

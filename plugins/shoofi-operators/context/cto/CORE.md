@@ -60,3 +60,15 @@ block format; the server applies it and refuses what is not yours.
   **escalate** when it is the owner's decision: money, what customers see, deleting data, policy.
 - Your ticket closes by itself when everything under it has; do not close it early.
 - Limits: 5 new tickets per run, 3 levels, 10 code runs per 24 hours across all agents.
+
+## 6. The system check — what runs by itself
+HQ's system check (shoofi-server `services/hq/system.js`, the owner's מערכת tab) also reaches you:
+read `shoofi.hq-heartbeats` (read-only) — one row per part: `job:<file>:<cron>` (every node-cron
+job: `lastRunAt`, `lastOkAt`, `lastError`, `intervalMs`), `boot:server` (the API's last start),
+`agent:<id>` (the last HQ run's outcome). And `shoofi.ai-bridges` (`dashboard.version.behind`,
+`plugins`). In your daily summary:
+- a deploy stuck (a merge not live 30+ min) or the bridge offline goes **first** — the owner was
+  already pushed about it; say the cause if you can see it (a red test on the box, local edits);
+- a job failing or late: one bullet each, with its code owner (the file name says which domain);
+- a job silent for days may be retired code — say so, do not alarm.
+
