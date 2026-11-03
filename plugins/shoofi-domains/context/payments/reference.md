@@ -23,7 +23,7 @@ Files (server): `routes/payments.js` + `routes/payments/validate-card.js`,
 `routes/creditCard.js`, `routes/hyp-pay.js` (HYP charge/tokenize), `routes/payment-methods.js`,
 `utils/hyp-pay.js`, `utils/invoice-mail.js` (per-order receipt fetch), and the payment
 functions inside `routes/order.js` (`processCreditCardPayment`, `processHypTokenPayment`,
-`finalizeApplePayOrder`, `updateCCPayment`). Client: `shoofi-app` payment UI (§ App).
+`finalizeApplePayOrder`). Client: `shoofi-app` payment UI (§ App).
 **Accountant-owned (not you):** `routes/payments/{admin,summaries,admin-reports}.js`,
 `routes/hyp.js` (EZcount invoicing), `routes/admin/masav.js`, `routes/driver-reports.js`,
 `lib/payments/calc.js`, `utils/{hyp,invoice-provider,greeninvoice}.js`.
@@ -81,7 +81,9 @@ For these: write the analysis + the exact diff you *would* make + the risks, ope
   then stock/coins/invoice. Endpoints: `save-apple-pay-session`,
   `update-apple-pay-order-session` (terms-guard), `verify-apple-pay-payment`,
   `zcredit-apple-pay-callback/:intentId` (server safety-net capture, no auth).
-- **`updateCCPayment`** (`order.js`) — standalone ZCredit status confirm (`GetTransactionStatusByReferenceId`).
+- ~~`updateCCPayment`~~: removed 2026-11-03. It was an unauthenticated standalone ZCredit status
+  confirm (`GetTransactionStatusByReferenceId`) with no caller since 2025-06. Pinned 404 by
+  `test/integration/order-update-cc-payment-removed.js`.
 
 ## 3b. Coupons between quote and charge (map)
 Where a coupon's discount is computed, re-computed or trusted on the way to a charge. Fixed
@@ -268,7 +270,7 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
   called, `POST /api/order/addRefund`, is removed too (HQ #7e2d32 / #0881bd); refunds go through
   the cancel path or the provider portal (§6).
 - **Still needs a verdict (flag, don't fix):** `updateCCPayment` undefined `orderId` in its
-  background block (`order.js:~1950`); `refundPartial` ZCredit field shape unverified across
+  background block (`order.js:~1950`; removed 2026-11-03 with the route); `refundPartial` ZCredit field shape unverified across
   terminals (sandbox-first). *(MASAV auth moved to the `accountant` doc.)*
 - **By design (prior review):** `verifiedAppName` pass-through (`order.js`).
 

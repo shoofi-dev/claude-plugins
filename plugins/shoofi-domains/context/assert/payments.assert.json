@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@fix/HIGH-RISK-remove-addrefund-route / 2026-11-03 (addRefund removed; no pin added: an absence pin on main would red every shoofi-server PR until the deletion merges); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@main / 2026-11-05 (addRefund removed #423, updateCCPayment removed #424; no absence pins: the routes are gone from routes-baseline.txt); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -88,6 +88,16 @@
         ]
       },
       "patterns": [
+        {
+          "file": "routes/order.js",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*/api/order/updateCCPayment)",
+          "desc": "CORE scope: POST /api/order/updateCCPayment was removed 2026-11-03 (unauthenticated, no caller) and must not come back ungated"
+        },
+        {
+          "file": "test/integration/order-update-cc-payment-removed.js",
+          "regex": "\\[401, 404\\]\\.includes\\(res\\.status\\)",
+          "desc": "CORE scope: the integration test pins an anonymous updateCCPayment POST to 401/404"
+        },
         {
           "file": "routes/admin.js",
           "regex": "const invoiceQueueAdmins = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",

@@ -168,7 +168,7 @@
         {
           "file": "routes/order.js",
           "regex": "(?<![\\s\\S])(?![\\s\\S]*await sendStoreOwnerNotifications\\((?:orderDoc|updatedOrder),)",
-          "desc": "NO create path, updateCCPayment or finalizeApplePayOrder awaits the store-owner alert - an awaited alert on a stalled push socket held the create response 128s/257s and the customer resubmitted. Only the fraud-approval call (argument `order`) may await it"
+          "desc": "NO create path or finalizeApplePayOrder awaits the store-owner alert - an awaited alert on a stalled push socket held the create response 128s/257s and the customer resubmitted. Only the fraud-approval call (argument `order`) may await it"
         },
         {
           "file": "services/notification/notification-service.js",

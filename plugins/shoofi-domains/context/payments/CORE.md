@@ -23,8 +23,11 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 **Yours:** `routes/payments.js`, `routes/payments/validate-card.js`, `routes/creditCard.js`,
 `routes/hyp-pay.js` (HYP charge/tokenize), `routes/payment-methods.js`, `utils/hyp-pay.js`,
 `utils/invoice-mail.js` (per-order receipt), and the payment functions inside `routes/order.js`
-(`processCreditCardPayment`, `processHypTokenPayment`, `finalizeApplePayOrder`,
-`updateCCPayment`). Client: the payment UI in `shoofi-app`.
+(`processCreditCardPayment`, `processHypTokenPayment`, `finalizeApplePayOrder`).
+Client: the payment UI in `shoofi-app`. `POST /api/order/updateCCPayment` was removed on
+2026-11-03: it was unauthenticated and had no caller, and
+`test/integration/order-update-cc-payment-removed.js` keeps it 404. If it ever comes back,
+it needs auth, a customerId match, an atomic `status:"0"` guard and an amount check.
 **Not yours:** settlement/reports/store invoices/MASAV = **`accountant`**; order lifecycle =
 `orders`. `lib/payments/calc.js` lives with accountant.
 
@@ -299,7 +302,7 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
   orders are flagged `paymentAuth.refundRequired` and refunded by hand in the provider portal.
   The apps' read-only `order.refundData` display stays for old records.
 - **Flagged, needs verdict:** `updateCCPayment` references an undefined `orderId` in its
-  background block; `refundPartial`'s ZCredit field shape is unverified across terminals
+  background block (removed 2026-11-03: the whole route is gone); `refundPartial`'s ZCredit field shape is unverified across terminals
   (sandbox first).
 - **RESOLVED by manual invoicing:** the exempt document's TITLE used to be unfixable —
   neither gateway publishes a per-transaction document-type parameter, so `EZ.type` and
