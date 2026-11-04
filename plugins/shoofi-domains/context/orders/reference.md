@@ -552,6 +552,17 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   - **Capture**: `getInvoiceSP` returns one slot per queued order (or distribution group),
     `null` where capture failed (`utils/print-queue.ts` `captureAlignedToQueue`). The loop
     pairs `orderInvoicesPS[i]` with `queue[i]` and never prints or marks a `null` slot.
+  - **Ticket layout: one Text per line.** The ticket is captured from a hidden host as an
+    image, and anything that overflows the host is simply not in it. A `label: value` line
+    built as a row of two Texts overflows: React Native measures the value against the
+    whole row, so it wraps at the ticket's width and then starts after the label. Under
+    forced RTL its end runs past the LEFT edge and is cut off. On 2026-11-04 pastito's
+    tickets lost "فلفل" from "…ثوم, فلفل أسود", and a line of paid add-ons lost its last
+    items and prices. Extras lines are therefore ONE Text built by
+    `helpers/invoice-extra-line.ts` (`invoiceExtraLine`), drawn by
+    `components/shared/InvoiceOrderExtrasDisplay.tsx`. The same rule holds for any new
+    ticket line. To see the exact printed image on a simulator, run Metro with
+    `EXPO_PUBLIC_DUMP_INVOICE=1`: the capture is logged as a data-uri.
   - **Diagnosing a loop**: `<store>.client-error` rows with `error.source:
     "printer-testPrint"` (and `error.outcome` since 2026-10-29). `customerId` there is the
     `shoofi.store-users` `_id` of the tablet's user. Then the store's
