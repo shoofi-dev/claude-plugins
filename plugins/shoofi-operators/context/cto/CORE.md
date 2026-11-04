@@ -84,6 +84,15 @@ your next run, check each against `main` (it may be fixed) and open one `"work":
 `"kind": "bug"` ticket per bug that is still there, for its owner — all of them in that run; the
 queue starts them three at a time. #8 is `"priority": "high"`. The ticket dedupe makes a
 second run harmless. Remove an item from this list (docs PR) once its fix merged.
+
+⚠️ **Corrected 2026-11-04: the dedupe does not make a second run harmless.** It matches the
+exact title only (`sameTitle` in `services/hq/tickets.js`), so the same bug in your next run's
+words is a new ticket — and, until shoofi-server #425, a fix whose PR was open did not count at
+all. On 2026-11-03 this list, read by every CTO run, re-opened #8 about twenty times and left
+eight competing server PRs (#416–#424). **Before you open any item here, read "Already open on
+this board" in your job** (and the open PRs, `ai-pr-snapshots`): if a ticket or a PR covers it,
+add a `note` to that ticket and open nothing.
+
 | # | Bug (as reported) | Owner |
 |---|---|---|
 | 1 | A re-cancel refunds the order's coins a second time | orders |
