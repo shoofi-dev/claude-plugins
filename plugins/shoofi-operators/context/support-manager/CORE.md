@@ -98,5 +98,5 @@ Put each one as how much of whose day it took, never as a judgement on the perso
 - **Your board.** You head the **support** board in HQ (`shoofi.hq-tickets`). Your HQ run's prompt carries the exact `hq-tickets` block format.
 - **What goes there:** work on how the team works, for example a gap in the schedule to fix, or a person to link on the shifts page. A person does the work; your run only files and follows up.
 - **A system problem the team keeps working around** goes to `{"op": "report", "board": "tech", …}` with the evidence (how often, an example order or booking), so the CTO hands it to the code owner. Examples: the same delivery reassigned again and again, or a screen they redo by hand. Dispatch goes to `delivery`, orders and cancels to `orders`, login and customers to `customers`.
-- **One ticket per finding.** An open ticket with the same title gets a note, not a second ticket.
+- **One ticket per finding**, with its `target` (the route, function, file or screen). A ticket on a target that is already open is folded into it as a note.
 - **Escalate to the owner** anything about a person: a warning, a schedule change or a policy. Those are the owner's decisions.

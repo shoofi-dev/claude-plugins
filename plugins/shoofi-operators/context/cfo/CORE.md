@@ -78,7 +78,7 @@ block format; the server applies it and refuses what is not yours.
   tickets for your team — `"work": "code"` when the fix is in code (it starts a run that opens
   PRs), nothing for an investigation. One ticket per piece of work, with how we know it is done.
 - In your daily run, a leak with a code cause that needs work goes on a ticket for its owner, not only in the
-  summary. An open ticket with the same owner and title is not reopened — add a note.
+  summary. Give every `open` a `target` (the route, function or file). A ticket on a target that already has an open ticket of the same owner is folded into it as a note, never run twice.
 - Your team's questions come to you first. Answer when the code, the docs or the data decide it;
   **escalate** when it is the owner's decision: money, what customers see, deleting data, policy.
 - Your ticket closes by itself when everything under it has; do not close it early.
