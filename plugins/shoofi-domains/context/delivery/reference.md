@@ -307,6 +307,17 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
 deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
 `driver-inactivate` (**currently disabled** — commented out in app.js).
 
+**`store-delivery-availability`: the alerts are noisy on the hour.**
+- It runs every 30 minutes, around the clock, with no business-day gate, and writes `shoofi.store-delivery-availability-alerts`.
+- Its `:00` run races the hourly `driver-shift` deactivation. The driver list is read before the hour's drivers go off, and the probes run after. So it opens `unavailable_despite_drivers` for every store: 123 at 00:01 and 147 at 01:01 on 2026-11-04, all resolved by the `:30` run.
+- An alert a later run still finds keeps its `createdAt` and gets a new `updatedAt`.
+- No reason means "every driver at capacity" or "outside shift hours". Neither the cron nor `checkStoreDeliveryAvailability` reads load (`maxOrdersByAdmin`).
+- HQ's inbox (shoofi-server `services/hq/delivery-status.js`, `docs/hq.md` *Delivery off: one alert*):
+  - counts a "despite drivers" alert only once `updatedAt > createdAt`;
+  - alerts only inside the business day (`utils/shift-time.js`);
+  - folds "delivery off for everyone" into one item that carries each active driver's open deliveries / `getDriverCapacity`. Off for everyone means the `delivery_support` switch is off, no `isActive` driver, or none with `driverHasCapacity`.
+- The race itself is not fixed in the cron.
+
 ## 7. Data model (delivery-company DB)
 - `bookDelivery` — `{status, isPendingAssignment, assignDriverAt, pickupTime, created,
   expectedDeliveryAt, area(embedded), company(embedded), driver(embedded), bookId,
