@@ -145,8 +145,16 @@ Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restric
 hangs the request (CORE invariant 11), so none of them answered.
 
 ## 6. Refunds (customer-side — you own these)
-- **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
-  `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.
+- **Per-order ZCredit card refund** = `POST /api/payments/zcredit-refund`
+  (`services/payments/zcredit-refund.js`, since 2026-11). `auth.required` + `refundGate`
+  (dashboard `admin`/`manager`, master passes, or a mobile token whose own record has
+  `isAdmin`). Only `order.payment_provider === "CREDITCARD"` with a successful charge and
+  `ccPaymentRefData.data.ReferenceNumber`; HYP, wallets, twins → 422. Success → `refundData[]`
+  row (`HasError:false`, `by`, `idempotencyKey`); declined / unknown → `refundAttempts[]`.
+  `zcreditRefundInFlight` is the per-order lock; `state:"unknown"` stays until cleared by hand.
+  Nothing on the server reads `refundData` for settlement.
+- `order.js addRefund` is **retired**: it writes nothing and answers 200 `RETIRED` so old
+  builds' dialogs don't hang. Legacy `HasError:true` rows remain in old orders' `refundData`.
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,
@@ -246,9 +254,9 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
   When touching card code, prefer HYP and never add new CVV storage.
 - **CONFIRMED — REMOVE (backlog #1):** `hyp-test-soft` debug endpoint (`hyp-pay.js`)
   that charges 1 NIS with a token. It should not be in prod.
-- **CONFIRMED — REMOVE (backlog #2):** the legacy client-side ZCredit charge/refund in the
-  customer app — `components/credit-card/api/payment.ts` + `refund.ts` (terminal number +
-  password in client state). Deprecated; remove after confirming no live references.
+- **DONE (backlog #2, 2026-11):** the legacy client-side ZCredit charge/refund is removed
+  from shoofi-app and shoofi-shoofir; refunds go through the server (§6). shoofi-partner
+  still has the dead copies.
 - **Still needs a verdict (flag, don't fix):** `updateCCPayment` undefined `orderId` in its
   background block (`order.js:~1950`); `refundPartial` ZCredit field shape unverified across
   terminals (sandbox-first). *(MASAV auth moved to the `accountant` doc.)*
@@ -257,7 +265,7 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
 ## 10b. Payments agent — starter backlog (human-confirmed, remove-only)
 1. **Remove `hyp-test-soft`** (`routes/hyp-pay.js`) — money-guardrail file, so a **draft
    HIGH-RISK PR**: minimal diff, confirm nothing calls it, note the rollback.
-2. **Remove the legacy client-side charge/refund** in shoofi-app
+2. **DONE 2026-11 (app + shoofir; partner pending).** Remove the legacy client-side charge/refund in shoofi-app
    (`components/credit-card/api/payment.ts` + `refund.ts`; sweep the deprecated
    `use-checkout-charge-cc.ts` no-op and manual `validate-card` add-card UIs if unused) —
    **verify zero live references first**, then delete.

@@ -281,9 +281,16 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
 - **CONFIRMED — remove (backlog):** `hyp-test-soft` debug endpoint in `routes/hyp-pay.js`
   (charges 1 NIS with a saved token) should not exist in prod. Money file → draft HIGH-RISK PR,
   confirm nothing calls it.
-- **CONFIRMED — remove (backlog):** legacy client-side ZCredit charge/refund in `shoofi-app`
-  (`components/credit-card/api/payment.ts`, `refund.ts`) — terminal number + password in client
-  state. Verify zero live references first, then delete.
+- **DONE (2026-11, HQ #d2048f):** the client-side ZCredit charge/refund is removed from
+  `shoofi-app` and `shoofi-shoofir` (`components/credit-card/api/payment.ts`, `refund.ts`, the
+  `1234` confirm code). Card refunds of a ZCredit `CREDITCARD` order go through
+  `POST /api/payments/zcredit-refund` (`shoofi-server/services/payments/zcredit-refund.js`):
+  server-held terminal credentials, capped at charged minus successful `refundData`, success →
+  `refundData` (with `by`), decline/unknown → `refundAttempts` (never `refundData`). An unknown
+  ZCredit outcome leaves `zcreditRefundInFlight.state: "unknown"` on the order and blocks every
+  retry (409) until a person checks the back office and unsets it. `POST /api/order/addRefund`
+  writes nothing (200 `RETIRED`). `shoofi-partner` still carries copies of the files behind
+  dead buttons.
 - **Flagged, needs verdict:** `updateCCPayment` references an undefined `orderId` in its
   background block; `refundPartial`'s ZCredit field shape is unverified across terminals
   (sandbox first).
