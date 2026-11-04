@@ -288,7 +288,9 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
   server-held terminal credentials, capped at charged minus successful `refundData`, success →
   `refundData` (with `by`), decline/unknown → `refundAttempts` (never `refundData`). An unknown
   ZCredit outcome leaves `zcreditRefundInFlight.state: "unknown"` on the order and blocks every
-  retry (409) until a person checks the back office and unsets it. `POST /api/order/addRefund`
+  retry (409) until an admin checks the back office and calls
+  `POST /api/payments/zcredit-refund/resolve`. A full refund clears `paymentAuth.refundRequired`
+  only when `paymentAuth` already exists; never create one on a ZCredit order. `POST /api/order/addRefund`
   writes nothing (200 `RETIRED`). `shoofi-partner` still carries copies of the files behind
   dead buttons.
 - **Flagged, needs verdict:** `updateCCPayment` references an undefined `orderId` in its

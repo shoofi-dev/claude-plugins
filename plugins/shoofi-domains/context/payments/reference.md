@@ -151,7 +151,14 @@ hangs the request (CORE invariant 11), so none of them answered.
   `isAdmin`). Only `order.payment_provider === "CREDITCARD"` with a successful charge and
   `ccPaymentRefData.data.ReferenceNumber`; HYP, wallets, twins → 422. Success → `refundData[]`
   row (`HasError:false`, `by`, `idempotencyKey`); declined / unknown → `refundAttempts[]`.
-  `zcreditRefundInFlight` is the per-order lock; `state:"unknown"` stays until cleared by hand.
+  `zcreditRefundInFlight` is the per-order lock. A lock in `state` `unknown` (lost answer),
+  `unrecorded` (ZCredit said yes, the save failed) or `calling` older than 10 min is closed
+  only by `POST /api/payments/zcredit-refund/resolve` (dashboard admin/master): `refunded` →
+  a `source:"manual"` `refundData` row, `not_refunded` → a `refundAttempts` row; both release
+  the lock. The money audit lists such locks (`zcredit-refund-unknown`, 7-day lookback only).
+  A FULL refund sets `paymentAuth.refundRequired:false` + `refundedAmount` + `refundedAt`, but
+  only on an order that already has `paymentAuth`. Never create one on a ZCredit order:
+  `settleCancelledOrderMoney` treats its presence as an HYP J5 hold.
   Nothing on the server reads `refundData` for settlement.
 - `order.js addRefund` is **retired**: it writes nothing and answers 200 `RETIRED` so old
   builds' dialogs don't hang. Legacy `HasError:true` rows remain in old orders' `refundData`.
