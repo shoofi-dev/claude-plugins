@@ -153,6 +153,14 @@ hangs the request (CORE invariant 11), so none of them answered.
   (`paymentAuth.refundedAmount` / `refundRequired`, `services/payments/order-authorization.js`).
   Pinned by `test/integration/order-addrefund-route-removed.js`. Do not re-add a refund-recording
   route without auth.
+- **There is no in-app refund button any more** (CTO decision, HQ #0881bd, option A). On cancel,
+  `releaseOrderAuthorization` → `refundOrderPayment` credits a **HYP** charge automatically only
+  when support chose "refund" (`autoRefund`). Everything else is **flagged, not refunded**:
+  `paymentAuth.refundRequired: true` plus `refundRequiredReason` / `refundRequiredAmount`. A
+  **ZCredit** order is flagged `refund_unsupported_provider_zcredit` and a **twin** side
+  `refund_twin_order_manual`, and a person refunds it by hand in the provider's back office
+  (portal). Nothing records that manual refund on the order. The three apps still *display*
+  `order.refundData` (`gerRefundAmount`) for old records; that read is inert and kept on purpose.
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,
@@ -256,7 +264,9 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
   customer app — `components/credit-card/api/payment.ts` + `refund.ts` (terminal number +
   password in client state). Deprecated; remove after confirming no live references.
   `refund.ts` + the `refund-confirm` dialog removed from all three apps (HQ #1a2f9e);
-  `payment.ts` (all 3) and `validate-card.ts` (partner, shoofir) remain.
+  `payment.ts` (all 3) and `validate-card.ts` (partner, shoofir) remain. The server route it
+  called, `POST /api/order/addRefund`, is removed too (HQ #7e2d32 / #0881bd); refunds go through
+  the cancel path or the provider portal (§6).
 - **Still needs a verdict (flag, don't fix):** `updateCCPayment` undefined `orderId` in its
   background block (`order.js:~1950`); `refundPartial` ZCredit field shape unverified across
   terminals (sandbox-first). *(MASAV auth moved to the `accountant` doc.)*
