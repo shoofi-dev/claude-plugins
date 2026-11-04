@@ -262,13 +262,14 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
   When touching card code, prefer HYP and never add new CVV storage.
 - **CONFIRMED — REMOVE (backlog #1):** `hyp-test-soft` debug endpoint (`hyp-pay.js`)
   that charges 1 NIS with a token. It should not be in prod.
-- **CONFIRMED — REMOVE (backlog #2):** the legacy client-side ZCredit charge/refund in the
-  customer app — `components/credit-card/api/payment.ts` + `refund.ts` (terminal number +
-  password in client state). Deprecated; remove after confirming no live references.
-  `refund.ts` + the `refund-confirm` dialog removed from all three apps (HQ #1a2f9e);
-  `payment.ts` (all 3) and `validate-card.ts` (partner, shoofir) remain. The server route it
-  called, `POST /api/order/addRefund`, is removed too (HQ #7e2d32 / #0881bd); refunds go through
-  the cancel path or the provider portal (§6).
+- **Backlog #2, done except `validate-card.ts`:** the legacy client-side ZCredit charge/refund
+  (`components/credit-card/api/payment.ts` + `refund.ts`, terminal number + password in client
+  state) is removed from all three apps: `refund.ts` and the `refund-confirm` dialog by HQ
+  #1a2f9e (merged 2026-11-05), `payment.ts` by #d2025c, with the z-cr commented-out
+  full-credentials return. The server route the refund called, `POST /api/order/addRefund`, is
+  removed too (HQ #7e2d32 / #0881bd); refunds go through the cancel path or the provider portal
+  (§6). Still open: `validate-card.ts` (partner, shoofir), which reads the same missing fields
+  (shoofi-partner#42, shoofi-shoofir#30).
 - **Still needs a verdict (flag, don't fix):** `updateCCPayment` undefined `orderId` in its
   background block (`order.js:~1950`; removed 2026-11-03 with the route); `refundPartial` ZCredit field shape unverified across
   terminals (sandbox-first). *(MASAV auth moved to the `accountant` doc.)*
@@ -277,10 +278,10 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
 ## 10b. Payments agent — starter backlog (human-confirmed, remove-only)
 1. **Remove `hyp-test-soft`** (`routes/hyp-pay.js`) — money-guardrail file, so a **draft
    HIGH-RISK PR**: minimal diff, confirm nothing calls it, note the rollback.
-2. **Remove the legacy client-side charge/refund** in shoofi-app
-   (`components/credit-card/api/payment.ts` + `refund.ts`; sweep the deprecated
-   `use-checkout-charge-cc.ts` no-op and manual `validate-card` add-card UIs if unused) —
-   **verify zero live references first**, then delete.
+2. **Remove the legacy client-side refund** (`refund.ts`; `payment.ts` is gone since #d2025c),
+   and sweep the `use-checkout-charge-cc.ts` no-op (zero callers: `use-checkout-submit.ts`
+   destructures `chargeCC` but never calls it) and the manual `validate-card` add-card UIs if
+   unused. **Verify zero live references first**, then delete.
 - Both align with the ZCredit→HYP migration direction (§2).
 
 ## 11. Definition of done
