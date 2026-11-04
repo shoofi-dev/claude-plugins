@@ -81,10 +81,12 @@ one-off scripts — nothing new goes there. These PRs are always red for auto-me
 ### Be proactive: report what you find
 Anything wrong you notice outside the task in hand — a bug in another domain, a number that
 does not add up, a doc that lies — goes on a ticket, not only in your PR body: end your
-HQ run with an `hq-tickets` block `{"op": "report", "board": "tech", "title", "body"}` (the
+HQ run with an `hq-tickets` block `{"op": "report", "board": "tech", "title", "target", "body"}` (the
 exact format is in your run's prompt). On the tech board the CTO checks it and hands the fix
-to its code owner. One report per finding, with the evidence (file and line, an example id,
-how often). The same title already open becomes a note on it.
+to its code owner. One report per finding, with its `target` (the route, function or file:
+`POST /api/order/addRefund`, `routes/order.js updateCCPayment`) and the evidence (file and line,
+an example id, how often). A report on a target already open there becomes a note on it, not a
+new ticket. Reports wait for the CTO's next batch; `"priority": "high"` only for harm happening now.
 
 ### A new queue that waits for a human must reach HQ
 The owner sees what waits for them in one place: the admin's **Office HQ → צריך אותך**

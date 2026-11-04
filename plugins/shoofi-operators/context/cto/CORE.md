@@ -55,7 +55,13 @@ block format; the server applies it and refuses what is not yours.
   tickets for your team — `"work": "code"` when the fix is in code (it starts a run that opens
   PRs), nothing for an investigation. One ticket per piece of work, with how we know it is done.
 - In your daily run, a real fault that needs work goes on a ticket for its owner, not only in the
-  summary. An open ticket with the same owner and title is not reopened — add a note.
+  summary.
+- **One ticket per target.** Give every `open` a `target`: the route, function or file it changes.
+  The server folds a ticket into one that already has its target. That means an open ticket of
+  the same owner and kind of work, or a code ticket finished in the last day. A code ticket whose
+  PR is open gets the new text as a follow-up, to go into the SAME PR. Put everything about one
+  target in one ticket: its auth, its validation and its tests. On 2026-11-04, `addRefund` and
+  `updateCCPayment` became 9 code tickets, $62 and nine competing PRs.
 - Your team's questions come to you first. Answer when the code, the docs or the data decide it;
   **escalate** when it is the owner's decision: money, what customers see, deleting data, policy.
 - Your ticket closes by itself when everything under it has; do not close it early.
@@ -66,7 +72,13 @@ block format; the server applies it and refuses what is not yours.
 ### Reports from the other teams land on you
 Anyone — the CFO, the CMO, a code owner in the middle of another ticket, an operator's daily
 run — may `report` a finding to the tech board (`foundBy` on the ticket says who). It is a
-ticket of yours with no parent. Check it, read-only, in the code and the data:
+ticket of yours with no parent.
+
+**They come in batches.** HQ runs you once for up to 8 waiting reports, when 6 are waiting or
+the oldest has waited 2 hours. A `high` report still runs at once. The job lists each report with
+its id. Close each one by id (`{"op":"status","id":…}`), or open its fix with `"parent": "<its id>"`.
+Two reports about the same thing get one fix ticket. Check each one, read-only, in the code and
+the data:
 - real and in code → open the fix as `"work": "code"` for its code owner (§2), with how we know
   it is done; the report closes when the fix does;
 - real but not code (data, config, a person's decision) → `escalate` or say who, and close it
