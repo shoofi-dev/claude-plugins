@@ -18,9 +18,10 @@
 | `competitive-intel` | Haat + Tira Eat — the coverage gap, price gaps, menu coverage, promos, ratings, and competitor↔our-store matching |
 | `social-marketing` | Shoofi's own Facebook/Instagram content — Arabic only, one account. Drafts posts, stories and ad copy against live platform data. **Never publishes.** |
 | `cfo` | **The daily money picture.** Reads the nightly money audit (shoofi-server `services/hq/money-audit`, `hq-money-audits`) of the business day that closed, triages its findings (real leak / known pattern / noise), and writes the owner a short Hebrew money summary for the morning brief. Names the code owner (accountant, payments, orders, delivery) for a cause in the code; the HQ run hands it over. **Never computes its own totals, never moves money.** |
+| `support-manager` | **Manages the human support team.** Every morning (07:55) it reads the team's day the server built at 07:50 (`hq-support-days`: each person's score, parts, numbers, focus areas, shift and flags, from respond.io chats and the admin audit log) and writes the owner a short Hebrew review per person, judged on the 7-day score, plus which manual work an agent could take over. Heads the **support** board. **Never computes its own scores, never edits shifts or staff.** |
 | `cto` | **The daily technical picture, in charge of the six code owners.** Reads the last day of the bridge's error digest (`hq-tech-digests`) and the PR queue (`ai-pr-snapshots`), triages faults by customers hit, and writes the owner a short Hebrew summary with one code owner per problem; the HQ run hands each to its owner. **Never writes code, never merges.** |
 
-**Tickets.** The department heads (cto, cfo, marketing-manager) each head a board of the agents'
+**Tickets.** The department heads (cto, cfo, marketing-manager, support-manager) each head a board of the agents'
 own tickets in HQ (shoofi-server `services/hq/tickets.js`, `hq-tickets`, apart from the people's
 Team Tasks). The Chief opens a ticket for a head, the head splits it for his team (code work starts
 a run that opens PRs), a team's question goes to its head first and to the owner only on escalation.
@@ -30,7 +31,7 @@ Runs stay read-only; they end with an `hq-tickets` block the server applies. See
 `services/hq/run-outcome.js`). The prompt asks for it; without it an answer that reads like a
 refusal or a missing agent counts as failed. Never claim ok for a job not done.
 
-Planned: `merchant-success`, `retention-crm`, `bizops-brief`, `support-cx`.
+Planned: `merchant-success`, `retention-crm`, `bizops-brief`.
 
 ### Where an operator's output reaches the owner: HQ
 
