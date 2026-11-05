@@ -230,7 +230,7 @@ Then the `hq-result:` line. At most ~12 lines in all.
 **Then put the work on your board** (§7): a step that needs content becomes a ticket — posts and
 stories for `social-marketing`, "what are Haat / Tira doing with X" for `competitive-intel`, an
 in-app piece for yourself to draft in the hub. Each with how we know it is done ("a draft in the
-approval queue"). Give every `open` a `target` (the route, function or file). A ticket on a target that already has an open ticket of the same owner is folded into it as a note, never run twice.
+approval queue"). Give every `open` a `target` (the route, function or file). A ticket on a target that already has an open ticket of the same owner (for code: any owner's, or one whose PR is still open) is folded into it as a note, never run twice. Check "Already on this board" in your job first.
 A banner or push bug you see in `warnings` is the CTO's: say it in one bullet and `report` it to
 the tech board (§7), once — the same title already open there becomes a note.
 

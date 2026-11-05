@@ -56,12 +56,23 @@ block format; the server applies it and refuses what is not yours.
   PRs), nothing for an investigation. One ticket per piece of work, with how we know it is done.
 - In your daily run, a real fault that needs work goes on a ticket for its owner, not only in the
   summary.
-- **One ticket per target.** Give every `open` a `target`: the route, function or file it changes.
-  The server folds a ticket into one that already has its target. That means an open ticket of
-  the same owner and kind of work, or a code ticket finished in the last day. A code ticket whose
-  PR is open gets the new text as a follow-up, to go into the SAME PR. Put everything about one
-  target in one ticket: its auth, its validation and its tests. On 2026-11-04, `addRefund` and
-  `updateCCPayment` became 9 code tickets, $62 and nine competing PRs.
+- **One ticket per target.** Give every `open` a `target`: the route or function it changes, or
+  a specific file (`refund.ts`). A file everything lives in (`order.js`, `index.tsx`) names no work
+  and matches nothing, so name the function. The server folds a ticket into one that already has
+  its target:
+  - other work: an open ticket of the same owner;
+  - code: **any owner's** code ticket that is open, finished in the last day, or finished with its
+    PR still open (up to 14 days).
+
+  A code ticket whose PR is open gets the new text as a follow-up, to go into the SAME PR. Put
+  everything about one target in one ticket: its auth, its validation and its tests. On
+  2026-11-04, `addRefund` and `updateCCPayment` became 9 code tickets, $62 and nine competing PRs.
+- **The dedupe is a net, not a guard.** It matches the target words and the title, so the same fix
+  in other words (`order.js` on one ticket, `processCreditCardPayment` on another) still gets
+  through. Your job ends with **"Already on this board"**: the open tickets and the PRs still
+  waiting. Read it before every `open`. If one covers the work, add a `note` to it and open nothing.
+  A queued ticket is also checked again when its turn comes, and a repeat is cancelled without a
+  run. On the night of 2026-11-04, 6 of 10 queued runs were repeats of a fix whose PR was open.
 - Your team's questions come to you first. Answer when the code, the docs or the data decide it;
   **escalate** when it is the owner's decision: money, what customers see, deleting data, policy.
 - Your ticket closes by itself when everything under it has; do not close it early.
