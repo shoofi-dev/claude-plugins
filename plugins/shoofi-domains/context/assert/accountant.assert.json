@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@87e71bed + shoofi-delivery-web@21fc470 (feat/driver-invoice-sent-filter) / 2026-11-05 (CORE invariant 18 sending bullet, ref §6/§8/§9: truthful send results, the companyInvoiceSent filter, reportSendOutcome); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -934,7 +934,7 @@
         {
           "file": "routes/hyp.js",
           "regex": "hypCompanyInvoiceSent: true,\\s*\\n\\s*hypCompanyInvoiceSentAt: new Date\\(\\)",
-          "desc": "reference §6/§8: send-invoice marks hypCompanyInvoiceSent + hypCompanyInvoiceSentAt (unconditionally, even when every WhatsApp failed); the admin bulk send's 'already sent' bucket reads it"
+          "desc": "reference §6/§8: send-invoice marks hypCompanyInvoiceSent + hypCompanyInvoiceSentAt; since feat/driver-invoice-sent-filter only after the 422 'nothing went out' guard (next pin). The admin bulk send's 'already sent' bucket and the companyInvoiceSent list filter read it"
         },
         {
           "file": "routes/hyp.js",
@@ -945,6 +945,26 @@
           "file": "routes/driver-reports.js",
           "regex": "const activeContacts = company\\.phone \\? \\[\\{ phone: company\\.phone, isActive: true \\}\\] : billingContacts\\.filter",
           "desc": "reference §6: the driver report send (monthly_report) goes to company.phone first, billing contacts only as fallback"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "if \\(!delivery\\.sent\\) \\{\\s*\\n\\s*return res\\.status\\(422\\)\\.json\\(\\{|whatsappResults\\.push\\(\\{ type: 'whatsapp', contact: normalizedPhone, success: true \\}\\);",
+          "desc": "CORE invariant 18 / reference §6: send-invoice answers 422 and writes nothing when no WhatsApp went out. Second alternative = the pre-change form (every non-throwing call recorded success:true), kept so this pin holds on shoofi-server main until feat/driver-invoice-sent-filter merges; drop it then."
+        },
+        {
+          "file": "utils/whatsapp.js",
+          "regex": "async function sendWhatsAppTemplateOutcome\\(|sendWhatsAppTemplate = async function \\(phone, bodyParams = \\[\\], req = null, db = null, templateName = null, buttonParams = null, languageCode = null\\) \\{",
+          "desc": "reference §6: the opt-in {sent, reason} variant both driver-report send routes use; the plain sendWhatsAppTemplate keeps its resolve-undefined/throw contract. Second alternative = the pre-change signature, kept until feat/driver-invoice-sent-filter merges; drop it then."
+        },
+        {
+          "file": "utils/driver-invoice-status.js",
+          "regex": "if \\(value === 'false'\\) return \\{ hypCompanyInvoiceSent: \\{ \\$ne: true \\} \\};|const MISSING_INVOICE_MODES = ",
+          "desc": "reference §6: the list's companyInvoiceSent=false matches a missing field ($ne: true), not only false. Second alternative only lets the pin hold on shoofi-server main until feat/driver-invoice-sent-filter merges; drop it then."
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "reportSendOutcome: \\{\\s*\\n\\s*sent: delivery\\.sent,|status: 'sent',\\s*\\n\\s*sentAt: new Date\\(\\),",
+          "desc": "reference §6/§8: the report send still writes status 'sent' (lifecycle) and records whether a WhatsApp went out in reportSendOutcome. Second alternative = the pre-change write, kept until feat/driver-invoice-sent-filter merges; drop it then."
         }
       ]
     }

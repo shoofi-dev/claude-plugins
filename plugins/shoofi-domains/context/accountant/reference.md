@@ -257,13 +257,37 @@ Cash fees are reported as receipts but are **NOT** in the transfer (already in t
   `shoofir_monthly_invoice` (month, credit link, additions link) to **`company.contactPhone || company.phone`**,
   with billing contacts only when both are empty. So when `contactPhone` is set, the report and the invoices go
   to different numbers. A missing link is sent as the text `לא הופקה`. 400 when neither link exists.
-- Both routes then mark the report (`status: 'sent'` / `hypCompanyInvoiceSent: true` +
-  `hypCompanyInvoiceSentAt`) **unconditionally** and answer 200 with per-contact results
-  (`whatsappResults` / `results: [{contact, success, error?}]`), **even when every WhatsApp failed**.
-  `success: true` is weaker still: `utils/whatsapp.js` `sendWhatsAppTemplate` returns without throwing when
-  WhatsApp is inactive or misconfigured, or when respond.io contact creation fails, and the route records
-  those as success. Only a rejected message POST becomes `success: false`. Delivery is checked
-  asynchronously afterwards (`checkMessageStatus`), never by the route. **A 200 is not a delivery.**
+- **What "success" means (since 2026-11, `feat/driver-invoice-sent-filter`).** Both routes send through
+  `sendWhatsAppTemplateOutcome` (`utils/whatsapp.js`). It never throws and returns `{sent, reason, error?}`.
+  `sent` means respond.io accepted the message POST. Otherwise `reason` is one of:
+  - `whatsapp_inactive`: config missing or `isActive` false;
+  - `whatsapp_config_incomplete`: no `ACCESS_TOKEN` or channel;
+  - `contact_creation_failed`: respond.io refused to create the contact;
+  - `send_failed`: the message POST was rejected, and `error` carries respond.io's status and message;
+  - `no_config_source`.
+
+  The plain `sendWhatsAppTemplate` keeps its old contract for its other callers: it resolves `undefined`
+  on the first three, and throws on a rejected POST. It only gained an optional 8th `outcome` argument,
+  and no other call site passes more than 7. Each per-contact row (`results` / `whatsappResults`) is
+  `{type, contact, success, reason, error?}` (`utils/whatsapp-send-outcome.js`). Delivery to the phone
+  is still checked asynchronously afterwards (`checkMessageStatus`), never by the route.
+- **send-invoice** sets `hypCompanyInvoiceSent: true` + `hypCompanyInvoiceSentAt` and answers 200
+  `{sent: true, results}` only when at least one row succeeded. When none did, it answers **422**
+  `{sent: false, reason, message: "החשבונית לא נשלחה: <Hebrew reason>", results}` and writes nothing, so the
+  report stays "not sent" and the next send picks it up.
+- **The report send** still writes `status: 'sent'` + `sentAt` on every call, and answers 200. That status
+  is the report's lifecycle step (draft → approved → sent), and other code reads it:
+  - `isReportLocked` (`routes/driver-reports.js`) locks the driver-hours edit, which moves `netTotal`;
+  - the list shows its per-row "שלח" only for `approved`, and the detail page shows "שלח שוב" for `sent`;
+  - the list's status filter and Excel column;
+  - the financial overview's `withSentReport` count and status rank (`services/financial-overview/`).
+
+  No mobile app reads driver reports. The admin may also forward the PDF by hand after a failed WhatsApp.
+  So the truth sits next to the status: `reportSendOutcome: {sent, reason, sentCount, failedCount, at}` on
+  the report, and `sent` / `reason` in the response. When `sent` is false, `message` is the Hebrew
+  "הדוח סומן כנשלח, אבל לא יצאה אף הודעת WhatsApp: …".
+- **Before 2026-11** both routes marked the report and answered 200 even when every WhatsApp failed, and a
+  silently skipped send also read `success: true`. A report marked before then can read sent with nothing sent.
 - The legacy `POST /api/driver-reports/admin/reports/:id/send-invoice` (GreenInvoice `greenInvoiceUrl`,
   `monthly_invoice` to billing contacts, sets `invoiceSent`) is not called by the admin web.
 
@@ -280,16 +304,28 @@ to full documents in this order: current page → one list refetch with the same
 3. **already sent**: `hypCompanyInvoiceSent`. Skipped unless the admin opts in to resends.
 4. otherwise **sent**.
 
-A send counts as success only if the HTTP call resolved AND `results[]` has at least one `success: true`.
-Anything else is listed as failed, with the company and the reason. Because the server has already marked a
-failed one sent, the summary offers "retry the failed ones" by id. A plain re-run with "only not-yet-sent"
-would skip them. Even a counted success is only "the server reported a send" (see above), never proof of
-delivery. Pinned by `__tests__/bulkInvoiceSend.test.ts` and `tests/e2e/reports/driver-invoice-bulk-send.spec.ts`.
-The list shows `hypCompanyInvoiceSent(At)` per row ("נשלחה <date>" / "לא נשלחה"). It has **no**
-"invoice sent" filter, because the list endpoint has no such query param and a client-side filter on a
-20-row page would misstate the page counts and select-all. Adding one needs a server param.
-The bulk report **"שלח"** on the same screen counts only HTTP failures. A 200 whose WhatsApps all failed
-still counts as sent there. Known, not fixed.
+A send counts as success only if the HTTP call resolved AND a WhatsApp went out: the body's `sent`, or, from
+a server older than `sent`, at least one `success: true` in `results[]` (`isInvoiceSendSuccess`). The 422
+"nothing went out" is listed under "לא נשלחו" with the company and the server's Hebrew reason. Those reports
+are no longer marked sent, so a plain re-run with "only not-yet-sent" includes them too. The summary also
+offers "נסה שוב את שלא נשלחו" by id. A counted success means respond.io accepted the message, not that it
+reached the phone. Pinned by `__tests__/bulkInvoiceSend.test.ts` and
+`tests/e2e/reports/driver-invoice-bulk-send.spec.ts`.
+The list shows `hypCompanyInvoiceSent(At)` per row ("נשלחה <date>" / "לא נשלחה"), and filters on it.
+`GET /api/driver-reports/admin/reports?companyInvoiceSent=true|false|all` comes from
+`buildCompanyInvoiceSentFilter` (`utils/driver-invoice-status.js`), and its clause goes into the Mongo
+query's `$and`:
+- `true` → `hypCompanyInvoiceSent: true`;
+- `false` → `$ne: true`, which also matches `false`, `null` and a missing field (most reports never carry it);
+- `all` or empty → no clause;
+- anything else → 400.
+
+Because the clause is in the query, `pagination.total` and the select-all fetch (`fetchAllMatchingReports`,
+same endpoint with `limit=10000` and the same params) match the filter. The admin filter is "חשבונית נשלחה:
+הכל / כן / לא". Like every list param, an older server ignores it and returns every row.
+The bulk report **"שלח"** (and the row and detail "שלח") reads the response's `sent`. Its toast separates
+"נשלחו", "סומנו כנשלחו אבל לא יצאה הודעת WhatsApp" and request failures (`reportSendOutcome` /
+`reportSendToast` in `bulkInvoiceSend.ts`).
 **⚠️ Field names change meaning by level (trap, 2026-11).** In `generateDriverReportData`, **per
 driver** (`driverPayments[]`) `earningsByCash` / `earningsByCreditCard` are the **GROSS** fees
 (`effectiveShippingPrice`) on CASH / CREDITCARD orders. At **company level** the SAME names are
@@ -377,8 +413,11 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   totalDeliveryBookingDriverFees, totalMinGuaranteeTopUp, netTotal, driverPayments[]}, status,
   transferPerformed, pdfUrl, hypCompanyInvoice{PdfLink,DocId,DocNumber,DocUuid,CreatedAt,Items},
   hypCompanyAdditionsInvoice{PdfLink,DocId,DocNumber,DocUuid,CreatedAt},
-  hypCompanyInvoiceSent, hypCompanyInvoiceSentAt (set by `/api/hyp/admin/driver-reports/:id/send-invoice` even
-  when every WhatsApp failed, §6), hypCompanyInvoiceHistory[]}`. Company → Shoofi documents (CORE invariant 18):
+  hypCompanyInvoiceSent, hypCompanyInvoiceSentAt (set by `/api/hyp/admin/driver-reports/:id/send-invoice` only
+  when at least one WhatsApp went out, since 2026-11; before that also when all failed, §6; list filter
+  `?companyInvoiceSent=`), sentAt + reportSendOutcome{sent, reason, sentCount, failedCount, at} (the report
+  send: `status: 'sent'` is written on every send, and `reportSendOutcome` says whether a WhatsApp went out;
+  absent on reports sent before 2026-11), hypCompanyInvoiceHistory[]}`. Company → Shoofi documents (CORE invariant 18):
   `hypCompanyInvoiceItems` is written only when invoice 1 carried the negative deductions row. Both the
   admin web (`DriverReportDetail.tsx`, `DriverReportsList.tsx`) and `send-invoice` show whichever
   link exists, so a report with only invoice 1 displays correctly.
@@ -416,7 +455,7 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
 ## 9. Client — shoofi-delivery-web (admin) is the accountant's cockpit
 The reports/settlement/payout UI lives in the **admin** app: `views/admin/DriverPayments.tsx`,
 `DriverBonuses.tsx`, `CompensationManagement.tsx`, `driver-reports/` (list bulk bar: report אשר/שלח/Excel/מחק
-and company צור חשבונית / שלח חשבונית — the bulk invoice send's rules are in §6), `financial-overview/` (the live
+and company צור חשבונית / שלח חשבונית, plus the "חשבונית נשלחה" filter; the bulk invoice send's rules are in §6), `financial-overview/` (the live
 26-metric screen, tabs: summary / Shoofi expenses / stores / companies / delivery fees; the summary
 opens with "חנויות עם נתונים בלי דוח" (`MissingReports.tsx`, fed by `missingReports`), and hidden /
 coming-soon stores carry a red `VisibilityBadge`), plus store-report screens

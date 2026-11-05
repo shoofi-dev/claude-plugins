@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@87e71bed + shoofi-delivery-web@feat/driver-invoice-sent-filter (feat/driver-invoice-sent-filter) / 2026-11-05 (invariant 18 sending bullet rewritten: truthful send results, the invoice-sent filter; ref §6/§8/§9); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -671,14 +671,25 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     - **Flagged, not fixed:** `utils/driver-invoice-status.js` (the "missing invoice" badge) leaves
       `totalDeliveryBookingDriverFees` out of its additions expression, and it still expects a credit
       invoice when credit + additions ≤ 0.
-    - **Sending them: a 200 is not a delivery.** `send-invoice` (`routes/hyp.js`) sends both links in one
-      WhatsApp to `contactPhone || phone`, with `לא הופקה` for a missing link. It sets `hypCompanyInvoiceSent`
-      even when every WhatsApp failed. The admin's bulk "שלח חשבונית" (2026-11) sends one report at a time and
-      counts a success only when `results[]` holds a `success: true`. It always skips reports with no
-      invoice. Partial reports (`invoiceStatus.missingAny`) and already-sent ones are skipped by default, and
-      the admin can opt in to each, with a warning for partial because of the flag above. Details: reference §6.
+    - **Sending them: "sent" means a WhatsApp went out** (2026-11, `feat/driver-invoice-sent-filter`).
+      `send-invoice` (`routes/hyp.js`) sends both links in one WhatsApp to `contactPhone || phone`, with
+      `לא הופקה` for a missing link. Each `results[]` row is `{contact, success, reason, error?}`, built from
+      `sendWhatsAppTemplateOutcome` (`utils/whatsapp.js`), and `success` means respond.io accepted the message.
+      The route sets `hypCompanyInvoiceSent` only when at least one went out. When none did, it answers **422**
+      `{sent: false, reason, message, results}` and writes nothing. Before this, it marked the report and answered
+      200 even when every WhatsApp failed or was silently skipped, so a report marked before 2026-11 may read
+      sent without a send. The list filters on the flag (`?companyInvoiceSent=true|false|all`, where "false" also
+      matches a missing field). The report send (`/api/driver-reports/admin/reports/:id/send`) still writes
+      `status: 'sent'` on every call, because that status is a lifecycle step other code reads. The WhatsApp
+      outcome is recorded next to it as `reportSendOutcome` and returned as `sent`. The admin's bulk
+      "שלח חשבונית" sends one report at a time and counts a success only on a 200 that went out. It always
+      skips reports with no invoice. Partial reports (`invoiceStatus.missingAny`) and already-sent ones are
+      skipped by default, and the admin can opt in to each, with a warning for partial because of the flag
+      above. Details: reference §6.
     Tests: shoofi-server `test/integration/hyp-company-invoice-negative-additions.js` (licensed and
-    exempt, with HYP mocked at `axios.post`) and `test/integration/hashavshevet-movein.js`.
+    exempt, with HYP mocked at `axios.post`) and `test/integration/hashavshevet-movein.js`. The sending
+    rules: `test/integration/driver-report-send-outcome.js` and
+    `test/integration/driver-reports-invoice-sent-filter.js` (real Mongo).
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
