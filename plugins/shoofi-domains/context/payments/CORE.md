@@ -301,9 +301,8 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
   (`services/payments/order-authorization.js`) credits HYP charges, while ZCredit and twin
   orders are flagged `paymentAuth.refundRequired` and refunded by hand in the provider portal.
   The apps' read-only `order.refundData` display stays for old records.
-- **Flagged, needs verdict:** `updateCCPayment` references an undefined `orderId` in its
-  background block (removed 2026-11-03: the whole route is gone); `refundPartial`'s ZCredit field shape is unverified across terminals
-  (sandbox first).
+- **Flagged, needs verdict:** `refundPartial`'s ZCredit field shape is unverified across
+  terminals (sandbox first).
 - **RESOLVED by manual invoicing:** the exempt document's TITLE used to be unfixable —
   neither gateway publishes a per-transaction document-type parameter, so `EZ.type` and
   ZCredit's `Type` were guesses that could reject a live charge. Issuing the document
