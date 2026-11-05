@@ -287,18 +287,20 @@ Cash fees are reported as receipts but are **NOT** in the transfer (already in t
 **Who a driver report and its invoices are sent to** (`delivery-company.store`, verified 2026-11-05):
 - **Report** `POST /api/driver-reports/admin/reports/:id/send` (approved or sent only): a WhatsApp
   `monthly_report` (month, `pdfUrl`) to **`company.phone`**. Only a company with no `phone` falls back to its
-  active `accounting.billingContacts`. It sets `status: 'sent'`.
+  active `accounting.billingContacts`. It sets `status: 'sent'` only if a WhatsApp went out (2026-11-06);
+  otherwise 502, the report stays approved, and step `reportSend` = failed.
 - **Company invoices** `POST /api/hyp/admin/driver-reports/:id/send-invoice` (`routes/hyp.js`): a WhatsApp
   `shoofir_monthly_invoice` (month, credit link, additions link) to **`company.contactPhone || company.phone`**,
   with billing contacts only when both are empty. So when `contactPhone` is set, the report and the invoices go
   to different numbers. A missing link is sent as the text `לא הופקה`. 400 when neither link exists.
-- Both routes then mark the report (`status: 'sent'` / `hypCompanyInvoiceSent: true` +
-  `hypCompanyInvoiceSentAt`) **unconditionally** and answer 200 with per-contact results
-  (`whatsappResults` / `results: [{contact, success, error?}]`), **even when every WhatsApp failed**.
-  `success: true` is weaker still: `utils/whatsapp.js` `sendWhatsAppTemplate` returns without throwing when
-  WhatsApp is inactive or misconfigured, or when respond.io contact creation fails, and the route records
-  those as success. Only a rejected message POST becomes `success: false`. Delivery is checked
-  asynchronously afterwards (`checkMessageStatus`), never by the route. **A 200 is not a delivery.**
+- **Since 2026-11-06 both routes mark the report only when a WhatsApp went out** (`status: 'sent'` /
+  `hypCompanyInvoiceSent: true` + `hypCompanyInvoiceSentAt`), and count `success` only when
+  `sendWhatsAppTemplate` returned a result — it RETURNS undefined (no throw) when WhatsApp is inactive or
+  misconfigured or respond.io contact creation fails. All failed → 502 with `whatsappResults` / `results`.
+  Before, both marked the report unconditionally and counted those silent failures as success. Delivery is
+  still only checked asynchronously afterwards (`checkMessageStatus`): **a sent mark is not a delivery.**
+  The invoice send also refuses (409) a document without its required allocation number or that does not
+  open (CORE invariant 19).
 - The legacy `POST /api/driver-reports/admin/reports/:id/send-invoice` (GreenInvoice `greenInvoiceUrl`,
   `monthly_invoice` to billing contacts, sets `invoiceSent`) is not called by the admin web.
 
@@ -320,11 +322,10 @@ Anything else is listed as failed, with the company and the reason. Because the 
 failed one sent, the summary offers "retry the failed ones" by id. A plain re-run with "only not-yet-sent"
 would skip them. Even a counted success is only "the server reported a send" (see above), never proof of
 delivery. Pinned by `__tests__/bulkInvoiceSend.test.ts` and `tests/e2e/reports/driver-invoice-bulk-send.spec.ts`.
-The list shows `hypCompanyInvoiceSent(At)` per row ("נשלחה <date>" / "לא נשלחה"). It has **no**
-"invoice sent" filter, because the list endpoint has no such query param and a client-side filter on a
-20-row page would misstate the page counts and select-all. Adding one needs a server param.
-The bulk report **"שלח"** on the same screen counts only HTTP failures. A 200 whose WhatsApps all failed
-still counts as sent there. Known, not fixed.
+The list shows the send state on the row's stepper (the שליחה dot) and has chips הכל / עם בעיה / מוכן
+לשליחה / הושלם (`stepFilter`, `COMPANY_CATEGORY_FILTERS`). The bulk report **"שלח"** and bulk create run 3
+at a time and end in a per-company results modal; the report send now returns 502 when every WhatsApp
+failed, so those count as failures there (fixed 2026-11-06).
 **⚠️ Field names change meaning by level (trap, 2026-11).** In `generateDriverReportData`, **per
 driver** (`driverPayments[]`) `earningsByCash` / `earningsByCreditCard` are the **GROSS** fees
 (`effectiveShippingPrice`) on CASH / CREDITCARD orders. At **company level** the SAME names are
@@ -419,6 +420,13 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   `reportCategoryOf`), filters `stepFilter=problem|ready|done` (`stepProblems=true` = problem) and, with
   `includeStepCounts=true`, returns `stepCounts{all, problem, ready, done}` over the other filters
   (`REPORT_CATEGORY_FILTERS`, `services/invoicing/report-steps.js`).
+- **`shoofi.driverReports`** step tracking (2026-11-06, CORE invariant 19): `invoiceSteps.<generate|companyInvoice|
+  companyAdditionsInvoice|allocation|reportSend|send>` + `invoiceStepHistory[]` (same entry shape as stores),
+  `invoicePrecheck` (+ `documents[{key, amount, requiresAllocation}]`), `hypCompanyInvoiceAllocationNumber`,
+  `hypCompanyAdditionsInvoiceAllocationNumber`, `hypCompany(Additions)InvoiceCreateResponse`,
+  `hypCompanyInvoiceCreatingAt` (claim). The list adds `stepCategory`, `taxAuthority`, `companyReportPhone`,
+  `companyInvoicePhone`, and `stepCounts` with `includeStepCounts=true`. `delivery-company.store` carries
+  `hyp.taxAuthority` and `hyp.taxUrlSendLog[]` like a store.
 - **`shoofi.driverReports`** (collection `driver-reports`) — `{deliveryCompanyId (string), dateRange, reportData{totalDeliveries,
   totalDriverPayment, earningsBy*, totalBonuses, totalCompensations, totalDriverCharges,
   totalDeliveryBookingDriverFees, totalMinGuaranteeTopUp, netTotal, driverPayments[]}, status,
@@ -482,7 +490,11 @@ with EZcount's raw answers / רשות המסים ומסמכים). Filter chips �
 `stepFilter` + `stepCounts`. The row is a translation of the server's records (`storeRowModel.ts`); it
 decides no status. "בדיקה מקדימה לחשבוניות" creates nothing; bulk create / send run 3 at a time with a
 per-store result.
-`ReportDetail.tsx` adds the full step history with EZcount's raw answers. `hyp/HypManagement.tsx` shows each
+`ReportDetail.tsx` adds the full step history with EZcount's raw answers. The delivery-company list
+(`driver-reports/DriverReportsList.tsx`, 2026-11-06) uses the same row and components through
+`companyRowModel.ts`: dots דוח → אשראי → תוספות → הקצאה → שליחה, the report's own WhatsApp folded into
+the דוח dot; same chips, pre-check (`/hyp/admin/driver-reports/invoice-precheck`) and results modal;
+`DriverReportDetail.tsx` shows the stepper and the history. `hyp/HypManagement.tsx` shows each
 store's approval expiry and expired / expiring / locked counts. This is where a human generates,
 approves, sends reports, and exports the MASAV Excel. (Full-stack: server computes, admin drives.)
 
@@ -531,6 +543,14 @@ approves, sends reports, and exports the MASAV Excel. (Full-stack: server comput
 12. **Business-type data**: 46 stores have no `businessType` (now blocks their store invoice);
     smoky-city and chorizous-taybe disagree with EZcount on exempt status (blocks; a human decides which
     side is right — it also changes customer-receipt VAT); 11 more differ only מורשה vs חברה (warns).
+
+13. **Delivery companies, read-only snapshot 2026-11-06** (184 with a report since August): HYP not
+    connected 46; approval never given 111; expired 16 (mostly June 2026 — e.g. בדיר אחמד סאבר, ₪13,100
+    last credit, non-exempt, expired 13.10); valid 7 (אוואב דלברי until 3.12, ₪11,298 last credit); not in
+    the distributor list 4; 30 OAuth / 108 distributor. 129 exempt / 45 מורשה / 4 חברה / 6 with no
+    business type (now blocks their invoice). 6 disagree with EZcount on exempt status (blocks: also moves
+    the exempt ÷1.18 payout, CORE invariant 1). Every company has a phone; 47 have no email (warns).
+    35 have no company number (blocks only above the ceiling).
 
 ## 11. Definition of done
 Inherit `_shared-guardrails.md` §7. For accountant specifically: for ANY change to a payout or
