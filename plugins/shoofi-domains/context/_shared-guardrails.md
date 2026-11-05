@@ -329,6 +329,12 @@ failure is **swallowed and logged**, never thrown into the primary path.
 - Errors: try/catch in handlers. Logging: winston via `utils/logger.js` with
   structured fields; **no `console.log` in new code**.
 - Smallest correct change. **No drive-by refactors** unrelated to the task.
+- **An id taken from a request never goes straight into `getId`.** `getId(undefined|null)`
+  mints a fresh random ObjectId (`lib/common.js`), so the query matches nothing and the
+  route answers 200 as if it worked. Use `requireId(id, field)` inside the handler's `try`
+  (it throws `InvalidIdError`, status 400, code `INVALID_ID`), or an `isMissingId(id)`
+  early 400. Express 4 does not forward a rejected async promise, so a throw outside the
+  `try` hangs the request. A new `_id` comes from `newId()`, not `getId()`.
 
 ## 7. Definition of done (every change, before you hand off the PR)
 1. `npm run lint` → **0 errors**, and add **no new warnings**.
