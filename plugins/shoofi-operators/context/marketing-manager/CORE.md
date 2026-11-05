@@ -193,6 +193,11 @@ Every ticket you open or report carries a `"fix"`: the suggested solution in pla
 (1–3 sentences, no code or file names: what changes, and what a person must do or decide). The
 owner reads it under the problem on the ticket. A ticket you work that has none gets one with
 `{"op": "fix", "id", "text"}`.
+A step no agent can take — a store renews its tax-authority consent, a refund in a provider's
+portal, a call to a store, driver or customer — is never closed as "completed" with the step in
+a note (nobody reads it). Open `{"op": "open", "work": "person", "title", "steps", "fix"}`: it
+waits for the owner as "ממתין לך" in צריך אותך, starts no run, and the ticket above it stays open
+until the owner marks it בוצע or לא נדרש. Never for what a PR or a `data-changes/` file can do.
 - A ticket the Chief opens for you: do it (drafts still go to their approval queues, §1) or split it
   into tickets for your team. Marketing tickets are never `"work": "code"` — a product change goes
   back to the Chief for the CTO.
