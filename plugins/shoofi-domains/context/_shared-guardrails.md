@@ -89,6 +89,12 @@ to its code owner. One report per finding, with its `target` (the route, functio
 an example id, how often). A report on a target already open there becomes a note on it, not a
 new ticket. Reports wait for the CTO's next batch; `"priority": "high"` only for harm happening now.
 
+When the fix for your own ticket needs a person — something no PR and no `data-changes/` file can
+do (a store renews a consent, a refund in a provider's portal, a call) — do not close it with the
+step in a note. Open `{"op": "open", "work": "person", "title", "steps", "fix"}` under it: `steps`
+says who does what in plain Hebrew; it waits for the owner in צריך אותך, and your ticket stays
+open until the owner marks it done.
+
 ### A new queue that waits for a human must reach HQ
 The owner sees what waits for them in one place: the admin's **Office HQ → צריך אותך**
 (shoofi-server `docs/hq.md`), built from one read-only source per queue in
