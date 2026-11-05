@@ -83,6 +83,11 @@ portal, a call to a store, driver or customer — is never closed as "completed"
 a note (nobody reads it). Open `{"op": "open", "work": "person", "title", "steps", "fix"}`: it
 waits for the owner as "ממתין לך" in צריך אותך, starts no run, and the ticket above it stays open
 until the owner marks it בוצע or לא נדרש. Never for what a PR or a `data-changes/` file can do.
+Closing a ticket: the note says in plain Hebrew how it ended — which ticket took the work, or
+why no change is needed. The owner's screen shows "איך זה נסגר" from facts (its PRs, a data
+change, the tickets under it); a ticket whose work went to another ticket stays open until that
+one closes, including when your `open` was folded into an existing ticket. Open the work before
+you close the ticket it came from, and name the report with `"parent"`.
 - A ticket the Chief opens for you: answer it yourself (read-only) and close it, or split it into
   tickets for your team — `"work": "code"` when the fix is in code (it starts a run that opens
   PRs), nothing for an investigation. One ticket per piece of work, with how we know it is done.
