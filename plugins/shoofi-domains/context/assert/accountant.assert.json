@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -34,7 +34,14 @@
         "services/coupons/delivery-price-enforcement.js",
         "services/compensations/access.js",
         "services/payments/settlement-access.js",
-        "services/payments/earnings-access.js"
+        "services/payments/earnings-access.js",
+        "services/invoicing/tax-authority-state.js",
+        "services/invoicing/store-invoice-precheck.js",
+        "services/invoicing/report-steps.js",
+        "services/invoicing/allocation-check.js",
+        "services/invoicing/precheck-runner.js",
+        "utils/email-validation.js",
+        "docs/invoice-step-tracking.md"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -173,6 +180,34 @@
           "driverEarningsAccess",
           "ownStoreEarningsGate",
           "ownDriverEarningsGate"
+        ],
+        "services/invoicing/tax-authority-state.js": [
+          "fetchTaxAuthorityState",
+          "deriveApprovalState",
+          "getDistributorUsersCached",
+          "parseEzcountDate"
+        ],
+        "services/invoicing/store-invoice-precheck.js": [
+          "evaluateStoreInvoicePrecheck",
+          "summarizeBlocking"
+        ],
+        "services/invoicing/report-steps.js": [
+          "recordStep",
+          "PROBLEM_REPORT_FILTER"
+        ],
+        "services/invoicing/allocation-check.js": [
+          "checkStoreDocumentAllocation",
+          "classifyAllocationResult"
+        ],
+        "services/invoicing/precheck-runner.js": [
+          "runStoreInvoicePrecheck"
+        ],
+        "utils/email-validation.js": [
+          "checkEmail"
+        ],
+        "utils/hyp.js": [
+          "getTaxMinistryAllocationNumber",
+          "getDocumentViewStatus"
         ]
       },
       "patterns": [
@@ -945,6 +980,81 @@
           "file": "routes/driver-reports.js",
           "regex": "const activeContacts = company\\.phone \\? \\[\\{ phone: company\\.phone, isActive: true \\}\\] : billingContacts\\.filter",
           "desc": "reference §6: the driver report send (monthly_report) goes to company.phone first, billing contacts only as fallback"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "const precheck = evaluateStoreInvoicePrecheck\\(\\{ storeData, amount: totalForInvoice, taxState \\}\\);",
+          "desc": "CORE invariant 19: create-store-invoice runs the full pre-check (every problem in one pass) before EZcount is called"
+        },
+        {
+          "file": "services/invoicing/store-invoice-precheck.js",
+          "regex": "problem\\('TAX_AUTH_LOOKUP_FAILED', taxSeverity,",
+          "desc": "CORE invariant 19: a failed Tax Authority lookup BLOCKS a document that needs an allocation number (fail closed; it failed open until 2026-11)"
+        },
+        {
+          "file": "services/invoicing/store-invoice-precheck.js",
+          "regex": "problems\\.push\\(problem\\('BUSINESS_TYPE_MISSING', 'block',",
+          "desc": "CORE invariant 19: a store with no business type is refused a store invoice (flora-boutique, 46 stores on 2026-11-05)"
+        },
+        {
+          "file": "services/invoicing/store-invoice-precheck.js",
+          "regex": "const exemptOnOneSide = \\(businessType === 'exempt'\\) !== \\(taxState\\.ezcountBusinessType === 'exempt'\\);",
+          "desc": "CORE invariant 19: an exempt-vs-non-exempt mismatch with EZcount blocks (smoky-city); מורשה vs חברה only warns"
+        },
+        {
+          "file": "services/invoicing/tax-authority-state.js",
+          "regex": "state\\.isLocked = bd\\.isTaxAuthorityUserLocked === true",
+          "desc": "CORE invariant 19: the lock flag comes from getBusinessData (qamha/aldo had valid consent and were locked)"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "if \\(allocation\\.entry\\.status !== 'ok'\\) \\{",
+          "desc": "CORE invariant 19: send-invoice refuses a store document without its allocation number"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "if \\(succeeded\\.length === 0\\) \\{",
+          "desc": "CORE invariant 19: a store report is marked sent only after at least one WhatsApp really went out"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "\\.\\.\\.\\(ok \\? \\{ \\$set: \\{ 'hyp\\.taxUrlSentAt': at \\} \\} : \\{\\}\\)",
+          "desc": "CORE invariant 19: taxUrlSentAt is stamped only when the approval link was actually sent"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.post\\(\"/api/hyp/admin/reports/:reportId/recheck-allocation\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariants 17/19: recheck-allocation (read-only at EZcount) needs a dashboard role"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.post\\(\"/api/hyp/admin/reports/invoice-precheck\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariants 17/19: the pre-check (creates nothing) needs a dashboard role"
+        },
+        {
+          "file": "services/audit/admin-audit-routes.js",
+          "regex": "pattern: '/api/hyp/admin/reports/:reportId/send-invoice', method: 'POST', action: 'hyp_reports_send_invoice'",
+          "desc": "CORE invariant 19: every /api/hyp/admin write is in the admin audit route map (category invoicing)"
+        }
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/utils/run-with-concurrency.ts",
+        "src/utils/email-validation.ts",
+        "src/views/admin/reports/invoice-steps/InvoiceStepsCell.tsx"
+      ],
+      "symbols": {},
+      "patterns": [
+        {
+          "file": "src/views/admin/reports/ReportsList.tsx",
+          "regex": "(\"/hyp/admin/reports/\\$\\{report\\._id\\}/create-store-invoice\"|`/hyp/admin/reports/\\$\\{report\\._id\\}/create-store-invoice`)\\),\\s*\\n\\s*\\(done\\) =>",
+          "desc": "CORE invariant 19: bulk create-store-invoice runs through runWithConcurrency with per-store results, not Promise.all"
+        },
+        {
+          "file": "src/views/admin/reports/ReportsList.tsx",
+          "regex": "axiosInstance\\.post\\('/hyp/admin/reports/invoice-precheck', body\\)",
+          "desc": "CORE invariant 19: the reports screen's 'בדיקה מקדימה לחשבוניות' action"
         }
       ]
     }
