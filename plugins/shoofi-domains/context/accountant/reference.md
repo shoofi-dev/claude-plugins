@@ -1,5 +1,7 @@
 # Accountant / Settlement / Payouts — Domain Context
 
+> last-verified §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
+
 > **Who you are:** the agent that owns **money OUT + the books** — computing what stores
 > and delivery companies/drivers are owed, issuing tax invoices, and generating bank
 > payouts. This is distinct from `payments` (money IN / charge acceptance). You inherit
@@ -216,12 +218,14 @@ Provider = `amazonconfigs {app:"invoiceProvider"}.active` (`greeninvoice` defaul
 `utils/restricted-admin-routes.js` takes `settlementDashboard` (any dashboard role) on its own
 line — invoices, `config/switch`, the per-store/per-company HYP account routes; the 16 bulk /
 `send-oauth-link` / `update-email` routes are MASTER_ONLY via that list. The switch writes no
-actor (`amazonconfigs` keeps only `switchedAt`) and the audit log does not map `hyp` routes, so who
-switches or disconnects is unrecorded. `/api/hyp/oauth/callback` (HYP's OAuth redirect) stays open.
+actor (`amazonconfigs` keeps only `switchedAt`). Until 2026-11 the audit log did not map `hyp` routes;
+since then every `/api/hyp/admin` write is in `services/audit/admin-audit-routes.js` (category
+`invoicing`, a test walks the router), so who switches, disconnects, issues or sends is recorded. `/api/hyp/oauth/callback` (HYP's OAuth redirect) stays open.
 - **Shoofi → store commission invoice**: amount = `totalOutcomes`. GreenInvoice type **320**
   (tax invoice+receipt, when `totalForTransfer>0`) else **305**; HYP always docType **305**, itemized.
 - **Store → Shoofi invoice (on behalf of store)** (`create-store-invoice`, `hyp.js`): amount =
-  CC revenue + coins-CC + driveIn-CC; `÷1.18 if exempt`; docType **300 (receipt) if exempt else 305**;
+  CC revenue + driveIn-CC (coins-CC is a line inside it, netted back out); **no ÷1.18 for any business type**
+  since 2026-08-03 (CORE invariant 1); docType **300 (receipt) if exempt else 305**;
   uses the **store's own** HYP `api_key` (`createInvoiceOnBehalf`), customer = Shoofi.
 - **Credit notes** = docType **330** (reversals / negative balance).
 - **`ua_uuid` is for CUSTOMER documents only.** The per-order customer document
@@ -230,9 +234,40 @@ switches or disconnects is unrecorded. `/api/hyp/oauth/callback` (HYP's OAuth re
   routing a store invoice or credit note to a different business changes whose books it
   lands in. If you touch `utils/hyp.js`, keep the field inside `createCustomerInvoice`'s
   own object literal.
-- **Israel allocation-number rule** (`hyp.js`, threshold **4999**): a non-exempt tax invoice
-  > 4999 VAT-incl needs an allocation number; block only when (connection invalid AND amount>threshold
-  AND non-exempt) — **fail-open** on transient distributor-API errors.
+- **Israel allocation-number rule** (`utils/invoice-allocation.js`, threshold **₪4,999 before VAT** =
+  ₪5,898.82 gross): a non-exempt tax invoice above it needs a Tax Authority allocation number (מספר
+  הקצאה). Since 2026-11 `create-store-invoice` runs the full pre-check (CORE invariant 19,
+  `services/invoicing/store-invoice-precheck.js`) and **fails closed** — it was fail-open until then.
+- **HYP / EZcount lifecycle (verified 2026-11-05 against prod and EZcount's API collection,
+  documenter.getpostman.com/view/16363118/TzkyNLWB):**
+  1. *Connect* the store's EZcount account to Shoofi: `create-account` (distributor sub-account,
+     `POST /api/user/create` → `u_uuid` stored as `hyp.ua_uuid`, `u_api_key` as `hyp.api_key`;
+     153 stores) or `oauth-url` → `/general/oauth2/authorize` scope `CREATE_DOCS SSO` → callback
+     stores the access token as `hyp.api_key` (18 stores; `refresh_token` stored, never used). The
+     `ua_uuid` is NOT sent on settlement documents (see the bullet above).
+  2. *Tax Authority approval* by the OWNER: `taxMinistryURL` (…/front/auth/igniteTaxAuthorityOauth2/<u_uuid>,
+     from the distributor list or `getBusinessData.taxAuthorityURL`), sent by `send-tax-url` /
+     `bulk/send-tax-urls` with WhatsApp template `tax_authority_approval`. It **expires**:
+     `maxConsentDate`, ≈ 3 months after approval (91–95 days after `taxUrlSentAt` on prod). Renewal =
+     the owner opens the same URL again.
+  3. *Validity* — `GET /v2/api/distributors/users` (distributor key: `isHaveAccessTokenAndValid`,
+     `maxConsentDate`, `taxMinistryURL`, all stores incl. OAuth) and `GET /api/users/getBusinessData`
+     (store key: same + `isTaxAuthorityUserLocked`, `u_comp_type`; 401 `insufficient_scope` for OAuth
+     tokens). Cached per store as `hyp.taxAuthority` (`services/invoicing/tax-authority-state.js`).
+  4. *Per document* — `POST /api/documents/getTaxMinistryAllocationNumber/{doc_uuid}` (issuer's key)
+     returns the number or the Authority's refusal (`Refresh token has expired`, `The user is locked…`,
+     errNum 460 = refused, text must be shown to the issuer). The public `pdf_link` answers 302 when
+     ready, **429 while not ready ("מסמך לא מוכן")**, 417 while awaiting allocation.
+  5. *Stuck document options at EZcount* (none exposed in the admin; human decisions):
+     `ignoreApproval`, `addApprovalNumber`, `furtherObjection`, `cancel`, `reverseTax` (our
+     `cancelInvoice` uses this one — it also issues a zero-VAT document). Our recovery is
+     `recheck-allocation` after the owner renews / unlocks.
+- **Per-step tracking** of the store run (`services/invoicing/report-steps.js`, CORE invariant 19):
+  `recordStep` from `reports/generate` (generate), `create-store-invoice` (storeInvoice + allocation),
+  `create-invoice` (shoofiInvoice), `send-invoice` (allocation + send), `recheck-allocation`
+  (allocation), `cancel-store-invoice` (storeInvoice → pending). The GreenInvoice path
+  (`/api/payments/admin/reports/:id/create-invoice|send-invoice`) records no steps (HYP is the active
+  provider in prod).
 - Invoice fields land on `storeReports` (`greenInvoice*`, `hyp*Invoice*`, `invoiceProvider`).
 
 ## 6. Driver / delivery-company settlement — `routes/driver-reports.js`
@@ -371,7 +406,16 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   monthlyCharges, campaigns, compensationsTo*, carryover*, driveInShoofi, totalOutcomes,
   totalForTransfer, totalForInvoice, balance, commissionPercent, businessType,
   compensationWindow{start, endExclusive} (2026-10+; absent on older reports)}, reportSent,
-  invoiceSent, invoiceReceived, transferPerformed, pdfUrl, greenInvoice*, hyp*Invoice*}`.
+  invoiceSent, invoiceReceived, transferPerformed, pdfUrl, greenInvoice*, hyp*Invoice*,
+  hypStoreInvoiceAllocationNumber, hypStoreInvoiceAllocationCheckedAt, hypStoreInvoiceCreateResponse (the
+  whole createDoc answer), hypStoreInvoiceCreatingAt (idempotency claim while createDoc runs),
+  invoiceSteps{generate,storeInvoice,shoofiInvoice,allocation,send: {step, status ok|failed|blocked|pending,
+  code, reasonHe, raw, details, at, by{id,name}}}, invoiceStepHistory[] (same entries, last 200),
+  invoicePrecheck{ok, blockingCount, warningCount, requiresAllocation, amount, businessType,
+  problems[{code, severity block|warn, messageHe, nextActionHe, action, field?}], taxAuthority, at, by}}`
+  (CORE invariant 19; shoofi-server `docs/invoice-step-tracking.md`). The list route adds a computed
+  `taxAuthority{approvalState, maxConsentDate, isLocked, taxMinistryURL, taxUrlSentAt, lastTaxUrlSend}`
+  per row and filters `stepProblems=true`.
 - **`shoofi.driverReports`** (collection `driver-reports`) — `{deliveryCompanyId (string), dateRange, reportData{totalDeliveries,
   totalDriverPayment, earningsBy*, totalBonuses, totalCompensations, totalDriverCharges,
   totalDeliveryBookingDriverFees, totalMinGuaranteeTopUp, netTotal, driverPayments[]}, status,
@@ -398,7 +442,12 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   Hashavshevet customer account the movein export debits; also on `delivery-company.store`),
   `bankAccount{bank,branch,accountNumber,companyId,
   businessType('exempt'|'licensed')}`, `billingContacts[]`, `contract{commissionTiers[],
-  coinsCommissionPercent, monthlyPayments[], onetimePayments[]}`, `store.hyp{ua_uuid,api_key,access_token,status}`.
+  coinsCommissionPercent, monthlyPayments[], onetimePayments[]}`, `store.hyp{ua_uuid,api_key,access_token,status,
+  connectionMethod, taxUrlSentAt (only on a real send since 2026-11), taxUrlSendLog[] (last 20: at, by,
+  phone, method, ok, error), taxAuthority{checkedAt, source business_data|distributor, matched,
+  isHaveAccessTokenAndValid, maxConsentDate, isLocked, ezcountBusinessType, ezcountCrn, taxMinistryURL,
+  businessDataUnavailable oauth_scope|error, lookupError, approvalState, raw}}`. `businessType` values in prod:
+  `authorized_dealer` | `company` | `exempt` (and legacy `licensed`); 46 stores had none on 2026-11-05.
   Who may write it: `POST /api/store/update` takes `accounting` (and `hyp`, `coinsSettings`) only from a
   dashboard token. A partner token's write is cut to its store-management toggles (menu-catalog CORE
   invariant 28). The billing-contacts screen saves through that route with the admin's own token.
@@ -420,7 +469,13 @@ and company צור חשבונית / שלח חשבונית — the bulk invoice s
 26-metric screen, tabs: summary / Shoofi expenses / stores / companies / delivery fees; the summary
 opens with "חנויות עם נתונים בלי דוח" (`MissingReports.tsx`, fed by `missingReports`), and hidden /
 coming-soon stores carry a red `VisibilityBadge`), plus store-report screens
-and `generate-stores-summaries.tsx`; `app-type: shoofi-admin`. This is where a human generates,
+and `generate-stores-summaries.tsx`; `app-type: shoofi-admin`. The store reports list
+(`views/admin/reports/ReportsList.tsx` + `invoice-steps/`) shows each report's step chips, every blocking
+reason, the owner's approval state / expiry / link-sent date and the next actions (שלח קישור אישור, בדוק
+הקצאה, נסה שוב ליצור חשבונית חנות, להגדרות החנות); the filter "רק חנויות עם בעיה בחשבונית"; the action
+"בדיקה מקדימה לחשבוניות" (creates nothing); and per-store results for bulk create / send, run 3 at a time.
+`ReportDetail.tsx` adds the full step history with EZcount's raw answers. `hyp/HypManagement.tsx` shows each
+store's approval expiry and expired / expiring / locked counts. This is where a human generates,
 approves, sends reports, and exports the MASAV Excel. (Full-stack: server computes, admin drives.)
 
 ## 10. ⚠️ Known risks / flagged for verdict (money-critical — do NOT silently "fix")
@@ -458,6 +513,16 @@ approves, sends reports, and exports the MASAV Excel. (Full-stack: server comput
     `SPLIT_FIELDS`) does not follow the amount. Too low → 422 (`COUPON_TEMPLATE_INVARIANT`); too high →
     silently leaves part of the value unassigned (CORE invariant 13). Drafts replace it with a percent
     split; the plain picker → CouponForm path still has this.
+
+11. **Store invoices that never got an allocation number** (CORE invariant 19 + Known status): GCP 10059,
+    burger-house 10044, qamha 10030 + 10027, aldo 10002 — sent, stuck. Owner action + "בדוק הקצאה".
+    On 2026-11-05 (read-only snapshot of 177 stores): 9 approvals expired (abu-saleh-kitchen, b-fresh,
+    beit-toest, cafe-365-qalansuwa, el-patron, flora-boutique, greg, pasta-de-amor, shawerma-alarz),
+    4 expire within 21 days (abu-aldeeb, farnosh, shnetzel-5-taamim, tortilla), 3 users locked
+    (abomoayed-bakerya, aldo, qamha), 95 never approved, 4 connected stores not in the distributor list.
+12. **Business-type data**: 46 stores have no `businessType` (now blocks their store invoice);
+    smoky-city and chorizous-taybe disagree with EZcount on exempt status (blocks; a human decides which
+    side is right — it also changes customer-receipt VAT); 11 more differ only מורשה vs חברה (warns).
 
 ## 11. Definition of done
 Inherit `_shared-guardrails.md` §7. For accountant specifically: for ANY change to a payout or

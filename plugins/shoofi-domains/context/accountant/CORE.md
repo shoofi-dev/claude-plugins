@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -627,10 +627,11 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       is a dashboard role). `routes/hyp.js` (do-not-touch) changed only in its import and route
       lines. Prod 2026-10-30: every store/driver report's `generatedBy`/`approvedBy` is an
       admin-dashboard user (live or since deleted). **Not narrowed, on purpose:** `config/switch`
-      and the two `disconnect`s stay on the dashboard gate — the admin audit log never records
-      them (the audit middleware skips unmapped routes, and no `hyp` route is mapped), so there is
-      no evidence which roles used them. Narrowing them to `["master","admin"]` is a
-      recommendation that needs the requester's ruling first.
+      and the two `disconnect`s stay on the dashboard gate — until 2026-11 the admin audit log never
+      recorded them (the audit middleware skips unmapped routes, and no `hyp` route was mapped), so
+      there is no evidence which roles used them. Since 2026-11 every `/api/hyp/admin` write IS
+      mapped (category `invoicing`, invariant 19), so that evidence now accumulates. Narrowing them
+      to `["master","admin"]` is a recommendation that needs the requester's ruling first.
     **Rule:** a route under `/api/hyp/admin`, `/api/driver-reports` or `admin-reports.js`'s
     `/api/payments/admin` is either on this gate or on the restricted list, never login-only —
     the test walks the three routers.
@@ -680,6 +681,49 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     Tests: shoofi-server `test/integration/hyp-company-invoice-negative-additions.js` (licensed and
     exempt, with HYP mocked at `axios.post`) and `test/integration/hashavshevet-movein.js`.
 
+19. **A store → Shoofi tax document is never created for a store whose allocation cannot be
+    obtained, and every step of the monthly run is recorded per report** (2026-11;
+    `services/invoicing/`, shoofi-server `docs/invoice-step-tracking.md` — read it first).
+    On 2026-11-05 GCP 10059 (₪80,276), burger-house 10044 and qamha 10030 were issued in the
+    stores' EZcount accounts, never got a מספר הקצאה, and were sent while EZcount showed
+    "מסמך לא מוכן". Rules:
+    - **The pre-check returns EVERY problem in one pass** (`evaluateStoreInvoicePrecheck`, run by
+      `create-store-invoice` before EZcount is called, and by `POST /api/hyp/admin/reports/invoice-precheck`,
+      which creates nothing). Always blocks: HYP not connected / no api_key, **business type
+      missing** (it picks 305 vs 300; 46 stores had none on 2026-11-05) and an **exempt-vs-non-exempt
+      mismatch with EZcount's `u_comp_type`** (smoky-city: ours מורשה, EZcount פטור). מורשה vs חברה only
+      warns (both issue a 305 with VAT). **Never resolve a mismatch automatically** — switching a store
+      to exempt also zeroes VAT on its customer receipts (payments invariant 9); the admin and the
+      business decide.
+    - **Blocks only when the document needs an allocation number** (`requiresAllocationNumber`):
+      company number missing, and the owner's Tax Authority approval not found / not approved /
+      expired / **locked**. Otherwise those only warn. The approval comes from EZcount, never from
+      dates we wrote: `getBusinessData` (store key: `maxConsentDate`, `isHaveAccessTokenAndValid`,
+      `isTaxAuthorityUserLocked`, `u_comp_type`; 401 for OAuth stores) then the distributor list
+      (`maxConsentDate`, `isHaveAccessTokenAndValid`). qamha and aldo had a valid consent and a
+      LOCKED user — the old check read only the validity flag. The consent lasts ≈ 3 months
+      (`maxConsentDate` sits 91–95 days after `taxUrlSentAt` on prod); the owner renews by opening
+      the same `taxMinistryURL` again.
+    - **Fail closed.** If the lookup cannot answer, a document that needs allocation is refused
+      (`TAX_AUTH_LOOKUP_FAILED`). The old guard failed open, and under the web's `Promise.all` bulk
+      run that let GCP and burger-house through. Never restore fail-open.
+    - **Steps on the report:** `invoiceSteps.<generate|storeInvoice|shoofiInvoice|allocation|send>` +
+      `invoiceStepHistory` (status ok / failed / blocked / pending, Hebrew `reasonHe`, provider `raw`,
+      acting admin). EZcount's raw answer is kept on failure AND success
+      (`hypStoreInvoiceCreateResponse`). `recordStep` never throws (tracking is secondary).
+    - **send-invoice refuses** a store document that needs allocation and has none, or whose link does
+      not open (HTTP 429 "not ready" / 417 "awaiting allocation" / a probe that fails), and **marks sent
+      only after a WhatsApp that actually went out** — `sendWhatsAppTemplate` RETURNS undefined when it
+      did not send. (The company send, invariant 18, still marks sent unconditionally — not changed.)
+    - **Recovering a stuck document = `recheck-allocation`**, read-only at EZcount
+      (`getTaxMinistryAllocationNumber`). Never reset + re-create: `reset-invoice` does not cancel at
+      the provider (Known status), so that issues a duplicate tax invoice. EZcount's ignoreApproval /
+      addApprovalNumber / furtherObjection / cancel stay manual human decisions and are not exposed.
+    - `send-tax-url` stamps `taxUrlSentAt` only on a real send; every attempt is in `hyp.taxUrlSendLog`.
+    - The admin web runs bulk create/send 3 at a time (`utils/run-with-concurrency.ts`) with a
+      per-store result, and shows each report's steps, reasons and next actions (reference §9).
+    Tests: shoofi-server `test/integration/hyp-invoice-steps.js`, `test/integration/hyp-store-invoice-guard.js`.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
@@ -703,6 +747,13 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 - **OPEN — flagged, needs a decision:** `reset-invoice` only clears the *local* invoice fields;
   it does **not** cancel the document at GreenInvoice/HYP, so a following `create-invoice`
   issues a **second** invoice. Do not silently change behavior — ask.
+- **Awareness — five stuck store documents (Sari, 2026-11-05: do NOT auto-cancel or re-issue; recovery
+  is the owner + "בדוק הקצאה", invariant 19):** GCP 10059 and burger-house 10044 (`Refresh token has expired` — consent never
+  valid), qamha 10030 and 10027 (user LOCKED at the Tax Authority), aldo 10002 (`Not Acceptable`, user
+  LOCKED). All five were already sent. Cancelling or re-issuing any of them is a human decision.
+- **Awareness — `cancelInvoice` is not a plain cancel.** `utils/hyp.js` calls EZcount
+  `/v2/api/taxMinistry/documents/reverseTax/{uuid}`, which per EZcount's docs cancels the document AND
+  issues a zero-VAT reverse-charge document. Flagged 2026-11-05, not changed.
 - **Awareness:** MASAV is **decoupled** from the reports — payout amounts are re-keyed into an
   Excel by a human; there is no automated report→MASAV link. Hardcoded GreenInvoice
   `businessId`/`itemId` constants exist.
