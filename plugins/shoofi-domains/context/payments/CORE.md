@@ -25,7 +25,7 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 `utils/invoice-mail.js` (per-order receipt), and the payment functions inside `routes/order.js`
 (`processCreditCardPayment`, `processHypTokenPayment`, `finalizeApplePayOrder`).
 Client: the payment UI in `shoofi-app`. `POST /api/order/updateCCPayment` was removed on
-2026-11-03: it was unauthenticated and had no caller, and
+2026-11-05 (shoofi-server#424): it was unauthenticated and had no caller, and
 `test/integration/order-update-cc-payment-removed.js` keeps it 404. If it ever comes back,
 it needs auth, a customerId match, an atomic `status:"0"` guard and an amount check.
 **Not yours:** settlement/reports/store invoices/MASAV = **`accountant`**; order lifecycle =
