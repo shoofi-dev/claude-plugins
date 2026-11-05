@@ -60,7 +60,9 @@ for **orders** (joined via `order.appName`).
 4. **Verification** — `routes/auth.js getTokenFromHeaders`: scheme `Authorization: Token <jwt>`;
    verifies signature, loads the user by app-type, and **enforces stored-token equality**
    (`customer.token !== token` → reject, `auth.js`). So `logout` (which nulls `token`)
-   genuinely invalidates a session. Impersonation tokens (`imp:true`) bypass this check.
+   genuinely invalidates a session. Impersonation tokens (`imp:true`) bypass this check, and
+   instead need a live `shoofi.impersonation-tokens` grant row (CORE invariant 3). Signed and
+   verified with `getJwtSecret()` = `process.env.JWT_SECRET`, no fallback (CORE invariant 3a).
 5. `auth.required` / `auth.optional` = `expressjwt`, `userProperty:"auth"` → handlers read `req.auth.id`.
 
 Nothing else rides on verification. The AI-helper taste-profile merge is a **separate client
@@ -85,12 +87,16 @@ customer's id, name, `isAdmin` and `isBlocked`.
 **bcrypt password** (cost 10), `roles[]` (`master|admin|manager|operator|viewer|editor`),
 access token **180m**, refresh **365d**, temp-reset **10m**. Endpoints: `login`,
 `change-password`, `forgot-password` (6-digit code, 15-min expiry), `verify-reset-code`,
-`reset-password`, `refresh-token`, `logout`. `checkAdminRole(roles)` reads `req.auth.roles`.
+`reset-password`, `refresh-token`, `logout`. `checkAdminRole(roles)` reads `req.auth.roles`,
+which `routes/auth.js` (`withDbRoles`) sets from the `shoofiAdminUsers` doc, never the token's
+claim (CORE invariant 3a). `refresh-token` verifies the signature, ignoring expiry.
 Unlike customers, admin verification **skips stored-token equality** (signature + user exists).
 
 **Impersonation** — `POST /api/admin/impersonation/order-token` : **`master`-only**,
 audited, mints a 15-min `imp:true` JWT to open the partner/driver/customer app as that user.
-It does **not** overwrite the subject's stored token. **Keep the master gate + audit intact.**
+It does **not** overwrite the subject's stored token. It writes a grant row first
+(`mintImpersonationToken`, CORE invariant 3) carrying `by` = the admin id; the token is valid
+only while that row is. **Keep the master gate + audit + grant row intact.**
 
 ## 4. Data model
 - **`shoofi.customers`** — identity (`fullName`, `phone`, `email`, `language`), auth
@@ -674,10 +680,12 @@ the schedule as an Israel wall-clock string and shows stored instants through
 ## 7. Known status (human-confirmed) — do NOT act without an explicit task
 All four items below were reviewed with the owner and are **KNOWN / accepted for now**.
 Do not "fix" them opportunistically; they are scheduled work, not bugs to discover.
-1. **KNOWN — planned rotation:** hardcoded JWT secret `'secret'`
-   (`utils/auth-service.js`, `admin-auth-service.js`), shared by customer, admin and
-   impersonation tokens. **Changing the literal logs out every user on every app**, so it must
-   be a planned migration. Also a Basic-auth credential baked into `utils/sms.js`. Leave alone.
+1. **IN FLIGHT — JWT secret rotation:** the hardcoded `'secret'` (`utils/auth-service.js`,
+   `admin-auth-service.js`, `routes/auth.js`, switch-store, impersonation) moves to
+   `JWT_SECRET` in shoofi-server `fix/HIGH-RISK-jwt-secret-env-and-claims` (CORE invariant 3a).
+   **Deploying it logs out every user on every app**, so it is a planned rollout. Still
+   untouched: the Basic-auth credential baked into `utils/sms.js`, and the literal fallbacks of
+   `JWT_REFRESH_SECRET` / `JWT_TEMP_RESET_SECRET`. Leave those alone.
 2. **KNOWN — hardening planned.** `authCode` is a plaintext 4-digit code with no expiry, no
    attempt counter, no lockout; the `apiLimiter` (5/5min) is defined but **not wired**.
    **Planned work (do not implement unasked):** (a) add a **max-retry limit on requesting a

@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@fix/HIGH-RISK-jwt-secret-env-and-claims / 2026-11-05 (CORE invariants 3 + 3a: JWT_SECRET from env with no fallback, roles from shoofiAdminUsers, imp tokens need a live grant row); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -94,7 +94,29 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    from the token, no granting roles the caller lacks), never a role-only gate. Pinned by
    `test/integration/store-users-admin-auth.js`.
 3. **Impersonation** (`imp:true`) bypasses that check by design — it is **`master`-role only and
-   audited**. Never loosen the gate or drop the audit.
+   audited**. Never loosen the gate or drop the audit. **What replaces the stored-token check is a
+   grant row** (shoofi-server `fix/HIGH-RISK-jwt-secret-env-and-claims`, 2026-11): the mint
+   (`POST /api/admin/impersonation/order-token` → `mintImpersonationToken`,
+   `utils/impersonation-tokens.js`) writes `shoofi.impersonation-tokens` (handle
+   `impersonationTokens`) `{jti, subjectId, target, appName, orderId, by, createdAt, expiresAt,
+   revokedAt: null}` and puts the `jti` on the token; `routes/auth.js` accepts an imp token only
+   while a row with that jti, the same subject id, `revokedAt: null` and `expiresAt` ahead exists.
+   15-minute life, TTL index on `expiresAt`, unique `jti`. Revoke one early by setting `revokedAt`.
+   Before it, ANY signed `imp: true` token was a login for any account. Never sign
+   `{ imp: true }` by hand; local dev scripts go through `scripts/local-impersonation-token.js`
+   (refuses a non-local Mongo).
+3a. **The secret is `JWT_SECRET`, and no claim is trusted on its own** (same change).
+   - Every sign/verify site calls `getJwtSecret()` (`utils/jwt-secret.js`): no fallback, and a
+     missing value, a known placeholder or < 32 chars throws; `app.js` asserts it at boot.
+     `JWT_REFRESH_SECRET` / `JWT_TEMP_RESET_SECRET` still have literal fallbacks (not moved).
+   - **`req.auth.roles` is the `shoofiAdminUsers` doc's roles, never the token's claim.**
+     `auth.required` / `auth.optional` (`withDbRoles`) overwrite it from the doc the admin branch
+     already loaded (no extra query) and delete it for every non-admin app-type. So
+     `hasAdminRole` and every direct `req.auth.roles` reader see stored roles: a forged or stale
+     claim does nothing, a role removed in the DB is gone on the next request.
+   - `POST /api/admin/users/refresh-token` verifies the signature (expiry ignored). It used to
+     `jwt.decode`, so an unsigned token naming an admin id came back as a real access token.
+   Pinned by shoofi-server `test/integration/jwt-secret-and-claims.js`.
 4. **The partner `switch-store` flow** re-mints a **per-store token** and sets
    `@storage_storeDB`; that's how later requests get scoped to the right store. Don't bypass it.
 5. **`customers.orders[]` is a snapshot with NO status** — join the store `orders` collection;
@@ -129,7 +151,7 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    **express-jwt v8** (`package.json`) configured with `userProperty: "auth"`
    (`routes/auth.js`), so the verified payload lands on `req.auth` —
    `{ id, fullName, phoneNumber, roles, type }` for admins, minted by `generateAccessToken`
-   (`utils/admin-auth-service.js`). **Nothing in the codebase ever assigns `req.user`** (v8
+   (`utils/admin-auth-service.js`) — with `roles` replaced by the stored ones (invariant 3a). **Nothing in the codebase ever assigns `req.user`** (v8
    dropped the v5 default), so every `req.user?.…` read is permanently `undefined` and silently
    falls through to its default: `routes/shoofi-admin.js` writes the literal `'admin'` for
    `createdBy`/`approvedBy`, `routes/customer.js` writes `'Admin'` for `createdByName`,
@@ -753,9 +775,12 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
-- **KNOWN — planned rotation:** the JWT secret is a hardcoded literal shared by customer, admin
-  and impersonation tokens. **Changing it logs out every user on every app**, so it needs a
-  planned migration. An SMS credential is likewise baked into `utils/sms.js`. Leave both alone.
+- **IN FLIGHT — JWT secret rotation:** shoofi-server `fix/HIGH-RISK-jwt-secret-env-and-claims`
+  moves the secret to `JWT_SECRET` (invariant 3a). Until it is deployed, prod still signs with
+  the literal `'secret'`. **Deploying it logs out every user on every app** (all customer,
+  partner, driver and admin tokens were signed with the literal), so it ships as a planned
+  rollout, never as a side effect of another change. An SMS credential is still baked into
+  `utils/sms.js`; leave it alone.
 - **KNOWN — hardening planned:** the OTP is a plaintext 4-digit code with no expiry, no attempt
   counter and no lockout; a rate limiter exists but is not wired up. **Planned direction (design
   toward it, don't implement unasked):** (a) a **max-retry limit on requesting a code**, and
@@ -779,7 +804,8 @@ All of these are **known and accepted for now**. They are scheduled work, not di
 1. State **which of the four app-types** your change affects — they all share these endpoints.
    A taste-profile change also names whether it touches the visitor (`device-id`) owner
    (invariant 9).
-2. Confirm you haven't weakened stored-token equality, the impersonation master-gate, or
+2. Confirm you haven't weakened stored-token equality, the impersonation master-gate or its
+   grant-row check, roles-from-the-DB (invariant 3a), or
    `getCustomerAppName`'s central-DB behavior.
 3. Anything touching the JWT secret or token lifetime is a **planned migration with a
    logout blast-radius**, not a code fix — stop and ask.
