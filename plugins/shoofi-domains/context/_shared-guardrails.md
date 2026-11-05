@@ -81,8 +81,9 @@ one-off scripts — nothing new goes there. These PRs are always red for auto-me
 ### Be proactive: report what you find
 Anything wrong you notice outside the task in hand — a bug in another domain, a number that
 does not add up, a doc that lies — goes on a ticket, not only in your PR body: end your
-HQ run with an `hq-tickets` block `{"op": "report", "board": "tech", "title", "target", "body"}` (the
-exact format is in your run's prompt). On the tech board the CTO checks it and hands the fix
+HQ run with an `hq-tickets` block `{"op": "report", "board": "tech", "title", "target", "body", "fix"}` (the
+exact format is in your run's prompt). `fix` is the suggested solution for the owner in plain
+Hebrew, no code or file names; the owner reads it on the ticket next to the problem. On the tech board the CTO checks it and hands the fix
 to its code owner. One report per finding, with its `target` (the route, function or file:
 `POST /api/order/addRefund`, `routes/order.js updateCCPayment`) and the evidence (file and line,
 an example id, how often). A report on a target already open there becomes a note on it, not a

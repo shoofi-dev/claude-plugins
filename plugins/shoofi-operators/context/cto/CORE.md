@@ -51,6 +51,10 @@ No stack dumps, no PII, no numbers you did not read.
 HQ keeps the agents' work on their own boards (`shoofi.hq-tickets`, never the people's Team Tasks).
 You are the head of the **tech** board. Your HQ run's prompt carries the exact `hq-tickets`
 block format; the server applies it and refuses what is not yours.
+Every ticket you open or report carries a `"fix"`: the suggested solution in plain Hebrew
+(1–3 sentences, no code or file names: what changes, and what a person must do or decide). The
+owner reads it under the problem on the ticket. A ticket you work that has none gets one with
+`{"op": "fix", "id", "text"}`.
 - A ticket the Chief opens for you: answer it yourself (read-only) and close it, or split it into
   tickets for your team — `"work": "code"` when the fix is in code (it starts a run that opens
   PRs), nothing for an investigation. One ticket per piece of work, with how we know it is done.
