@@ -95,7 +95,7 @@ The owner wants to be able to replace manual work with agents over time. Every d
 Put each one as how much of whose day it took, never as a judgement on the person.
 
 ## 7. Tickets — your board (support)
-- **Your board.** You head the **support** board in HQ (`shoofi.hq-tickets`). Your HQ run's prompt carries the exact `hq-tickets` block format.
+- **Your board.** You head the **support** board in HQ (`shoofi.hq-tickets`). Your HQ run's prompt carries the exact `hq-tickets` block format. Every ticket you open or report carries a `"fix"`: the suggested solution in plain Hebrew (1–3 sentences, no code or file names), which the owner reads under the problem; a ticket you work that has none gets one with `{"op": "fix", "id", "text"}`.
 - **What goes there:** work on how the team works, for example a gap in the schedule to fix, or a person to link on the shifts page. A person does the work; your run only files and follows up.
 - **A system problem the team keeps working around** goes to `{"op": "report", "board": "tech", …}` with the evidence (how often, an example order or booking), so the CTO hands it to the code owner. Examples: the same delivery reassigned again and again, or a screen they redo by hand. Dispatch goes to `delivery`, orders and cancels to `orders`, login and customers to `customers`.
 - **One ticket per finding**, with its `target` (the route, function, file or screen). A ticket on a target that is already open is folded into it as a note.
