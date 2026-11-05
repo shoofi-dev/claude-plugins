@@ -112,9 +112,10 @@ no approval fields, and `createdBy`, `order.appName`/`storeData.appName` (partne
 `approvedAmount` from the body. The order card files approved compensations directly; 662 of the
 683 items filed in the 120 days to 2026-10-29 are status 1.
 
-**Lifecycle**: `draft →(approve)→ approved →(send: WhatsApp monthly_report to billingContacts)→
-sent`; `send-invoice`; `create-invoice` (§5); status toggles `reportSent/invoiceSent/
+**Lifecycle**: `draft →(approve)→ approved →(send: WhatsApp monthly_report to the store's active
+billingContacts)→ sent`; `send-invoice`; `create-invoice` (§5); status toggles `reportSent/invoiceSent/
 invoiceReceived/transferPerformed`. Carry-over comps marked collected only on **send** (idempotency).
+This recipient rule is the STORE path only. Driver reports pick their recipients differently (§6).
 
 ## 3. Commission & fee math — `lib/payments/calc.js` (+ tiered helper)
 - **Store commission is TIERED** — `calculateCommissionTiered` (`admin-reports.js`),
@@ -247,6 +248,48 @@ only by the dashboard-only `/api/shoofiAdmin/driver-bonuses*` routes, CORE invar
 hours from `driverDailyHours` nightly cron w/ live fallback), exempt `÷1.18`.
 `netTotal = totalDriverPayment + bonuses + compensations + minGuaranteeTopUp - driverCharges`.
 Cash fees are reported as receipts but are **NOT** in the transfer (already in the driver's pocket).
+
+**Who a driver report and its invoices are sent to** (`delivery-company.store`, verified 2026-11-05):
+- **Report** `POST /api/driver-reports/admin/reports/:id/send` (approved or sent only): a WhatsApp
+  `monthly_report` (month, `pdfUrl`) to **`company.phone`**. Only a company with no `phone` falls back to its
+  active `accounting.billingContacts`. It sets `status: 'sent'`.
+- **Company invoices** `POST /api/hyp/admin/driver-reports/:id/send-invoice` (`routes/hyp.js`): a WhatsApp
+  `shoofir_monthly_invoice` (month, credit link, additions link) to **`company.contactPhone || company.phone`**,
+  with billing contacts only when both are empty. So when `contactPhone` is set, the report and the invoices go
+  to different numbers. A missing link is sent as the text `לא הופקה`. 400 when neither link exists.
+- Both routes then mark the report (`status: 'sent'` / `hypCompanyInvoiceSent: true` +
+  `hypCompanyInvoiceSentAt`) **unconditionally** and answer 200 with per-contact results
+  (`whatsappResults` / `results: [{contact, success, error?}]`), **even when every WhatsApp failed**.
+  `success: true` is weaker still: `utils/whatsapp.js` `sendWhatsAppTemplate` returns without throwing when
+  WhatsApp is inactive or misconfigured, or when respond.io contact creation fails, and the route records
+  those as success. Only a rejected message POST becomes `success: false`. Delivery is checked
+  asynchronously afterwards (`checkMessageStatus`), never by the route. **A 200 is not a delivery.**
+- The legacy `POST /api/driver-reports/admin/reports/:id/send-invoice` (GreenInvoice `greenInvoiceUrl`,
+  `monthly_invoice` to billing contacts, sets `invoiceSent`) is not called by the admin web.
+
+**Bulk "שלח חשבונית"** (admin web `DriverReportsList.tsx` → `BulkInvoiceSendModal.tsx`, pure rules in
+`views/admin/driver-reports/bulkInvoiceSend.ts`, 2026-11). It calls the per-report `send-invoice` above,
+**sequentially** (one awaited call at a time, never `Promise.all`). Before sending, it resolves the selection
+to full documents in this order: current page → one list refetch with the same filters (rows carry
+`invoiceStatus`) → the single-report GET (which has no `invoiceStatus`). Classification, first match wins:
+1. **no invoice**: both links empty. Always skipped, because the server would 400.
+2. **partial**: `invoiceStatus.missingAny` (the server's `utils/driver-invoice-status.js`; the client never
+   re-derives it), or, on a row without `invoiceStatus`, only one link present. Skipped unless the admin opts in.
+   It warns rather than blocks because that status is known to be slightly off (CORE invariant 18 "Flagged":
+   booking fees left out, negative additions folded into invoice 1).
+3. **already sent**: `hypCompanyInvoiceSent`. Skipped unless the admin opts in to resends.
+4. otherwise **sent**.
+
+A send counts as success only if the HTTP call resolved AND `results[]` has at least one `success: true`.
+Anything else is listed as failed, with the company and the reason. Because the server has already marked a
+failed one sent, the summary offers "retry the failed ones" by id. A plain re-run with "only not-yet-sent"
+would skip them. Even a counted success is only "the server reported a send" (see above), never proof of
+delivery. Pinned by `__tests__/bulkInvoiceSend.test.ts` and `tests/e2e/reports/driver-invoice-bulk-send.spec.ts`.
+The list shows `hypCompanyInvoiceSent(At)` per row ("נשלחה <date>" / "לא נשלחה"). It has **no**
+"invoice sent" filter, because the list endpoint has no such query param and a client-side filter on a
+20-row page would misstate the page counts and select-all. Adding one needs a server param.
+The bulk report **"שלח"** on the same screen counts only HTTP failures. A 200 whose WhatsApps all failed
+still counts as sent there. Known, not fixed.
 **⚠️ Field names change meaning by level (trap, 2026-11).** In `generateDriverReportData`, **per
 driver** (`driverPayments[]`) `earningsByCash` / `earningsByCreditCard` are the **GROSS** fees
 (`effectiveShippingPrice`) on CASH / CREDITCARD orders. At **company level** the SAME names are
@@ -334,7 +377,8 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   totalDeliveryBookingDriverFees, totalMinGuaranteeTopUp, netTotal, driverPayments[]}, status,
   transferPerformed, pdfUrl, hypCompanyInvoice{PdfLink,DocId,DocNumber,DocUuid,CreatedAt,Items},
   hypCompanyAdditionsInvoice{PdfLink,DocId,DocNumber,DocUuid,CreatedAt},
-  hypCompanyInvoiceHistory[]}`. Company → Shoofi documents (CORE invariant 18):
+  hypCompanyInvoiceSent, hypCompanyInvoiceSentAt (set by `/api/hyp/admin/driver-reports/:id/send-invoice` even
+  when every WhatsApp failed, §6), hypCompanyInvoiceHistory[]}`. Company → Shoofi documents (CORE invariant 18):
   `hypCompanyInvoiceItems` is written only when invoice 1 carried the negative deductions row. Both the
   admin web (`DriverReportDetail.tsx`, `DriverReportsList.tsx`) and `send-invoice` show whichever
   link exists, so a report with only invoice 1 displays correctly.
@@ -371,7 +415,8 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
 
 ## 9. Client — shoofi-delivery-web (admin) is the accountant's cockpit
 The reports/settlement/payout UI lives in the **admin** app: `views/admin/DriverPayments.tsx`,
-`DriverBonuses.tsx`, `CompensationManagement.tsx`, `driver-reports/`, `financial-overview/` (the live
+`DriverBonuses.tsx`, `CompensationManagement.tsx`, `driver-reports/` (list bulk bar: report אשר/שלח/Excel/מחק
+and company צור חשבונית / שלח חשבונית — the bulk invoice send's rules are in §6), `financial-overview/` (the live
 26-metric screen, tabs: summary / Shoofi expenses / stores / companies / delivery fees; the summary
 opens with "חנויות עם נתונים בלי דוח" (`MissingReports.tsx`, fed by `missingReports`), and hidden /
 coming-soon stores carry a red `VisibilityBadge`), plus store-report screens

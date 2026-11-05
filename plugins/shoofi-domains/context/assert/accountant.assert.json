@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -925,6 +925,26 @@
           "file": "services/accountant-export/movein.js",
           "regex": "companyCreditInvoiceLinePrices\\(report, isExempt\\)|\\[String\\(amount\\)\\], accounts\\.expenseAccount, \"company-invoice\"",
           "desc": "CORE invariant 18 / reference §7b: the export books company invoice 1 from the stored hypCompanyInvoiceItems when present, else the single credit line. Second alternative = the pre-fix form, kept so this pin holds on shoofi-server main until fix/company-invoice-negative-additions merges; drop it then."
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "const primaryPhone = company\\.contactPhone \\|\\| company\\.phone;",
+          "desc": "reference §6: the driver-report company invoice send goes to contactPhone || phone, billing contacts only when both are empty"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "hypCompanyInvoiceSent: true,\\s*\\n\\s*hypCompanyInvoiceSentAt: new Date\\(\\)",
+          "desc": "reference §6/§8: send-invoice marks hypCompanyInvoiceSent + hypCompanyInvoiceSentAt (unconditionally, even when every WhatsApp failed); the admin bulk send's 'already sent' bucket reads it"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "const MISSING_INVOICE_PLACEHOLDER = 'לא הופקה';",
+          "desc": "reference §6: a missing company invoice link goes out as the text 'לא הופקה' — why the admin bulk send skips partial reports by default"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "const activeContacts = company\\.phone \\? \\[\\{ phone: company\\.phone, isActive: true \\}\\] : billingContacts\\.filter",
+          "desc": "reference §6: the driver report send (monthly_report) goes to company.phone first, billing contacts only as fallback"
         }
       ]
     }
