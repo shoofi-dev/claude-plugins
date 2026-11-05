@@ -485,6 +485,16 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       "to handle later" list describe the state before this change.
     Pinned by shoofi-server `test/integration/customer-search-admin-auth.js` and
     `test/integration/otp-verify-requires-code.js`.
+    - **The five saved-address routes take the caller's OWN id, or a dashboard role**
+      (shoofi-server `fix/HIGH-RISK-customer-address-auth`, 2026-11-05):
+      `/api/customer/:customerId/addresses` (GET), `addresses/add`, `addresses/:addressId`
+      (PUT/DELETE), `addresses/:addressId/default` carry `...OWN_ADDRESSES` =
+      `[auth.required, ownAddressesGate]` (`services/customer/address-access.js`). Never
+      role-only: the customer app calls them with `userDetails.customerId` = its own token id,
+      and mobile tokens carry no roles. Partner/shoofir tokens pass on their own id (inherited
+      `AddressSelector`) and read `[]`. PUT writes only `UPDATABLE_ADDRESS_FIELDS`; a 500 never
+      carries `err.message`. Flagged for a human: "address CRUD" in Known status describes the
+      state before this change. Pinned by `test/integration/customer-address-auth.js`.
 16. **Generated marketing text states only the subject's facts, loaded from the DB.**
     `POST /api/admin/marketing/generate` (`routes/marketing-generate.js`, shoofi-server
     `feat/marketing-generate`, 2026-10-30) writes the AR + HE text for a banner / story / note /
