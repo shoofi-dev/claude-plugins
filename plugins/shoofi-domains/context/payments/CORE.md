@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/HIGH-RISK-remove-hyp-test-soft / 2026-11-05 (hyp-test-soft removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -278,9 +278,6 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.
   HYP tokenization does not store CVV; this resolves as ZCredit is retired. **Do not
   independently rip out CVV handling.**
-- **CONFIRMED — remove (backlog):** `hyp-test-soft` debug endpoint in `routes/hyp-pay.js`
-  (charges 1 NIS with a saved token) should not exist in prod. Money file → draft HIGH-RISK PR,
-  confirm nothing calls it.
 - **CONFIRMED — remove (backlog):** legacy client-side ZCredit charge/refund in `shoofi-app`
   (`components/credit-card/api/payment.ts`, `refund.ts`) — terminal number + password in client
   state. Verify zero live references first, then delete.
