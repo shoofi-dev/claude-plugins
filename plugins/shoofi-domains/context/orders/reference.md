@@ -147,11 +147,16 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   **The group's `paymentStatus` stays as it was — `both_captured` after a degrade**; the
   refund's state is only `degrade.refund{Attempted,Completed,ReferenceNumber,Error}`. Groups
   degraded before 2026-11-06 read `pending` (overwritten) and carry the old `orderPrice`-based
-  `refundOwed`. `undoDegrade` is refused (route: 409 `{ message, reason }`, nothing written) by
+  `refundOwed`. No automatic ZCredit reversal (`degradeAutoRefund` is not read); a degrade with no
+  decision owes `refundOwed` as `undecided` on the group's money ledger (CORE invariant 22), and
+  returns the dropped leg's coins / coupon uses / deal uses. `undoDegrade` is refused (route: 409
+  `{ message, reason }`, nothing written) by
   `undoDegradeBlockReason`: `money_already_handled` — `degrade.refundAttempted ||
   degrade.refundCompleted`, either order has `cancelCompensation`, or either order has a
   `cancelMoneyDecision` with `cancelMoneyDecisionAt` after `degrade.triggeredAt` (a missing
-  timestamp counts as after); else `kept_side_cancelled` — the kept order is in 4/5/7/8/9.
+  timestamp counts as after), or the group's `moneyLedger` moved since the degrade (anything but
+  capture/release and the degrade's own undecided decide/owe); else `kept_side_cancelled` — the
+  kept order is in 4/5/7/8/9.
   Before 2026-11-06 undo's group write went to `db.twinOrderGroups`, aliased to the empty
   `twin-order-groups`, so it never restored a group. All three write `orderFlowEvents` on both
   legs (`twin_cascade_cancel`, `twin_degrade`, `twin_undo_degrade`) with the admin as actor.
@@ -649,11 +654,39 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   and `admin/coins/customer/{id}/earned` (`src/apis/admin/customers/customer-details.ts`, the
   customer modal's coins tab). Nothing calls `admin/coins/expire`, `admin/coins/customer/{id}` or
   `admin/coins/store/{appName}/stats`.
-- **Refunds**: `order/addRefund` no longer exists (removed 2026-11-03). A single order's money
-  is decided in the cancel modal (`cancelMoneyDecision` keep/refund, CORE invariant 21). Twin:
-  only a DEGRADE records an amount (`degrade.refundOwed`/`refundBreakdown`); a twin CANCEL
-  (`twin-order/admin/cancel`, `cascadeCancel`) records none — it stamps `undecided` on the card
-  legs and a person settles the group. Compensations: `shoofiAdmin/compensations/*`.
+- **Refunds**: `order/addRefund` no longer exists (removed 2026-11-03). Money is decided per
+  CHARGE in the cancel dialog (`money/cancel`, keep/refund) and lives in the charge's
+  `moneyLedger` / `moneySummary` (CORE invariant 22). The old `twin-order/admin/cancel` route
+  records no amount on the group doc; its legs settle `undecided` through the ledger. Only a
+  degrade writes `degrade.refundOwed`/`refundBreakdown`. Compensations:
+  `shoofiAdmin/compensations/*`.
+- **Cancel money (CORE invariant 22) — the admin side, shoofi-delivery-web#346:**
+  - **One cancel dialog** (`src/components/Modals/CancelMoneyDialog.tsx`, rules in
+    `src/utils/cancel-dialog.ts`, calls in `src/apis/admin/money.ts`) for single orders and both
+    twin cards: `money/cancel-preview` → scope choice (twin: this side / the other side by name /
+    both, or only "remaining"), the server's amount + breakdown + coins/coupons returned, keep or
+    refund (asked only when money is at stake), then `money/cancel`. **A 404 from cancel-preview
+    (a server without `/api/money`) falls back to the old dialog** (`isMoneyApiMissing`).
+  - **MoneyLine** (`src/components/MoneyLine.tsx`, `src/utils/money-summary.ts`) renders
+    `order.moneySummary` on every order card / twin card / live-ops row; a twin leg shows its
+    GROUP's line ("חלק מתשלום משולב"). No `moneySummary` → the legacy `charge-state.ts` badge.
+  - **"חייבים ללקוח"** (`src/views/admin/money/MoneyOwed.tsx`, `/admin/money-owed`,
+    `src/utils/money-owed.ts`): the owed queue (`money/owed`), record a portal refund
+    (`money/record-refund`), resolve an in-doubt HYP refund (`money/resolve-unknown`). Finance =
+    `MONEY_FINANCE_ROLES = ["master", "accountant"]` (`menu-access.ts`) — a NEW grant to
+    `accountant` (Sari, 2026-11-06). **"החלף קופון להחזר"** (`MoneyFinanceModals.tsx`
+    `ChangeDecisionModal` → `money/change-decision {to: "refund"}`) on a cancelled order / twin
+    card with a keep coupon, finance + master only.
+  - **Status dropdown** (`src/utils/cancel-money.ts` `statusChoicesFor` /
+    `statusChangeNeedsCancelDialog`): an order with money at stake no longer offers the
+    cancel/reject statuses there (they would be stamped `undecided` with nobody asked) — cancels go
+    through "בטל הזמנה" and its dialog; "בטל הזמנה" is hidden on status 5.
+  - **Undo guard** (`src/utils/twin-cancel.ts` `undoDegradeBlock`) mirrors the server's
+    `undoDegradeBlockReason` and also reads `group.moneySummary` (a coupon, a refund or a refund in
+    doubt since the degrade hides undo).
+  - Monitoring: `admin/order-monitoring/summary` carries `moneySummary` (+ `orderObjectId`,
+    `appName`) and `twin.group.moneySummary`; `analytics/deliveries` `storeOrder` carries
+    `moneySummary`.
 - **Twin admin auth**: every `twin-order/admin/*` action takes `TWIN_ADMIN_ROLES` (every
   dashboard seat but `accountant`; support works on `viewer`), `group/:id/full` and
   `GET admin/twin-order-config` any dashboard seat, `POST admin/twin-order-config` admin (+ master).

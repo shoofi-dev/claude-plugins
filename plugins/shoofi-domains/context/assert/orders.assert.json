@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@fix/twin-cancel-safety / 2026-11-06 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@fix/twin-cancel-safety / 2026-11-07 (CORE invariants 21-22); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -55,7 +55,13 @@
         "services/database/DatabaseInitializationService.js",
         "test/integration/twin-cancel-safety.js",
         "test/integration/twin-admin-auth.js",
-        "test/integration/order-cancel-undecided.js"
+        "test/integration/order-cancel-undecided.js",
+        "services/money/ledger.js",
+        "services/money/money-store.js",
+        "services/money/money-cancel.js",
+        "routes/money.js",
+        "scripts/money-backfill.js",
+        "test/integration/money-cancel.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -71,6 +77,9 @@
           "undoDegradeBlockReason",
           "computeDegradeRefund"
         ],
+        "services/money/ledger.js": ["summarize", "checkInvariant", "totals", "ledgerMovedSince"],
+        "services/money/money-store.js": ["appendEntries", "claimCharge", "ensureCaptureEntry", "twinCapturedAtCapture"],
+        "services/money/money-cancel.js": ["settleCancelledMoney", "attemptHypTwinRefund", "recordSingleCancel", "settleTwinAfterLegCancel"],
         "services/orders/cancel-money.js": [
           "hasCancelMoneyAtStake",
           "cancelMoneyStamp",
@@ -554,7 +563,16 @@
         {"file": "routes/order.js", "regex": "const stamp = cancelMoney\\.cancelMoneyStamp\\(currentOrder, updateobj\\);", "desc": "CORE invariant 21: the stamp is what was decided (keep/refund/undecided/none), not the REFUND the settle step ran"},
         {"file": "routes/twin-order.js", "regex": "const TWIN_ADMIN_ROLES = \\['master', 'admin', 'manager', 'senior', 'operator', 'viewer', 'editor'\\];", "desc": "CORE invariant 21: twin admin actions keep every operating seat (support = viewer), not accountant"},
         {"file": "routes/twin-order.js", "regex": "router\\.post\\('/api/twin-order/admin/undo-degrade', \\.\\.\\.TWIN_ADMIN,", "desc": "CORE invariant 21: undo-degrade carries the admin role gate"},
-        {"file": "routes/admin/twin-order-config.js", "regex": "const CONFIG_WRITE = \\[auth\\.required, checkAdminRole\\(\\['admin'\\]\\)\\];", "desc": "CORE invariant 21: twin config write is admin (+ master)"}
+        {"file": "routes/admin/twin-order-config.js", "regex": "const CONFIG_WRITE = \\[auth\\.required, checkAdminRole\\(\\['admin'\\]\\)\\];", "desc": "CORE invariant 21: twin config write is admin (+ master)"},
+        {"file": "services/money/ledger.js", "regex": "if \\(t\\.refunded \\+ t\\.compensated \\+ t\\.owedOpen > t\\.captured \\+ EPS\\) \\{", "desc": "CORE invariant 22: refunded + compensated + owed <= captured, checked before every ledger write"},
+        {"file": "services/money/money-store.js", "regex": "\\{ \\.\\.\\.ctx\\.filter, moneyLedgerVersion: version === 0 \\? \\{ \\$in: \\[0, null\\] \\} : version \\}", "desc": "CORE invariant 22: ledger writes are versioned (a lost race re-reads and retries)"},
+        {"file": "services/money/money-store.js", "regex": "\\{ moneyClaim: \\{ \\$exists: false \\} \\}, \\{ moneyClaim: null \\}, \\{ \\\"moneyClaim\\.at\\\": \\{ \\$lt: stale \\} \\}", "desc": "CORE invariant 22: one money action per charge (409 charge_busy)"},
+        {"file": "services/money/money-cancel.js", "regex": "if \\(config\\.hypAutoRefund !== true\\) return \\{ attempted: false, reason: \\\"flag_off\\\" \\};", "desc": "CORE invariant 22 / payments CORE 12: HYP twin auto refund only behind hypAutoRefund"},
+        {"file": "services/money/money-cancel.js", "regex": "if \\(t\\.unknownOpen\\.length > 0\\) return \\{ attempted: false, reason: \\\"refund_in_doubt\\\" \\};", "desc": "CORE invariant 22: never retried while a refund is in doubt"},
+        {"file": "routes/money.js", "regex": "const MONEY_FINANCE_ROLES = \\[\\\"accountant\\\"\\];", "desc": "CORE invariant 22: finance routes = accountant (+ master)"},
+        {"file": "services/coins/coins-service.js", "regex": "cancelRefundedOrderIds: \\{ \\$ne: refundKey \\}", "desc": "CORE invariant 22: coins are refunded once per order"},
+        {"file": "routes/admin/twin-order-config.js", "regex": "hypAutoRefund: false,", "desc": "CORE invariant 22: hypAutoRefund defaults off"},
+        {"file": "routes/order.js", "regex": "module\\.exports\\.handleOrderUpdate = handleOrderUpdate;", "desc": "CORE invariant 22: /api/money/cancel runs the same order-update pipeline for singles"}
       ]
     },
     "shoofi-app": {
