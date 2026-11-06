@@ -1,6 +1,6 @@
 # Accountant / Settlement / Payouts — Domain Context
 
-> last-verified §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
+> last-verified §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
 
 > **Who you are:** the agent that owns **money OUT + the books** — computing what stores
 > and delivery companies/drivers are owed, issuing tax invoices, and generating bank
@@ -323,7 +323,7 @@ failed one sent, the summary offers "retry the failed ones" by id. A plain re-ru
 would skip them. Even a counted success is only "the server reported a send" (see above), never proof of
 delivery. Pinned by `__tests__/bulkInvoiceSend.test.ts` and `tests/e2e/reports/driver-invoice-bulk-send.spec.ts`.
 The list shows the send state on the row's stepper (the שליחה dot) and has chips הכל / עם בעיה / מוכן
-לשליחה / הושלם (`stepFilter`, `COMPANY_CATEGORY_FILTERS`). The bulk report **"שלח"** and bulk create run 3
+לשליחה / הושלם (`stepFilter`, `deriveCompanyReportState` — the facts, CORE invariant 19). The bulk report **"שלח"** and bulk create run 3
 at a time and end in a per-company results modal; the report send now returns 502 when every WhatsApp
 failed, so those count as failures there (fixed 2026-11-06).
 **⚠️ Field names change meaning by level (trap, 2026-11).** In `generateDriverReportData`, **per
@@ -416,16 +416,24 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   problems[{code, severity block|warn, messageHe, nextActionHe, action, field?}], taxAuthority, at, by}}`
   (CORE invariant 19; shoofi-server `docs/invoice-step-tracking.md`). The list route adds a computed
   `taxAuthority{approvalState, maxConsentDate, isLocked, taxMinistryURL, taxUrlSentAt, lastTaxUrlSend}`
-  per row (plus `ezcountBusinessType`), the row's filter chip `stepCategory` (problem | ready | done | open,
-  `reportCategoryOf`), filters `stepFilter=problem|ready|done` (`stepProblems=true` = problem) and, with
-  `includeStepCounts=true`, returns `stepCounts{all, problem, ready, done}` over the other filters
-  (`REPORT_CATEGORY_FILTERS`, `services/invoicing/report-steps.js`).
+  per row (plus `ezcountBusinessType`), and **`derived`**:
+  `{category, problems[{key, code, severity fail|block|warn, title, detail, actionId, source facts|steps}],
+  steps[{key, state ok|failed|blocked|pending|na|warn, sub, title}], nextAction{actionId, tone}, history[]
+  (recorded + synthesized `legacy: true` entries), taxAuthority, facts{businessType, ezcountBusinessType,
+  requiresAllocation, allocationNumber, allocationMissing}}`. It is computed on read by
+  `deriveStoreReportState` (`services/invoicing/report-facts.js`) and never stored. `stepCategory` =
+  `derived.category`. Filters: `stepFilter=problem|ready|done` (`stepProblems=true` = problem). With
+  `includeStepCounts=true` the route also returns `stepCounts{all, problem, ready, done}` over the other
+  filters. The counts are derived in JS over the filtered set (`report-list-derive.js`), then paged; the
+  single-report GET carries `derived` too.
 - **`shoofi.driverReports`** step tracking (2026-11-06, CORE invariant 19): `invoiceSteps.<generate|companyInvoice|
   companyAdditionsInvoice|allocation|reportSend|send>` + `invoiceStepHistory[]` (same entry shape as stores),
   `invoicePrecheck` (+ `documents[{key, amount, requiresAllocation}]`), `hypCompanyInvoiceAllocationNumber`,
   `hypCompanyAdditionsInvoiceAllocationNumber`, `hypCompany(Additions)InvoiceCreateResponse`,
-  `hypCompanyInvoiceCreatingAt` (claim). The list adds `stepCategory`, `taxAuthority`, `companyReportPhone`,
-  `companyInvoicePhone`, and `stepCounts` with `includeStepCounts=true`. `delivery-company.store` carries
+  `hypCompanyInvoiceCreatingAt` (claim). The list adds `derived` (`deriveCompanyReportState`; `facts` adds
+  `owesShoofi` and `documents{companyInvoice, companyAdditionsInvoice: {requiresAllocation,
+  allocationMissing}}`), `stepCategory`, `taxAuthority`, `companyReportPhone`, `companyInvoicePhone`, and
+  `stepCounts` with `includeStepCounts=true`. `delivery-company.store` carries
   `hyp.taxAuthority` and `hyp.taxUrlSendLog[]` like a store.
 - **`shoofi.driverReports`** (collection `driver-reports`) — `{deliveryCompanyId (string), dateRange, reportData{totalDeliveries,
   totalDriverPayment, earningsBy*, totalBonuses, totalCompensations, totalDriverCharges,
@@ -487,8 +495,11 @@ problem + "+N") · סכומים · דוח · תשלום (the two toggles) · ש�
 דוח → חנות → שופי → הקצאה → שליחה; the approval state is the הקצאה dot) · פעולה הבאה (`RowActions`: one
 next action, a ⋯ menu with EVERY other action, a chevron to `RowDetail` — מה צריך לטפל / היסטוריית פעולות
 with EZcount's raw answers / רשות המסים ומסמכים). Filter chips הכל / עם בעיה / מוכן לשליחה / הושלם use
-`stepFilter` + `stepCounts`. The row is a translation of the server's records (`storeRowModel.ts`); it
-decides no status. "בדיקה מקדימה לחשבוניות" creates nothing; bulk create / send run 3 at a time with a
+`stepFilter` + `stepCounts`. The row maps the server's `derived` (`storeRowModel.ts`); it decides no
+status. A `warn` dot (yellow !) means done but not cleanly (sent with the allocation number missing). The
+word under a dot is the server's short `sub` ("חסר", "נכשל"); the full text is the tooltip. The history
+tags pre-tracking entries "לפני מעקב השלבים". Bulk "בדוק הקצאה" (both lists) rechecks the selected
+reports whose document waits for its number, 3 at a time, read-only at EZcount. "בדיקה מקדימה לחשבוניות" creates nothing; bulk create / send run 3 at a time with a
 per-store result.
 `ReportDetail.tsx` adds the full step history with EZcount's raw answers. The delivery-company list
 (`driver-reports/DriverReportsList.tsx`, 2026-11-06) uses the same row and components through
@@ -543,6 +554,22 @@ approves, sends reports, and exports the MASAV Excel. (Full-stack: server comput
 12. **Business-type data**: 46 stores have no `businessType` (now blocks their store invoice);
     smoky-city and chorizous-taybe disagree with EZcount on exempt status (blocks; a human decides which
     side is right — it also changes customer-receipt VAT); 11 more differ only מורשה vs חברה (warns).
+
+14. **October 2026 under the derivation from the facts (read-only, 2026-11-06).**
+    - **Stores:** 135 reports → עם בעיה 24 / מוכן 13 / הושלם 95 / open 3. Before the fix, the same
+      screen showed GCP as הושלם.
+      - 22 store documents had no stored allocation number. A read-only
+        `getTaxMinistryAllocationNumber` found that EZcount DID allocate 19 of them; their number was
+        just never saved (pre-#438). One "בדוק הקצאה" each stores it and clears the row.
+      - Truly unallocated: GCP #10059 and burger-house #10044 ("Tax Authority integration does not
+        exists in your account" → `TAX_AUTH_NOT_CONNECTED`), and qamha #10030 ("Not Acceptable").
+      - The other 2 problems are approval-only: flora-boutique (no business type, approval expired
+        20.10) and shawerma-alarz (approval expired 5.10).
+      - After a bulk recheck, the expected store problems are 5.
+    - **Companies:** 182 reports → 2 / 33 / 1 / 146.
+      - בדיר אחמד סאבר #10015 is not allocated (no Tax Authority connection; approval expired 13.10,
+        link never sent).
+      - אוואב דלברי #10048 IS allocated; a recheck clears it.
 
 13. **Delivery companies, read-only snapshot 2026-11-06** (184 with a report since August): HYP not
     connected 46; approval never given 111; expired 16 (mostly June 2026 — e.g. בדיר אחמד סאבר, ₪13,100

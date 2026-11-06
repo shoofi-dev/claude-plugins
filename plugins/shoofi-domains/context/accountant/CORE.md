@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -736,11 +736,44 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       refuses it) — the chips and the row say so instead of asking for one. Shoofi → company
       `driver-reports/:id/create-invoice` exists and was never used (0 documents). 129 of 184 companies
       are exempt (300 receipts, no allocation). Tests: shoofi-server `test/integration/company-invoice-steps.js`.
-    - The admin web runs bulk create/send 3 at a time (`utils/run-with-concurrency.ts`) with a
-      per-store result, and shows each report's steps, reasons and next actions (reference §9). Its
-      filter chips are `REPORT_CATEGORY_FILTERS` / `reportCategoryOf` (problem → done → ready → open,
-      in that order; "problem" is exactly the rule above) — one rule in Mongo and JS, tested
-      against each other; never re-derive a category in the client.
+    - **One derivation from the FACTS decides what is wrong** (2026-11-06,
+      `services/invoicing/report-facts.js`: `deriveStoreReportState` / `deriveCompanyReportState`).
+      It gives the chip (problem → done → ready → open), every problem, the 5 dots, the next action
+      and the history. **Every surface uses it**: the chip counts, the "עם בעיה" filter, the stepper,
+      the next action, "מה צריך לטפל" and both report pages. Rows carry it as `derived`, and the
+      web maps it and decides nothing.
+      - **Why:** the first version read only the recorded steps. GCP's October report was created
+        before step tracking and has no steps. It was sent, and its doc #10059 (₪80,276) was never
+        allocated, yet it showed "הושלם" with "אין בעיות פתוחות".
+      - **What it reads:** the report's invoice fields, the issuer doc (business type, company
+        number, email, phones, HYP), the cached approval (distributor list + `hyp.taxAuthority`)
+        and `requiresAllocationNumber`. It makes no EZcount call per report.
+      - **A report with a `fail` or `block` problem is never "הושלם".** A document above the
+        ceiling with no stored allocation number is a `fail`:
+        - with no recorded check, it is `ALLOCATION_UNVERIFIED` "— מספר ההקצאה לא נבדק" (every
+          pre-#438 report);
+        - after a recheck that found none, it is "ללא מספר הקצאה".
+
+        Sent in that state gives a `warn` dot and "נשלח לפני שנבדק" / "נשלח עם קישור שלא נפתח".
+        Such a report is never "ready" either.
+      - **How issuer facts weigh:** they block only while the document is still missing. Approval
+        problems block only while a needed number is missing. A lookup that cannot answer is
+        dropped.
+      - **History for pre-tracking reports** is synthesized from their timestamps (`legacy: true`,
+        "לפני מעקב השלבים").
+      - **Derived on read, never written back.** No migration of legacy reports. The chips are
+        computed in JS (`report-list-derive.js`), because the facts live in per-store DBs; the
+        Mongo category filters are gone.
+      - **Never add a second category or problem rule** in Mongo or the client.
+      - "Tax Authority integration does not exists in your account" from the allocation call
+        means the business has no Tax Authority connection at all. It is mapped to `blocked`
+        `TAX_AUTH_NOT_CONNECTED`, with the send-link action.
+
+      Tests: shoofi-server `test/integration/reports-step-categories.js` (GCP legacy → problem, an
+      allocated legacy report stays done).
+    - The admin web runs bulk create / send / "בדוק הקצאה" 3 at a time
+      (`utils/run-with-concurrency.ts`) with a per-store result, and shows each report's derived
+      steps, reasons and next actions (reference §9).
     Tests: shoofi-server `test/integration/hyp-invoice-steps.js`, `test/integration/hyp-store-invoice-guard.js`.
 
 ## Known status (human-confirmed — do NOT "fix")

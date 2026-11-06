@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -195,11 +195,8 @@
         ],
         "services/invoicing/report-steps.js": [
           "recordStep",
-          "PROBLEM_REPORT_FILTER",
-          "REPORT_CATEGORY_FILTERS",
           "reportCategoryOf",
           "COMPANY_STEPS",
-          "COMPANY_CATEGORY_FILTERS",
           "companyReportCategoryOf"
         ],
         "services/invoicing/allocation-check.js": [
@@ -1080,9 +1077,36 @@
           "desc": "CORE invariants 17/19: the company pre-check route needs a dashboard role"
         },
         {
-          "file": "services/invoicing/report-steps.js",
-          "regex": "\\{ \\$gt: \\[\\{ \\$ifNull: \\['\\$reportData\\.netTotal', 1\\] \\}, 0\\] \\}",
-          "desc": "CORE invariant 19: a company period with netTotal <= 0 expects no invoice in the chips"
+          "file": [
+            "services/invoicing/report-facts.js",
+            "services/invoicing/report-steps.js"
+          ],
+          "regex": "const owes = \\(report\\.reportData\\?\\.netTotal \\?\\? 1\\) <= 0;|\\{ \\$gt: \\[\\{ \\$ifNull: \\['\\$reportData\\.netTotal', 1\\] \\}, 0\\] \\}",
+          "desc": "CORE invariant 19: a company period with netTotal <= 0 expects no invoice (derived from the facts in report-facts.js; the Mongo form in report-steps.js before fix/report-problems-from-facts)"
+        },
+        {
+          "file": [
+            "services/invoicing/report-facts.js",
+            "services/invoicing/report-steps.js"
+          ],
+          "regex": "const allocationMissing = hasStore && needsAlloc && !allocated;|const PROBLEM_REPORT_FILTER = problemFilterFor\\(STORE_STEPS\\);",
+          "desc": "CORE invariant 19: a store document above the ceiling with no stored allocation number is a problem from the FACTS, even with no recorded step (GCP Oct 2026 showed הושלם)"
+        },
+        {
+          "file": [
+            "services/invoicing/report-facts.js",
+            "services/invoicing/report-steps.js"
+          ],
+          "regex": "if \\(problems\\.some\\(\\(p\\) => p\\.severity === 'fail' \\|\\| p\\.severity === 'block'\\)\\) return 'problem';|if \\(hasStepProblem\\(report, STORE_STEPS\\)\\) return 'problem';",
+          "desc": "CORE invariant 19: a report with a failed or blocking problem is never 'done' — the category checks problems first"
+        },
+        {
+          "file": [
+            "services/invoicing/report-facts.js",
+            "services/invoicing/report-steps.js"
+          ],
+          "regex": "function legacyEntry\\(step, at, reasonHe\\)|const PROBLEM_REPORT_FILTER = ",
+          "desc": "CORE invariant 19: pre-tracking reports get a synthesized, never-stored history marked 'לפני מעקב השלבים'"
         }
       ]
     },
@@ -1120,6 +1144,11 @@
           "file": "src/views/admin/driver-reports/DriverReportsList.tsx",
           "regex": "axiosInstance\\.post\\('/hyp/admin/driver-reports/invoice-precheck', body\\)",
           "desc": "reference §9: the company reports screen's 'בדיקה מקדימה לחשבוניות'"
+        },
+        {
+          "file": "src/views/admin/reports/invoice-steps/storeRowModel.ts",
+          "regex": "return mapDerivedSteps\\(r\\.derived,|export function buildStoreSteps\\(r: StoreReportRow\\): StepView\\[\\] \\{\\n  const s = r\\.invoiceSteps",
+          "desc": "reference §9: the store row's dots are the server's derived state, mapped as is"
         }
       ]
     }
