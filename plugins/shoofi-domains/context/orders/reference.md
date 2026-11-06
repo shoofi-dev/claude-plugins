@@ -40,7 +40,8 @@ explicit "what could break" section in the PR body. Open it as a **draft**.
 - **Customers are ALWAYS central `shoofi`** — `getCustomerAppName()` ignores
   appName and returns `req.app.db['shoofi']` (`utils/app-name-helper.js`).
   So `customers` + `customers.orders[]` are central, orders are per-store.
-- Central `shoofi` also holds: `orderFlowEvents`, `twinOrderGroups`, `couponUsages`,
+- Central `shoofi` also holds: `orderFlowEvents`, `twinOrderGroups` (the `db.twinOrderGroups`
+  handle maps to it since 2026-11-06; before, to an empty `twin-order-groups`), `couponUsages`,
   `fraudChecks`, `deviceCustomers`, `ipCustomers`, `applePaySessions`,
   `hypPaySessions`, `pendingFeedbackNotifications`, `stores`, `store{id:1}` (platform creds).
 - `delivery-company` holds `bookDelivery` + twin config (`readConfig`).
@@ -137,8 +138,23 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   kept order (`$inc total`) while the primary's coupon usage stays. This was already true for
   every delivery coupon before this change.
 - **Dispatch**: longer-prep side dispatched first; second side revealed on first accept.
-- **Cancel/degrade**: `cascadeCancel` (both), `degradeToSingle` (keep one, record
-  `degrade.refundOwed`), `undoDegrade` (bails if refund cleared).
+- **Cancel/degrade** (CORE invariant 21): `cascadeCancel` cancels both legs, stamps
+  `cancelMoneyDecision: "undecided"` on each card leg it cancels and records NO refund amount
+  (no group money decision exists yet). `degradeToSingle` keeps one leg and records
+  `degrade.refundOwed` = the dropped leg's `total − shippingPrice` (before any shipping
+  transfer) + `combinationFee.customerPays`, and **0 unless that leg was card-captured** (cash,
+  never-paid, failed → `refundBreakdown.basis: "not_card_captured"`, no auto-refund attempt).
+  **The group's `paymentStatus` stays as it was — `both_captured` after a degrade**; the
+  refund's state is only `degrade.refund{Attempted,Completed,ReferenceNumber,Error}`. Groups
+  degraded before 2026-11-06 read `pending` (overwritten) and carry the old `orderPrice`-based
+  `refundOwed`. `undoDegrade` is refused (route: 409 `{ message, reason }`, nothing written) by
+  `undoDegradeBlockReason`: `money_already_handled` — `degrade.refundAttempted ||
+  degrade.refundCompleted`, either order has `cancelCompensation`, or either order has a
+  `cancelMoneyDecision` with `cancelMoneyDecisionAt` after `degrade.triggeredAt` (a missing
+  timestamp counts as after); else `kept_side_cancelled` — the kept order is in 4/5/7/8/9.
+  Before 2026-11-06 undo's group write went to `db.twinOrderGroups`, aliased to the empty
+  `twin-order-groups`, so it never restored a group. All three write `orderFlowEvents` on both
+  legs (`twin_cascade_cancel`, `twin_degrade`, `twin_undo_degrade`) with the admin as actor.
 - Never route twin peer transitions through `/api/order/update` — use the services (recursion).
 
 ## 5. Data model — the join map (memorize the snapshot trap)
@@ -486,7 +502,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   store user without `all`, and before user details load), **`update/viewd` = ACCEPT** (→ `6→1`, future `14→1`,
   sends `readyMinutes` — not persisted, §2), `update` (forward/back status + note), `update-item-collected`,
   `start-preparing` / `update-start-preparing`, `update-delay`, `printed`,
-  `book-delivery`, `*-custom-delivery`, `addRefund`, `future-orders-ready`, `drive-in-arrival-confirm`.
+  `book-delivery`, `*-custom-delivery`, `future-orders-ready`, `drive-in-arrival-confirm`.
+  (`addRefund` is gone: the app dialog was deleted under HQ #1a2f9e and the server route removed
+  in shoofi-server 29ed5252, 2026-11-03.)
 - **Transition rule**: ACCEPT goes through **`order/update/viewd`** (NOT `order/update`);
   all other forward/back transitions use `order/update` with an explicit `status` the
   client computes (`1→3` delivery / `1→2` takeaway; `3→11`; `2→11|10`; `15→1`).
@@ -631,8 +649,22 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   and `admin/coins/customer/{id}/earned` (`src/apis/admin/customers/customer-details.ts`, the
   customer modal's coins tab). Nothing calls `admin/coins/expire`, `admin/coins/customer/{id}` or
   `admin/coins/store/{appName}/stats`.
-- **Refunds**: `order/addRefund` is **NOT** used here — admin refunds surface via twin
-  `degrade`/`cancel` (`refundOwed`/`refundBreakdown`) and `shoofiAdmin/compensations/*`.
+- **Refunds**: `order/addRefund` no longer exists (removed 2026-11-03). A single order's money
+  is decided in the cancel modal (`cancelMoneyDecision` keep/refund, CORE invariant 21). Twin:
+  only a DEGRADE records an amount (`degrade.refundOwed`/`refundBreakdown`); a twin CANCEL
+  (`twin-order/admin/cancel`, `cascadeCancel`) records none — it stamps `undecided` on the card
+  legs and a person settles the group. Compensations: `shoofiAdmin/compensations/*`.
+- **Twin admin auth**: every `twin-order/admin/*` action takes `TWIN_ADMIN_ROLES` (every
+  dashboard seat but `accountant`; support works on `viewer`), `group/:id/full` and
+  `GET admin/twin-order-config` any dashboard seat, `POST admin/twin-order-config` admin (+ master).
+- **Cancel money UI (shoofi-delivery-web#346)**: `src/utils/cancel-money.ts` — the status
+  dropdown hides the cancel/reject statuses on an order with money at stake (they would be
+  stamped `undecided` with nobody asked); those cancels go through "בטל הזמנה", which asks keep
+  or refund; "בטל הזמנה" is hidden on status 5. `src/utils/twin-cancel.ts` — `undoDegradeBlock`
+  mirrors the server's `undoDegradeBlockReason` (hides undo with `UNDO_BLOCK_TEXT`), and the
+  twin cancel/degrade confirms no longer promise an automatic refund or coupon.
+  `src/utils/charge-state.ts` — an `undecided` cancel (and a `cancel_no_decision` flag) gets
+  its own badge; an undecided cancelled twin leg names no per-leg amount.
 - **Twin admin**: full lifecycle control (degrade / undo / cancel / assign single|split)
   + the twin-order-config screen (`degradeAutoRefund`, timeouts, enable switch).
 - **State**: not centralized — component-local `useState`; MobX only for store open/close.
