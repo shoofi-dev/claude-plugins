@@ -69,7 +69,15 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    `verifyAndCaptureTwinSession` in `routes/twin-order.js` (from `digital-finalize` and
    `zcredit-callback`), then `applyCaptureSuccess`. Its customer documents go through
    `issueSessionTwinInvoices` (`twin-payment-service.js`), never `captureCombined`'s block.
-   Its `both_captured` pre-check is not atomic, so finalize and the callback can both pass.
+   Its `both_captured` pre-check reads a possibly stale group, so finalize and the callback
+   can both reach `applyCaptureSuccess`. **Exactly-once is the claim there**, for every twin
+   capture: order flips first (idempotent on status `"0"`), then `claimBothCaptured`
+   (`twin-group-service.js`, `findOneAndUpdate` on `paymentStatus $ne "both_captured"`),
+   and only the winner runs coins, coupon usage, promotions, dispatch, the alert and the
+   documents; the loser gets `{alreadyCaptured: true}`. A `captureCombined` that LOSES the
+   claim has charged a second time (two `/pay` past `validateGroupForCharge`): it logs
+   CRITICAL for a manual refund. The double-charge window itself is still open.
+   `paymentLink` is now spread, not replaced, so `sessionId`/`twinIntentId` survive capture.
 9. **The per-order customer document follows the STORE's VAT status.** A store that is
    עוסק פטור (`accounting.bankAccount.businessType === 'exempt'`) charges no VAT, so its
    sale may not be documented with any. The flag is read with `isVatExempt`

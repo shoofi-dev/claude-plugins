@@ -44,7 +44,9 @@
           "chargeCombinedHyp",
           "refundPartial",
           "issueSessionTwinInvoices",
-          "customerDocuments"
+          "customerDocuments",
+          "claimBothCaptured",
+          "alreadyCaptured"
         ],
         "routes/twin-order.js": [
           "verifyAndCaptureTwinSession",
