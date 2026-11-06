@@ -57,8 +57,12 @@ PLAYWRIGHT=<…/node_modules/playwright> node $SK/engine/render.mjs $W/specs/x.j
 PLAYWRIGHT=<…> node $SK/engine/render.mjs $W/specs/x.json $W/out/x.mp4    # the draft
 ```
 
-Look at stills at the key moments before the full render (text in the safe zone, nothing cut,
-the highlight not wrapping). **GATE 1**: the draft video(s), the words, the facts each depends on.
+Pick dishes with **distinct photos** (menus reuse one photo for several sizes — group them by
+hash) and photos large enough for where they show. Then the review, before any person sees it:
+`render.mjs <spec> /dev/null --review` (stretched photos, repeated photos, text outside the safe
+zone or overlapping — exit 3 on a finding), and the **creative director** (`shoofi-operators:
+creative-director`) looks at the full-size frames against its rubric. Only a PASS goes on.
+**GATE 1**: the draft video(s), the words, the facts each depends on, the director's scorecard.
 
 ## 4. Clips and voice (paid)
 
@@ -76,7 +80,8 @@ the highlight not wrapping). **GATE 1**: the draft video(s), the words, the fact
 
 ## 5. Final and QA
 
-Render each language; check the stills again and watch it. **GATE 3**: the final MP4s. Posting
+Render each language; `--review` again and the creative director again (full size, never a
+contact sheet). **GATE 3**: the final MP4s. Posting
 goes through פרסום ידני (social) or a story in the app — a person does it.
 
 ## Banners

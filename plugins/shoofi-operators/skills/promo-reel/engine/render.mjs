@@ -44,6 +44,18 @@ const page = await browser.newPage({ viewport: { width: vw, height: vh }, device
 await page.goto(pathToFileURL(path.join(path.dirname(new URL(import.meta.url).pathname), 'stage.html')).href);
 const duration = await page.evaluate((s) => window.prepare(s), pageSpec);
 
+// --review: the creative director's measurable checks, at 12 moments (or the still's), as JSON.
+if (rest.includes('--review')) {
+  const isReel = vh > vw;
+  const times = still ? [Number(still.split('=')[1])] : Array.from({ length: 12 }, (_, i) => +(((i + 0.5) * duration) / 12).toFixed(2));
+  const safe = isReel ? { top: 250, bottom: 1450, right: 1080 - 200 } : null;
+  const report = await page.evaluate(([ts, sf]) => window.review(ts, sf), [times, safe]);
+  const fail = report.resolution.length + report.duplicates.length + report.text.length;
+  console.log(JSON.stringify({ spec: path.basename(specPath), pass: fail === 0, ...report }, null, 1));
+  await browser.close();
+  process.exit(fail ? 3 : 0);
+}
+
 if (still) {
   await page.evaluate((t) => window.renderAt(t), Number(still.split('=')[1]));
   await page.screenshot({ path: outPath, type: 'png' });

@@ -15,6 +15,7 @@
 | Operator | Owns |
 |---|---|
 | `marketing-manager` | **Leads marketing — HQ's CMO.** Every morning (07:45) it summarises the day's marketing picture (`hq-marketing-days`): published, next, what worked, existing offers nothing promotes, three steps for the week. Every marketing ask enters here; it knows the fleet, the skills and the admin marketing hub, and routes the work — running a specialist's playbook itself, handing back to the session for agents only the session can call, and stopping at every human gate. |
+| `creative-director` | Reviews every reel, banner and image before the owner sees it — measurable checks (stretched or repeated photos, text outside the safe zone) and a rubric (hook, food as hero, clarity, brand, CTA, craft, truth, variety). PASS or FIX with fixes. |
 | `competitive-intel` | Haat + Tira Eat — the coverage gap, price gaps, menu coverage, promos, ratings, and competitor↔our-store matching |
 | `social-marketing` | Shoofi's own Facebook/Instagram content — Arabic only, one account. Drafts posts, stories and ad copy against live platform data. **Never publishes.** |
 | `cfo` | **The daily money picture.** Reads the nightly money audit (shoofi-server `services/hq/money-audit`, `hq-money-audits`) of the business day that closed, triages its findings (real leak / known pattern / noise), and writes the owner a short Hebrew money summary for the morning brief. Names the code owner (accountant, payments, orders, delivery) for a cause in the code; the HQ run hands it over. **Never computes its own totals, never moves money.** |
@@ -151,6 +152,8 @@ answered with evidence rather than argument.
 ```
 .claude-plugin/plugin.json
 agents/marketing-manager.md              # the lead: routing, delegation, hard limits
+agents/creative-director.md              # the reviewer: PASS / FIX before every human gate
+context/creative-director/CORE.md        # the bar, the checks, the rubric, things learned
 agents/competitive-intel.md              # mission, hard limits, hand-offs, definition of done
 agents/social-marketing.md
 context/marketing-manager/CORE.md        # ALWAYS read: owner decisions, the fleet, routing,

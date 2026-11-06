@@ -137,6 +137,75 @@
     await Promise.all([...document.images].map((im) => (im.complete ? 0 : new Promise((r) => { im.onload = im.onerror = r; }))));
     return d;
   };
+  /**
+   * The creative director's measurable checks (render.mjs --review), at the given times:
+   *  - resolution: every visible photo/clip, its displayed size (with its Ken Burns zoom) over its
+   *    real pixels — above 1.15 it is stretched and will look soft;
+   *  - duplicates: a 9x8 difference hash of every photo; two pictures within 6 bits are the same
+   *    photo (menus reuse one photo for several dishes);
+   *  - text: every text block inside the canvas, inside the safe zone on a 9:16 reel, and not
+   *    overlapping another text block.
+   */
+  window.review = async (times, safe) => {
+    const out = { resolution: [], duplicates: [], text: [] };
+    const seen = new Map();
+    const hash = (el) => {
+      try {
+        const c = document.createElement('canvas'); c.width = 9; c.height = 8;
+        const g = c.getContext('2d'); g.drawImage(el, 0, 0, 9, 8);
+        const d = g.getImageData(0, 0, 9, 8).data; let bits = '';
+        for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+          const a = (y * 9 + x) * 4, b = a + 4;
+          bits += (d[a] + d[a + 1] + d[a + 2]) > (d[b] + d[b + 1] + d[b + 2]) ? '1' : '0';
+        }
+        return bits;
+      } catch (_) { return null; }
+    };
+    for (const t of times) {
+      await window.renderAt(t);
+      const boxes = [];
+      for (const l of layers) {
+        if (t < l.start || t >= l.end) continue;
+        for (const m of l.el.querySelectorAll('img, video')) {
+          const r = m.getBoundingClientRect();
+          const nw = m.naturalWidth || m.videoWidth, nh = m.naturalHeight || m.videoHeight;
+          if (!nw || !nh || r.width < 40) continue;
+          // object-fit: cover — the picture is scaled to fill the box on its tighter side.
+          const cover = getComputedStyle(m).objectFit === 'cover';
+          const f = cover ? Math.max(r.width / nw, r.height / nh) : Math.min(r.width / nw, r.height / nh);
+          const src = m.currentSrc || m.src;
+          const name = decodeURIComponent(src.split('/').pop());
+          if (f > 1.15) out.resolution.push({ t, file: name, factor: +f.toFixed(2), shown: [Math.round(r.width), Math.round(r.height)], real: [nw, nh] });
+          if (m.tagName === 'IMG' && r.width > 150 && !/icon|logo|shadi/i.test(name)) {
+            const h = hash(m);
+            if (h) {
+              for (const [other, oh] of seen) {
+                if (other === name) continue;
+                let dist = 0; for (let i = 0; i < 64; i++) if (h[i] !== oh[i]) dist++;
+                if (dist <= 6 && !out.duplicates.some((d) => (d.a === other && d.b === name) || (d.a === name && d.b === other))) out.duplicates.push({ a: other, b: name, bits: dist });
+              }
+              seen.set(name, h);
+            }
+          }
+        }
+        for (const tx of l.el.querySelectorAll('.txt')) {
+          const r = tx.getBoundingClientRect();
+          if (!r.width || getComputedStyle(l.el).opacity === '0') continue;
+          boxes.push({ r, text: tx.textContent.trim().slice(0, 40) });
+          const W = stage.clientWidth, H = stage.clientHeight;
+          if (r.left < 0 || r.top < 0 || r.right > W || r.bottom > H) out.text.push({ t, problem: 'outside the canvas', text: tx.textContent.trim().slice(0, 40) });
+          else if (safe && (r.top < safe.top || r.bottom > safe.bottom || r.right > safe.right)) out.text.push({ t, problem: 'outside the safe zone', text: tx.textContent.trim().slice(0, 40), box: [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)] });
+        }
+      }
+      for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i].r, b = boxes[j].r;
+        const ix = Math.min(a.right, b.right) - Math.max(a.left, b.left), iy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (ix > 12 && iy > 12) out.text.push({ t, problem: 'text overlaps text', text: `${boxes[i].text} / ${boxes[j].text}` });
+      }
+    }
+    return out;
+  };
+
   window.renderAt = async (t) => { for (const l of layers) place(l, t); await seekVideos(t); };
 })();
 </script>

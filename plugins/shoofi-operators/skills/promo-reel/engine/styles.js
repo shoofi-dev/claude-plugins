@@ -292,11 +292,13 @@
 
   STYLES.bannerCloseup = (spec) => {
     const s = spec.subject, t = spec.theme, d = s.dishes[0];
+    // The photo at its own proportions, never wider than the panel and never stretched past its
+    // pixels (a small menu photo stays sharp); a blurred copy fills the rest.
     return [
-      still({ full: true, html: `<img class="cover" src="${d.img}" style="object-position:30% 50%">`, z: 1 }),
-      still({ full: true, html: `<div class="cover" style="background:linear-gradient(90deg,rgba(0,0,0,0) 30%,rgba(0,0,0,.82) 62%)"></div>`, z: 2 }),
+      still({ full: true, html: `<div class="cover" style="background:${t.ink}"></div>`, z: 1 }),
+      still({ html: `<div style="position:relative;width:1080px;height:${BH}px;overflow:hidden"><img src="${d.img}" style="position:absolute;left:-20px;top:-20px;width:280px;height:280px;object-fit:cover;filter:blur(8px) brightness(.5);transform-origin:0 0;transform:scale(4.2)"><div style="position:absolute;inset:0;display:flex;justify-content:center;align-items:center"><img src="${d.img}" style="max-height:100%;max-width:100%;display:block;object-fit:contain;box-shadow:0 20px 60px rgba(0,0,0,.45)"></div><div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,0) 70%,${t.ink} 100%)"></div></div>`, x: 0, y: 0, w: 1080, h: BH, z: 2 }),
       still({ html: `<div class="pill" style="background:var(--lime);color:${t.ink};font-size:48px;padding:10px 34px">${esc(spec.text.hook)}</div>`, x: 1110, y: 170, w: 400, z: 6 }),
-      bannerWords(spec, { headline: `${d.name}\n${s.store.name}`, sub: [...(s.chips || []), s.price].filter(Boolean).join(' · '), y: 290 }),
+      bannerWords(spec, { headline: `${d.name}\n${s.store.name}`, sub: [(s.chips || []).join(' · '), s.price].filter(Boolean).join('\n'), y: 290 }),
       bannerPill(spec),
     ];
   };
