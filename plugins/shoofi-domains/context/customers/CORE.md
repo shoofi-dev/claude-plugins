@@ -748,6 +748,14 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
     - One Claude call per channel per day (pictures attached → API backend), feature
       `marketing templates`, which counts against the marketing daily budget. The run checks the
       budget before each channel.
+    - **Pictures are read by their bytes** (`sniffImage`): the CDN serves uploads as
+      `application/octet-stream`, so trusting the header dropped every banner and story picture
+      (`too_few_images`) until 2026-11-06. They go to the model as ≤ 1024 px JPEGs.
+    - **The owner can also give one picture** (2026-11-06,
+      `POST /api/admin/marketing/templates/from-picture`, `learnFromPicture`): a design they like
+      from anywhere → one Claude call → the same no-facts `style` → **`suggested`**, with
+      `source {kind: "upload", by, note}` and the picture kept on the CDN as its example. Still
+      only the owner's approve makes it offered; ≤ 6 suggested in all before another upload.
     Pinned by shoofi-server `test/integration/marketing-templates.js` and
     `marketing-routes-auth.js`.
 
