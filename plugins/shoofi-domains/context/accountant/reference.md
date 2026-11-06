@@ -426,6 +426,24 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   `includeStepCounts=true` the route also returns `stepCounts{all, problem, ready, done}` over the other
   filters. The counts are derived in JS over the filtered set (`report-list-derive.js`), then paged; the
   single-report GET carries `derived` too.
+
+  **The period is always bounded** (`report-period.js`, both list routes):
+  - no `startDate`/`endDate` (and no full created-at range) → the previous calendar month, Israel
+    calendar;
+  - one side given → the other is filled, within 12 months;
+  - more than 12 months, reversed, or malformed → 400 `REPORT_RANGE_INVALID`, Hebrew `message`;
+  - the response adds `range{startDate, endDate, createdStartDate, createdEndDate, defaulted}`.
+
+  `dateRange` is stored as date labels at UTC midnight (October = 2026-10-01 → 2026-10-31; the
+  business-day boundaries are applied at generation and not stored), so the filter is a date
+  overlap.
+
+  **Index:** `{dateRange.endDate: 1, dateRange.startDate: 1}` on both collections (shoofi DB,
+  fire-and-forget at startup). Before 2026-11 there was only `_id`.
+
+  **The per-row `isHaveAccessTokenAndValid`** now comes from `derived.taxAuthority` (the old
+  per-request walk of every store, `getStoresHypStatus`, is only used by the "ללא אישור מסים"
+  filter).
 - **`shoofi.driverReports`** step tracking (2026-11-06, CORE invariant 19): `invoiceSteps.<generate|companyInvoice|
   companyAdditionsInvoice|allocation|reportSend|send>` + `invoiceStepHistory[]` (same entry shape as stores),
   `invoicePrecheck` (+ `documents[{key, amount, requiresAllocation}]`), `hypCompanyInvoiceAllocationNumber`,
@@ -499,7 +517,10 @@ with EZcount's raw answers / רשות המסים ומסמכים). Filter chips �
 status. A `warn` dot (yellow !) means done but not cleanly (sent with the allocation number missing). The
 word under a dot is the server's short `sub` ("חסר", "נכשל"); the full text is the tooltip. The history
 tags pre-tracking entries "לפני מעקב השלבים". Bulk "בדוק הקצאה" (both lists) rechecks the selected
-reports whose document waits for its number, 3 at a time, read-only at EZcount. "בדיקה מקדימה לחשבוניות" creates nothing; bulk create / send run 3 at a time with a
+reports whose document waits for its number, 3 at a time, read-only at EZcount. Both lists open on the
+previous calendar month (Israel calendar, `invoice-steps/reportPeriod.ts`, kept in the URL; "נקה מסננים"
+returns to it), never all-time; a 400 for a period over 12 months shows its Hebrew reason. The support
+button sits inside the issues rail on md+ so it covers no content. "בדיקה מקדימה לחשבוניות" creates nothing; bulk create / send run 3 at a time with a
 per-store result.
 `ReportDetail.tsx` adds the full step history with EZcount's raw answers. The delivery-company list
 (`driver-reports/DriverReportsList.tsx`, 2026-11-06) uses the same row and components through
@@ -556,20 +577,27 @@ approves, sends reports, and exports the MASAV Excel. (Full-stack: server comput
     side is right — it also changes customer-receipt VAT); 11 more differ only מורשה vs חברה (warns).
 
 14. **October 2026 under the derivation from the facts (read-only, 2026-11-06).**
-    - **Stores:** 135 reports → עם בעיה 24 / מוכן 13 / הושלם 95 / open 3. Before the fix, the same
-      screen showed GCP as הושלם.
+    - **Stores:** 136 reports → עם בעיה 25 / מוכן 13 / הושלם 95 / open 3. Before the fix, the same
+      screen showed GCP as הושלם. The 136th is super-abu-shaqra's custom Sep 1 → Oct 31 report: the
+      date overlap lists it under October, and it is a problem (owner never approved, ₪14,075).
       - 22 store documents had no stored allocation number. A read-only
         `getTaxMinistryAllocationNumber` found that EZcount DID allocate 19 of them; their number was
         just never saved (pre-#438). One "בדוק הקצאה" each stores it and clears the row.
       - Truly unallocated: GCP #10059 and burger-house #10044 ("Tax Authority integration does not
         exists in your account" → `TAX_AUTH_NOT_CONNECTED`), and qamha #10030 ("Not Acceptable").
-      - The other 2 problems are approval-only: flora-boutique (no business type, approval expired
-        20.10) and shawerma-alarz (approval expired 5.10).
-      - After a bulk recheck, the expected store problems are 5.
+      - The other 3 problems are approval-only: flora-boutique (no business type, approval expired
+        20.10), shawerma-alarz (approval expired 5.10) and super-abu-shaqra (never approved, link sent
+        5.11; no store invoice yet).
+      - After a bulk recheck, the expected store problems are 6: GCP, burger-house, qamha,
+        flora-boutique, shawerma-alarz and super-abu-shaqra.
     - **Companies:** 182 reports → 2 / 33 / 1 / 146.
-      - בדיר אחמד סאבר #10015 is not allocated (no Tax Authority connection; approval expired 13.10,
-        link never sent).
+      - בדיר אחמד סאבר #10015 is not allocated (no Tax Authority connection; the distributor list
+        now reports the approval as not given — the 11-06 morning snapshot had it expired 13.10; the
+        approval link was never sent).
       - אוואב דלברי #10048 IS allocated; a recheck clears it.
+    - **Load time** (read-only prod, laptop with 70 ms RTT, page of 20 with chips):
+      - stores: all-time 4.8 s (derived) / 2.4 s (main) → last month 1.95 s;
+      - companies: all-time 1.37 s → last month 1.13 s.
 
 13. **Delivery companies, read-only snapshot 2026-11-06** (184 with a report since August): HYP not
     connected 46; approval never given 111; expired 16 (mostly June 2026 — e.g. בדיר אחמד סאבר, ₪13,100
