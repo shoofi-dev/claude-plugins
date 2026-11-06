@@ -278,6 +278,21 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.
   HYP tokenization does not store CVV; this resolves as ZCredit is retired. **Do not
   independently rip out CVV handling.**
+- **OPEN (HQ #d20fad, 2026-11-06): the ZCredit charge payload is stored unredacted on the order.**
+  `processCreditCardPayment` (`routes/order.js:656-665`) and twin `buildChargePayload`
+  (`services/twin-order/twin-payment-service.js:165-174`) build a payload with the terminal
+  `Password`, the customer's `CVV` and the card holder's ID number (`HolderID`). It is persisted at
+  `ccPaymentRefData.payload.*` on success and on the twin paths. On a single-order **failure**,
+  `routes/order.js:4495` stores the whole `paymentResult`, so the same fields land one level deeper
+  at `ccPaymentRefData.paymentData.payload.*`. A scan that reads only the first path misses about
+  7.7k orders. `redactPaymentSecrets` cleans only the request-body copy at `order.paymentData`
+  (`cvv` → `"<redacted>"`), and it **keeps** `paymentData.id`, the same ID number.
+  Partner-accept copies the whole order into `delivery-company.book-delivery.order`
+  (`services/delivery/book-delivery.js`), so every path above also exists under `order.` there.
+  The scrub is `data-changes/2026-11-06-scrub-zcredit-secrets-*`. Do not run it before the
+  write-side redaction is deployed: its `plan()` refuses while matching rows are under 24h old.
+  ⚠️ **A data-change backup copies whatever the change removes.** HQ writes each target document
+  whole to `shoofi.hq-data-change-backups` (no expiry), and Undo restores it.
 - **CONFIRMED — remove (backlog):** `hyp-test-soft` debug endpoint in `routes/hyp-pay.js`
   (charges 1 NIS with a saved token) should not exist in prod. Money file → draft HIGH-RISK PR,
   confirm nothing calls it.
