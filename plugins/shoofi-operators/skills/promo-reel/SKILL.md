@@ -39,13 +39,25 @@ customer. "New" only when it is (a store in its `launchDate` window; a dish crea
 weeks). Ask the owning domain agent when a rule is unclear (orders: deals and coupons;
 menu-catalog: dishes).
 
+**Check the offer is live, on the day you render — never from a spec or memory.** A deal:
+`isActive: true` and today inside `startDate`–`endDate`. A coupon: `isActive`, no `customerId`,
+today inside `start`–`end`, and read its scope — `discountType` (`delivery` takes the money off the
+delivery fee, not the order) and `applicableTo.stores` (one store = say that store). 2026-11-07:
+the ₪20 coupon in four examples had ended a year earlier, was one store's, and was a delivery
+discount; Burger Cave's 10% deal was switched off while its dates still ran. A reel on a dead offer
+is a false ad — stop and ask for a live one.
+
 ## 2. The look — rotate everything
 
 Run `scripts/pick.py` with the styles the owner approved (`marketingTemplates`, `channel: "reel"`,
 `status: "approved"`) and the store: it picks style, theme, opening motion, end card, music, food
 sound and opening line, each the option this store used longest ago and never one of the last two
-reels (styles.md "No two posts alike"). Shadi is optional (a 3 s insert) unless the style is
-`shadi`.
+reels (styles.md "No two posts alike").
+
+**Options (the owner's defaults, 2026-11-07): plain is the default.** No voice and no Shadi unless
+the request asks for them (`pick.py --voice`, `--shadi`; without `--shadi` the `shadi` style is never
+picked); the soundtrack is ON unless switched off (`--no-music`). Text, real photos, motion and
+music always; voice and Shadi cost credits and are opt-in per reel.
 
 ## 3. Draft (free)
 
@@ -76,10 +88,13 @@ creative-director`) looks at the full-size frames against its rubric. Only a PAS
   in words, «عشره» with ه). Transcribe the take with whisper-cli and diff it against the script.
   One take per language, cut at its pauses, each phrase placed on its scene. (2026-11-07: the
   Sweet Diablo line said «هلأ» on Eleven v3 — the owner caught it.)
-- Music: the picker's catalog track (download_track; its hook start in pick.py), ducked under the
-  voice (`sidechaincompress`). Sounds: a food sound at the open, an impact where the dish lands
-  and where the Shoofi logo lands (search_sfx; the download link of a sound effect can 403 — its
-  preview link serves the whole clip). Mix to -14 LUFS into `audio` in the spec.
+- Music: the picker's catalog track (download_track; its hook start in pick.py). Sounds: a food
+  sound at the open, an impact where the offer and the Shoofi logo land (search_sfx; the download
+  link of a sound effect can 403 — its preview link serves the whole clip).
+- Mix with `scripts/mix.py` (music on by default, the voice only when asked; the music ducks under
+  the voice; -14 LUFS) into `audio` in the spec — its length is the reel's length:
+  `python3 -I scripts/mix.py out/mix.m4a --duration 10.6 --music m.mp3 --music-start 123.1
+  --voice v.mp3 --cut 0:0.8@0.15 --cut 0.9:6.05@1.9 --cut 6.2:@8.35 --sound impact.aac@5.4:0.7`
 - The final Sweet Diablo reel (`examples/closeup-masterburger-final.json`) was made this way.
 - **GATE 2**: the total credits from the batch quote.
 
