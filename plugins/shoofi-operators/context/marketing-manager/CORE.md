@@ -36,6 +36,7 @@ what can do each piece, and the decisions the owner (Sari) has already made.
 |---|---|---|
 | `shoofi-operators:social-marketing` | Our Facebook/Instagram posts, stories, ad copy — Arabic voice C, drafts only, never the Meta token | `${CLAUDE_PLUGIN_ROOT}/context/social-marketing/CORE.md` |
 | `shoofi-operators:competitive-intel` | Haat / Tira Eat: coverage gap, prices, promos, what they post. **Input** to marketing, never in our content | `${CLAUDE_PLUGIN_ROOT}/context/competitive-intel/CORE.md` |
+| `shoofi-operators:creative-director` | Reviews every reel, banner and image before the owner sees it: measurable checks + the rubric → PASS / FIX. **Hand off to it; never review your own work** | `${CLAUDE_PLUGIN_ROOT}/context/creative-director/CORE.md` |
 
 Planned, not built (do their work yourself under these rules until they exist): in-app
 content specialist, `retention-crm` (push/CRM), an offers analyst who asks the accountant
@@ -45,6 +46,7 @@ what a deal costs.
 | Skill | What it makes | Where |
 |---|---|---|
 | `shoofi-operators:guided-reel` | A lip-synced Shadi explainer reel (AR + HE) over real app screens, 1080x1920 MP4 | `${CLAUDE_PLUGIN_ROOT}/skills/guided-reel/SKILL.md` |
+| `shoofi-operators:promo-reel` | A 10–12 s promo video for a new store / new dish / deal / coupon in one of six styles, rotated so posts don't look alike; real dish photos, DB facts | `${CLAUDE_PLUGIN_ROOT}/skills/promo-reel/SKILL.md` |
 | `shoofi-testing:local-app-e2e` | Real app screenshots on a simulator with seeded data (reels, store pages, how-tos) | the shoofi-testing plugin |
 
 ### 2c. Facts come from the code owners (Class A, `shoofi-domains`)
@@ -65,6 +67,8 @@ what a deal costs.
 |---|---|---|
 | "Write a post / story caption / ad copy" | social-marketing | run its playbook (load its CORE) |
 | "Make a video/reel explaining <feature>" | guided-reel | run the skill; gates at script, voice, clip credits, final |
+| "Review / is this good enough" (and every reel or banner before its gate) | creative-director | **hand back** with the output paths — it runs as its own agent; only a PASS goes to the owner |
+| "A video / reel / story ad for <store, dish, deal, coupon>" | promo-reel | run the skill: a style the owner approved (video templates, `channel: "reel"`), never the last one used for that store nor the last two published; free draft first, credits after a yes |
 | "Promote <coupon/deal/store/product/new store>" | admin marketing hub (§4) | check it's promotable (§1 #1–2) and not colliding (`/active`); draft per channel; a person approves |
 | "Send a push about X" | push campaign draft (§4c) | respect opt-out + cap; propose a holdout % for anything you'll want to measure |
 | "How did <campaign/push/post> do?" | results (§4d) | read the numbers; say which method and its limits |

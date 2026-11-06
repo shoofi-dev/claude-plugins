@@ -15,6 +15,7 @@
 | Operator | Owns |
 |---|---|
 | `marketing-manager` | **Leads marketing — HQ's CMO.** Every morning (07:45) it summarises the day's marketing picture (`hq-marketing-days`): published, next, what worked, existing offers nothing promotes, three steps for the week. Every marketing ask enters here; it knows the fleet, the skills and the admin marketing hub, and routes the work — running a specialist's playbook itself, handing back to the session for agents only the session can call, and stopping at every human gate. |
+| `creative-director` | Reviews every reel, banner and image before the owner sees it — measurable checks (stretched or repeated photos, text outside the safe zone) and a rubric (hook, food as hero, clarity, brand, CTA, craft, truth, variety). PASS or FIX with fixes. |
 | `competitive-intel` | Haat + Tira Eat — the coverage gap, price gaps, menu coverage, promos, ratings, and competitor↔our-store matching |
 | `social-marketing` | Shoofi's own Facebook/Instagram content — Arabic only, one account. Drafts posts, stories and ad copy against live platform data. **Never publishes.** |
 | `cfo` | **The daily money picture.** Reads the nightly money audit (shoofi-server `services/hq/money-audit`, `hq-money-audits`) of the business day that closed, triages its findings (real leak / known pattern / noise), and writes the owner a short Hebrew money summary for the morning brief. Names the code owner (accountant, payments, orders, delivery) for a cause in the code; the HQ run hands it over. **Never computes its own totals, never moves money.** |
@@ -93,6 +94,7 @@ Invoke namespaced: **`shoofi-operators:marketing-manager`**, **`shoofi-operators
 
 | Skill | Makes |
 |---|---|
+| `/shoofi-operators:promo-reel` | A 10–12 s promo video (9:16, AR + HE) for a new store, new dish, deal or coupon, in one of six styles (תקריב, קצב, המספר, שולחן, באפליקציה, שאדי מציג) rotated so posts don't look alike. Free draft from the real photos first; dish clips (Kling from the real photo), voice and music after a yes for the credits. Engine: `skills/promo-reel/engine/` (Playwright renders each frame, ffmpeg encodes). The owner approves a style by uploading its example as a video template. |
 | `/shoofi-operators:guided-reel` | A guided explainer reel: Shadi (the 3D courier mascot) explains a feature in Arabic and Hebrew, lip-synced, beside a phone showing real app screens with the key item zoomed out. Four human gates (script, voice, clip credits, final). Builder: `skills/guided-reel/scripts/reel.py` driven by a `reel.json`. |
 
 ## The Library — the managers learn, the owner approves
@@ -150,6 +152,8 @@ answered with evidence rather than argument.
 ```
 .claude-plugin/plugin.json
 agents/marketing-manager.md              # the lead: routing, delegation, hard limits
+agents/creative-director.md              # the reviewer: PASS / FIX before every human gate
+context/creative-director/CORE.md        # the bar, the checks, the rubric, things learned
 agents/competitive-intel.md              # mission, hard limits, hand-offs, definition of done
 agents/social-marketing.md
 context/marketing-manager/CORE.md        # ALWAYS read: owner decisions, the fleet, routing,
@@ -160,6 +164,10 @@ context/competitive-intel/CORE.md        # ALWAYS read: competitor endpoints + f
 context/social-marketing/CORE.md         # ALWAYS read: the measured voice spec and its
                                          #   evidence, the account model, the approval
                                          #   chain, the coupon rule, what exists today
+skills/promo-reel/SKILL.md               # promo video: subject × style, gates
+skills/promo-reel/engine/                #   stage.html + styles.js (6 styles) + render.mjs
+skills/promo-reel/references/            #   styles.md, research.md (Meta/TikTok), motion.md (Kling)
+skills/promo-reel/examples/              #   the six example specs (2026-11-06)
 skills/guided-reel/SKILL.md              # Shadi explainer reel: steps + gates
 skills/guided-reel/scripts/reel.py       #   the builder (Chrome renders, ffmpeg composites)
 skills/guided-reel/assets/shadi/         #   blue-screen poses: stand.png, point.png
