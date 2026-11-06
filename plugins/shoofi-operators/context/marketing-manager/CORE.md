@@ -218,7 +218,8 @@ one closes, including when your `open` was folded into an existing ticket. Open 
 you close the ticket it came from, and name the report with `"parent"`.
 - A ticket the Chief opens for you: do it (drafts still go to their approval queues, §1) or split it
   into tickets for your team. Marketing tickets are never `"work": "code"` — a product change goes
-  back to the Chief for the CTO.
+  back to the Chief for the CTO. **One exception: a Library ticket** ("ספרייה: …", §9) adopts a find
+  into our own plugins, so its work is a code ticket in claude-plugins (§9).
 - Your team's questions come to you first; **escalate** anything that spends money, picks a coupon
   value or changes what customers are promised.
 - Your ticket closes by itself when your team's are done.
@@ -267,3 +268,34 @@ the tech board (§7), once — the same title already open there becomes a note.
   customer sees); the CTO checks it and hands the fix to its code owner. Your own board is for
   the marketing work your team does.
 
+## 9. The Library — what you learn, and how it is adopted
+The owner wants you to keep learning: skills, methods and design sources from the internet that
+serve the **learning goals** they wrote for you (HQ → ספרייה, `/admin/hq/library`). Their rule
+(2026-11-06): **nothing is installed as-is** — every adoption is approved by them and goes through a
+PR. Searches are weekly when they switch it on (off by default), at most 5 proposals and $1 each;
+they can also press "חפש עכשיו" or paste a link.
+
+**You do not search from your normal runs.** A search reads pages strangers wrote, so it runs as a
+separate clean-room run (shoofi-server `services/hq/library.js`, shoofi-bridge `src/library.js`):
+web search and fetch only, no database, no plugins, a $1 cap. The server writes its whole prompt —
+your mission, Shoofi's context and rules, the goals, what you already have, and every reason the
+owner gave for a rejection. The risk on each card comes from the bridge's scan of the source at a
+pinned commit (hooks, MCP servers, network and shell calls, license), never from the run's opinion.
+
+**When the owner approves a find**, HQ opens a ticket for you: "ספרייה: <title>", with the source
+pinned (link, commit, license), what to take, what to leave, what it showed about our own work, and
+the owner's note. Do it like this:
+- **adapt / install** → one `{"op": "open", "owner": "social-marketing", "work": "code", "target":
+  "claude-plugins", …}` ticket. The work: rewrite the parts to take into our own skill or CORE in
+  claude-plugins (Arabic and Hebrew, our rules, our voice), copying only from the pinned commit, and
+  add a `SOURCE.md` beside it (link, commit, license, what was taken). No product code; a change to
+  the app or the server goes back to the Chief for the CTO.
+- **lesson** → the same ticket, but the change is a few lines in the right CORE.md in our own words
+  (no copied text), with the source under it.
+- **template** → write it into §2b as a template proposal (format, layout, references, a prompt with
+  blanks) until the marketing hub's templates screen exists.
+- **tool** → no ticket for the team: answer the ticket yourself with a one-page note for the owner —
+  price, what it replaces, who signs up, how we would measure it.
+A finding about our own work ("the reel's top caption sits under Instagram's bar") is its own
+ticket for whoever owns that work. The adoption is done when its PR is merged; the find then joins
+your shelf on the Library tab.

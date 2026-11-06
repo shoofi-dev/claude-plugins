@@ -95,6 +95,16 @@ Invoke namespaced: **`shoofi-operators:marketing-manager`**, **`shoofi-operators
 |---|---|
 | `/shoofi-operators:guided-reel` | A guided explainer reel: Shadi (the 3D courier mascot) explains a feature in Arabic and Hebrew, lip-synced, beside a phone showing real app screens with the key item zoomed out. Four human gates (script, voice, clip credits, final). Builder: `skills/guided-reel/scripts/reel.py` driven by a `reel.json`. |
 
+## The Library — the managers learn, the owner approves
+
+HQ's Library tab (`/admin/hq/library`) is where a manager proposes what to learn: skills, methods
+and design sources from the internet that serve the learning goals the owner wrote. The marketing
+manager is the first (CMO CORE §9). Searches run in a clean room (shoofi-server
+`services/hq/library.js`, shoofi-bridge `src/library.js`) — web tools only, no database, no plugins,
+$1 — and the risk on each card comes from a scan of the source, not from the agent. **Nothing is
+installed as-is**: an approved find becomes a ticket on the manager's board, and the adoption lands
+here as a PR with a `SOURCE.md` (link, pinned commit, license, what was taken).
+
 ## The marketing manager and delegation
 
 A subagent cannot start another subagent, so `marketing-manager` "delegates" three ways:
