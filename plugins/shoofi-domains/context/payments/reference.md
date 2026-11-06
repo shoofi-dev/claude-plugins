@@ -23,7 +23,7 @@ Files (server): `routes/payments.js` + `routes/payments/validate-card.js`,
 `routes/creditCard.js`, `routes/hyp-pay.js` (HYP charge/tokenize), `routes/payment-methods.js`,
 `utils/hyp-pay.js`, `utils/invoice-mail.js` (per-order receipt fetch), and the payment
 functions inside `routes/order.js` (`processCreditCardPayment`, `processHypTokenPayment`,
-`finalizeApplePayOrder`, `updateCCPayment`). Client: `shoofi-app` payment UI (§ App).
+`finalizeApplePayOrder`). Client: `shoofi-app` payment UI (§ App).
 **Accountant-owned (not you):** `routes/payments/{admin,summaries,admin-reports}.js`,
 `routes/hyp.js` (EZcount invoicing), `routes/admin/masav.js`, `routes/driver-reports.js`,
 `lib/payments/calc.js`, `utils/{hyp,invoice-provider,greeninvoice}.js`.
@@ -81,7 +81,9 @@ For these: write the analysis + the exact diff you *would* make + the risks, ope
   then stock/coins/invoice. Endpoints: `save-apple-pay-session`,
   `update-apple-pay-order-session` (terms-guard), `verify-apple-pay-payment`,
   `zcredit-apple-pay-callback/:intentId` (server safety-net capture, no auth).
-- **`updateCCPayment`** (`order.js`) — standalone ZCredit status confirm (`GetTransactionStatusByReferenceId`).
+- ~~`updateCCPayment`~~: removed 2026-11-03. It was an unauthenticated standalone ZCredit status
+  confirm (`GetTransactionStatusByReferenceId`) with no caller since 2025-06. Pinned 404 by
+  `test/integration/order-update-cc-payment-removed.js`.
 
 ## 3b. Coupons between quote and charge (map)
 Where a coupon's discount is computed, re-computed or trusted on the way to a charge. Fixed
@@ -145,10 +147,22 @@ Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restric
 hangs the request (CORE invariant 11), so none of them answered.
 
 ## 6. Refunds (customer-side — you own these)
-- **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
-  `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.
-  Since HQ #1a2f9e (2026-11-03) **no client calls it** — its only caller was the removed
-  client-side refund dialog — and no store DB holds a `refundData` row. The route has no auth.
+- **`POST /api/order/addRefund` is REMOVED** (HQ #7e2d32, shoofi-server
+  `fix/HIGH-RISK-remove-addrefund-route`): it answers 404. It was bookkeeping only (it pushed
+  `refundData[]`, no provider reversal) and had no auth. Its only caller was the client-side
+  refund dialog removed under HQ #1a2f9e. On 2026-11-03, 0 of 262 store DBs held a `refundData`
+  row, and nothing in shoofi-server reads the field. A customer refund is the cancel flow's
+  (`paymentAuth.refundedAmount` / `refundRequired`, `services/payments/order-authorization.js`).
+  Pinned by `test/integration/order-addrefund-route-removed.js`. Do not re-add a refund-recording
+  route without auth.
+- **There is no in-app refund button any more** (CTO decision, HQ #0881bd, option A). On cancel,
+  `releaseOrderAuthorization` → `refundOrderPayment` credits a **HYP** charge automatically only
+  when support chose "refund" (`autoRefund`). Everything else is **flagged, not refunded**:
+  `paymentAuth.refundRequired: true` plus `refundRequiredReason` / `refundRequiredAmount`. A
+  **ZCredit** order is flagged `refund_unsupported_provider_zcredit` and a **twin** side
+  `refund_twin_order_manual`, and a person refunds it by hand in the provider's back office
+  (portal). Nothing records that manual refund on the order. The three apps still *display*
+  `order.refundData` (`gerRefundAmount`) for old records; that read is inert and kept on purpose.
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,
@@ -252,9 +266,11 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
   customer app — `components/credit-card/api/payment.ts` + `refund.ts` (terminal number +
   password in client state). Deprecated; remove after confirming no live references.
   `refund.ts` + the `refund-confirm` dialog removed from all three apps (HQ #1a2f9e);
-  `payment.ts` (all 3) and `validate-card.ts` (partner, shoofir) remain.
+  `payment.ts` (all 3) and `validate-card.ts` (partner, shoofir) remain. The server route it
+  called, `POST /api/order/addRefund`, is removed too (HQ #7e2d32 / #0881bd); refunds go through
+  the cancel path or the provider portal (§6).
 - **Still needs a verdict (flag, don't fix):** `updateCCPayment` undefined `orderId` in its
-  background block (`order.js:~1950`); `refundPartial` ZCredit field shape unverified across
+  background block (`order.js:~1950`; removed 2026-11-03 with the route); `refundPartial` ZCredit field shape unverified across
   terminals (sandbox-first). *(MASAV auth moved to the `accountant` doc.)*
 - **By design (prior review):** `verifiedAppName` pass-through (`order.js`).
 

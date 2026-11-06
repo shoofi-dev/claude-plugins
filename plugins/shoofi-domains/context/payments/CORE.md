@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/HIGH-RISK-remove-addrefund-route / 2026-11-04 (addRefund route removed; cancel-path refund routing re-verified); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -23,8 +23,11 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 **Yours:** `routes/payments.js`, `routes/payments/validate-card.js`, `routes/creditCard.js`,
 `routes/hyp-pay.js` (HYP charge/tokenize), `routes/payment-methods.js`, `utils/hyp-pay.js`,
 `utils/invoice-mail.js` (per-order receipt), and the payment functions inside `routes/order.js`
-(`processCreditCardPayment`, `processHypTokenPayment`, `finalizeApplePayOrder`,
-`updateCCPayment`). Client: the payment UI in `shoofi-app`.
+(`processCreditCardPayment`, `processHypTokenPayment`, `finalizeApplePayOrder`).
+Client: the payment UI in `shoofi-app`. `POST /api/order/updateCCPayment` was removed on
+2026-11-05 (shoofi-server#424): it was unauthenticated and had no caller, and
+`test/integration/order-update-cc-payment-removed.js` keeps it 404. If it ever comes back,
+it needs auth, a customerId match, an atomic `status:"0"` guard and an amount check.
 **Not yours:** settlement/reports/store invoices/MASAV = **`accountant`**; order lifecycle =
 `orders`. `lib/payments/calc.js` lives with accountant.
 
@@ -291,9 +294,15 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
   never returns (only `zcredit_api_key`), and recorded the result before checking `HasError`.
   0 `orders.refundData` rows existed in any store DB. `payment.ts` (all 3) and `validate-card.ts`
   (partner, shoofir) remain and read the same missing fields. Refunds are server-side only.
-- **Flagged, needs verdict:** `updateCCPayment` references an undefined `orderId` in its
-  background block; `refundPartial`'s ZCredit field shape is unverified across terminals
-  (sandbox first).
+  **Server half (HQ #7e2d32):** the route those dialogs called, `POST /api/order/addRefund`
+  (unauthenticated, wrote `refundData[]`, moved no money), is removed and answers 404.
+  **CTO decision (HQ #0881bd, option A, 2026-11-04):** no in-app refund button comes back.
+  The cancel path is the only refund path: `refundOrderPayment`
+  (`services/payments/order-authorization.js`) credits HYP charges, while ZCredit and twin
+  orders are flagged `paymentAuth.refundRequired` and refunded by hand in the provider portal.
+  The apps' read-only `order.refundData` display stays for old records.
+- **Flagged, needs verdict:** `refundPartial`'s ZCredit field shape is unverified across
+  terminals (sandbox first).
 - **RESOLVED by manual invoicing:** the exempt document's TITLE used to be unfixable —
   neither gateway publishes a per-transaction document-type parameter, so `EZ.type` and
   ZCredit's `Type` were guesses that could reject a live charge. Issuing the document
