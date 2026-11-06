@@ -167,6 +167,7 @@
       for (const l of layers) {
         if (t < l.start || t >= l.end) continue;
         for (const m of l.el.querySelectorAll('img, video')) {
+          if (m.dataset.bg) continue; // a deliberately blurred backdrop, not a picture to judge
           const r = m.getBoundingClientRect();
           const nw = m.naturalWidth || m.videoWidth, nh = m.naturalHeight || m.videoHeight;
           if (!nw || !nh || r.width < 40) continue;

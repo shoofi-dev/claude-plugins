@@ -39,6 +39,12 @@ clip, e.g. the Kling split) or `subject.split` (y cuts between the layers of a s
 the 1080x1920 frame — the free split: the real photo cut into bands that fly apart and snap back,
 a blurred copy of the photo behind the gaps), else the slow push-in.
 
+**Menu photos smaller than the frame** (most are landscape, 1000–1700 px tall — full-bleed on a
+1920 frame they stretch 1.3–1.9×): `panel(d, {y, h})` in styles.js shows the dish full-width at a
+size it fills sharply (h 1080 square, 1350 for 4:5) over a blurred copy of itself (`data-bg`, which
+the resolution check skips). Rush and Number use it; an AI clip for a panel comes from the photo
+cropped to the panel's shape (Kling v3 Pro from a 4:5 crop → 1288x1608).
+
 ## Variations (so one style still looks different from post to post)
 
 - **theme** — `green` (ink #17320F, end card dark), `lime` (light paper, lime end card), `dark`

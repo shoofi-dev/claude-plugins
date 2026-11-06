@@ -17,6 +17,14 @@
   const img = (src, extra = '') => `<img class="cover" src="${src}" style="${extra}">`;
   /** A dish: its animated clip when the spec has one (a Kling clip from the real photo), else the photo. */
   const media = (d, extra = '') => (d.clip ? `<video class="cover" src="${d.clip}" muted playsinline preload="auto" style="${extra}"></video>` : img(d.img, extra));
+  /**
+   * A dish photo that is smaller than the frame, at a size it can fill sharply: a full-width panel
+   * (h = 1080 square, 1350 for 4:5) over a blurred copy of itself. Menu photos are landscape and
+   * 1000–1700 px tall — full-bleed on a 1920 frame they stretch 1.3–1.9×.
+   */
+  const panel = (d, { y = 420, h = 1080, extra = '' } = {}) =>
+    `<div class="cover" style="position:relative;overflow:hidden"><img data-bg="1" src="${d.img}" style="position:absolute;left:-15px;top:-25px;width:282px;height:500px;object-fit:cover;filter:blur(7px) brightness(.5);transform-origin:0 0;transform:scale(4)">`
+    + `<div style="position:absolute;left:0;top:${y}px;width:1080px;height:${h}px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.45)">${media(d, extra)}</div></div>`;
 
   /** Text in the safe column. */
   const text = (s, { size = 64, color = '#fff', bg = null, weight = 400, y, start, end, inn = { kind: 'rise' }, out = { kind: 'fade' }, z = 20, pad = '26px 40px', radius = 36, shadow = true, w = SAFE.w, x = SAFE.x }) => ({
@@ -147,11 +155,11 @@
       { full: true, html: `<div class="cover" style="background:${t.ink}"></div>`, start: 0, end: 2.2, z: 1 },
       brandPill(spec, 0, 2.2),
       { html: `<div class="txt" style="font-size:96px;color:#fff">${esc(s.offer.label)}</div>`, x: SAFE.x, w: SAFE.w, y: 560, start: 0.15, end: 2.2, z: 10, in: { kind: 'rise', dur: 0.35 }, out: { kind: 'fade' } },
-      { html: `<div class="txt" style="font-size:340px;line-height:1;color:var(--lime);direction:ltr">${esc(s.offer.big)}</div>`, x: SAFE.x, w: SAFE.w, y: 700, start: 0.35, end: 2.2, z: 10, in: { kind: 'slam', dur: 0.55, from: 1.6 }, out: { kind: 'shrink', dur: 0.3 } },
-      { full: true, html: media(d[0]), start: 1.9, end: 5.0, z: 2, in: { kind: 'fade', dur: 0.3 }, kb: { from: 1.05, to: 1.22, oy: -40 } },
+      { html: `<div class="txt" style="font-size:270px;line-height:1;color:var(--lime);direction:ltr;unicode-bidi:isolate">${esc(s.offer.big)}</div>`, x: 130, w: 700, y: 730, start: 0.35, end: 2.2, z: 10, in: { kind: 'slam', dur: 0.55, from: 1.08 }, out: { kind: 'shrink', dur: 0.3 } },
+      { full: true, html: panel(d[0], { y: 360, h: 1350 }), start: 1.9, end: 5.0, z: 2, in: { kind: 'fade', dur: 0.3 }, kb: { from: 1.0, to: 1.12, oy: -30 } },
       offerBadge(spec, s.offer.big, s.offer.label, { x: 520, y: 300, size: 300, start: 2.1, end: 9.6 }),
       text(s.offer.line, { size: 66, bg: 'rgba(23,50,15,.88)', y: 1180, start: 2.3, end: 5.0 }),
-      { full: true, html: media(d[1]), start: 4.8, end: 7.6, z: 3, in: { kind: 'fade', dur: 0.25 }, kb: { from: 1.18, to: 1.04, ox: 30 } },
+      { full: true, html: panel(d[1], { y: 360, h: 1350 }), start: 4.8, end: 7.6, z: 3, in: { kind: 'fade', dur: 0.25 }, kb: { from: 1.12, to: 1.0, ox: 20 } },
       text(d[1].name, { size: 62, bg: 'rgba(255,255,255,.94)', color: t.ink, y: 1220, start: 5.0, end: 7.6 }),
       { full: true, html: `<div class="cover" style="background:${t.paper}"></div>`, start: 7.4, end: 9.8, z: 4, in: { kind: 'fade', dur: 0.3 } },
       { html: `<div style="display:flex;justify-content:center"><div class="card" style="width:420px;height:420px;border:10px solid #fff">${img(d[0].img)}</div></div>`, x: SAFE.x, w: SAFE.w, y: 560, start: 7.6, end: 9.8, z: 6, in: { kind: 'pop', dur: 0.4 } },
@@ -166,7 +174,7 @@
     const out = [brandPill(spec, 0, 1.6)];
     const cut = 0.9, start = 0;
     s.dishes.slice(0, 6).forEach((d, i) => {
-      out.push({ full: true, html: media(d), start: start + i * cut, end: start + (i + 1) * cut + 0.02, z: 2 + i, punch: true, kb: { from: 1.0, to: 1.08 } });
+      out.push({ full: true, html: panel(d, { y: 420, h: 1080 }), start: start + i * cut, end: start + (i + 1) * cut + 0.02, z: 2 + i, punch: true, kb: { from: 1.0, to: 1.06 } });
     });
     const after = start + Math.min(6, s.dishes.length) * cut;
     out.push(text(spec.text.hook, { size: 120, y: 760, start: 0.1, end: 1.8, inn: { kind: 'slam', dur: 0.4, from: 0.8 } }));
@@ -248,7 +256,7 @@
       text(spec.text.hook, { size: 72, color: t.ink, y: 430, start: 0.2, end: 9.4, shadow: false }),
       { html: `<div class="phone" style="width:${PW}px"><div class="scr" style="height:${viewH}px"><img src="${sc.src}" style="width:${SW}px;position:absolute;top:${top}px;left:0">${hl}</div></div>`, x: 120, y: 600, w: PW, start: 0.5, end: 9.4, z: 5, in: { kind: 'up', dur: 0.7, by: 1300 } },
       { html: `<div class="card" style="width:${callW}px;height:${Math.round(sc.hl.h * cs)}px;border:8px solid var(--lime);box-shadow:0 0 0 5px ${t.ink},0 30px 60px rgba(0,0,0,.35)"><img src="${sc.src}" style="width:${sc.width * cs}px;margin-left:${-sc.hl.x * cs}px;margin-top:${-sc.hl.y * cs}px;display:block"></div>`, x: 140, y: 820, w: callW, start: 2.4, end: 6.4, z: 10, in: { kind: 'pop', dur: 0.45 }, out: { kind: 'shrink' } },
-      { html: `<div class="ticket txt" style="--hole:${t.paper};background:${t.ink};color:#fff;padding:34px 60px;font-size:58px">${rich(s.coupon.line)}<div style="font-size:44px;margin-top:12px;opacity:.9">${esc(s.coupon.terms)}</div><div style="margin-top:20px;display:inline-block;border:3px dashed var(--lime);border-radius:16px;padding:8px 28px;font-size:52px;color:var(--lime);direction:ltr;letter-spacing:4px">${esc(s.coupon.code)}</div></div>`, x: 150, y: 1160, w: 760, start: 5.8, end: 9.4, z: 12, in: { kind: 'slideL', dur: 0.5, by: 900 } },
+      { html: `<div class="txt" style="${ticketCss};border-radius:30px;background:${t.ink};color:#fff;padding:30px 60px;font-size:58px">${rich(s.coupon.line)}<div style="font-size:42px;margin-top:10px;opacity:.9;white-space:nowrap">${esc(s.coupon.terms)}</div><div style="margin-top:18px;display:inline-block;border:3px dashed var(--lime);border-radius:16px;padding:6px 28px;font-size:50px;color:var(--lime);direction:ltr;letter-spacing:4px;${codeCss}">${esc(s.coupon.code)}</div></div>`, x: 120, y: 1100, w: 740, start: 5.8, end: 9.4, z: 12, in: { kind: 'slideL', dur: 0.5, by: 900 } },
       ...endCard(spec, 9.2, 11.8),
     ];
   };
@@ -262,8 +270,8 @@
       { html: `<img src="${spec.assets.shadiStand}" style="width:900px">`, x: -40, y: 420, w: 900, start: 0, end: 3.4, z: 5, in: { kind: 'up', dur: 0.6, by: 900 }, out: { kind: 'fade', dur: 0.2 } },
       text(spec.text.hook, { size: 76, color: t.ink, bg: '#fff', y: 470, start: 0.6, end: 3.4, inn: { kind: 'pop', dur: 0.4 }, shadow: false }),
       { html: `<img src="${spec.assets.shadiPoint}" style="width:780px">`, x: -230, y: 700, w: 780, start: 3.2, end: 9.6, z: 5, in: { kind: 'fade', dur: 0.2 } },
-      { html: `<div class="ticket txt" style="--hole:${t.paper};background:${t.ink};color:#fff;padding:40px 44px;font-size:64px;transform:rotate(-4deg)">${rich(s.coupon.line)}<div style="font-size:40px;margin-top:14px;opacity:.9">${esc(s.coupon.terms)}</div><div style="margin-top:22px;display:inline-block;border:3px dashed var(--lime);border-radius:16px;padding:8px 24px;font-size:48px;color:var(--lime);direction:ltr;letter-spacing:4px">${esc(s.coupon.code)}</div></div>`, x: 430, y: 760, w: 520, start: 3.5, end: 9.6, z: 8, in: { kind: 'slideR', dur: 0.5, by: 700 }, pulse: 0.5 },
-      text(spec.text.line2, { size: 58, color: t.ink, bg: 'var(--lime)', y: 1330, start: 5.2, end: 9.6, shadow: false }),
+      { html: `<div class="txt" style="${ticketCss};border-radius:30px;background:${t.ink};color:#fff;padding:36px 50px;font-size:62px;transform:rotate(-4deg)">${rich(s.coupon.line)}<div style="font-size:36px;margin-top:12px;opacity:.9;white-space:nowrap">${esc(s.coupon.terms)}</div><div style="margin-top:20px;display:inline-block;border:3px dashed var(--lime);border-radius:16px;padding:6px 22px;font-size:46px;color:var(--lime);direction:ltr;letter-spacing:4px;${codeCss}">${esc(s.coupon.code)}</div></div>`, x: 350, y: 760, w: 500, start: 3.5, end: 9.6, z: 8, in: { kind: 'slideR', dur: 0.5, by: 700 }, pulse: 0.5 },
+      text(spec.text.line2, { size: 58, color: t.ink, bg: 'var(--lime)', y: 1290, start: 5.2, end: 9.6, shadow: false }),
       ...endCard(spec, 9.4, 12.0),
     ];
   };
