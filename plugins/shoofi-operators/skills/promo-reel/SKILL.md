@@ -68,9 +68,14 @@ creative-director`) looks at the full-size frames against its rubric. Only a PAS
 
 - One Kling clip per dish shown (motion.md), from the uploaded real photo, in one batch; Shadi
   lip-sync only if switched on (guided-reel's pipeline). Add `clip` to each dish in the spec.
-- Voice: Artlist Explore (≈ 17 credits for a 10 s line; Artlist may route it to Eleven v3 — check
-  it with whisper-cli), the guided-reel voice rules (numbers in words, عشره with ه). Cut it at its
-  pauses and place each phrase on its scene.
+- Voice: the house voice — Artlist **Explore on Eleven v4** (pin the v4 model; left to routing it
+  goes to Eleven v3), Arabic, stability 50%, no effect, **plain lines, no `[tone]` tags**, a blank
+  line between phrases (≈ 11 credits for a 8 s line). **Palestinian colloquial**, never Lebanese/
+  Syrian or standard Arabic: «هسّا» (not «هلأ» / «الآن»), «جْديد» with the sukun (jdīd, not jadīd),
+  «أُطلُبو» (not «اطلبه»); the full rules are guided-reel `references/shadi.md` §Voice (numbers
+  in words, «عشره» with ه). Transcribe the take with whisper-cli and diff it against the script.
+  One take per language, cut at its pauses, each phrase placed on its scene. (2026-11-07: the
+  Sweet Diablo line said «هلأ» on Eleven v3 — the owner caught it.)
 - Music: the picker's catalog track (download_track; its hook start in pick.py), ducked under the
   voice (`sidechaincompress`). Sounds: a food sound at the open, an impact where the dish lands
   and where the Shoofi logo lands (search_sfx; the download link of a sound effect can 403 — its
