@@ -56,3 +56,11 @@ Keep it short; the owner reads the maker's summary, not yours.
 - Highlighted numbers in RTL text need left-to-right isolation, or "10%" prints as "%10".
 - A Hebrew screen in a Hebrew piece (the in-app style); an Arabic screenshot in a Hebrew banner is
   a FIX.
+- Right-to-left flex columns: `align-items: flex-end` puts the block on the LEFT edge; the right edge
+  is `flex-start` (the app's RTL rule applies to rendered creative too).
+- A headline that leaves one word alone on its last line is a craft FIX (`text-wrap: balance`).
+- The offer number is the hook: it is the largest element, never the same size as its sentence.
+- Before failing "truth" on a deal's wording, read the deal engine (shoofi-server
+  `utils/promotion-discount.js`): Burger Cave's ₪30 minimum is the cart subtotal and the deal
+  covers every category — "orders over ₪30" was exact (2026-11-07 round 1).
+

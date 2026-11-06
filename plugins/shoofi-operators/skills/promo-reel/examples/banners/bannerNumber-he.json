@@ -16,10 +16,10 @@
   },
   "offer": {
    "big": "10%",
-   "label": "خصم",
-   "line": "على كل وجبة عند **Burger Cave**",
+   "label": "הנחה",
+   "line": "על כל ארוחה ב-Burger Cave",
    "terms": "בהזמנה מעל ₪30 · עד 30/11",
-   "headline": "הנחה **10%**\nעל כל ארוחה"
+   "headline": "הנחה\nעל כל ארוחה"
   },
   "dishes": [
    {

@@ -19,12 +19,9 @@
    "label": "خصم",
    "line": "على كل وجبة عند **Burger Cave**",
    "terms": "للطلبات فوق ₪30 · لغاية 30/11",
-   "headline": "خصم **10%**\nعلى كل وجبة"
+   "headline": "خصم\nعلى كل وجبة"
   },
   "dishes": [
-   {
-    "img": "../img/bc/6959240b8158a9000df2298b.jpg"
-   },
    {
     "img": "../img/bc/6959240b8158a9000df22989.jpg"
    },
@@ -32,13 +29,16 @@
     "img": "../img/bc/6959240bff01e3000dab9737.png"
    },
    {
+    "img": "../img/bc/695924058158a9000df2297a.jpg"
+   },
+   {
     "img": "../img/bc/69592407ff01e3000dab9724.png"
    },
    {
-    "img": "../img/bc/69592406ff01e3000dab971e.jpg"
+    "img": "../img/bc/6959240aff01e3000dab9732.png"
    },
    {
-    "img": "../img/bc/6959240aff01e3000dab9732.png"
+    "img": "../img/bc/69fb3d058e72cf000d93b964.jpg"
    }
   ]
  },

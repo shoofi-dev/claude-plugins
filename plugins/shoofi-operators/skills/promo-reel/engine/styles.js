@@ -273,44 +273,57 @@
    * drawn by an image model: the real photos and exact text. One banner version per style. */
   const BW = 1920, BH = 1080;
   const still = (l) => ({ start: 0, end: 1, ...l });
-  /** The words block on the right: headline, the line under it, the button and the store's logo. */
-  const bannerWords = (spec, { headline, sub, color = '#fff', button = true, x = 1110, y = 230, w = 740, btnBg = 'var(--lime)', btnInk = null }) => still({
-    html: `<div class="txt" style="direction:rtl;text-align:right;color:${color}"><div style="font-size:92px;line-height:1.15">${rich(headline)}</div>${sub ? `<div style="font-size:48px;opacity:.92;margin-top:20px">${esc(sub)}</div>` : ''}${button ? `<div style="margin-top:44px;display:inline-flex;align-items:center;gap:26px"><span class="pill" style="background:${btnBg};color:${btnInk || spec.theme.ink};font-size:52px;padding:18px 52px">${esc(spec.text.ctaButton || spec.text.cta.replace(/\*\*/g, ''))}</span>${spec.subject.store && spec.subject.store.logo ? `<img src="${spec.subject.store.logo}" style="width:150px;height:150px;border-radius:50%;object-fit:cover;background:#fff;border:6px solid var(--lime)">` : ''}</div>` : ''}</div>`,
-    x, y, w, z: 6,
+  /**
+   * The words column on the right, vertically centred in the banner: an optional badge, the offer
+   * number BIG (the hook — the largest thing on the banner), the headline, a smaller second line,
+   * the terms, an optional price tag, and the button with the store's logo.
+   */
+  const bannerWords = (spec, { badge = null, big = null, headline, second = null, sub, price = null, color = '#fff', button = true, logo = true, x = 1130, w = 720, btnBg = 'var(--lime)', btnInk = null, bigColor = 'var(--lime)' }) => still({
+    html: `<div style="height:${BH}px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:18px;direction:rtl;text-align:right;color:${color}">`
+      + (badge ? `<div class="pill" style="background:var(--lime);color:${spec.theme.ink};font-size:46px;padding:10px 34px">${esc(badge)}</div>` : '')
+      + (big ? `<div style="font-size:230px;line-height:.95;color:${bigColor};direction:ltr;unicode-bidi:isolate">${esc(big)}</div>` : '')
+      + `<div class="txt" style="font-size:88px;line-height:1.12;text-align:right;text-wrap:balance;max-width:${w}px">${rich(headline)}</div>`
+      + (second ? `<div style="font-size:52px;opacity:.85">${esc(second)}</div>` : '')
+      + (sub ? `<div style="font-size:44px;opacity:.92;max-width:${w}px">${esc(sub)}</div>` : '')
+      + (price ? `<div class="pill" style="background:transparent;border:4px solid var(--lime);color:var(--lime);font-size:52px;padding:4px 28px;direction:ltr">${esc(price)}</div>` : '')
+      + (button ? `<div style="margin-top:22px;display:flex;align-items:center;gap:26px"><span class="pill" style="background:${btnBg};color:${btnInk || spec.theme.ink};font-size:52px;padding:18px 52px">${esc(spec.text.ctaButton || spec.text.cta.replace(/\*\*/g, ''))}</span>${logo && spec.subject.store && spec.subject.store.logo ? `<img src="${spec.subject.store.logo}" style="width:150px;height:150px;border-radius:50%;object-fit:cover;background:#fff;border:6px solid var(--lime)">` : ''}</div>` : '')
+      + `</div>`,
+    x, y: 0, w, h: BH, z: 6,
   });
-  const bannerPill = (spec, x = 1500) => still({ html: `<div class="pill" style="background:rgba(0,0,0,.35);color:#fff;font-size:40px"><img src="${spec.assets.icon}" style="width:64px;height:64px;border-radius:16px"><span>${esc(spec.text.pill)}</span></div>`, x, y: 60, w: 360, z: 7 });
+  const bannerPill = (spec, x = 1500) => still({ html: `<div class="pill" style="background:rgba(0,0,0,.35);color:#fff;font-size:40px"><img src="${spec.assets.icon}" style="width:64px;height:64px;border-radius:16px"><span>${esc(spec.text.pill)}</span></div>`, x, y: 50, w: 360, z: 7 });
+  /** A photo filling the left side, its right edge fading into the panel colour. */
+  const photoLeft = (src, w, ink, pos = '50% 50%') => still({ html: `<div style="position:relative;width:${w}px;height:${BH}px;overflow:hidden"><img class="cover" src="${src}" style="object-position:${pos}"><div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,0) 62%,${ink} 100%)"></div></div>`, x: 0, y: 0, w, h: BH, z: 2 });
 
   STYLES.bannerNumber = (spec) => {
     const s = spec.subject, t = spec.theme, d = s.dishes[0];
     return [
       still({ full: true, html: `<div class="cover" style="background:${t.ink}"></div>`, z: 1 }),
-      still({ html: `<div style="position:relative;width:1080px;height:${BH}px">${img(d.img)}<div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,0) 55%,${t.ink} 100%)"></div></div>`, x: 0, y: 0, w: 1080, h: BH, z: 2 }),
-      bannerWords(spec, { headline: s.offer.headline || s.offer.line, sub: s.offer.terms }),
+      photoLeft(d.img, 1080, t.ink),
+      bannerWords(spec, { big: s.offer.big, headline: s.offer.headline || s.offer.line, sub: s.offer.terms }),
       bannerPill(spec),
     ];
   };
 
   STYLES.bannerCloseup = (spec) => {
     const s = spec.subject, t = spec.theme, d = s.dishes[0];
-    // The photo at its own proportions, never wider than the panel and never stretched past its
-    // pixels (a small menu photo stays sharp); a blurred copy fills the rest.
     return [
       still({ full: true, html: `<div class="cover" style="background:${t.ink}"></div>`, z: 1 }),
-      still({ html: `<div style="position:relative;width:1080px;height:${BH}px;overflow:hidden"><img src="${d.img}" style="position:absolute;left:-20px;top:-20px;width:280px;height:280px;object-fit:cover;filter:blur(8px) brightness(.5);transform-origin:0 0;transform:scale(4.2)"><div style="position:absolute;inset:0;display:flex;justify-content:center;align-items:center"><img src="${d.img}" style="max-height:100%;max-width:100%;display:block;object-fit:contain;box-shadow:0 20px 60px rgba(0,0,0,.45)"></div><div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,0) 70%,${t.ink} 100%)"></div></div>`, x: 0, y: 0, w: 1080, h: BH, z: 2 }),
-      still({ html: `<div class="pill" style="background:var(--lime);color:${t.ink};font-size:48px;padding:10px 34px">${esc(spec.text.hook)}</div>`, x: 1110, y: 170, w: 400, z: 6 }),
-      bannerWords(spec, { headline: `${d.name}\n${s.store.name}`, sub: [(s.chips || []).join(' · '), s.price].filter(Boolean).join('\n'), y: 290 }),
+      photoLeft(d.img, 1000, t.ink, '50% 60%'),
+      bannerWords(spec, { badge: spec.text.hook, headline: d.name, second: s.store.name, sub: (s.chips || []).join(' · '), price: s.price, x: 1110, w: 740 }),
       bannerPill(spec),
     ];
   };
 
   STYLES.bannerRush = (spec) => {
     const s = spec.subject, t = spec.theme;
-    const cells = s.dishes.slice(0, 6).map((d, i) => `<div style="position:absolute;left:${(i % 3) * 382}px;top:${Math.floor(i / 3) * 545}px;width:376px;height:535px;overflow:hidden">${img(d.img)}</div>`).join('');
+    // One identical tile per dish on a black grid: equal rects, one 6 px gutter, no grey seams.
+    const TW = 376, TH = 537, G = 6;
+    const cells = s.dishes.slice(0, 6).map((d, i) => `<div style="position:absolute;left:${(i % 3) * (TW + G)}px;top:${Math.floor(i / 3) * (TH + G)}px;width:${TW}px;height:${TH}px;overflow:hidden"><img class="cover" src="${d.img}"></div>`).join('');
     return [
       still({ full: true, html: `<div class="cover" style="background:var(--lime)"></div>`, z: 1 }),
-      still({ html: `<div style="position:relative;width:1140px;height:${BH}px;background:${t.ink}">${cells}</div>`, x: 0, y: 0, w: 1140, h: BH, z: 2 }),
-      bannerWords(spec, { headline: s.offer.headline || s.offer.line, sub: s.offer.terms, color: t.ink, x: 1190, w: 680, y: 250, btnBg: t.ink, btnInk: '#fff' }),
-      still({ html: `<div class="pill" style="background:${t.ink};color:#fff;font-size:40px"><img src="${spec.assets.icon}" style="width:64px;height:64px;border-radius:16px"><span>${esc(spec.text.pill)}</span></div>`, x: 1510, y: 60, w: 360, z: 7 }),
+      still({ html: `<div style="position:relative;width:${3 * TW + 2 * G}px;height:${BH}px;background:#000">${cells}</div>`, x: 0, y: 0, w: 3 * TW + 2 * G, h: BH, z: 2 }),
+      bannerWords(spec, { big: s.offer.big, bigColor: t.ink, headline: s.offer.headline || s.offer.line, sub: s.offer.terms, color: t.ink, x: 1190, w: 680, btnBg: t.ink, btnInk: '#fff' }),
+      still({ html: `<div class="pill" style="background:${t.ink};color:#fff;font-size:40px"><img src="${spec.assets.icon}" style="width:64px;height:64px;border-radius:16px"><span>${esc(spec.text.pill)}</span></div>`, x: 1510, y: 50, w: 360, z: 7 }),
     ];
   };
 
@@ -322,14 +335,17 @@
       still({ full: true, html: `<div class="cover" style="background:${t.paper}"></div>`, z: 1 }),
       ...cards,
       still({ html: `<img src="${s.store.logo}" style="width:260px;height:260px;border-radius:50%;object-fit:cover;background:#fff;border:10px solid #fff;box-shadow:0 18px 50px rgba(0,0,0,.3)">`, x: 400, y: 410, w: 260, h: 260, z: 9 }),
-      bannerWords(spec, { headline: s.offer.headline || s.offer.line, sub: s.offer.terms, color: t.ink, y: 260, x: 1130 }),
-      still({ html: `<div class="pill" style="background:${t.ink};color:#fff;font-size:40px"><img src="${spec.assets.icon}" style="width:64px;height:64px;border-radius:16px"><span>${esc(spec.text.pill)}</span></div>`, x: 1500, y: 60, w: 360, z: 7 }),
+      bannerWords(spec, { big: s.offer.big, bigColor: t.ink, headline: s.offer.headline || s.offer.line, sub: s.offer.terms, color: t.ink, x: 1150, logo: false }),
+      still({ html: `<div class="pill" style="background:${t.ink};color:#fff;font-size:40px"><img src="${spec.assets.icon}" style="width:64px;height:64px;border-radius:16px"><span>${esc(spec.text.pill)}</span></div>`, x: 1500, y: 50, w: 360, z: 7 }),
     ];
   };
 
+  /** A coupon ticket: notches cut through (a mask, so the background shows), the code in lining figures. */
+  const ticketCss = 'mask:radial-gradient(circle 30px at 0 50%,transparent 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 30px at 100% 50%,transparent 98%,#000) right/51% 100% no-repeat;-webkit-mask:radial-gradient(circle 30px at 0 50%,transparent 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 30px at 100% 50%,transparent 98%,#000) right/51% 100% no-repeat';
+  const codeCss = "font-family:'SF Pro Display','Helvetica Neue',Arial,sans-serif;font-variant-numeric:lining-nums;font-weight:600";
   const couponTicket = (spec, x, y, w, rot = -3) => {
     const s = spec.subject, t = spec.theme;
-    return still({ html: `<div class="ticket txt" style="--hole:${t.paper};background:${t.ink};color:#fff;padding:40px 50px;font-size:72px;transform:rotate(${rot}deg)">${rich(s.coupon.line)}<div style="font-size:44px;margin-top:12px;opacity:.9">${esc(s.coupon.terms)}</div><div style="margin-top:22px;display:inline-block;border:3px dashed var(--lime);border-radius:16px;padding:8px 28px;font-size:54px;color:var(--lime);direction:ltr;letter-spacing:4px">${esc(s.coupon.code)}</div></div>`, x, y, w, z: 8 });
+    return still({ html: `<div class="txt" style="${ticketCss};border-radius:30px;background:${t.ink};color:#fff;padding:40px 60px;font-size:72px;transform:rotate(${rot}deg)">${rich(s.coupon.line)}<div style="font-size:40px;margin-top:12px;opacity:.9;white-space:nowrap">${esc(s.coupon.terms)}</div><div style="margin-top:22px;display:inline-block;border:3px dashed var(--lime);border-radius:16px;padding:8px 28px;font-size:54px;color:var(--lime);direction:ltr;letter-spacing:4px;${codeCss}">${esc(s.coupon.code)}</div></div>`, x, y, w, z: 8 });
   };
 
   STYLES.bannerInapp = (spec) => {
@@ -338,8 +354,8 @@
     const hl = `<div class="hl" style="left:${sc.hl.x * scale - 8}px;top:${(sc.hl.y - sc.from) * scale - 8}px;width:${sc.hl.w * scale + 16}px;height:${sc.hl.h * scale + 16}px"></div>`;
     return [
       still({ full: true, html: `<div class="cover" style="background:${t.paper}"></div>`, z: 1 }),
-      still({ html: `<div class="phone" style="width:${PW}px;transform:rotate(-6deg)"><div class="scr" style="height:${viewH}px"><img src="${sc.src}" style="width:${SW}px;position:absolute;top:${top}px;left:0">${hl}</div></div>`, x: 120, y: 150, w: PW, z: 5 }),
-      couponTicket(spec, 640, 330, 560),
+      still({ html: `<div class="phone" style="width:${PW}px;transform:rotate(-6deg)"><div class="scr" style="height:${viewH}px"><img src="${sc.src}" style="width:${SW}px;position:absolute;top:${top}px;left:0">${hl}</div></div>`, x: 120, y: 230, w: PW, z: 5 }),
+      couponTicket(spec, 640, 380, 600),
       bannerWords(spec, { headline: spec.text.hook, sub: null, color: t.ink, x: 1290, w: 580, y: 300 }),
       still({ html: `<div class="pill" style="background:${t.ink};color:#fff;font-size:40px"><img src="${spec.assets.icon}" style="width:64px;height:64px;border-radius:16px"><span>${esc(spec.text.pill)}</span></div>`, x: 1510, y: 60, w: 360, z: 7 }),
     ];
@@ -349,8 +365,8 @@
     const t = spec.theme;
     return [
       still({ full: true, html: `<div class="cover" style="background:radial-gradient(circle at 25% 60%, ${t.glow} 0%, ${t.paper} 65%)"></div>`, z: 1 }),
-      still({ html: `<img src="${spec.assets.shadiPoint}" style="width:760px">`, x: -60, y: 60, w: 760, z: 5 }),
-      couponTicket(spec, 610, 300, 560, 4),
+      still({ html: `<img src="${spec.assets.shadiPoint}" style="width:700px">`, x: 30, y: 120, w: 700, z: 5 }),
+      couponTicket(spec, 660, 310, 600, 4),
       bannerWords(spec, { headline: spec.text.hook, sub: spec.text.line2, color: t.ink, x: 1260, w: 610, y: 280 }),
       still({ html: `<div class="pill" style="background:${t.ink};color:#fff;font-size:40px"><img src="${spec.assets.icon}" style="width:64px;height:64px;border-radius:16px"><span>${esc(spec.text.pill)}</span></div>`, x: 1510, y: 60, w: 360, z: 7 }),
     ];
