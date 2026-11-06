@@ -45,6 +45,14 @@ dish can come apart and land back exactly as it is (`input: {startFrame: {assetI
 
 The layers separate at ~1.0 s, hover 2.0–3.0 s and land at ~3.8 s — put the impact sound there.
 
+**Sharp version (2026-11-07, 630 credits).** The Standard clip came back 856x1072 and showed at 1.8× on
+the 9:16 frame — soft. The fix that passed the review: re-render the menu photo vertical at 2K
+(Nano Banana 2 I2I 2K, 9:16, 130 credits — prompt: recompose into 9:16, keep every layer identical,
+extend the background) → 1536x2752; then the same split on **Kling v3 Pro (1080)** with that image as
+start and end frame (500 / 5 s) → 1076x1924, 24 fps, shown at 1.0×. Use the 2K image for the stills
+too. This take lands at ~3.5 s (impact at 3.0 s in the mix: the sound has a short lead-in). Look at the
+2K image first: the model zooms out a little (the dish fills ~55% of the width) and redraws the fries.
+
 ### A motion for each kind of dish (the picker's `motion`)
 
 | Dish | Motions (AI, from the real photo) | Free fallback |

@@ -17,7 +17,7 @@
   "dishes": [
    {
     "name": "سويت ديابلو",
-    "img": "../img/6adf253722cb9f000d7cd7ab.jpg"
+    "img": "../img/hd/diablo-2k.png"
    }
   ],
   "chips": [
@@ -26,7 +26,7 @@
    "صوص ديابلو"
   ],
   "price": "₪75",
-  "hookClip": "../clips/split-diablo.mp4"
+  "hookClip": "../clips/split-diablo-pro.mp4"
  },
  "text": {
   "pill": "شوفي",
@@ -39,5 +39,5 @@
   "shadiPoint": "../assets/shadi-point.png",
   "font": "../assets/me.ttf"
  },
- "audio": "../out/mix-ar.m4a"
+ "audio": "../out/mix-closeup-v4.m4a"
 }
