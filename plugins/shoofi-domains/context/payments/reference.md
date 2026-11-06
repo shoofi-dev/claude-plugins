@@ -129,6 +129,17 @@ Prod on 2026-10-30, across 188 store DBs: 41,351 `completed`, 4,122 `none`,
 **2,916 `pending`** (newest 2026-09-22) and 12 `failed`. `docId` is a number on most orders.
 Flagged with no verdict: whether those pending orders should be re-queued.
 
+**`docId` is written only when the first fetch fails** (the "not found" branch); a success writes
+`url` and no `docId`, and a fetch cut short (a restart during `saveInvoice`'s in-process retries,
+~15s) writes neither. The
+background queue's success writes `invoiceStatus: "completed"` but **never `url`**
+(`processPendingInvoices`), and it matches the order by `docId`. **A ZCredit twin capture never
+fetches at all** (`applyCaptureSuccess`, `services/twin-order/twin-payment-service.js`): both
+legs carry the one document's `DocumentID` and no url. To find every order that misses its PDF,
+read `DocumentID` too — `services/payments/customer-invoice-backfill.js` (accountant CORE,
+"a missing customer invoice PDF is found by DocumentID"; prod 2026-11-06: 437 such orders, 410
+of them twin legs).
+
 **Admin routes** (`routes/admin.js`, CORE invariant 11). Every one is `auth.required` plus a
 role check, and no client calls any of them.
 | Route | Roles | What it does |
