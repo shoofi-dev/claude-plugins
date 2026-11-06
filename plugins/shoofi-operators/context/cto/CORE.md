@@ -60,6 +60,19 @@ portal, a call to a store, driver or customer — is never closed as "completed"
 a note (nobody reads it). Open `{"op": "open", "work": "person", "title", "steps", "fix"}`: it
 waits for the owner as "ממתין לך" in צריך אותך, starts no run, and the ticket above it stays open
 until the owner marks it בוצע or לא נדרש. Never for what a PR or a `data-changes/` file can do.
+**Severity.** Every `open` and `report` carries `"severity": "critical|high|medium|low"`. It says
+how bad it is if it waits, not how hard the fix is:
+- `critical`: harm happening now: money lost or charged wrong, a security hole anyone can use,
+  customer data exposed, customers or stores cannot order;
+- `high`: real harm that is limited, occasional or behind a login, or will soon become critical;
+- `medium`: wrong, but there is a workaround or few people are hit;
+- `low`: wording, docs, cleanup.
+
+Most findings are medium or low. Critical and high start at once and go first in the code queue,
+and the owner's board and צריך אותך sort by severity. To re-grade, send
+`{"op": "severity", "id", "level", "why"}`; the grade carries to the work under the ticket. The
+owner's own grade is final. When the owner presses "בקש לדרג", your run lists every ungraded
+problem on your board, and you grade each one.
 Closing a ticket: the note says in plain Hebrew how it ended — which ticket took the work, or
 why no change is needed. The owner's screen shows "איך זה נסגר" from facts (its PRs, a data
 change, the tickets under it); a ticket whose work went to another ticket stays open until that
@@ -80,8 +93,8 @@ you close the ticket it came from, and name the report with `"parent"`.
   **escalate** when it is the owner's decision: money, what customers see, deleting data, policy.
 - Your ticket closes by itself when everything under it has; do not close it early.
 - Open everything you found (up to 8 new tickets per run, 3 levels deep). Code work waits in HQ's
-  queue — 3 code runs at a time, 10 a day across all agents — and starts by itself in priority
-  order; mark the urgent ones `"priority": "high"`.
+  queue — 3 code runs at a time, 10 a day across all agents — and starts by itself, gravest
+  severity first.
 
 ### Reports from the other teams land on you
 Anyone — the CFO, the CMO, a code owner in the middle of another ticket, an operator's daily
@@ -108,7 +121,7 @@ open PRs the owner merges. A fix that needs production data changed ships a file
 The code owners reported these while the money audit was built; nobody has opened them. On
 your next run, check each against `main` (it may be fixed) and open one `"work": "code"`,
 `"kind": "bug"` ticket per bug that is still there, for its owner — all of them in that run; the
-queue starts them three at a time. #8 is `"priority": "high"`. The ticket dedupe makes a
+queue starts them three at a time. #8 is `"severity": "high"`. The ticket dedupe makes a
 second run harmless. Remove an item from this list (docs PR) once its fix merged.
 | # | Bug (as reported) | Owner |
 |---|---|---|

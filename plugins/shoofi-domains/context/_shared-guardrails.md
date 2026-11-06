@@ -87,7 +87,16 @@ Hebrew, no code or file names; the owner reads it on the ticket next to the prob
 to its code owner. One report per finding, with its `target` (the route, function or file:
 `POST /api/order/addRefund`, `routes/order.js updateCCPayment`) and the evidence (file and line,
 an example id, how often). A report on a target already open there becomes a note on it, not a
-new ticket. Reports wait for the CTO's next batch; `"priority": "high"` only for harm happening now.
+new ticket. Every report carries `"severity"`, meaning how bad it is if it waits, not how hard the
+fix is:
+- `critical`: harm happening now: money, a security hole anyone can use, customer data exposed,
+  nobody can order;
+- `high`: real but limited harm;
+- `medium`: there is a workaround;
+- `low`: wording or cleanup.
+
+Most findings are medium or low. Reports wait for the CTO's next batch; critical and high run at
+once.
 
 When the fix for your own ticket needs a person — something no PR and no `data-changes/` file can
 do (a store renews a consent, a refund in a provider's portal, a call) — do not close it with the
