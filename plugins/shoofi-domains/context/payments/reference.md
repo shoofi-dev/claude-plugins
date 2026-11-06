@@ -81,6 +81,15 @@ For these: write the analysis + the exact diff you *would* make + the risks, ope
   then stock/coins/invoice. Endpoints: `save-apple-pay-session`,
   `update-apple-pay-order-session` (terms-guard), `verify-apple-pay-payment`,
   `zcredit-apple-pay-callback/:intentId` (server safety-net capture, no auth).
+  **Inline variant** (the other half of the ZCredit Apple Pay orders): the client posts
+  `/api/order/create` with `status:"6"` + `order.sessionId`; `/create` calls
+  `GetSessionStatus` and stores the parsed `CallBackJSON` as `ccPaymentRefData`. It has
+  no amount backstop, and the callback / `finalizeApplePayOrder` never touch it (both
+  act only on `status:"0"`), so whatever `/create` saves is final. An empty
+  `InvoiceRecieptNumber` must still save the session data (`ReferenceNumber` is what the
+  money audit's `chargeOf()` reads as charged). Until HQ #d20b90 it threw on an
+  undeclared `response` and saved `ccPaymentRefData: null`: 8 paid orders, 2025-09 →
+  2026-07; pinned by `test/integration/applepay-session-no-receipt-number.js`.
 - **`updateCCPayment`** (`order.js`) — standalone ZCredit status confirm (`GetTransactionStatusByReferenceId`).
 
 ## 3b. Coupons between quote and charge (map)
