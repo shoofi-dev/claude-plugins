@@ -10,11 +10,14 @@
  },
  "subject": {
   "kind": "coupon",
-  "store": {},
+  "store": {
+   "name": "Pizza Bella Vitta",
+   "logo": "../img/pizza-bella-vitta-logo.png"
+  },
   "coupon": {
-   "line": "**₪20** הנחה",
-   "terms": "בהזמנה מעל ₪100",
-   "code": "8PL6DBZI"
+   "line": "**₪20** הנחה\nעל המשלוח",
+   "terms": "מעל ₪135 · עד 31/12",
+   "note": "יורדת לבד בסל"
   }
  },
  "assets": {
@@ -22,23 +25,23 @@
   "shadiStand": "../assets/shadi-stand.png",
   "shadiPoint": "../assets/shadi-point.png",
   "screen": {
-   "src": "../assets/checkout-he.png",
+   "src": "../assets/checkout-135-he.png",
    "width": 1206,
-   "from": 1480,
-   "view": 1080,
+   "from": 1170,
+   "view": 1390,
    "hl": {
     "x": 40,
-    "y": 1895,
+    "y": 1885,
     "w": 1126,
-    "h": 80
+    "h": 95
    }
   },
   "font": "../assets/me.ttf"
  },
  "text": {
   "pill": "שופי",
-  "hook": "קופון **₪20**\nלהזמנה שלך",
-  "line2": "הזינו את הקוד בסל",
+  "hook": "**₪20** הנחה\nעל המשלוח",
+  "line2": "Pizza Bella Vitta\nכפר קאסם",
   "cta": "הזמינו בשופי",
   "ctaButton": "הזמינו בשופי"
  },

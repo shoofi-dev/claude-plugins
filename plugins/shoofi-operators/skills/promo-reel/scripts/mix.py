@@ -10,7 +10,9 @@ The reel's soundtrack, from its parts — music (on by default), food/impact sou
 
 --cut FROM:TO@AT places the voice from FROM to TO (TO empty = the end) at AT seconds — cut a take
 at its pauses (silencedetect) and put each phrase on its scene. --sound FILE@AT:VOLUME[:LENGTH].
-The music ducks under the voice (sidechain) and fades in and out.
+The music dips about 12 dB under every voice phrase (a volume curve built from the cuts, with
+0.15 s ramps — a compressor keyed on the voice missed the first and last phrases) and fades in
+and out.
 """
 import argparse
 import subprocess
@@ -35,7 +37,10 @@ def main():
         ins.extend(["-i", path])
         return len(ins) // 2 - 1
 
+    spans = []  # (start, end) of each placed phrase, for the music's volume curve
     if a.voice and a.cut:
+        vlen = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", a.voice],
+                                    capture_output=True, text=True, check=True).stdout.strip())
         parts = []
         for n, c in enumerate(a.cut):
             span, at = c.split("@")
@@ -43,21 +48,22 @@ def main():
             i = add(a.voice)
             trim = f"atrim=start={t0}" + (f":end={t1}" if t1 else "")
             ms = int(float(at) * 1000)
+            spans.append((float(at), float(at) + (float(t1) if t1 else vlen) - float(t0)))
             f.append(f"[{i}:a]{trim},asetpts=PTS-STARTPTS,adelay={ms}|{ms},apad[v{n}]")
             parts.append(f"[v{n}]")
-        f.append(f"{''.join(parts)}amix=inputs={len(parts)}:normalize=0:duration=longest,atrim=0:{D},volume=1.6,asplit=2[voice][key]")
+        f.append(f"{''.join(parts)}amix=inputs={len(parts)}:normalize=0:duration=longest,atrim=0:{D},volume=1.6[voice]")
         mix.append("[voice]")
     if a.music:
         i = add(a.music)
         f.append(f"[{i}:a]atrim=start={a.music_start}:duration={D},asetpts=PTS-STARTPTS,afade=t=in:d=0.3,"
                  f"afade=t=out:st={max(D - 1.0, 0)}:d=1.0,volume={a.music_volume}[m0]")
-        if "[voice]" in mix:
-            f.append("[m0][key]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=300[m]")
+        if spans:
+            # 1 outside speech, 0.25 (-12 dB) inside, linear 0.15 s ramps around each phrase.
+            w = "+".join(f"clip(min((t-{s0 - 0.25:.2f})/0.15,({s1 + 0.3:.2f}-t)/0.15),0,1)" for s0, s1 in spans)
+            f.append(f"[m0]volume=eval=frame:volume='1-0.75*min(1,{w})'[m]")
         else:
             f.append("[m0]anull[m]")
         mix.append("[m]")
-    elif "[voice]" in mix:
-        f.append("[key]anullsink")
     for n, s in enumerate(a.sound):
         path, rest = s.rsplit("@", 1)
         bits = rest.split(":")
