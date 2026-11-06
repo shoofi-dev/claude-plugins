@@ -47,8 +47,13 @@ HYP portal leaves no trace on the order, so `cancelled-not-refunded` can be a ha
   Real money; a pattern — report the count and total, not each order.
 - **Coins recorded but not taken off the total** (`total-arithmetic` with detail "הקוינז נרשמו
   אבל לא הורדו"): the customer paid in full AND lost the coins. Real; small ₪; customer harm.
-- **`uncancel-leftovers` with `cancelMoneyDecision: refund`**: an order went back to active after a
-  refund decision — the customer may be refunded AND the store paid. Confirm on the order.
+- **`uncancel-leftovers`** (since 2026-11-06): an order set back to active after a cancel — the
+  un-cancel changes only the status, so whatever the cancel did stays. It is a finding only when
+  something real is left: a live or spent COMP coupon, the compensation row, a card refund or a
+  released J5 hold (never charged), a `refundRequired` flag, earned coins taken back or spent coins
+  returned. A cash order's "refund" decision is the cancel default and moved no money; a coupon a
+  person revised (`cancelCompensation.revisedAt`) is their decision. The detail already says, in
+  Hebrew, מה קרה / מה נשאר / מה לעשות — use it, do not re-derive it. Coins only = no ₪ amount.
 - **`STACKED_FULL_DISCOUNT`** is a stack of coupons, not a missing coupon — already excluded.
 - **`cancelled-not-refunded`** can be a hand refund in the HYP portal (no DB trace) — say so.
 - Commission is tiered on the **month's** revenue: a day has no exact commission; never present
@@ -71,6 +76,11 @@ Hebrew. First line: one sentence — the day's money and whether anything leaked
 No tables, no PII, no numbers you did not read.
 
 ## 6. Tickets — your board (finance)
+**Put the order number in the ticket** ("9410-2717" in the title, target or body). The owner's
+brief and Needs you show, under each money item, the agents' tickets whose text contains its
+order number (shoofi-server `services/hq/item-tickets.js`). A ticket without it reads as "אף סוכן
+עוד לא פתח כרטיס על זה" beside an item you did take up.
+
 HQ keeps the agents' work on their own boards (`shoofi.hq-tickets`, never the people's Team Tasks).
 You are the head of the **finance** board. Your HQ run's prompt carries the exact `hq-tickets`
 block format; the server applies it and refuses what is not yours.

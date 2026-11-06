@@ -86,7 +86,9 @@ exact format is in your run's prompt). `fix` is the suggested solution for the o
 Hebrew, no code or file names; the owner reads it on the ticket next to the problem. On the tech board the CTO checks it and hands the fix
 to its code owner. One report per finding, with its `target` (the route, function or file:
 `POST /api/order/addRefund`, `routes/order.js updateCCPayment`) and the evidence (file and line,
-an example id, how often). A report on a target already open there becomes a note on it, not a
+an example id, how often). Write the example ids as they are: an order number ("9410-2717"), a
+twin group id. HQ links a ticket to the owner's Needs-you item by the ids it contains, so a ticket
+that names them shows under the item as "אצל הסוכנים". A report on a target already open there becomes a note on it, not a
 new ticket. Every report carries `"severity"`, meaning how bad it is if it waits, not how hard the
 fix is:
 - `critical`: harm happening now: money, a security hole anyone can use, customer data exposed,
