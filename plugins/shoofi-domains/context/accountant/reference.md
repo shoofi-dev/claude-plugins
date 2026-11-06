@@ -415,7 +415,10 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   problems[{code, severity block|warn, messageHe, nextActionHe, action, field?}], taxAuthority, at, by}}`
   (CORE invariant 19; shoofi-server `docs/invoice-step-tracking.md`). The list route adds a computed
   `taxAuthority{approvalState, maxConsentDate, isLocked, taxMinistryURL, taxUrlSentAt, lastTaxUrlSend}`
-  per row and filters `stepProblems=true`.
+  per row (plus `ezcountBusinessType`), the row's filter chip `stepCategory` (problem | ready | done | open,
+  `reportCategoryOf`), filters `stepFilter=problem|ready|done` (`stepProblems=true` = problem) and, with
+  `includeStepCounts=true`, returns `stepCounts{all, problem, ready, done}` over the other filters
+  (`REPORT_CATEGORY_FILTERS`, `services/invoicing/report-steps.js`).
 - **`shoofi.driverReports`** (collection `driver-reports`) — `{deliveryCompanyId (string), dateRange, reportData{totalDeliveries,
   totalDriverPayment, earningsBy*, totalBonuses, totalCompensations, totalDriverCharges,
   totalDeliveryBookingDriverFees, totalMinGuaranteeTopUp, netTotal, driverPayments[]}, status,
@@ -470,10 +473,15 @@ and company צור חשבונית / שלח חשבונית — the bulk invoice s
 opens with "חנויות עם נתונים בלי דוח" (`MissingReports.tsx`, fed by `missingReports`), and hidden /
 coming-soon stores carry a red `VisibilityBadge`), plus store-report screens
 and `generate-stores-summaries.tsx`; `app-type: shoofi-admin`. The store reports list
-(`views/admin/reports/ReportsList.tsx` + `invoice-steps/`) shows each report's step chips, every blocking
-reason, the owner's approval state / expiry / link-sent date and the next actions (שלח קישור אישור, בדוק
-הקצאה, נסה שוב ליצור חשבונית חנות, להגדרות החנות); the filter "רק חנויות עם בעיה בחשבונית"; the action
-"בדיקה מקדימה לחשבוניות" (creates nothing); and per-store results for bulk create / send, run 3 at a time.
+(`views/admin/reports/ReportsList.tsx` + `invoice-steps/`, redesigned 2026-11-06) is a 7-column grid
+(`ReportRowFrame.tsx`, 842px, sized for the content area at a 1280px viewport): ☐ · חנות (period, first
+problem + "+N") · סכומים · דוח · תשלום (the two toggles) · שלבי חשבונית (`StepTracker`, five dots
+דוח → חנות → שופי → הקצאה → שליחה; the approval state is the הקצאה dot) · פעולה הבאה (`RowActions`: one
+next action, a ⋯ menu with EVERY other action, a chevron to `RowDetail` — מה צריך לטפל / היסטוריית פעולות
+with EZcount's raw answers / רשות המסים ומסמכים). Filter chips הכל / עם בעיה / מוכן לשליחה / הושלם use
+`stepFilter` + `stepCounts`. The row is a translation of the server's records (`storeRowModel.ts`); it
+decides no status. "בדיקה מקדימה לחשבוניות" creates nothing; bulk create / send run 3 at a time with a
+per-store result.
 `ReportDetail.tsx` adds the full step history with EZcount's raw answers. `hyp/HypManagement.tsx` shows each
 store's approval expiry and expired / expiring / locked counts. This is where a human generates,
 approves, sends reports, and exports the MASAV Excel. (Full-stack: server computes, admin drives.)

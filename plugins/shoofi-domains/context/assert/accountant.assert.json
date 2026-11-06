@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -193,7 +193,9 @@
         ],
         "services/invoicing/report-steps.js": [
           "recordStep",
-          "PROBLEM_REPORT_FILTER"
+          "PROBLEM_REPORT_FILTER",
+          "REPORT_CATEGORY_FILTERS",
+          "reportCategoryOf"
         ],
         "services/invoicing/allocation-check.js": [
           "checkStoreDocumentAllocation",
@@ -1035,6 +1037,11 @@
           "file": "services/audit/admin-audit-routes.js",
           "regex": "pattern: '/api/hyp/admin/reports/:reportId/send-invoice', method: 'POST', action: 'hyp_reports_send_invoice'",
           "desc": "CORE invariant 19: every /api/hyp/admin write is in the admin audit route map (category invoicing)"
+        },
+        {
+          "file": "routes/payments/admin-reports.js",
+          "regex": "const stepFilter = req\\.query\\.stepFilter \\|\\| \\(req\\.query\\.stepProblems === 'true' \\? 'problem' : null\\);",
+          "desc": "CORE invariant 19 / reference §8: the reports list's chip filter; stepProblems=true is the old spelling of 'problem'"
         }
       ]
     },
@@ -1042,7 +1049,12 @@
       "files": [
         "src/utils/run-with-concurrency.ts",
         "src/utils/email-validation.ts",
-        "src/views/admin/reports/invoice-steps/InvoiceStepsCell.tsx"
+        "src/views/admin/reports/invoice-steps/InvoiceStepsCell.tsx",
+        "src/views/admin/reports/invoice-steps/ReportRowFrame.tsx",
+        "src/views/admin/reports/invoice-steps/StepTracker.tsx",
+        "src/views/admin/reports/invoice-steps/RowActions.tsx",
+        "src/views/admin/reports/invoice-steps/RowDetail.tsx",
+        "src/views/admin/reports/invoice-steps/storeRowModel.ts"
       ],
       "symbols": {},
       "patterns": [
@@ -1055,6 +1067,11 @@
           "file": "src/views/admin/reports/ReportsList.tsx",
           "regex": "axiosInstance\\.post\\('/hyp/admin/reports/invoice-precheck', body\\)",
           "desc": "CORE invariant 19: the reports screen's 'בדיקה מקדימה לחשבוניות' action"
+        },
+        {
+          "file": "src/views/admin/reports/invoice-steps/ReportRowFrame.tsx",
+          "regex": "export const REPORT_GRID_COLUMNS = '28px minmax\\(140px, 1fr\\) 112px 56px 88px 190px 176px';",
+          "desc": "reference §9: the 7-column row is 842px so it fits the content area at a 1280px viewport (e2e store-report-row.spec.ts measures it)"
         }
       ]
     }
