@@ -159,6 +159,14 @@ What that means for the PR you open:
   HIGH-RISK or draft, ready for 10 minutes, merges with no press — one at a time,
   10 a day, never while the agents are paused or a server deploy is being watched.
   So assume your green or amber PR may reach production with nobody reading it.
+- **The screen labels who opened each group, and HQ's PRs are found by their ticket.**
+  Every PR is opened under the same GitHub account, so the server reads the AI task
+  that opened it (`docs/ai-tasks.md`, *Who opened it*): an HQ run is **המטה**, a
+  board task is the person who pressed it, and a PR no task records counts as the
+  owner's own. A task records only its code PRs. So on an HQ ticket, write
+  **`HQ #<ticket ref>`** (the 6-character ref your run's prompt gives) in the body of
+  **every** PR you open, the docs PR too. Without it, a docs PR whose code already
+  merged shows as the owner's.
 - **Grouping comes from your branch names and your cross-links in both directions.**
   Give every PR of one change the **same branch name** in each repo. Only the type prefix
   may differ: `docs/stuck-push` in claude-plugins groups with `fix/stuck-push` in the
