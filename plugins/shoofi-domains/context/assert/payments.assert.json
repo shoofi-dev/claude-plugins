@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-twin-session-per-store-invoices / 2026-11-06 (CORE invariants 8 + 10: twin ZCredit-session documents); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -42,7 +42,13 @@
           "captureCombined",
           "resolveSavedCard",
           "chargeCombinedHyp",
-          "refundPartial"
+          "refundPartial",
+          "issueSessionTwinInvoices",
+          "customerDocuments"
+        ],
+        "routes/twin-order.js": [
+          "verifyAndCaptureTwinSession",
+          "issueSessionTwinInvoices"
         ],
         "utils/hyp.js": [
           "createCustomerInvoice",

@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/HIGH-RISK-twin-session-per-store-invoices / 2026-11-06 (invariants 8 + 10 — twin ZCredit-session documents); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -64,6 +64,12 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    failed with `"תאריך תוקף לא במבנה תקין ,expirationDate"` until the same lookup was ported
    into `twin-payment-service.js`. **When you change charge routing, provider selection or a
    charge guard, apply it in both places — or say in the PR why the twin path doesn't need it.**
+   **A twin also has a third capture entry point that charges nothing:** a ZCredit
+   web-checkout session (Apple/Google Pay on the ZCredit wallet path) is only VERIFIED, by
+   `verifyAndCaptureTwinSession` in `routes/twin-order.js` (from `digital-finalize` and
+   `zcredit-callback`), then `applyCaptureSuccess`. Its customer documents go through
+   `issueSessionTwinInvoices` (`twin-payment-service.js`), never `captureCombined`'s block.
+   Its `both_captured` pre-check is not atomic, so finalize and the callback can both pass.
 9. **The per-order customer document follows the STORE's VAT status.** A store that is
    עוסק פטור (`accounting.bankAccount.businessType === 'exempt'`) charges no VAT, so its
    sale may not be documented with any. The flag is read with `isVatExempt`
@@ -124,9 +130,20 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    their keys and never spread `params`; keep it that way rather than adding a generic
    pass-through. Note `createInvoice` accepts a `storeUaUuid` that four call sites pass and
    it has **never sent** — a dead parameter, not evidence the field already flows.
-   Reach: wallet orders always (unconditionally manual), card orders only where the flag is
+   Reach: HYP wallet orders always (unconditionally manual), card orders only where the flag is
    on — a gateway-issued document cannot take a `ua_uuid`, and `EZ.*` is an undocumented
    pass-through that can reject the whole charge, so do not try `EZ.ua_uuid`.
+   ⚠️ **ZCredit-SESSION wallets are NOT manual, single-store or twin.** The CLIENT builds the
+   session with `CreateInvoice: "true"` (`shoofi-app/data/zcredit-config.ts:17`, twin
+   checkout reuses it), so ZCredit always prints ONE document for the whole charge — for a
+   twin, one merged receipt shared by both orders (`ccPaymentRefData.data.InvoiceRecieptDocumentNumber`),
+   naming one store, with VAT even on an exempt leg — and the flag cannot stop it.
+   `issueSessionTwinInvoices` therefore keeps a gateway document when the session status
+   carries one and issues the per-store set only when it does not, claimed once per group
+   on `twinOrderGroups.customerDocuments` (`issueInvoicesForTwin` itself is NOT idempotent).
+   Never backfill per-store documents onto a twin that has the merged receipt: that
+   documents the money twice. Production: 38 such groups (76 orders, Aug–5 Oct 2026); the
+   path has been idle since wallets moved to HYP on 2026-08-26.
 11. **Only admin-dashboard users may call the per-order invoice queue routes, and only
    owners may write to the queue.** `/api/admin/invoices/{pending,retry,process-all,webhook}`
    (`routes/admin.js`) drive the `utils/invoice-mail.js` Gmail-fetch queue. No client, cron,
