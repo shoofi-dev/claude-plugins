@@ -110,6 +110,25 @@ Every style has a 16:9 banner version (styles.md "Banner versions"): one still p
 exact words, the real photos. Make it with the reel, or alone for a home banner; it goes into the
 ad form as `imageAR` / `imageHE`.
 
+## A request from the admin ("צור סרטון")
+
+The marketing wizard (story or social post → "תוכן" → סרטון) queues a reel as a bridge task whose
+whole prompt the server wrote (shoofi-server docs/marketing-reels.md). The owner's choices in it
+are the switches — `--voice` / `--shadi` / `--no-music` for `pick.py`, AI dish motion on or off,
+the style or the styles "auto" may pick from, the languages — and the **spend cap**: the credits
+the owner approved by switching paid options on (0 with all of them off). Follow them exactly;
+the gates in this skill are already answered by those switches, up to the cap. Anything above the
+cap: stop, render nothing more, and answer what it needs and the price.
+
+- Facts are checked that day (§1). An offer that is not live → no reel; the answer says why.
+- `render.mjs --review` and the creative director's PASS before anything is handed over.
+- **Output contract:** in `.reel-out/` in the working directory — `reel-<lang>.mp4` (1080x1920,
+  H.264, under 40 MB — the story form takes 50) per language, optionally `banner-<lang>.png` (1920x1080), and
+  `manifest.json`: `{"files":[{"name":"reel-ar.mp4","kind":"video","lang":"ar","caption":"…"}],
+  "style":"rush","creditsSpent":0,"review":"PASS — …"}`. The bridge uploads exactly these names
+  when the run ends; the owner attaches the video to the story or post in the wizard.
+- Never publish, never create a draft, never change data — the owner's form does that.
+
 ## A video template's example
 
 When the owner asks for examples of the styles, make drafts on real subjects (one per style) and
