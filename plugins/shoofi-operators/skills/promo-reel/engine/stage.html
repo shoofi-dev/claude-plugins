@@ -54,6 +54,9 @@
     document.head.appendChild(font);
     document.documentElement.style.setProperty('--lime', spec.theme.lime);
     document.documentElement.style.setProperty('--ink', spec.theme.ink);
+    // A banner is 16:9; a reel 9:16 (the default).
+    const [sw, sh] = spec.size || [1080, 1920];
+    for (const n of [document.documentElement, document.body, stage]) Object.assign(n.style, { width: sw + 'px', height: sh + 'px' });
     layers = window.STYLES[spec.style](spec);
     duration = Math.max(...layers.map((l) => l.end));
     for (const l of layers) {
@@ -104,6 +107,8 @@
       const ox = (l.kb.ox || 0) * p, oy = (l.kb.oy || 0) * p;
       l.inner.style.transform = `translate(${ox}px, ${oy}px) scale(${s})`;
     }
+    // A layer's own motion, beyond the shared in/out kinds (the end card's rings and shine, a dish splitting).
+    if (l.tick) l.tick(t - l.start, el, l);
     if (l.punch) {
       // A cut that lands: the frame starts slightly big and settles in the first 0.25 s.
       const p = clamp((t - l.start) / 0.25);

@@ -1,0 +1,37 @@
+{
+ "style": "bannerShadi",
+ "theme": {
+  "ink": "#17320F",
+  "lime": "#8AEA5F",
+  "paper": "#F9F8F5",
+  "endBg": "#17320F",
+  "endInk": "#ffffff",
+  "glow": "#DFF5D0"
+ },
+ "subject": {
+  "kind": "coupon",
+  "store": {},
+  "coupon": {
+   "line": "**₪20** הנחה",
+   "terms": "בהזמנה מעל ₪100",
+   "code": "8PL6DBZI"
+  }
+ },
+ "text": {
+  "pill": "שופי",
+  "hook": "יש לי בשבילך\nקופון!",
+  "line2": "ההנחה מופיעה בסל",
+  "cta": "הזמינו בשופי",
+  "ctaButton": "הזמינו בשופי"
+ },
+ "assets": {
+  "icon": "../assets/shoofi-icon.png",
+  "shadiStand": "../assets/shadi-stand.png",
+  "shadiPoint": "../assets/shadi-point.png",
+  "font": "../assets/me.ttf"
+ },
+ "size": [
+  1920,
+  1080
+ ]
+}

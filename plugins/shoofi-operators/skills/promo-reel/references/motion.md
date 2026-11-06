@@ -30,5 +30,37 @@ Example (5 s):
 > side light from the left. Slow push-in toward the burger, stable. Food-commercial macro look,
 > shallow depth of field. The burger, the bun and the plate stay identical to the reference.
 
+### The split (tested 2026-11-06, Master Burgers' Sweet Diablo, 400 credits)
+
+Kling v3 Standard takes a **start AND an end frame**: give the same real photo as both, and the
+dish can come apart and land back exactly as it is (`input: {startFrame: {assetId}, endFrame:
+{assetId}}`, 5 s). The prompt that worked:
+> The burger from the reference photo, exactly as it is, on its plate with fries. Its layers lift
+> apart vertically one by one: the top bun rises first, then the two crispy coated pieces, then the
+> beef patty, until they float in mid-air with small even gaps between them, a few crumbs drifting.
+> They hold for a moment, then fall back down in order and land together into the exact original
+> burger. The background and the warm light stay as in the photo. The camera stays fixed and
+> stable. Food-commercial macro look, shallow depth of field. The bun, the crispy pieces, the
+> patty, the fries and the plate stay identical to the reference.
+
+The layers separate at ~1.0 s, hover 2.0–3.0 s and land at ~3.8 s — put the impact sound there.
+
+### A motion for each kind of dish (the picker's `motion`)
+
+| Dish | Motions (AI, from the real photo) | Free fallback |
+|---|---|---|
+| burger | `ai-split` (start = end frame, above), `ai-steam` | `free-split`, push-in |
+| pizza | `ai-cheese-pull` (a slice lifts, the cheese stretches) | push-in |
+| shawarma / wrap | `ai-slice` (a knife cuts it in half, the inside shows) | push-in |
+| salad | `ai-toss` (the leaves lift and settle) | push-in |
+| drink | `ai-pour` (ice and drink poured), `ai-condensation` | push-in |
+| dessert | `ai-drizzle` (sauce runs down) | push-in |
+| fries | `ai-tumble` (fries drop into the box) | push-in |
+| anything | `ai-steam` (steam rises, slow push-in) | push-in |
+
+Write each with the formula above: the dish exactly as in the photo, ONE motion, one camera
+instruction, what must stay identical. Use the start = end frame trick whenever the motion should
+return to the dish as it is (split, toss, tumble).
+
 Look at every clip before using it: a changed dish (extra toppings, a different bun) is a false
 claim — drop it and keep the still.

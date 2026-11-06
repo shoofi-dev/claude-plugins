@@ -1,0 +1,50 @@
+{
+ "style": "bannerNumber",
+ "theme": {
+  "ink": "#17320F",
+  "lime": "#8AEA5F",
+  "paper": "#F9F8F5",
+  "endBg": "#17320F",
+  "endInk": "#ffffff",
+  "glow": "#DFF5D0"
+ },
+ "subject": {
+  "kind": "deal",
+  "store": {
+   "name": "Burger Cave",
+   "logo": "../img/burger-cave-logo.png"
+  },
+  "offer": {
+   "big": "10%",
+   "label": "خصم",
+   "line": "على كل وجبة عند **Burger Cave**",
+   "terms": "للطلبات فوق ₪30 · لغاية 30/11",
+   "headline": "خصم **10%**\nعلى كل وجبة"
+  },
+  "dishes": [
+   {
+    "name": "برجر لحم عجل 400 غرام",
+    "img": "../img/6959240c8158a9000df2298e.jpg"
+   },
+   {
+    "name": "برجر شنيتسل دجاج دبل",
+    "img": "../img/696542b030987b000d45e577.png"
+   }
+  ]
+ },
+ "text": {
+  "pill": "شوفي",
+  "cta": "اطلب من شوفي",
+  "ctaButton": "اطلب من شوفي"
+ },
+ "assets": {
+  "icon": "../assets/shoofi-icon.png",
+  "shadiStand": "../assets/shadi-stand.png",
+  "shadiPoint": "../assets/shadi-point.png",
+  "font": "../assets/me.ttf"
+ },
+ "size": [
+  1920,
+  1080
+ ]
+}

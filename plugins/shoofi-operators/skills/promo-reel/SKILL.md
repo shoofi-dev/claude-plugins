@@ -39,12 +39,13 @@ customer. "New" only when it is (a store in its `launchDate` window; a dish crea
 weeks). Ask the owning domain agent when a rule is unclear (orders: deals and coupons;
 menu-catalog: dishes).
 
-## 2. Style — rotate
+## 2. The look — rotate everything
 
-Pick a style the owner approved (`marketingTemplates`, `channel: "reel"`, `status: "approved"`)
-whose `fits` includes the subject: never the same style twice in a row for a store, never the
-style of the last two reels. Then a theme and an opening line (styles.md "Variations"). Shadi is
-optional (a 3 s insert) unless the style is `shadi`.
+Run `scripts/pick.py` with the styles the owner approved (`marketingTemplates`, `channel: "reel"`,
+`status: "approved"`) and the store: it picks style, theme, opening motion, end card, music, food
+sound and opening line, each the option this store used longest ago and never one of the last two
+reels (styles.md "No two posts alike"). Shadi is optional (a 3 s insert) unless the style is
+`shadi`.
 
 ## 3. Draft (free)
 
@@ -63,9 +64,14 @@ the highlight not wrapping). **GATE 1**: the draft video(s), the words, the fact
 
 - One Kling clip per dish shown (motion.md), from the uploaded real photo, in one batch; Shadi
   lip-sync only if switched on (guided-reel's pipeline). Add `clip` to each dish in the spec.
-- Voice: Artlist Explore on Eleven v4, the guided-reel voice rules (numbers in words, عشره with
-  ه). Music: a catalog track (search_music, instrumental, upbeat), ducked under the voice; one
-  food sound on the first cut (search_sfx). Mix to `audio` in the spec.
+- Voice: Artlist Explore (≈ 17 credits for a 10 s line; Artlist may route it to Eleven v3 — check
+  it with whisper-cli), the guided-reel voice rules (numbers in words, عشره with ه). Cut it at its
+  pauses and place each phrase on its scene.
+- Music: the picker's catalog track (download_track; its hook start in pick.py), ducked under the
+  voice (`sidechaincompress`). Sounds: a food sound at the open, an impact where the dish lands
+  and where the Shoofi logo lands (search_sfx; the download link of a sound effect can 403 — its
+  preview link serves the whole clip). Mix to -14 LUFS into `audio` in the spec.
+- The final Sweet Diablo reel (`examples/closeup-masterburger-final.json`) was made this way.
 - **GATE 2**: the total credits from the batch quote.
 
 ## 5. Final and QA
@@ -73,11 +79,18 @@ the highlight not wrapping). **GATE 1**: the draft video(s), the words, the fact
 Render each language; check the stills again and watch it. **GATE 3**: the final MP4s. Posting
 goes through פרסום ידני (social) or a story in the app — a person does it.
 
+## Banners
+
+Every style has a 16:9 banner version (styles.md "Banner versions"): one still per language,
+exact words, the real photos. Make it with the reel, or alone for a home banner; it goes into the
+ad form as `imageAR` / `imageHE`.
+
 ## A video template's example
 
 When the owner asks for examples of the styles, make drafts on real subjects (one per style) and
 hand them over. The owner uploads the ones they approve in מרכז שיווק → תבניות → "תבנית וידאו"
-(shoofi-server `POST /api/admin/marketing/templates/video`); that is the approval, and the CMO uses
+(shoofi-server `POST /api/admin/marketing/templates/video`, with the style's banner version as
+`banner`); that is the approval, and the CMO uses
 only approved styles. The six examples in `examples/` were made this way on 2026-11-06 (Burger
 Cave's 10% deal, Pastito's 7% deal, Master Burgers' Sweet Diablo, the public ₪20 coupon).
 

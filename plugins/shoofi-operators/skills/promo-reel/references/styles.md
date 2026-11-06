@@ -19,6 +19,26 @@ Brand on screen ≤ 25% of the video.
 | `inapp` | באפליקציה | A phone rises with a real app screen; the line that matters is ringed and zoomed; a coupon ticket slides in | coupon · store · deal | a real screenshot (local-app-e2e) |
 | `shadi` | שאדי מציג | Shadi greets, then points at the offer ticket | all | — (lip-sync clips optional, 800 credits per 4 s) |
 
+## No two posts alike: the picker
+
+`scripts/pick.py <history.json> --store <appName> --subject … [--dish-type …] [--styles …] --write`
+chooses every dimension of the next reel — **style, theme, opening motion, end card, music,
+food sound, opening line** — as the option this store used longest ago, never one of the last
+two reels overall (ties: a stable hash of store + date). Four Burger Cave deals in a row came out
+shadi/dark/stamp/ai-steam, closeup/beige/drop/free-split, rush/green/spin/ai-split,
+number/lime/stamp/still. The history lives in `~/Documents/project/shoofi/marketing/promo-history.json`
+(one row per reel); merge the printed choice into the spec (`style`, `theme`, `endCard`, …).
+
+**End cards** (`spec.endCard`): `drop` (the icon drops, squashes, wiggles), `spin` (spins in),
+`stamp` (slams in from big with a shake). All three: 380 px Shoofi icon, lime rings pulsing out,
+a shine across the icon, the CTA on one line, the store's logo at 300 px with a lime ring (a
+coupon gets a pulsing «اطلب الآن» button instead).
+
+**Opening motion** (`motion`): per dish type (motion.md). In the spec: `subject.hookClip` (an AI
+clip, e.g. the Kling split) or `subject.split` (y cuts between the layers of a stacked dish, in
+the 1080x1920 frame — the free split: the real photo cut into bands that fly apart and snap back,
+a blurred copy of the photo behind the gaps), else the slow push-in.
+
 ## Variations (so one style still looks different from post to post)
 
 - **theme** — `green` (ink #17320F, end card dark), `lime` (light paper, lime end card), `dark`
@@ -26,6 +46,17 @@ Brand on screen ≤ 25% of the video.
 - **opening line** — a question («جوعان؟»), the number, or «جديد».
 - **music mood** — from the Artlist catalog (search_music), chosen per post.
 - **Shadi** — optional in every style: a 3 s insert you switch on (`shadi` is the one built on him).
+
+## Banner versions (1920x1080 stills, one per language)
+
+Every style has a banner: `bannerCloseup`, `bannerRush`, `bannerNumber`, `bannerTable`,
+`bannerInapp`, `bannerShadi` (`spec.size: [1920, 1080]`, render one still with `--still=0.5`).
+The words are in the picture (the app shows no overlay on a home banner) and exact — rendered,
+not drawn by an image model, which can misspell Arabic or invent a number. Arabic and Hebrew
+each get their own spec (`examples/banners/`); a Hebrew in-app banner needs the Hebrew screenshot.
+`subject.offer.headline` is the banner's big line (`\n` breaks it); `text.ctaButton` the button.
+Bidi: a highlighted number, price or Latin word (`**10%**`, `**₪20**`) is isolated left-to-right,
+or it prints "%10".
 
 ## Rotation
 

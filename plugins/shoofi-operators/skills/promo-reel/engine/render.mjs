@@ -39,7 +39,8 @@ const urls = (o) => {
 const pageSpec = urls(spec);
 
 const browser = await chromium.launch({ args: ['--allow-file-access-from-files'] });
-const page = await browser.newPage({ viewport: { width: 1080, height: 1920 }, deviceScaleFactor: 1 });
+const [vw, vh] = spec.size || [1080, 1920];
+const page = await browser.newPage({ viewport: { width: vw, height: vh }, deviceScaleFactor: 1 });
 await page.goto(pathToFileURL(path.join(path.dirname(new URL(import.meta.url).pathname), 'stage.html')).href);
 const duration = await page.evaluate((s) => window.prepare(s), pageSpec);
 

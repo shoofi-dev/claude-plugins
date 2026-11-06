@@ -1,0 +1,49 @@
+{
+ "style": "bannerInapp",
+ "theme": {
+  "ink": "#17320F",
+  "lime": "#8AEA5F",
+  "paper": "#EEF8E6",
+  "endBg": "#8AEA5F",
+  "endInk": "#17320F",
+  "glow": "#DFF5D0"
+ },
+ "subject": {
+  "kind": "coupon",
+  "store": {},
+  "coupon": {
+   "line": "خصم **₪20**",
+   "terms": "على الطلبات فوق ₪100",
+   "code": "8PL6DBZI"
+  }
+ },
+ "assets": {
+  "icon": "../assets/shoofi-icon.png",
+  "shadiStand": "../assets/shadi-stand.png",
+  "shadiPoint": "../assets/shadi-point.png",
+  "screen": {
+   "src": "../assets/checkout.png",
+   "width": 1206,
+   "from": 1480,
+   "view": 1080,
+   "hl": {
+    "x": 40,
+    "y": 1880,
+    "w": 1126,
+    "h": 110
+   }
+  },
+  "font": "../assets/me.ttf"
+ },
+ "text": {
+  "pill": "شوفي",
+  "hook": "كوبون **₪20**\nعلى طلبك",
+  "line2": "الخصم بيظهر بالسلة",
+  "cta": "اطلب من شوفي",
+  "ctaButton": "اطلب من شوفي"
+ },
+ "size": [
+  1920,
+  1080
+ ]
+}

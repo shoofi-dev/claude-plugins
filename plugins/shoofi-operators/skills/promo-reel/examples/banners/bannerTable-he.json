@@ -1,0 +1,54 @@
+{
+ "style": "bannerTable",
+ "theme": {
+  "ink": "#17320F",
+  "lime": "#8AEA5F",
+  "paper": "#EDE3D6",
+  "endBg": "#17320F",
+  "endInk": "#ffffff",
+  "glow": "#DFF5D0"
+ },
+ "subject": {
+  "kind": "deal",
+  "store": {
+   "name": "פסטיטו",
+   "logo": "../img/pastito-logo.jpg"
+  },
+  "offer": {
+   "big": "7%",
+   "label": "خصم",
+   "line": "على كل الوجبات",
+   "terms": "עד 27/3",
+   "headline": "**7%** הנחה\nעל כל הארוחות"
+  },
+  "dishes": [
+   {
+    "img": "../img/6ae742a71810b1000d5d5adb.jpg"
+   },
+   {
+    "img": "../img/6ae74745663d01000d708dfd.jpg"
+   },
+   {
+    "img": "../img/6ae748b2663d01000d7092a4.jpg"
+   },
+   {
+    "img": "../img/6ae7542c1810b1000d5d736a.jpg"
+   }
+  ]
+ },
+ "text": {
+  "pill": "שופי",
+  "cta": "הזמינו בשופי",
+  "ctaButton": "הזמינו בשופי"
+ },
+ "assets": {
+  "icon": "../assets/shoofi-icon.png",
+  "shadiStand": "../assets/shadi-stand.png",
+  "shadiPoint": "../assets/shadi-point.png",
+  "font": "../assets/me.ttf"
+ },
+ "size": [
+  1920,
+  1080
+ ]
+}
