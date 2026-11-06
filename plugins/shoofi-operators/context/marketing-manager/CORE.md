@@ -45,6 +45,7 @@ what a deal costs.
 | Skill | What it makes | Where |
 |---|---|---|
 | `shoofi-operators:guided-reel` | A lip-synced Shadi explainer reel (AR + HE) over real app screens, 1080x1920 MP4 | `${CLAUDE_PLUGIN_ROOT}/skills/guided-reel/SKILL.md` |
+| `shoofi-operators:promo-reel` | A 10–12 s promo video for a new store / new dish / deal / coupon in one of six styles, rotated so posts don't look alike; real dish photos, DB facts | `${CLAUDE_PLUGIN_ROOT}/skills/promo-reel/SKILL.md` |
 | `shoofi-testing:local-app-e2e` | Real app screenshots on a simulator with seeded data (reels, store pages, how-tos) | the shoofi-testing plugin |
 
 ### 2c. Facts come from the code owners (Class A, `shoofi-domains`)
@@ -65,6 +66,7 @@ what a deal costs.
 |---|---|---|
 | "Write a post / story caption / ad copy" | social-marketing | run its playbook (load its CORE) |
 | "Make a video/reel explaining <feature>" | guided-reel | run the skill; gates at script, voice, clip credits, final |
+| "A video / reel / story ad for <store, dish, deal, coupon>" | promo-reel | run the skill: a style the owner approved (video templates, `channel: "reel"`), never the last one used for that store nor the last two published; free draft first, credits after a yes |
 | "Promote <coupon/deal/store/product/new store>" | admin marketing hub (§4) | check it's promotable (§1 #1–2) and not colliding (`/active`); draft per channel; a person approves |
 | "Send a push about X" | push campaign draft (§4c) | respect opt-out + cap; propose a holdout % for anything you'll want to measure |
 | "How did <campaign/push/post> do?" | results (§4d) | read the numbers; say which method and its limits |

@@ -93,6 +93,7 @@ Invoke namespaced: **`shoofi-operators:marketing-manager`**, **`shoofi-operators
 
 | Skill | Makes |
 |---|---|
+| `/shoofi-operators:promo-reel` | A 10–12 s promo video (9:16, AR + HE) for a new store, new dish, deal or coupon, in one of six styles (תקריב, קצב, המספר, שולחן, באפליקציה, שאדי מציג) rotated so posts don't look alike. Free draft from the real photos first; dish clips (Kling from the real photo), voice and music after a yes for the credits. Engine: `skills/promo-reel/engine/` (Playwright renders each frame, ffmpeg encodes). The owner approves a style by uploading its example as a video template. |
 | `/shoofi-operators:guided-reel` | A guided explainer reel: Shadi (the 3D courier mascot) explains a feature in Arabic and Hebrew, lip-synced, beside a phone showing real app screens with the key item zoomed out. Four human gates (script, voice, clip credits, final). Builder: `skills/guided-reel/scripts/reel.py` driven by a `reel.json`. |
 
 ## The Library — the managers learn, the owner approves
@@ -160,6 +161,10 @@ context/competitive-intel/CORE.md        # ALWAYS read: competitor endpoints + f
 context/social-marketing/CORE.md         # ALWAYS read: the measured voice spec and its
                                          #   evidence, the account model, the approval
                                          #   chain, the coupon rule, what exists today
+skills/promo-reel/SKILL.md               # promo video: subject × style, gates
+skills/promo-reel/engine/                #   stage.html + styles.js (6 styles) + render.mjs
+skills/promo-reel/references/            #   styles.md, research.md (Meta/TikTok), motion.md (Kling)
+skills/promo-reel/examples/              #   the six example specs (2026-11-06)
 skills/guided-reel/SKILL.md              # Shadi explainer reel: steps + gates
 skills/guided-reel/scripts/reel.py       #   the builder (Chrome renders, ffmpeg composites)
 skills/guided-reel/assets/shadi/         #   blue-screen poses: stand.png, point.png

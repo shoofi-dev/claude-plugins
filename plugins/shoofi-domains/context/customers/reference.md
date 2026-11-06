@@ -534,11 +534,12 @@ story's 9:16 render when the post is a story.
 | `POST /api/admin/marketing/templates/:id/approve` \| `reject` \| `retire` | same | suggested → approved / rejected, approved → retired; 409 `state` or `full` (4 approved) |
 | `POST /api/admin/marketing/templates/run` | same | runs the daily job now; per-channel `{suggested, refreshed, dropped}` or `{skipped: too_few_sources \| too_few_images \| budget}`; 409 `locked` |
 | `POST /api/admin/marketing/templates/from-picture` | same | multipart `image` (≤ 10 MB, type by its bytes) + `channel` banner\|story + `note`? → 201 a `suggested` template with `source.kind: "upload"`; 400 `channel` / `no_image` / `not_image`, 409 `full` (6 suggested), 422 `not_a_design` / `no_style` / `has_facts`, 429 `budget` |
+| `POST /api/admin/marketing/templates/video` | same | multipart `video` (MP4 by its bytes, ≤ 60 MB) + `reelStyle` + `name`? `summary`? `fits`? → 201 a `suggested` reel template `{reelStyle, fits, videoUrl}`; 400 `style` / `no_video` / `not_video`, 409 `full` (8), 413. The list answers `reelStyles` and `limits.approvedReel` (8) |
 
 Data: `shoofi.marketingTemplates {channel banner|story|note|push, status
 suggested|approved|rejected|retired, name, summary (Hebrew), style (English), examples, uses,
 createdAt, lastSeenAt, lastUsedAt, decidedBy, decidedAt, source? {kind: "upload", by, note}}`
-(no `source` = learned), no TTL, no index. Uploaded pictures: `marketing-templates/<id>.jpg`. Admin client:
+(no `source` = learned); reel rows add `reelStyle, fits, video {url, bytes}`, no TTL, no index. Uploaded pictures: `marketing-templates/<id>.jpg`. Admin client:
 `src/apis/admin/marketing-templates.ts`, `views/admin/marketing/components/TemplatePicker.tsx`
 ("תבניות" in the "תוכן" step, which fetches nothing until clicked), and
 `views/admin/marketing-templates/MarketingTemplates.tsx` — מרכז שיווק's "תבניות" tab

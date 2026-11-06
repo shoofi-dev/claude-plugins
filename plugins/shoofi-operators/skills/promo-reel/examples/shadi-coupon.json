@@ -1,0 +1,32 @@
+{
+ "style": "shadi",
+ "theme": {
+  "ink": "#17320F",
+  "lime": "#8AEA5F",
+  "paper": "#F9F8F5",
+  "endBg": "#17320F",
+  "endInk": "#ffffff",
+  "glow": "#DFF5D0"
+ },
+ "subject": {
+  "kind": "coupon",
+  "store": {},
+  "coupon": {
+   "line": "خصم **₪20**",
+   "terms": "على الطلبات فوق ₪100",
+   "code": "8PL6DBZI"
+  }
+ },
+ "text": {
+  "pill": "شوفي",
+  "hook": "عندي إلك كوبون!",
+  "line2": "الخصم بيظهر بالسلة",
+  "cta": "اطلب من **شوفي**"
+ },
+ "assets": {
+  "icon": "../assets/shoofi-icon.png",
+  "shadiStand": "../assets/shadi-stand.png",
+  "shadiPoint": "../assets/shadi-point.png",
+  "font": "../assets/me.ttf"
+ }
+}

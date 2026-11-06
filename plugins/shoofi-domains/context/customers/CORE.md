@@ -756,6 +756,12 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       from anywhere → one Claude call → the same no-facts `style` → **`suggested`**, with
       `source {kind: "upload", by, note}` and the picture kept on the CDN as its example. Still
       only the owner's approve makes it offered; ≤ 6 suggested in all before another upload.
+    - **Video templates** (`channel: "reel"`, 2026-11-06): a promo-reel **style** (`reelStyle`
+      closeup / rush / number / table / inapp / shadi, `fits` store / dish / deal / coupon) with the
+      example video the owner uploaded (`POST /api/admin/marketing/templates/video`, MP4 ≤ 60 MB →
+      `suggested`, no model call). ≤ 8 approved / 8 suggested. The daily job never learns reels
+      (`CHANNELS` excludes them; `LISTED_CHANNELS` lists them). The promo-reel skill uses only
+      approved styles, rotated.
     Pinned by shoofi-server `test/integration/marketing-templates.js` and
     `marketing-routes-auth.js`.
 
