@@ -315,7 +315,8 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
 - HQ's inbox (shoofi-server `services/hq/delivery-status.js`, `docs/hq.md` *Delivery off: one alert*):
   - counts a "despite drivers" alert only once `updatedAt > createdAt`;
   - alerts only inside the business day (`utils/shift-time.js`);
-  - folds "delivery off for everyone" into one item that carries each active driver's open deliveries / `getDriverCapacity`. Off for everyone means the `delivery_support` switch is off, no `isActive` driver, or none with `driverHasCapacity`.
+  - folds "delivery off for everyone" into one urgent item that carries each active driver's open deliveries / `getDriverCapacity`. Off for everyone means the `delivery_support` switch is off or no `isActive` driver.
+  - every driver at his limit (none with `driverHasCapacity`) is NOT off: the customer check ignores load, so orders keep coming and wait in the `isPendingAssignment` queue. HQ shows a quiet "כל הנהגים מלאים" item (`delivery-full:`). It turns urgent once, as `delivery-late:`, when a queued delivery is 10 minutes past its `assignDriverAt` with no driver (`waitingForDriver`).
 - The race itself is not fixed in the cron.
 
 ## 7. Data model (delivery-company DB)
