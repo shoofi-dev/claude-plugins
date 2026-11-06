@@ -74,7 +74,10 @@ recording is only for how words are pronounced"). A recording guides the spellin
 the source audio.
 
 ## Lip-sync (Wan 2.7 image-to-video)
-- **720p, 9:16**, image = pose asset, audio = segment asset (the audio drives the mouth).
+- **720p, `aspect_ratio: "auto"`**, image = pose asset, audio = segment asset (the audio drives
+  the mouth). `auto` follows the 1152x2048 pose, so the clip comes back 720x1280. Since 2026-11
+  Wan refuses `"9:16"` ("Available options: auto") before generating — nothing is charged, but
+  the batch fails as a whole.
 - **Upload the pose and each segment mp3 as assets** (upload → PUT → confirm) and pass the asset
   ids. A previous generation's id as an input is refused. Seedance's reference-to-video does not
   accept image + audio together — Wan is the one that does.
@@ -99,8 +102,12 @@ His other hand makes small natural gestures on key words; friendly expressions a
 nods. Keep the exact character, outfit, full-body framing and the perfectly flat pure blue
 #0000FF background unchanged. Static camera." Extra negative: "lowering the pointing arm".
 
-**Outro (stand.png)** — "…talks excitedly to the camera … making an inviting open-hand gesture
-toward the camera and then a friendly wave goodbye. …"
+**Outro (stand.png, 4 s)** — "The full-body 3D cartoon courier talks excitedly to the camera with
+lips precisely synced to the voice audio, mouth clearly moving, making an inviting open-hand
+gesture toward the camera, then gives a friendly wave goodbye while smiling. Keep the exact
+character, outfit, full-body framing and the perfectly flat pure blue #0000FF background
+unchanged. Static camera." (Used for the invite reel's endings, 2026-11-06: arms open toward the
+camera, in sync, 800 credits each.)
 
 Negative prompt for all: "text, subtitles, extra people, camera movement, background change,
 shadows on background, warped hands, extra fingers, changing outfit, closed mouth while

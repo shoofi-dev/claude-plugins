@@ -120,7 +120,7 @@ for after Step 6.
 python3 -I $SK/scripts/reel.py segments <work> ar    # build/seg-ar-N.mp3, short ones padded to 4 s
 ```
 
-For each segment: Artlist **Wan 2.7 image-to-video, 720p, 9:16**, image = the pose PNG
+For each segment: Artlist **Wan 2.7 image-to-video, 720p, `aspect_ratio: "auto"`** (the 1152x2048 pose makes it 9:16 — Wan refuses `"9:16"` since 2026-11), image = the pose PNG
 (`assets/shadi/stand.png` or `point.png`, blue screen), audio = the segment mp3, duration = the
 segment length rounded up to a whole second (min 4 s). Prompts and upload rules:
 `references/shadi.md` §Lip-sync. **Upload the pose and every mp3 as assets first** — a previous
