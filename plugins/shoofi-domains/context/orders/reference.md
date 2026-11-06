@@ -661,11 +661,15 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   degrade writes `degrade.refundOwed`/`refundBreakdown`. Compensations:
   `shoofiAdmin/compensations/*`.
 - **Cancel money (CORE invariant 22) — the admin side, shoofi-delivery-web#346:**
+  - **A support cancel of one twin side leaves it `7`** (CANCELLED_BY_ADMIN), not `5`; the
+    customer app's `twin-active-order-header.tsx` `getGroupStatus` checks the degraded pair before
+    "any side cancelled" (shoofi-app#96), else order history would read "ההזמנה בוטלה".
   - **One cancel dialog** (`src/components/Modals/CancelMoneyDialog.tsx`, rules in
     `src/utils/cancel-dialog.ts`, calls in `src/apis/admin/money.ts`) for single orders and both
     twin cards: `money/cancel-preview` → scope choice (twin: this side / the other side by name /
     both, or only "remaining"), the server's amount + breakdown + coins/coupons returned, keep or
-    refund (asked only when money is at stake), then `money/cancel`. **A 404 from cancel-preview
+    refund (asked only when money is at stake — otherwise it sends `decision: "none"`), then
+    `money/cancel`. **A 404 from cancel-preview
     (a server without `/api/money`) falls back to the old dialog** (`isMoneyApiMissing`).
   - **MoneyLine** (`src/components/MoneyLine.tsx`, `src/utils/money-summary.ts`) renders
     `order.moneySummary` on every order card / twin card / live-ops row; a twin leg shows its

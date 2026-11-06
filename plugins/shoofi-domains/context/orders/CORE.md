@@ -660,7 +660,12 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       group. Every twin writer uses `db.collection('twinOrderGroups')`.
     - **`cascadeCancel`** stamps `moneyDecision` (keep/refund from `/api/money/cancel` or the
       triggering order route) or else `undecided` on each leg it cancels when money is at stake and
-      no decision exists; no refund flag. **`degradeToSingle`** returns the dropped leg's coins,
+      no decision exists; no refund flag. **The dropped leg's status:** a SUPPORT degrade (source
+      `admin` — `POST /api/money/cancel` one side, `/api/twin-order/admin/degrade`) cancels it as
+      `7` CANCELLED_BY_ADMIN with support's reason in `cancelReason` and `twinDegradeSource`; `5`
+      REJECTED only for the store side (timeout sweeper / store reject) — partner reports, HQ and
+      store metrics read 5 as "the store rejected". The customer app's twin header checks
+      "degraded" before "cancelled" (shoofi-app#96). **`degradeToSingle`** returns the dropped leg's coins,
       coupon uses and store-deal uses (`returnLegExtras`, recorded on `degrade.returnedOnDegrade`).
     - **Flow events** (`shoofi.orderFlowEvents`, the `trackOrderFlowEvent` writer, swallowed on
       failure): `twin_degrade`, `twin_undo_degrade`, `twin_cascade_cancel` on BOTH legs
@@ -722,6 +727,10 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       route). For `both`/`remaining` the amount is what is left (`captured − refunded −
       compensated − owed`) **plus any open undecided owe, which the decision replaces**
       (`cancel_owed {decision: undecided}`). Cash / never charged: 0, only a `decide` entry.
+      **`decision: "none"`** is accepted only when the preview has nothing to settle for that scope
+      (refundMode none or amount 0): no `cancelMoneyDecision` stamp, nothing owed, `cancelledAt` +
+      a `cancel_no_money` flow event; with money at stake it is 400 `bad_decision`. It exists so the
+      dialog never has to send "refund" for a cash order (the stamp invariant 21 removed).
     - **A degrade with no decision** (old admin route, timeout sweeper) records `decide` + `owe`
       `undecided` for `refundOwed` on the group; a twin leg cancelled through the order route with
       no decision owes the remainder `undecided`. Both land in the owed queue.
