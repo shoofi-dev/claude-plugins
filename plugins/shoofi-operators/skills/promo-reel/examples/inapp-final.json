@@ -4,8 +4,8 @@
   "ink": "#17320F",
   "lime": "#8AEA5F",
   "paper": "#EEF8E6",
-  "endBg": "#8AEA5F",
-  "endInk": "#17320F",
+  "endBg": "#17320F",
+  "endInk": "#fff",
   "glow": "#DFF5D0"
  },
  "subject": {
@@ -18,7 +18,13 @@
    "line": "خصم **₪20** عالتوصيل",
    "terms": "فوق ₪135 · لغاية 31/12",
    "note": "بينزل لحاله بالسلة · كفر قاسم"
-  }
+  },
+  "dishes": [
+   {
+    "name": "بيتسا حجم كبير",
+    "img": "../img/pbv-pizza-large.jpg"
+   }
+  ]
  },
  "assets": {
   "icon": "../assets/shoofi-icon.png",

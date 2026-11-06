@@ -8,7 +8,8 @@ The reel's soundtrack, from its parts — music (on by default), food/impact sou
       --voice voice.mp3 --cut 0:3.1@0.4 --cut 3.2:6.25@5.2 --cut 6.35:@8.55 \\
       --sound sizzle.aac@0:0.45:2.2 --sound impact.aac@3.0:0.8
 
---cut FROM:TO@AT places the voice from FROM to TO (TO empty = the end) at AT seconds — cut a take
+--cut [FILE=]FROM:TO@AT places the voice (or FILE, e.g. a lip-synced greeting's own take) from FROM
+to TO (TO empty = the end) at AT seconds — cut a take
 at its pauses (silencedetect) and put each phrase on its scene. --sound FILE@AT:VOLUME[:LENGTH].
 The music dips about 12 dB under every voice phrase (a volume curve built from the cuts, with
 0.15 s ramps — a compressor keyed on the voice missed the first and last phrases) and fades in
@@ -38,14 +39,18 @@ def main():
         return len(ins) // 2 - 1
 
     spans = []  # (start, end) of each placed phrase, for the music's volume curve
-    if a.voice and a.cut:
-        vlen = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", a.voice],
+    def length(path):
+        return float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path],
                                     capture_output=True, text=True, check=True).stdout.strip())
+
+    if a.cut and (a.voice or all("=" in c for c in a.cut)):
         parts = []
         for n, c in enumerate(a.cut):
+            src, c = c.split("=", 1) if "=" in c else (a.voice, c)
+            vlen = length(src)
             span, at = c.split("@")
             t0, t1 = span.split(":")
-            i = add(a.voice)
+            i = add(src)
             trim = f"atrim=start={t0}" + (f":end={t1}" if t1 else "")
             ms = int(float(at) * 1000)
             spans.append((float(at), float(at) + (float(t1) if t1 else vlen) - float(t0)))
@@ -76,7 +81,7 @@ def main():
     if not mix:
         raise SystemExit("nothing to mix: no music, voice or sound")
     f.append(f"{''.join(mix)}amix=inputs={len(mix)}:normalize=0:duration=longest,atrim=0:{D},"
-             f"alimiter=limit=0.95,loudnorm=I=-14:TP=-1.5:LRA=11[o]")
+             f"alimiter=limit=0.95,loudnorm=I=-14:TP=-2.5:LRA=11[o]")
     subprocess.run(["ffmpeg", "-v", "error", "-y", *ins, "-filter_complex", ";".join(f),
                     "-map", "[o]", "-c:a", "aac", "-b:a", "192k", a.out], check=True)
 
