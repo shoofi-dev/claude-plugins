@@ -67,7 +67,8 @@ const frames = Math.round(duration * FPS);
 const args = ['-v', 'error', '-y', '-f', 'image2pipe', '-framerate', String(FPS), '-i', '-'];
 if (spec.audio) args.push('-i', path.resolve(base, spec.audio));
 args.push('-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '19', '-preset', 'medium', '-r', String(FPS));
-if (spec.audio) args.push('-c:a', 'aac', '-b:a', '160k', '-shortest');
+// the mix is already AAC at -14 LUFS / -1 dBTP: copy it — a second encode overshoots the peak
+if (spec.audio) args.push('-c:a', 'copy', '-shortest');
 args.push('-movflags', '+faststart', outPath);
 const ff = spawn('ffmpeg', args, { stdio: ['pipe', 'inherit', 'inherit'] });
 

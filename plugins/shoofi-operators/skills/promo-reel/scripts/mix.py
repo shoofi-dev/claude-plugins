@@ -84,6 +84,15 @@ def main():
              f"alimiter=limit=0.95,loudnorm=I=-14:TP=-2.5:LRA=11[o]")
     subprocess.run(["ffmpeg", "-v", "error", "-y", *ins, "-filter_complex", ";".join(f),
                     "-map", "[o]", "-c:a", "aac", "-b:a", "192k", a.out], check=True)
+    # loudnorm stops short when its peak cap bites (Table came out at -16): measure, lift the gap
+    # under a limiter at -1 dBTP, and write again.
+    r = subprocess.run(["ffmpeg", "-i", a.out, "-af", "ebur128", "-f", "null", "-"], capture_output=True, text=True)
+    lufs = [float(l.split()[1]) for l in r.stderr.splitlines() if l.strip().startswith("I:")]
+    if lufs and lufs[-1] < -14.4:
+        tmp = a.out + ".tmp.m4a"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", a.out, "-af",
+                        f"volume={-14.0 - lufs[-1]:.2f}dB,alimiter=limit=0.84:level=false", "-c:a", "aac", "-b:a", "192k", tmp], check=True)
+        __import__("os").replace(tmp, a.out)
 
 
 if __name__ == "__main__":
