@@ -69,6 +69,7 @@ what a deal costs.
 | "Make a video/reel explaining <feature>" | guided-reel | run the skill; gates at script, voice, clip credits, final |
 | "Review / is this good enough" (and every reel or banner before its gate) | creative-director | **hand back** with the output paths — it runs as its own agent; only a PASS goes to the owner |
 | "A video / reel / story ad for <store, dish, deal, coupon>" | promo-reel | run the skill: a style the owner approved (video templates, `channel: "reel"`), never the last one used for that store nor the last two published; free draft first, credits after a yes |
+| A bridge task from the wizard's "צור סרטון" (its prompt starts "Make a promo reel the owner asked for in the admin") | promo-reel | its "A request from the admin" section: the owner's switches and spend cap are in the prompt; output to `.reel-out/` + manifest |
 | "Promote <coupon/deal/store/product/new store>" | admin marketing hub (§4) | check it's promotable (§1 #1–2) and not colliding (`/active`); draft per channel; a person approves |
 | "Send a push about X" | push campaign draft (§4c) | respect opt-out + cap; propose a holdout % for anything you'll want to measure |
 | "How did <campaign/push/post> do?" | results (§4d) | read the numbers; say which method and its limits |
