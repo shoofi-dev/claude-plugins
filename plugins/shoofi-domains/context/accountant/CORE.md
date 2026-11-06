@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 6 — cancelled excluded from settlement, keep → Shoofi COMP credited at redemption, customer documents fixed at capture); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -138,6 +138,24 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    `compensationFor: 'driver'` items, not driver-PAID ones.
 6. **Settlement reads the store `orders` collection** (which has status), never the
    `customers.orders[]` snapshot. Keep it that way.
+   - **Cancelled → excluded from settlement.** Only statuses `2,3,10,11,12` settle (the
+     `status: { $in: [...] }` order queries in `routes/payments/admin.js`); a cancelled or
+     rejected order (`4,5,7,8,9`, incl. a twin leg cancelled by degrade) earns the store
+     nothing and owes no commission, whatever happened to the money.
+   - **`keep` cancel → Shoofi COMP, credited at redemption.** When support cancels with
+     `cancelMoneyDecision: "keep"` (customer takes a coupon instead of a refund),
+     `settleCancelledOrderMoney` (`routes/order.js`) keeps/captures the charge and
+     `services/payments/cancel-compensation.js` files an APPROVED compensation with
+     `payingParty: "shoofi"` plus a `COMP-*` customer-specific coupon (`shoofiDiscount` =
+     the order total). The cancelled order's store is NOT charged (only `payingParty:
+     business` reaches `compensationsToCustomers`); the store where the coupon is later
+     REDEEMED is credited via `couponsFromShoofi` (invariant 7). A person may re-point the
+     row to business afterwards — then it bills like any store-paid compensation.
+   - **Customer documents are fixed at capture** (payments CORE invariant 10): the
+     per-order store/delivery documents are planned once at capture and a retry only
+     re-issues a recorded failed one at that amount. The retry cron is twin-aware
+     (`retryTwinOrderInvoices`) — a twin's delivery document (shipping + combination fee)
+     exists once, on the primary; an unprovable twin retry is held (`order.invoicesHeld`).
 7. **A store's coupon cost (`reportData.campaigns`) is the coupon's NOMINAL
    `storeDiscount`, never the waiver the customer actually got**, and the gate that
    decides it is **blind to `discountType`** (`routes/payments/admin.js:1188-1194`,
