@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -41,7 +41,9 @@
         "services/invoicing/allocation-check.js",
         "services/invoicing/precheck-runner.js",
         "utils/email-validation.js",
-        "docs/invoice-step-tracking.md"
+        "docs/invoice-step-tracking.md",
+        "services/invoicing/company-invoice-precheck.js",
+        "services/invoicing/company-precheck-runner.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -195,11 +197,16 @@
           "recordStep",
           "PROBLEM_REPORT_FILTER",
           "REPORT_CATEGORY_FILTERS",
-          "reportCategoryOf"
+          "reportCategoryOf",
+          "COMPANY_STEPS",
+          "COMPANY_CATEGORY_FILTERS",
+          "companyReportCategoryOf"
         ],
         "services/invoicing/allocation-check.js": [
           "checkStoreDocumentAllocation",
-          "classifyAllocationResult"
+          "classifyAllocationResult",
+          "checkDocumentAllocation",
+          "checkCompanyReportAllocation"
         ],
         "services/invoicing/precheck-runner.js": [
           "runStoreInvoicePrecheck"
@@ -210,6 +217,10 @@
         "utils/hyp.js": [
           "getTaxMinistryAllocationNumber",
           "getDocumentViewStatus"
+        ],
+        "services/invoicing/company-invoice-precheck.js": [
+          "evaluateCompanyInvoicePrecheck",
+          "companyDocumentAmounts"
         ]
       },
       "patterns": [
@@ -971,7 +982,7 @@
         {
           "file": "routes/hyp.js",
           "regex": "hypCompanyInvoiceSent: true,\\s*\\n\\s*hypCompanyInvoiceSentAt: new Date\\(\\)",
-          "desc": "reference §6/§8: send-invoice marks hypCompanyInvoiceSent + hypCompanyInvoiceSentAt (unconditionally, even when every WhatsApp failed); the admin bulk send's 'already sent' bucket reads it"
+          "desc": "reference §6/§8, CORE invariants 18/19: send-invoice marks hypCompanyInvoiceSent + hypCompanyInvoiceSentAt — since 2026-11-06 only after a WhatsApp actually went out"
         },
         {
           "file": "routes/hyp.js",
@@ -1042,6 +1053,36 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "const stepFilter = req\\.query\\.stepFilter \\|\\| \\(req\\.query\\.stepProblems === 'true' \\? 'problem' : null\\);",
           "desc": "CORE invariant 19 / reference §8: the reports list's chip filter; stepProblems=true is the old spelling of 'problem'"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "const precheck = evaluateCompanyInvoicePrecheck\\(\\{ company, documents: plannedDocs, taxState \\}\\);",
+          "desc": "CORE invariant 19: create-company-invoice runs the company pre-check (fail closed) with the exact documents it will issue"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "Saved NOW, before invoice 2 is requested",
+          "desc": "CORE invariant 19: invoice 1 is saved before invoice 2 is requested (a failure on invoice 2 must not lose invoice 1)"
+        },
+        {
+          "file": "routes/driver-reports.js",
+          "regex": "// Marked sent only when a WhatsApp actually went out \\(it used to be set regardless\\)\\.",
+          "desc": "reference §6: the driver report send sets status 'sent' only after a real WhatsApp"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.post\\(\"/api/hyp/admin/driver-reports/:reportId/recheck-allocation\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariants 17/19: the company recheck-allocation route needs a dashboard role"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "router\\.post\\(\"/api/hyp/admin/driver-reports/invoice-precheck\", \\.\\.\\.settlementDashboard,",
+          "desc": "CORE invariants 17/19: the company pre-check route needs a dashboard role"
+        },
+        {
+          "file": "services/invoicing/report-steps.js",
+          "regex": "\\{ \\$gt: \\[\\{ \\$ifNull: \\['\\$reportData\\.netTotal', 1\\] \\}, 0\\] \\}",
+          "desc": "CORE invariant 19: a company period with netTotal <= 0 expects no invoice in the chips"
         }
       ]
     },
@@ -1054,7 +1095,9 @@
         "src/views/admin/reports/invoice-steps/StepTracker.tsx",
         "src/views/admin/reports/invoice-steps/RowActions.tsx",
         "src/views/admin/reports/invoice-steps/RowDetail.tsx",
-        "src/views/admin/reports/invoice-steps/storeRowModel.ts"
+        "src/views/admin/reports/invoice-steps/storeRowModel.ts",
+        "src/views/admin/reports/invoice-steps/companyRowModel.ts",
+        "src/views/admin/reports/invoice-steps/rowShared.ts"
       ],
       "symbols": {},
       "patterns": [
@@ -1072,6 +1115,11 @@
           "file": "src/views/admin/reports/invoice-steps/ReportRowFrame.tsx",
           "regex": "export const REPORT_GRID_COLUMNS = '28px minmax\\(140px, 1fr\\) 112px 56px 88px 190px 176px';",
           "desc": "reference §9: the 7-column row is 842px so it fits the content area at a 1280px viewport (e2e store-report-row.spec.ts measures it)"
+        },
+        {
+          "file": "src/views/admin/driver-reports/DriverReportsList.tsx",
+          "regex": "axiosInstance\\.post\\('/hyp/admin/driver-reports/invoice-precheck', body\\)",
+          "desc": "reference §9: the company reports screen's 'בדיקה מקדימה לחשבוניות'"
         }
       ]
     }

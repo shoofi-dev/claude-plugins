@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -672,9 +672,13 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     - **Flagged, not fixed:** `utils/driver-invoice-status.js` (the "missing invoice" badge) leaves
       `totalDeliveryBookingDriverFees` out of its additions expression, and it still expects a credit
       invoice when credit + additions ≤ 0.
-    - **Sending them: a 200 is not a delivery.** `send-invoice` (`routes/hyp.js`) sends both links in one
-      WhatsApp to `contactPhone || phone`, with `לא הופקה` for a missing link. It sets `hypCompanyInvoiceSent`
-      even when every WhatsApp failed. The admin's bulk "שלח חשבונית" (2026-11) sends one report at a time and
+    - **Sending them: sent only when a WhatsApp went out** (changed 2026-11-06, invariant 19). `send-invoice`
+      (`routes/hyp.js`) sends both links in one WhatsApp to `contactPhone || phone`, with `לא הופקה` for a
+      missing link. It now refuses (409) a document that needs an allocation number and has none, or that
+      does not open, and sets `hypCompanyInvoiceSent` only if at least one WhatsApp went out
+      (`sendWhatsAppTemplate` returns undefined when it did not); otherwise 502 and step `send` = failed.
+      Until then it set the flag even when every WhatsApp failed. The report send
+      (`/api/driver-reports/admin/reports/:id/send`) follows the same rule for `status: 'sent'`. The admin's bulk "שלח חשבונית" (2026-11) sends one report at a time and
       counts a success only when `results[]` holds a `success: true`. It always skips reports with no
       invoice. Partial reports (`invoiceStatus.missingAny`) and already-sent ones are skipped by default, and
       the admin can opt in to each, with a warning for partial because of the flag above. Details: reference §6.
@@ -720,6 +724,18 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       the provider (Known status), so that issues a duplicate tax invoice. EZcount's ignoreApproval /
       addApprovalNumber / furtherObjection / cancel stay manual human decisions and are not exposed.
     - `send-tax-url` stamps `taxUrlSentAt` only on a real send; every attempt is in `hyp.taxUrlSendLog`.
+    - **Delivery companies get the same (2026-11-06).** A company issues invoice 1 (אשראי) and invoice 2
+      (תוספות) to Shoofi from ITS OWN EZcount account (`createInvoiceOnBehalf`, company `api_key`), so the
+      allocation rule applies per document: `create-company-invoice` runs `evaluateCompanyInvoicePrecheck`
+      (the store core with "החברה", plus phone warnings) with the exact documents it is about to issue,
+      fails closed, claims the report, and **saves invoice 1 before requesting invoice 2** (a failure on
+      invoice 2 used to drop invoice 1's fields while it existed at EZcount → a retry issued it twice).
+      Steps on `driverReports`: generate · companyInvoice · companyAdditionsInvoice · allocation (worst of
+      the documents) · reportSend · send. Recovery: `driver-reports/:id/recheck-allocation`; pre-check:
+      `driver-reports/invoice-precheck`. A period with `netTotal <= 0` expects no invoice (the route
+      refuses it) — the chips and the row say so instead of asking for one. Shoofi → company
+      `driver-reports/:id/create-invoice` exists and was never used (0 documents). 129 of 184 companies
+      are exempt (300 receipts, no allocation). Tests: shoofi-server `test/integration/company-invoice-steps.js`.
     - The admin web runs bulk create/send 3 at a time (`utils/run-with-concurrency.ts`) with a
       per-store result, and shows each report's steps, reasons and next actions (reference §9). Its
       filter chips are `REPORT_CATEGORY_FILTERS` / `reportCategoryOf` (problem → done → ready → open,
