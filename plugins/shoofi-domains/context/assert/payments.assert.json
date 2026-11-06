@@ -307,6 +307,21 @@
           "file": "data-changes/lib/scrub-zcredit-payload.js",
           "regex": "const PAYLOAD_PATHS = \\[\"ccPaymentRefData\\.payload\", \"ccPaymentRefData\\.paymentData\\.payload\"\\];",
           "desc": "CORE Known status HQ #d20fad: the scrub covers both payload paths"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(id !== undefined\\) safe\\.id = '<redacted>';",
+          "desc": "CORE Known status HQ #d20fad: redactPaymentSecrets redacts the holder's ID number on the stored copy"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "HolderID: paymentData\\?\\.id \\|\\| '',",
+          "desc": "CORE Known status HQ #d20fad: the charge still sends the real id from the request's paymentData"
+        },
+        {
+          "file": "data-changes/lib/scrub-zcredit-payload.js",
+          "regex": "const HOLDER_ID_PATH = \"paymentData\\.id\";",
+          "desc": "CORE Known status HQ #d20fad: the scrub removes a stored raw paymentData.id"
         }
       ]
     },

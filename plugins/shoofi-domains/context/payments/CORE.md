@@ -285,8 +285,14 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
   `ccPaymentRefData.payload.*` on success and on the twin paths. On a single-order **failure**,
   `routes/order.js:4495` stores the whole `paymentResult`, so the same fields land one level deeper
   at `ccPaymentRefData.paymentData.payload.*`. A scan that reads only the first path misses about
-  7.7k orders. `redactPaymentSecrets` cleans only the request-body copy at `order.paymentData`
-  (`cvv` → `"<redacted>"`), and it **keeps** `paymentData.id`, the same ID number.
+  7.7k orders. `redactPaymentSecrets` cleans only the request-body copy at `order.paymentData` and
+  the `orderFlowEvents` copies: `cvv` and, since HQ #d20fad, `id` (the holder's ID number) →
+  `"<redacted>"`. The charge reads the request's own `paymentData`, so ZCredit still gets the real
+  `HolderID`. Never strip `id` before the charge: whether ZCredit accepts an empty HolderID has not
+  been verified. `shoofi.creditCards.id` is the live source of that id (the app builds
+  `paymentData.id` from `defaultCard.id`) and stays, like the card's CVV above.
+  `shoofi.orderFlowEvents` (12.6M docs, no TTL) still holds raw `metadata.paymentData.id` (~65.6k)
+  and `.cvv` (~53.3k) from before the redaction. They are outside the scrub.
   Partner-accept copies the whole order into `delivery-company.book-delivery.order`
   (`services/delivery/book-delivery.js`), so every path above also exists under `order.` there.
   The scrub is `data-changes/2026-11-06-scrub-zcredit-secrets-*`. Do not run it before the
