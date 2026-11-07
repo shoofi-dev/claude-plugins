@@ -155,9 +155,9 @@ This recipient rule is the STORE path only. Driver reports pick their recipients
   coupons list's `GET /api/admin/coupons?funder=shoofi|store|split&isActive=now|live|expired`
   (any other `funder` → 400). `live` («פעילים», the default) = on and not over yet; `expired`
   («פג תוקף») = on but past its end; `now` = on and within its dates.
-  `kind=general|personal|gift` (`KINDS`, `kindFilter`; any other → 400) splits all coupons by
-  who they are for; gift cards (`isPurchasedCoupon`) are only in `kind=gift`, never in a funder
-  bucket, and their rows carry `giftCard` {value, spent, remaining, holder, holderName/Phone}
+  `kind=general|code|personal|gift` (`KINDS`, `kindFilter`; any other → 400) splits all coupons by
+  who they are for; only `general` (auto-apply, for everyone) has a funder — code coupons
+  (`isAutoApply` off) and gift cards (`isPurchasedCoupon`) are never in a funder bucket; gift cards and their rows carry `giftCard` {value, spent, remaining, holder, holderName/Phone}
   from `giftCardBalance`.
   The store's share alone decides: `storePercent` for a percent split, otherwise
   `storeDiscount` vs `value`. It is a restatement of settlement, never an input to it
