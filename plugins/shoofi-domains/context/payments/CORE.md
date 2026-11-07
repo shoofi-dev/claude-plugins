@@ -182,7 +182,10 @@ formula module, `utils/coupon-discount.js` (`computeCouponDiscount`), used by
 (`enforceCouponEntitlement`) — **except** for the fixed-delivery-price type.
 Creation does NOT notice a total lower than items + fee − coupon − deals − coins with nothing to
 explain it (shadow pricing records the drift and the order is kept), so the app must send the
-coupon its total took off: TotalPrice is its only writer (reference.md, "Coupons").
+coupon its total took off: TotalPrice is its only writer (reference.md, "Coupons"). The
+converse holds too: a coupon the total did NOT use (`couponSuppressed`: it lost to a delivery
+deal, or it is a delivery coupon on a pickup / drive-in order) stays on the card as "not used" and
+is not sent.
 
 **What is advertised** — `GET /api/coupons/active` feeds the store-page carousel AND the home
 store-card tag (shoofi-app `couponsStore.activeCoupons`, label `t(storeTagName)`). It lists public,
