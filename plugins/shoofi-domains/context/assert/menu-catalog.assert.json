@@ -701,8 +701,8 @@
         },
         {
           "file": "services/catalog/store-update-access.js",
-          "regex": "const PARTNER_STORE_FIELDS = Object\\.freeze\\(\\[\\n(?:\\s*//.*\\n|\\s*\"(?:isStoreClose|isOpen|isBusy|openHours|creditcard_support|cash_support|takeaway_support|delivery_support|isOrderLaterSupport|drive_in_support|invoicePrintCount|ramadanSettings)\",\\n){16}\\]\\);",
-          "desc": "doc CORE invariant 28 / reference §2 store: a partner writes exactly these twelve fields (four comment lines between them)"
+          "regex": "const PARTNER_STORE_FIELDS = Object\\.freeze\\(\\[\\n(?:(?:\\s*//.*\\n|\\s*\"(?:isStoreClose|isOpen|isBusy|openHours|creditcard_support|cash_support|takeaway_support|delivery_support|isOrderLaterSupport|drive_in_support|invoicePrintCount|ramadanSettings)\",\\n){16}|(?:\\s*//.*\\n|\\s*\"(?:isStoreClose|isOpen|isBusy|openHours|creditcard_support|cash_support|takeaway_support|delivery_support|isOrderLaterSupport|drive_in_support|invoicePrintCount|ramadanSettings|prepTimeSuggestion)\",\\n){18})\\]\\);",
+          "desc": "doc CORE invariant 28 / reference §2 store: a partner writes exactly these fields: the twelve (four comment lines) on shoofi-server main before shoofi-server#482, or the thirteen with prepTimeSuggestion (five comment lines) after it. Drop the twelve-field form once the server PR has merged."
         },
         {
           "file": "routes/store.js",
