@@ -121,7 +121,8 @@ captures `DocumentID`/`Hesh` and, in **background `setImmediate`**,
 `invoiceMailService.saveInvoice(docId)` (`utils/invoice-mail.js`) — fetches the PDF from
 the `customerinvoices@shoofi.app` Gmail by docId, uploads to DO Spaces, and sets
 `ccPaymentRefData.{url, invoiceStatus, docId, processedAt, failureReason}`. Background
-queue retries every **15s** (max 10). → **Store/settlement tax invoices are the `accountant` domain.**
+queue retries every **15s** (max 10). An ambiguous mail or a taken key is refused, not retried:
+`invoiceStatus: "needs_review"` + `invoiceMatchError` (CORE invariant 12). → **Store/settlement tax invoices are the `accountant` domain.**
 
 **The queue is in memory.** `pendingInvoices` is a `Map` in the process. A restart or deploy
 drops it, and the order keeps `invoiceStatus: "pending"` with nothing left to retry it.
@@ -139,8 +140,9 @@ role check, and no client calls any of them.
 | `POST /api/admin/invoices/webhook` `{docId, secret}` | master, admin | fetches now, falls back to the queue. Also needs `secret === INVOICE_WEBHOOK_SECRET`, which is not in `.env.production` (the DO app spec was not checked). No provider calls it. |
 
 The queue keeps the whole `req` and reads only `req.app.db` and the `app-name` header from
-it. It makes no HTTP call that carries request headers. `retry` puts `docId` into the Gmail
-query (`subject:<docId>`) and the public Spaces key (`invoices/doc-<docId>.pdf`) unvalidated.
+it. It makes no HTTP call that carries request headers. `retry` puts a numeric `docId` into
+the Gmail query (`subject:"<docId>"`, exact Subject match, CORE invariant 12) and the public
+Spaces key (`invoices/doc-<docId>.pdf`, never overwritten).
 Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restrict`, which
 hangs the request (CORE invariant 11), so none of them answered.
 

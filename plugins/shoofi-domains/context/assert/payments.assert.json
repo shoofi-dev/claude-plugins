@@ -134,6 +134,26 @@
           "desc": "reference §5: the webhook still checks its body secret behind the admin guard"
         },
         {
+          "file": "utils/invoice-mail-match.js",
+          "regex": "q: `subject:\"\\$\\{docId\\}\"`",
+          "desc": "CORE invariant 12: the receipt mail is searched with a quoted subject phrase, never bare subject:<docId>"
+        },
+        {
+          "file": "utils/invoice-mail-match.js",
+          "regex": "if \\(matches\\.length > 1\\) \\{\\s*return \\{ outcome: \"refused\", reason: REFUSAL\\.MULTIPLE_EMAILS",
+          "desc": "CORE invariant 12: two or more mails whose Subject holds the docId as a whole number → nothing is published"
+        },
+        {
+          "file": "utils/invoice-mail.js",
+          "regex": "if \\(await objectExists\\(s3Client, BUCKET_NAME, params\\.Key\\)\\)",
+          "desc": "CORE invariant 12: a published receipt key is never overwritten (DocumentIDs repeat across stores)"
+        },
+        {
+          "file": "utils/invoice-mail.js",
+          "regex": "\"ccPaymentRefData\\.invoiceStatus\": \"needs_review\"",
+          "desc": "CORE invariant 12: a refused receipt flags the order needs_review (not pending, not completed)"
+        },
+        {
           "file": "routes/order.js",
           "regex": "CommitFullTransaction",
           "desc": "ZCredit charge call (money-in path)"
