@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@feat/timed-busy-prep-extra (invariant 30 — timed busy busyUntil, extra prep time prepExtra, the expiry cron; invariant 28 partner fields) / 2026-11-07; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -13,7 +13,9 @@ Products, categories, menu assembly, options/extras, availability & stock, catal
 Server: `routes/menu.js`, `routes/product.js` (and its gate `services/catalog/product-access.js`), `routes/category.js`, the catalog slice of
 `routes/store.js` (the category gate `services/catalog/category-access.js`, the public store card
 `services/catalog/public-store.js` — invariant 27, and who may save the store document,
-`services/catalog/store-update-access.js` — invariant 28), `routes/translations.js`,
+`services/catalog/store-update-access.js` — invariant 28; timed busy and extra prep time,
+`services/catalog/store-timed-status.js` + `utils/crons/store-timed-status-cron.js` — invariant 30),
+`routes/translations.js`,
 `services/translations/owned-translations.js` (rows
 written by code — invariant 24), `routes/global-search.js`, `utils/menu-cache.js`,
 `utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`,
@@ -939,7 +941,7 @@ boundary and say so in the PR.
       tokens get 403, and no token gets 401. The own-store check is a copy of `ownStoreGate` in
       `services/catalog/product-access.js` (shoofi-server #346); fold the two together once both
       have merged.
-    - **What a partner writes:** only `PARTNER_STORE_FIELDS`: `isStoreClose`, `isOpen`, `isBusy`,
+    - **What a partner writes:** only `PARTNER_STORE_FIELDS`: `isStoreClose`, `isOpen`, `isBusy`, `busyUntil`, `prepExtra` (invariant 30),
       `openHours`, `creditcard_support`, `cash_support`, `takeaway_support`,
       `delivery_support`, `isOrderLaterSupport`, `drive_in_support`, `invoicePrintCount`,
       `ramadanSettings`. Those are exactly the controls of the partner app's store-management
@@ -1012,6 +1014,55 @@ boundary and say so in the PR.
       and on top of `ENABLE_CRONS` it runs only when `shoofi.store {id:1}.isExtrasIconsSyncEnabled
       === true`. `extrasIconsSyncDryRun === true` makes it a dry run that calls the model but writes
       only its run record. Both fields are server-only, not in `SHOOFI_CONFIG_PUBLIC_FIELDS`.
+
+30. **A TIMED BUSY ENDS BY ITSELF; EXTRA PREP TIME KEEPS THE STORE OPEN AND RAISES ONLY WHAT
+    CUSTOMERS SEE** (`services/catalog/store-timed-status.js`, `utils/crons/store-timed-status-cron.js`,
+    `docs/store-timed-status.md`; added 2026-11-07 for the partner's v3 header status sheet,
+    shoofi-partner `helpers/store/store-status.ts`). Two fields on `<appName>.store {id:1}`, both in
+    `PARTNER_STORE_FIELDS` (invariant 28):
+    - **`busyUntil`** — ISO string, stored as UTC `toISOString()`, or null. With `isBusy: true` the
+      pause ends at that instant; null/absent is the old busy, until switched off. Busy still means
+      **no ordering now** (the customer app treats it like closed). The partner offers 30 min, 1 h
+      and "until back".
+    - **`prepExtra`** — `{ minutes: 10 | 20, until: ISO }` or null (`PREP_EXTRA_MINUTES`). While
+      `until` is ahead the store stays open, `POST /api/store` raises `minReady`/`maxReady` by
+      `minutes` for customer-facing callers, and the partner's v3 new-order screen adds them to its
+      suggested prep time (`suggestPrepMinutes` `busyExtra`, `activePrepExtra`).
+    - **Writes** (`POST /api/store/update`, EVERY caller — partner and the admin StoreData form both
+      post their whole copy): `normalizeTimedStatusWrite` runs after `currentStore` is read and
+      before the status-change check. `busyUntil` must be null or an ISO date-time at most 24 h
+      ahead, `prepExtra.until` in (now, now + 4 h], each +5 min clock skew (`CLOCK_SKEW_MS`); junk is
+      **not written** (stored value stays, `warn` "store update: timed status value not written as
+      sent"). A `busyUntil` already past in a write that carries `isBusy: true` is a stale copy of an
+      ended pause and becomes `isBusy: false, busyUntil: null` (`info`), so an echo never switches
+      busy back on; an ended `prepExtra` is not written. `isBusy` written as anything but true also
+      writes `busyUntil: null` when one exists; a future `busyUntil` on a store not busy after the
+      write is not written. No key is added to a store that never had one.
+    - **Reads** (`POST /api/store`): `effectiveTimedStatus` for every caller (an ended pause reads
+      `isBusy: false, busyUntil: null`, ended/malformed `prepExtra` reads null), then
+      `withPrepExtraReadyRange` ONLY when the caller is not a verified admin and not
+      `app-type: shoofi-partner` (`isCustomerFacing`). **Never raise the range for the admin or the
+      partner:** both post their copy back, and a raised `minReady`/`maxReady` written back would stay
+      raised for good. (The admin form loads `GET /api/store/get/:appName`, raw.) Every ready range
+      the customer app shows reads `storeData.minReady/maxReady` (+ the delivery area's
+      `minETA/maxETA`), and the order snapshot's `storeData.maxReady` drives the order timer, so the
+      raised range needs no app change. **Not covered:** twin orders compute `twinPrepRange` in
+      `routes/twin-order.js` from the raw store docs (orders domain), without the extra minutes.
+    - **Expiry is a cron, not a read check in every reader.** `isBusy` is read raw by explore
+      ranking (and its cache), twin eligibility, For you `open-stores.js`, the public coupon page,
+      the store-status report and `RestaurantAvailabilityService`. The cron clears the stored flag
+      so all of them stay right: every minute (`* * * * *`, lock `cron:store-timed-status`, TTL 55 s,
+      `ENABLE_CRONS`), each `shoofi.stores` entry → `timedStatusExpiry`: an ended pause →
+      `isBusy: false, busyUntil: null`; a `busyUntil` on a store not busy → null; ended/malformed
+      `prepExtra` → null. The `$set` filters on the values it read (`busyUntil`, `prepExtra.minutes`,
+      `prepExtra.until` — dotted, because whole-subdocument equality is field-order-sensitive), so
+      an owner who extended the pause in between wins. Per changed store: a `store-update-history`
+      row (`source: "store-timed-status-cron"`, stamped at `busyUntil` so `busy-time.js` closes the
+      interval at the real end), `clearExploreCacheForStore` when busy ended, `store_refresh` to
+      customers and `store_updated` to the store's partner tablets (both refetch `POST /api/store`).
+      Side effects are swallowed and logged. Worst case for raw readers: ~1 minute after
+      `busyUntil`, plus the home's v2 explore cache TTL (5 min), which `clearExploreCacheForStore`
+      does not reach — the same as any status change.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified

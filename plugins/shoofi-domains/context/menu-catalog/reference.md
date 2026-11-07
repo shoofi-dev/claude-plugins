@@ -139,6 +139,12 @@ left out keeps its stored value; a nested object (`coinsSettings`, `accounting`)
 - `invoicePrintCount` missing or invalid in the request is written as `1`, for any caller.
 - `isStockManagment === true` in the write runs the stock backfill (§5), so only a dashboard save
   can run it.
+- `busyUntil` (ISO or null) and `prepExtra` (`{ minutes: 10|20, until: ISO }` or null) — timed busy
+  and extra prep time (CORE invariant 30), also in `PARTNER_STORE_FIELDS`. Normalised for any
+  caller by `normalizeTimedStatusWrite` (`services/catalog/store-timed-status.js`); `POST /api/store`
+  reads ended values as ended and, for customer-facing callers only, returns `minReady`/`maxReady`
+  raised by the active `prepExtra.minutes`. Ended values are cleared in the DB by the one-minute
+  `utils/crons/store-timed-status-cron.js`.
 
 ⚠️ **`hasGeneralCategories` lives in TWO documents and they drift.** `GET /api/menu`
 reads it from this per-store `store {id:1}` doc (`routes/menu.js`), but the admin
