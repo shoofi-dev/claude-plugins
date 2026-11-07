@@ -598,10 +598,20 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   `isUnviewOrdersEnabled` is on.
   - **What it is:** a series of local notifications scheduled up front. Each has an absolute
     `DATE` trigger and a fixed identifier `new-order-alarm-<i>`, plus `new-order-alarm-now`
-    for a ring made immediately. Each plays `store.wav`, with `data.type: "new_order_alarm"`
+    for a ring made immediately. Each plays this tablet's sound (default `store.wav`, see
+    "Per-tablet settings" below), with `data.type: "new_order_alarm"`
     and `appName`. A JS timer would not work: iOS suspends JS in the background, and the app
     has no background task. A repeating trigger would not work either: iOS rejects repeating
     intervals under 60s.
+  - **Per-tablet settings** (Wolt's device settings; `utils/new-order-alarm-prefs.ts`, UI at
+    the end of ادارة المحل, "التنبيهات على هذا الجهاز"). Stored on the DEVICE (AsyncStorage
+    `@new_order_alarm_prefs`), not the store. `repeat` (default on): off means the series
+    never runs (`alarmRepeatEnabled` = store alerts on AND repeat) and switching it off clears
+    a scheduled series; the first alert of a new order and the server's reminders still come.
+    `sound`: one of `store.wav`, `storelate.wav`, `deliverysound.wav`, `buffalosound.wav`
+    (all bundled in app.json `expo-notifications.sounds`), used by the series and by the
+    first local alert (`schedulePushNotification`). iOS only: Android plays the `default`
+    channel's sound.
   - **Numbers** (`ALARM_SETTINGS`, `utils/new-order-alarm.ts`). Every time comes from one
     deterministic grid per cycle (`alarmCycleGrid`):
     1. **While the server's reminder window runs**, one local ring a minute at **:30
