@@ -544,8 +544,11 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     - **`book-delivery.order._id` is an ObjectId OR a 24-hex STRING.** Partner-accept spreads
       the order document in (ObjectId); `POST /api/delivery/book` takes it from a JSON body
       (string). Any lookup by order must ask for both (`idVariants`). `GET
-      /api/delivery/order/:orderId/driver` asks for the ObjectId only, so the partner's driver
-      dialog 404s on a string-stored booking — not fixed, flagged.
+      /api/delivery/order/:orderId/driver` asked for the ObjectId only, so the partner's driver
+      dialog 404ed on a string-stored booking; it matches both since shoofi-server PR 486.
+      Still ObjectId-only, unreached today: the `order._id` branch of `GET delivery/book/:bookId`
+      (every client passes the short `orderId`, which its `bookId` branch matches) and the
+      support location update in `routes/customer.js` (it also matches on `bookId`).
     - **ETA = the engine's assignment-time `estimatedArrivalAtStore`; there is no live ETA.**
       It is quoted only for the courier who holds the row NOW: after a reassignment only
       `reassignmentMetadata.pickupFeasibility` (the reassign routes leave the previous courier's
