@@ -90,6 +90,9 @@ the server's). Anything reading `order.readyMinutes` (e.g. `computeOrderDelays` 
 
 ## 3. Order creation pipeline (understand; do not edit without sign-off)
 `POST /api/order/create` (`order.js`) — ordered side effects:
+**saved-address guard** (only when `shoofi.store{id:1}.requireSavedDeliveryAddress === true`,
+default off: a DELIVERY order to an address that is not one of the customer's saved ones →
+400 `DELIVERY_ADDRESS_REQUIRED`; APPLEPAY / HYP exempt — customers CORE invariant 19) →
 lock (Redis `SET NX` + in-mem fallback + 30s dup check) → fraud checks → generate
 `originalOrderId`/`orderId` → image upload → decide initial status → validate coins
 (no debit) → price corrections, in this order: coupon entitlement (`enforceCouponEntitlement`:
@@ -100,7 +103,11 @@ and never rejects → build `orderDoc` → **insert into store `orders`** (autho
 `[shippingPriceCheck]` fired and **never awaited** (log-only; a DELIVERY fee below the area
 tariff → one warn line + `order.shippingPriceCheck`, CORE invariant 20) →
 **stock decrement if status≠"0"** → first-order attribution → Apple Pay session
-self-heal → fraud persistence → **push `customers.orders[]` snapshot (central)** →
+self-heal → fraud persistence → **push `customers.orders[]` snapshot (central)** (+ seed
+`addresses[]` for a customer with none — a real address only, with an `_id`:
+`addressToSaveFromOrder`, customers CORE invariant 19) →
+remember the confirmed delivery address (`rememberConfirmedAddress`, **fire-and-forget**,
+after the snapshot write that would clobber it — customers CORE invariant 19) →
 notify store owner (**a repeating alert, not one push**, **fired in the background and
 never awaited** — `fireStoreOwnerNotifications`, see §7) → flow event →
 (CC/HYP branch: charge → set `6`/`1`/`13`, stock,
