@@ -526,6 +526,32 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       trigger. Prod had 0 sweep-written `expire` rows on 2026-10-30. The `expire` rows that do
       exist carry an `orderId`: they are `refundCoins` clawing back coins earned on a cancelled
       order, not the sweep.
+    - **`refundCoins` settles a cancelled order ONCE** (`services/coins/coins-service.js`,
+      verified 2026-11-07 on shoofi-server@fix/HIGH-RISK-coins-refund-idempotent). Its callers
+      are the cancel block of `POST /api/order/update` (statuses `4/5/7/8`; driver-cancel `9` is
+      left out on purpose) and the twin `cascadeCancel`. A double-tap, a retry, a cascade on top
+      of a direct cancel, and cancel → reactivate → cancel all call it again for the same
+      order. The guard is in the `findOneAndUpdate` FILTER, so the check and the write are one
+      atomic step: `transactions: { $not: { $elemMatch: { $or: cancelRefundMarkers(orderId) } } }`.
+      A wallet already holding one of these rows does not match:
+      - `{ orderId, cancelRefund: true }`: every row refundCoins writes now carries the tag;
+      - the exact legacy notes `Refund for cancelled order <orderId>` and
+        `Earned coins removed due to cancelled order <orderId>`, so orders cancelled before the
+        tag existed are covered too.
+
+      A repeat returns `{ success: true, alreadyRefunded: true }` and moves nothing. No wallet at
+      all is `{ success: false }`; before the guard it was reported as a success.
+      **Never key the guard on `type` + `orderId`**: amend's `reconcileOrderCoins` writes
+      `refund` and `expire` rows with the same orderId, and an amended order must still get its
+      cancel refund. **Reactivation re-redeems and re-earns nothing**, so after cancel →
+      reactivate → cancel the coins stay refunded once. Re-applying them on reactivation is a
+      money decision for the owner, not something to add quietly. ⚠️ The negative-balance clamp after the
+      update (and the returned `newBalance`) reads `result.balance`, but mongodb 3.7 returns
+      `{ value }`. So the clamp never fires, which is why 3 prod wallets are negative
+      (`test/integration/coins-buckets.js`), and `newBalance` is always 0. The same applies in
+      `reconcileOrderCoins`. Reading is safe because `computeAvailableBalance` clamps at 0.
+      Making the clamp work changes what customers get back, so it is the owner's decision.
+      Tests: `test/integration/coins-refund-idempotent.js` (mongodb-memory-server).
     - Tests: `test/integration/coins-admin-auth.js` (static gate check on every route plus every
       `/api/admin/*` route in `routes/coins.js`, 401/403 matrix, every dashboard role on seven
       routes, master-only on expire, the audit entry, refused writes write nothing).
