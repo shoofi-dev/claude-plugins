@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/HIGH-RISK-getid-empty-input / 2026-11-05 (invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -597,6 +597,22 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests: `test/integration/order-shipping-price-check.js`. It covers each exemption, active
       and paused areas, unresolved cases, a throwing lookup, a lookup that never answers (the
       create response is not held), and a failed flag write.
+
+21. **A MISSING `orderId` IS A 400 BEFORE ANY READ OR WRITE, BECAUSE `getId(undefined)` IS A
+    RANDOM ID, NOT AN ERROR** (shoofi-server `lib/common.js`). `getId(undefined|null)` mints a
+    fresh ObjectId, so a route given no id queries a document that cannot exist. Before
+    2026-11-05, `POST /api/order/update` ran `settleCancelledOrderMoney` and `updateOne` against
+    that random id before a TypeError ended it. `update`, `update/viewd` and `book-delivery`
+    now answer 400 `{ code: "INVALID_ID" }` via `isMissingId(req.body.orderId)` as the first
+    line in their `try`.
+    - **`getId` itself stays lenient on purpose.** About 1,080 internal callers rely on
+      "matches nothing" (e.g. `getId(store.cityId).toString()` in the admin order list), and
+      Express 4 does not forward an async throw, so a strict `getId` would turn them into 500s
+      or hung requests. It logs `[getId] empty id` with the calling file:line once per 10 min
+      instead. Use that log to find the next site to fix, then make it strict.
+    - **`getId(a) || getId(b)` never falls back**: the first call returns a truthy random id.
+      Pass `getId(a || b)`.
+    - Tests: `test/integration/getid-empty-input.js`.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
