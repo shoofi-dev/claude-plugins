@@ -632,6 +632,51 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   `*.v2.tsx` siblings: `navigation/MainStackNavigator.tsx` (~33-38) picks them while
   `FEATURE_FLAGS.ORDERS_LIST_V2` / `NEW_ORDERS_V2` are `true` (`consts/feature-flags.ts`
   ~20, ~22). The `index.tsx` originals are the v1 fallback, kept unedited. Edit the v2 file.
+- **v3 screens** (shoofi-partner feat/orders-v3-screens, 2a10861, stacked on
+  feat/orders-v3-rules; not on main yet). These are redesigned siblings,
+  `screens/admin/order/list/index.v3.tsx` and `new-orders/list/index.v3.tsx`.
+  - **How they are built.** `scripts/orders-v3/build_{list,new}_v3.py` generate them from the
+    v2 files. The state, latches, fetches and handlers are kept, and only the render is
+    replaced, by `components/orders-v3/*`. The accept handler `updateViewedOrder` is
+    byte-identical to v2, so ACCEPT is still `ordersStore.updatOrderViewd` →
+    `POST order/update/viewd`.
+  - **Flags.** `ORDERS_LIST_V3` / `NEW_ORDERS_V3` / `HEADER_V3` (`consts/feature-flags.ts`
+    ~23-44) are off in shipped builds. They turn on for one bundle when Metro/EAS runs with
+    `EXPO_PUBLIC_PARTNER_ORDERS_V3=1`. When on, v3 wins over v2 in `MainStackNavigator.tsx`.
+    `HEADER_V3` restyles only the shared header.
+  - **Rules** come from `helpers/orders/order-rules.ts` (above).
+  - **Money** is in `helpers/orders/order-money.ts`, and the two formulas differ on purpose:
+    - `orderMoneySummary` is the list's. It is built on `getPartnerPaymentSummary`, the
+      same math as the v2 list.
+    - `newOrderMoneySummary` is the new-order screen's own v2 inline formula, lifted
+      unchanged. It subtracts coins from a card order's bottom line too, takes the
+      `full_discount` coupon row from `appliedCoupon.breakdown`, and decides "full coupon"
+      without the drive-in price.
+    - Unifying the two is a money decision (accountant), not a layout one.
+  - **Order lines** are built by `helpers/orders/order-lines.ts` `buildOrderLines`. A line
+    whose product is not in the menu is KEPT, with its own `nameAR`/`nameHE`, flagged
+    `missingFromMenu` and sorted last. Its options cannot be decoded without the product's
+    extras.
+    - `stores/menu` `getFromCategoriesMealByKey` returns `{}` (not `null`) for a missing
+      product, so v2 behaves differently per screen.
+    - The live v2 list row (`list/index.v2.tsx` `sortedItems` ~289-300, filter `!!meal`)
+      lets `{}` through and draws the line with a BLANK name.
+    - The live v2 new-order screen (`new-orders/list/index.v2.tsx` `renderOrderItems`
+      ~1562-1573, `!isEmpty(meal)`) DROPS the line.
+    - The list's screen-level `renderOrderItems` (~3318, which also drops) is never called.
+  - **New-order v3** shows one waiting order at a time with a pager.
+    - The suggested prep time is the last time this device picked today (AsyncStorage
+      `@partner_last_prep_minutes`, `helpers/orders/last-prep-time.ts`), falling back to
+      `storeData.prepTimeSuggestion.defaultMinutes`, and snapped to an offered slot
+      (`suggestPrepMinutes` over `prepTimeSlots`).
+    - It is pre-selected only, never accepts by itself, and is skipped for iftar orders.
+    - It is off when `storeData.prepTimeSuggestion.enabled === false`. That field is not in
+      shoofi-server at all yet, and not in `PARTNER_STORE_FIELDS`
+      (`services/catalog/store-update-access.js` ~57), so it is on for every store until a
+      follow-up adds it.
+  - **Bell count.** `stores/new-orders-badge` holds the header bell's unviewed count.
+    `useNotifications` publishes it (`hooks/use-notifications.ts`), and the v3 list reads it
+    there. Mounting that hook a second time would double the polling and the new-order alarm.
 - **Gotcha**: no explicit REJECT endpoint, and **no reachable cancel/reject in the live
   partner screens**. Neither v2 screen writes `4` or `5` itself; the only `4` the store can
   compute is the `10→4` arm above. The list tabs are `1`, `2` (+`3`), `10` (+`11`), `14` and `15`
