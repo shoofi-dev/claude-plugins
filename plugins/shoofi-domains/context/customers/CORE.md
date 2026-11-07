@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -666,8 +666,12 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
         write; the claim and the cron add `archivedAt: null`.
       - **Social:** unsent = withdrawn (`cancelled`, leaves its item); once it went to Meta it is
         archived here and stays on the page (delete it there).
-      - Admin: one `EndRemoveActions` control (סיים / מחק) on the hub row, every channel form
-        (`MarketingFormStatus`) and the קידום page; the confirm says the results stay.
+      - Admin: one `EndRemoveActions` control (**הפסק להציג** / מחק — "סיים" until 2026-11-07) on the hub row, every
+        channel form (`MarketingFormStatus`) and the קידום page; the confirm says the results stay. The קידום card
+        says "מחק את כל הקידום" and keeps a visible legend of הפסק להציג / החזר לטיוטה / מחק. The server's item view
+        keeps `state` from the approval record, so the card reads a place as ended from its own end field
+        (`placeEnded` in `utils/marketing-approval.ts`: story `expiresAt`, banner `endDate`, note `isActive`) and an
+        ended DRAFT warns that approving it shows nothing.
     - **Grandfathering:** a doc with no `approval` (or `approval: null`) is published. In prod on
       2026-10-30, none of the 78 ads, 148 stories, 6 notes or 227 campaigns had the field. So the
       5 live banners, 86 live stories and 4 live popups stayed live, and no legacy campaign could
@@ -715,7 +719,8 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       `POST /api/notifications/send*`.
 
     Admin web: `src/utils/marketing-approval.ts` holds the same grandfathering and states. There
-    is the approval queue — מרכז שיווק's "ממתין לאישור" tab (`/admin/marketing?tab=approve`;
+    is the approval queue — מרכז שיווק's "קידומים" tab (was "ממתין לאישור"; `/admin/marketing?tab=approve`, pills
+    ממתינים לאישור / כולם;
     `/admin/marketing/drafts` forwards there), a פרסם עכשיו / תזמן choice in every
     channel's form, an approve confirmation that says what will happen, and chips plus אשר /
     החזר לטיוטה / מחק on every list and form. Pinned by shoofi-server

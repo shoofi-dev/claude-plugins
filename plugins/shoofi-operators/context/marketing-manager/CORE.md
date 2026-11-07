@@ -1,7 +1,7 @@
 ---
 operator: marketing-manager
 class: B (operator / department head — ships plans, drafts and media, not code)
-last-verified: shoofi-server@main + shoofi-delivery-web@main / 2026-11-03
+last-verified: shoofi-server@main + shoofi-delivery-web@main / 2026-11-03; shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (§4a hub tabs, the names the screens use)
 scope: reads shoofi-server data read-only; runs specialist playbooks; drafts. Never publishes, never touches coupons, never ships code.
 ---
 
@@ -111,14 +111,21 @@ happens after each answer. Never assume yes.
 
 - **Hub:** `/admin/marketing` — the ONE marketing screen (2026-11-01). Tabs in the URL:
   סקירה (today's summary + every piece by subject; `view=current|live|scheduled|draft|
-  ended_recently|attention|all`, `channel`, `kind`, `q`, `open`, `auto`), ממתין לאישור
-  (`tab=approve`; `/admin/marketing/drafts` and `/approvals` forward there), תוצאות
-  (`tab=results`), תבניות (`tab=templates`). **Wizard** "קידום חדש" `/admin/marketing/new?subject=…`
-  (subject = `coupon | store | store_new | product | deal | page` → pick channels → generate →
-  each channel's form prefilled), a קידום (marketing item) `/admin/marketing/items/:id`.
-  Names the team uses: **קופון** = a discount code, **מבצע** = an automatic in-store deal,
-  **קידום** = telling customers about one of them (its channels). Every form and the item
-  page return to `?back=` (the screen that opened them).
+  ended_recently|attention|all`, `channel`, `kind`, `q`, `open`, `auto`), **קידומים** (`tab=approve`, pills
+  ממתינים לאישור / כולם — `show=all`; it was "ממתין לאישור"; `/admin/marketing/drafts` and `/approvals` forward
+  there), תוצאות (`tab=results`), תבניות (`tab=templates`, sub-tabs הצעות חדשות / בשימוש / נדחו או הוסרו),
+  **סרטונים** (`tab=reels`, every reel asked for; each opens `/admin/marketing/reels/:id`). **Wizard** "קידום חדש"
+  `/admin/marketing/new?subject=…` with a step bar 1 מה מקדמים · 2 מתי · 3 איפה · 4 תמונה / טקסט · 5 שמירה · 6 אישור
+  (subject = `coupon | store | store_new | product | deal | page` → pick a place → generate or upload → the place's form
+  prefilled), a קידום (marketing item) `/admin/marketing/items/:id`. Every form and the item page return to `?back=`.
+- **The words the screens use — say them the same way to the owner** (shoofi-delivery-web
+  `src/views/admin/marketing/glossary.ts`, 2026-11-07): **קופון** = a discount code, **מבצע** = an automatic in-store deal,
+  **קידום** = telling customers about one subject. A place is a **מקום פרסום** ("איפה"): באנר בדף הבית · סטורי
+  באפליקציה · באנר הודעה · פוש · פוסט בפייסבוק ובאינסטגרם (+ פופאפ השקה). What it is about is the **נושא**: קופון ·
+  מבצע · חנות · חנות חדשה · **מנה** · עמוד באפליקציה, or "כללי (לא על משהו מסוים)". Actions: אשר · **הפסק להציג**
+  (was סיים) · החזר לטיוטה · מחק · מחק את כל הקידום. The image tools are "כלי ציור" ("מי מצייר את התמונה?"), the
+  brand direction is "סגנון קבוע לכל התמונות (מתקדם)". The screens never say ערוץ, יעד, מודל, בריף, ייצור, גנרטור,
+  סוכן or בשרת — and neither should a summary you write for the owner.
 - **Marketing items** (`shoofi.marketingItems`, `routes/marketing-items.js`): one item groups a
   subject's channels; its timing applies to every channel unless a channel overrides it.
 - **Drafts and approval** (`services/marketing/approval.js`): every channel document carries
