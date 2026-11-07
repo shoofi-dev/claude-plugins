@@ -123,6 +123,16 @@ the `customerinvoices@shoofi.app` Gmail by docId, uploads to DO Spaces, and sets
 `ccPaymentRefData.{url, invoiceStatus, docId, processedAt, failureReason}`. Background
 queue retries every **15s** (max 10). → **Store/settlement tax invoices are the `accountant` domain.**
 
+**"completed" must carry the url.** The ZCredit link is `invoices/doc-<docId>.pdf` on the
+`shoofi-spaces` CDN, built only by `getInvoicePdfUrl` (`utils/invoice-pdf-url.js`). Until
+HQ #0886e5 (2026-11-06) only the first-try `saveInvoice` success in `routes/order.js` set
+`url`; the queue's two completion writes (`processPendingInvoices`,
+`triggerInvoiceProcessing`) set only `invoiceStatus`/`processedAt`. So a receipt found late
+left the order `completed` with no link: 31 orders, 2026-03-12 → 2026-08-10, backfilled by
+`data-changes/2026-11-06-backfill-invoice-mail-receipt-urls.js`. A `completed` order with no
+`url` dated before the fix is this bug, not a missing PDF. HYP/EZcount links come from
+`getInvoiceUrl` (`utils/hyp-pay.js`), never from here.
+
 **The queue is in memory.** `pendingInvoices` is a `Map` in the process. A restart or deploy
 drops it, and the order keeps `invoiceStatus: "pending"` with nothing left to retry it.
 Prod on 2026-10-30, across 188 store DBs: 41,351 `completed`, 4,122 `none`,
