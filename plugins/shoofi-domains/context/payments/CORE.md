@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/HIGH-RISK-hyp-manual-invoice-status / 2026-11-07 (invariant 10 — documents close the HYP receipt status; invariant 11 — the 2,894 pending/EZ rows); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -114,6 +114,18 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    sale — and never fails the order: failures land on `order.invoices[]` and are retried by
    `utils/crons/invoice-retry-cron.js`, which is deliberately **not** gated on the flag so
    a rollback cannot strand a customer who paid while it was on.
+   ⚠️ **The charge-time receipt state is closed by the documents, not by the gateway.**
+   `buildCcPaymentRefData` writes `invoiceStatus` before any document exists: `pending` +
+   `docId: "EZ"` while HYP echoed its Hesh marker (until 2026-09-22 ~15:00 IDT, a HYP-side
+   change, no commit of ours), `none` + `docId: null` since. Once every document planned for
+   an order is `issued`, `issueInvoicesForOrder` / `issueInvoicesForTwin` set
+   `ccPaymentRefData.invoiceStatus: "completed"` + `processedAt` (`markHypReceiptCompleted`,
+   per twin leg, HYP receipts with `status: "success"` only, never throws). A document still
+   pending or failed leaves the old status, so the money audit's receipt-missing check keeps
+   seeing the gap until the retry cron issues it. **`url` stays null and `docId` is left
+   alone on purpose:** the links live on `invoices[]` (the admin invoice screens and the
+   clients' `getOrderInvoices` read them there), and the recharge path reads `docId`/`url` as
+   "already documented". Before 2026-11-07 nothing moved the status (see invariant 11).
    ⚠️ The customer document carries **`ua_uuid`** — Shoofi's EZcount user holds several
    businesses and this says which one issues it. `CUSTOMER_DOC_UA_UUID` in `amazonconfigs
    {app:"hyp"}` overrides the constant in `utils/hyp.js`; an **empty string there stops the
@@ -142,7 +154,9 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    - **Only a numeric docId may reach the Gmail fetch** (`isFetchableInvoiceDocId`):
      retry and webhook answer 400 otherwise, and process-all skips (`skippedNonNumericDocId`).
      HYP orders under manual invoicing carry `docId: "EZ"` (2,894 stuck at `pending` in prod,
-     2026-08-10..09-22). Their documents are in `invoices[]`, not Gmail. A fetch for `"EZ"`
+     2026-08-10..09-22, all with every document issued; shoofi-server
+     `data-changes/2026-11-07-complete-hyp-manual-invoice-receipts.js` completes them when run).
+     Their documents are in `invoices[]`, not Gmail. A fetch for `"EZ"`
      would search `subject:EZ`, publish an arbitrary customer's mail at the public key
      `invoices/doc-EZ.pdf` and mark one arbitrary order completed.
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
