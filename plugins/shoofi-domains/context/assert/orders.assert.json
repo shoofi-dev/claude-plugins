@@ -52,7 +52,8 @@
         "routes/coins.js",
         "test/integration/coins-admin-auth.js",
         "services/coins/coins-service.js",
-        "test/integration/coins-refund-idempotent.js"
+        "test/integration/coins-refund-idempotent.js",
+        "test/integration/coins-find-and-modify-result.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -521,6 +522,10 @@
         {"file": "services/coins/coins-service.js", "regex": "\\{ orderId, cancelRefund: true \\},\\s*\\{ note: `Refund for cancelled order \\$\\{orderId\\}` \\},\\s*\\{ note: `Earned coins removed due to cancelled order \\$\\{orderId\\}` \\},", "desc": "CORE invariant 19: the guard recognises the cancelRefund tag and the two legacy cancel notes, never type + orderId (amend writes those too)"},
         {"file": "services/coins/coins-service.js", "regex": "return \\{ success: true, alreadyRefunded: true, refundedCoins: 0, removedEarnedCoins: 0 \\};", "desc": "CORE invariant 19: a repeat cancel is a no-op success"},
         {"file": "test/integration/coins-refund-idempotent.js", "regex": "test\\(\"an amend's refund and expire rows do not block the later cancel\"", "desc": "CORE invariant 19: an amended order still gets its cancel refund"},
+        {"file": "services/coins/coins-service.js", "regex": "function unwrapFindAndModify\\(result\\) \\{\\s*if \\(result && Object\\.prototype\\.hasOwnProperty\\.call\\(result, \"value\"\\)\\) \\{\\s*return result\\.value;", "desc": "CORE invariant 19: customerCoins.findOneAndUpdate returns { value } on mongodb 3.7; value null = nothing matched"},
+        {"file": "services/coins/coins-service.js", "regex": "const doc = unwrapFindAndModify\\(result\\);\\s*if \\(!doc\\) \\{\\s*return \\{ success: false, error: 'Failed to redeem coins - balance changed' \\};", "desc": "CORE invariant 19: a redeem whose conditional deduct matched nothing is a failure"},
+        {"file": "services/coins/coins-service.js", "regex": "const CLAMP_NEGATIVE_BALANCE = false;", "desc": "CORE invariant 19: DECISION PENDING - the negative-balance clamp stays off (production behaviour)"},
+        {"file": "test/integration/coins-find-and-modify-result.js", "regex": "test\\(\"a redeem that loses the race to another redeem fails and deducts nothing\"", "desc": "CORE invariant 19: the lost-race redeem is pinned"},
         {"file": "routes/coins.js", "regex": "router\\.get\\(\"/api/admin/coins/store/:storeAppName/stats\", \\.\\.\\.COINS_ADMIN,", "desc": "CORE invariant 19: a store's coin totals are dashboard-only"},
         {"file": "routes/shoofi-admin.js", "regex": "const \\{ DASHBOARD_ROLES: COINS_SETTINGS_ROLES \\} = require\\(\"\\.\\./utils/analytics-access\"\\);\\s*const COINS_SETTINGS_ADMIN = \\[coinsSettingsAuth\\.required, coinsSettingsRoleCheck\\(COINS_SETTINGS_ROLES\\)\\];", "desc": "CORE invariant 19: the coin-settings gate is auth.required + every dashboard role, built inside the Coins Settings block"},
         {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/admin/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,[\\s\\S]*?router\\.post\\(\"/api/admin/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,", "desc": "CORE invariant 19: reading and flipping the platform-wide coins switch is dashboard-only"},

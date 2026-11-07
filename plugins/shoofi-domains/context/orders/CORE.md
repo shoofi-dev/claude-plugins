@@ -545,13 +545,36 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `refund` and `expire` rows with the same orderId, and an amended order must still get its
       cancel refund. **Reactivation re-redeems and re-earns nothing**, so after cancel →
       reactivate → cancel the coins stay refunded once. Re-applying them on reactivation is a
-      money decision for the owner, not something to add quietly. ⚠️ The negative-balance clamp after the
-      update (and the returned `newBalance`) reads `result.balance`, but mongodb 3.7 returns
-      `{ value }`. So the clamp never fires, which is why 3 prod wallets are negative
-      (`test/integration/coins-buckets.js`), and `newBalance` is always 0. The same applies in
-      `reconcileOrderCoins`. Reading is safe because `computeAvailableBalance` clamps at 0.
-      Making the clamp work changes what customers get back, so it is the owner's decision.
+      money decision for the owner, not something to add quietly.
       Tests: `test/integration/coins-refund-idempotent.js` (mongodb-memory-server).
+    - **`customerCoins.findOneAndUpdate` returns `{ value }`, and a redeem that matched nothing
+      is a FAILURE** (verified 2026-11-07 on shoofi-server@fix/HIGH-RISK-coins-refund-idempotent).
+      mongodb 3.7.4 wraps the document (`{ value, ok, lastErrorObject }`), honours
+      `returnDocument: 'after'`, and gives `value: null` when the filter matched nothing. All four
+      coin writers (`earnCoins`, `redeemCoins`, `refundCoins`, `reconcileOrderCoins`) read it
+      through `unwrapFindAndModify` (`services/coins/coins-service.js`). Never `result.balance`,
+      and never `result.value || result`, which hands back the truthy wrapper on `{ value: null }`.
+      - `redeemCoins` deducts with `balance: { $gte: coinsAmount }` in the filter. A balance that
+        moved under the request after the pre-read gives `value: null`, which is now
+        `{ success: false }` with nothing deducted. Before, the wrapper was truthy, so it reported
+        success. `reconcileOrderCoins` with no wallet is also `{ success: false }`.
+      - **What a redeem failure does to the order: nothing.** Every caller redeems AFTER the
+        charge and only logs CRITICAL on `success: false` (the "Awareness" note in Known status).
+        The callers are `redeemCoinsOnPaymentSuccess` and `finalizeApplePayOrder` in
+        `routes/order.js`, the cash twin in `routes/twin-order.js`, and the card twin in
+        `services/twin-order/twin-payment-service.js`. The order keeps the coins discount and its
+        `usedCoins`. A later cancel then refunds those coins through `refundCoins`, although they
+        were never deducted. Amend calls only `reconcileOrderCoins` and ignores its result.
+      - `newBalance` is the stored balance after the write. No client reads it.
+      - ⚠️ **DECISION PENDING: may a stored balance go negative?** The "never below zero" clamps in
+        `refundCoins` and `reconcileOrderCoins` read `result.balance`, so they never fired.
+        That is why 3 prod wallets are negative (`test/integration/coins-buckets.js`). They are
+        now gated on `CLAMP_NEGATIVE_BALANCE = false`, so behaviour is unchanged: a clawback can
+        leave the balance, and `newBalance`, negative. Reading is safe because
+        `computeAvailableBalance` clamps at 0. Turning the clamp on zeroes negative balances and
+        forgives clawed-back coins. That is the owner's call, made with the one constant.
+      Tests: `test/integration/coins-find-and-modify-result.js` (mongodb-memory-server; the
+      lost-race redeem, `newBalance` after each writer, and the two clamp-off pins).
     - Tests: `test/integration/coins-admin-auth.js` (static gate check on every route plus every
       `/api/admin/*` route in `routes/coins.js`, 401/403 matrix, every dashboard role on seven
       routes, master-only on expire, the audit entry, refused writes write nothing).
