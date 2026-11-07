@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -409,10 +409,14 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       `coupon-templates.js`, as its own change.
 
 14. **Who funds a GLOBAL coupon is decided by the store's share alone** — the admin coupons
-    list's `funder=shoofi|store|split` filter (`GET /api/admin/coupons`, plus `isActive=now` =
-    on AND within its dates) and each row's `funder`. Rule: `services/coupons/coupon-funder.js`
-    (`funderOf` for one coupon, `funderFilter` for the same rule as Mongo buckets,
-    `activeNowFilter`). **It is a display/filter rule, NOT a billing path.** Settlement never
+    list's `funder=shoofi|store|split` filter (`GET /api/admin/coupons`, plus the date-aware
+    statuses: `isActive=now` = on AND within its dates; `isActive=live` = on AND not over yet,
+    the list's default «פעילים» — a coupon that starts later stays, an expired one does not;
+    `isActive=expired` = on but past its end, «פג תוקף»; `true`/`false` stay the bare flag) and
+    each row's `funder`. Rule: `services/coupons/coupon-funder.js` (`funderOf` for one coupon,
+    `funderFilter` for the same rule as Mongo buckets, `activeNowFilter`, `liveFilter`,
+    `expiredFilter`). Prod 2026-11-07: 14,230 coupons switched on, 13,620 of them expired —
+    the bare flag listed them all under «פעילים». **It is a display/filter rule, NOT a billing path.** Settlement never
     calls it. It restates what `stores-export-new` already does, so if settlement changes,
     this file follows; never the other way round.
     - **Share:** `storePercent` out of 100 for `splitType: 'percentage'` (resolved per order by
@@ -439,8 +443,8 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       a value-0 tag coupon. A storePercent of 20 lands in `split`, 0 in `shoofi`, 100 in `store`
       — whatever the area fee turns out to be on each order.
     - **Dates:** `start`/`end` are strings with mixed +02:00/+03:00 offsets, so
-      `activeNowFilter` converts them with `$convert … onError: null` and never compares them
-      as text. Prod 2026-10-26, active now and global: 29 Shoofi, 5 store, 0 split.
+      `activeNowFilter`, `liveFilter` and `expiredFilter` convert them with `$convert … onError:
+      null` and never compare them as text (an unreadable `end` counts as not over). Prod 2026-10-26, active now and global: 29 Shoofi, 5 store, 0 split.
 
 15. **A FIXED DELIVERY PRICE coupon needs no settlement change, and must stay a percent split**
     (`type: 'delivery_price'`, `discountType: 'delivery'`, "משלוח ב-₪10"; shoofi-server

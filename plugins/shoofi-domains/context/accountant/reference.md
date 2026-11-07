@@ -150,8 +150,10 @@ This recipient rule is the STORE path only. Driver reports pick their recipients
   bears customer coupons (reimburses store), Shoofi comps, driver min-guarantee, drive-in cut;
   driver/company earns delivery+combo fees+bonuses+comps.
 - **Who funds a global coupon (display only)** — `services/coupons/coupon-funder.js`
-  (`funderOf`, `funderFilter`, `activeNowFilter`) backs the admin coupons list's
-  `GET /api/admin/coupons?funder=shoofi|store|split&isActive=now` (any other `funder` → 400).
+  (`funderOf`, `funderFilter`, `activeNowFilter`, `liveFilter`, `expiredFilter`) backs the admin
+  coupons list's `GET /api/admin/coupons?funder=shoofi|store|split&isActive=now|live|expired`
+  (any other `funder` → 400). `live` («פעילים», the default) = on and not over yet; `expired`
+  («פג תוקף») = on but past its end; `now` = on and within its dates.
   The store's share alone decides: `storePercent` for a percent split, otherwise
   `storeDiscount` vs `value`. It is a restatement of settlement, never an input to it
   (CORE invariant 14).

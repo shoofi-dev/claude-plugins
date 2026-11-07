@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -149,7 +149,9 @@
           "FUNDERS",
           "funderOf",
           "funderFilter",
-          "activeNowFilter"
+          "activeNowFilter",
+          "liveFilter",
+          "expiredFilter"
         ],
         "utils/coupon-discount.js": [
           "DELIVERY_PRICE_TYPE",
@@ -580,6 +582,11 @@
           "file": "routes/coupon.js",
           "regex": "if \\(req\\.query\\.isActive === 'now'\\) \\{[\\s\\S]{0,120}and\\.push\\(\\.\\.\\.activeNowFilter\\(\\)\\);",
           "desc": "CORE invariant 14: GET /api/admin/coupons isActive=now = switched on AND within its dates, via activeNowFilter"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "\\} else if \\(req\\.query\\.isActive === 'live'\\) \\{[\\s\\S]{0,140}and\\.push\\(\\.\\.\\.liveFilter\\(\\)\\);",
+          "desc": "CORE invariant 14: isActive=live («פעילים», the default) = switched on AND not over yet, via liveFilter — expired coupons never listed as active"
         },
         {
           "file": "routes/coupon.js",
