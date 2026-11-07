@@ -1046,8 +1046,12 @@ boundary and say so in the PR.
       raised for good. (The admin form loads `GET /api/store/get/:appName`, raw.) Every ready range
       the customer app shows reads `storeData.minReady/maxReady` (+ the delivery area's
       `minETA/maxETA`), and the order snapshot's `storeData.maxReady` drives the order timer, so the
-      raised range needs no app change. **Not covered:** twin orders compute `twinPrepRange` in
-      `routes/twin-order.js` from the raw store docs (orders domain), without the extra minutes.
+      raised range needs no app change. **Twin orders** (orders domain, `routes/twin-order.js`)
+      read the per-store docs raw and add the extra minutes themselves: `/quote`'s
+      `twinPrepRange` adds each side's `activePrepExtraMinutes` to that side's range, and
+      `/place` + `/digital-place-pending` embed `withPrepExtraReadyRange(store)` as each order's
+      `storeData` (orders reference §4). Twin dispatch sequencing (`avgPrepTime`) is a measured
+      average and does not include them.
     - **Expiry is a cron, not a read check in every reader.** `isBusy` is read raw by explore
       ranking (and its cache), twin eligibility, For you `open-stores.js`, the public coupon page,
       the store-status report and `RestaurantAvailabilityService`. The cron clears the stored flag
