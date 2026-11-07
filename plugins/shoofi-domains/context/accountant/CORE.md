@@ -297,7 +297,14 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       reports the lock recomputes it from the store's CURRENT openHours.
     Not covered: `services/payments/cancel-compensation.js` inserts compensations
     automatically (createdAt = now) without the lock — it can only collide with a report
-    generated for a period that has not ended.
+    generated for a period that has not ended. Since 2026-11-07 it also issues the ONE coupon of a
+    twin keep decision (`scope: "twin"`, `twinGroupId` + `cancelDecisionKey` on the row,
+    `payingParty: "shoofi"`, existing coupon shape, amount = the dropped leg's total − shipping +
+    combination fee or what is left of the charge — never `orderPrice`). The money API's
+    keep → refund change (`POST /api/money/change-decision`) switches the COUPON off
+    (`isActive: false`) and moves its unused balance to owed in the charge ledger (orders CORE
+    invariant 22) — it does NOT edit the compensation row, so this lock and every report are
+    unaffected (the row keeps the full approved amount; the ledger says how much was spent).
 
 11. **A store promotion is store-funded and needs no coupon branch** (`order.promotions`,
     shoofi-server `docs/promotions.md`). Never look for it in `appliedCoupon`.

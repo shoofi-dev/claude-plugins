@@ -148,6 +148,37 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.
+12. **A cancel's `cancelMoneyDecision` is `keep` | `refund` | `undecided`, and an undecided
+   settled charge is FLAGGED, never refunded** (shoofi-server `fix/twin-cancel-safety`,
+   2026-11-06; full rules in orders CORE invariant 21). `undecided` is stamped on a cancel that
+   arrived with no decision on an order with money at stake (it used to read `refund`). For a
+   single order charged outright (no `paymentAuth`), the order route writes the same flag
+   fields as `refundOrderPayment` with **`paymentAuth.refundRequiredReason:
+   "cancel_no_decision"`** and `refundRequiredAmount = order.total`; `order-authorization.js`
+   is unchanged — a J5 hold is still released by `releaseOrderAuthorization` (a captured one
+   flagged `captured_before_cancel`), and `refundOrderPayment` still runs only on an explicit
+   `refund`. Twin legs get no per-order flag (`refund_twin_order_manual` stays the explicit-refund
+   answer). A cancel is settled once: a second cancel records `cancelSettlementSkipped` instead.
+   Readers: admin `charge-state.ts` (badge), HQ money audit (`cancelled-not-refunded`,
+   `uncancel-leftovers`).
+   **Since 2026-11-07 every cancel is also recorded in the charge's money ledger** (orders CORE
+   invariant 22, `services/money/*`): `refunded + compensated + owed ≤ captured` is enforced on
+   every write. What touches money-in code: (a) `applyCaptureSuccess` (twin) records
+   `group.capturedAmount` = `computeCombinedTotal` + a ledger `capture` entry, best-effort after
+   the capture; (b) **HYP twin partial refunds** (`attemptHypTwinRefund` → `utils/hyp-pay`
+   `refundTransaction`, `zikoyAPI`) run only with `twinOrderConfig.hypAutoRefund` (default
+   **false**): a `refund_unknown` slot is written BEFORE the call, the amount is capped by the
+   ledger, one attempt per decision, never retried, and a thrown call stays in doubt for
+   `POST /api/money/resolve-unknown`. HYP's sandbox (2026-11-06, test masof 0010332520) approved
+   an over-refund (₪6 on ₪3) and every duplicate, so these guards are the only ones. (c) **ZCredit
+   is never refunded automatically** — `degradeAutoRefund` is no longer read and
+   `refundPartial` is not called; finance records portal refunds with
+   `POST /api/money/record-refund`, which on a single order also clears
+   `paymentAuth.refundRequired` once nothing is owed and adds `paymentAuth.refundedAmount`.
+   (d) `createCancelCompensation` takes `scope: "twin"` + an explicit `amount` + `decisionKey`
+   (idempotent: a compensation row with that `cancelDecisionKey` is reused) — one Shoofi-funded
+   `COMP-<primary originalOrderId>[-n]` per twin decision; per-side calls still refuse twins.
+   Invoices are untouched.
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
