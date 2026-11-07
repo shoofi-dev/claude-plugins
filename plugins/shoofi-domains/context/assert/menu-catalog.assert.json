@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 misheard dish name, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@fix/pizza-free-topping-count (#479) + shoofi-app@design/round-2 b581604 (reference §4 free pizza-topping slots) / 2026-11-07; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 misheard dish name, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -891,8 +891,8 @@
         },
         {
           "file": "utils/order-pricing.js",
-          "regex": "if \\(isFree \\|\\| remainingFreeCount > 0\\)",
-          "desc": "doc reference §4: an isFree-stamped topping is free WITHOUT decrementing remainingFreeCount, so freeCount: N gives away up to 2N. If this line changes, the defect note in reference §4 must be re-checked."
+          "regex": "function freePizzaToppings\\(extras, selections\\)|if \\(isFree \\|\\| remainingFreeCount > 0\\)",
+          "desc": "doc reference §4: freePizzaToppings decides the free toppings per group before pricing (flagged first, then unflagged in menu order, slots never below 0) — freeCount: N gives away at most N. The second alternative is the pre-fix line on main; drop it once shoofi-server#479 has merged."
         },
         {
           "file": "utils/order-pricing.js",
@@ -3080,6 +3080,11 @@
           "file": "screens/for-you/ForYouScreen.tsx",
           "regex": "const feedbackOn = !!userDetailsStore\\?\\.userDetails\\?\\.isShoofiEmployee;",
           "desc": "doc CORE invariant 22: For you quality — the testing team's flag — only employees see «مش مزبوط؟»"
+        },
+        {
+          "file": "stores/extras/index.ts",
+          "regex": "const freePizzaToppings = \\(extras, selections\\) =>|if \\(isFree \\|\\| remainingFreeCount > 0\\)",
+          "desc": "doc reference §4: the app's copy of the server's freePizzaToppings (same semantics, keep in lockstep). The second alternative is the pre-fix line on main; drop it once shoofi-app#87 has merged."
         }
       ]
     },

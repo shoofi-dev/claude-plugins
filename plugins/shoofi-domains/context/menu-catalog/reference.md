@@ -475,15 +475,30 @@ copy as a guard (`shoofi-app/helpers/extras-normalize.ts`). Any bulk tool writin
 a non-empty `options[].id`; `areaOptions[].id` is a fixed vocabulary and is out of that script's
 scope.
 
-⚠️ **`freeCount` is honoured twice — `freeCount: N` gives away up to 2N toppings.** The
-client stamps `isFree: true` on the first N toppings it sees selected and sends that on the
-selection; `calculateExtrasPrice` then skips the charge for an `isFree` topping **without
-decrementing its own `remainingFreeCount`** (the decrement sits inside `if (!isFree)`), so the
-counter gives away N more. The three pricers agree with each other, so the shadow-pricing
-drift alarm stays silent and the customer is charged exactly what they were shown — this is a
-store-revenue leak, not a client/server disagreement. Not yet fixed: it is a shared change
-across `shoofi-server`, `shoofi-app` and `shoofi-partner` and needs its own PR. **Any bulk
-tool writing extras should emit `freeCount: 0`** until it is.
+**Free pizza toppings — `freeCount: N` gives away at most N toppings per group.** A group
+header's `freeCount` is ONE allowance shared by every `pizza-topping` extra under that header
+(stores often model each topping as its own extra under one header). Before pricing,
+`freePizzaToppings(extras, selections)` decides the free set per group, with one running count
+that never goes below 0:
+1. toppings the client flagged `isFree: true` claim slots first;
+2. unflagged toppings take whatever slots remain, in menu order;
+3. everything else is charged its area price (else `topping.price`, the area-0 fall-through
+   above) — including a flagged topping once the allowance is spent, so flagging cannot buy
+   extra free toppings.
+
+A topping with no price spends no slot; an extra with no `groupId`, or a group with no header,
+has no allowance. The same function, same semantics, lives in three pricers that must stay in
+lockstep: `shoofi-server/utils/order-pricing.js` (shadow-prices order creation, prices the
+amend flow for real), `shoofi-app/stores/extras/index.ts` and `shoofi-partner/stores/extras/index.ts`.
+In a group with a header, the customer app also **re-stamps** every topping's `isFree` on each change
+(`components/extras-controls/ExtrasSection.tsx`, the `PizzaToppingGroup` `onChange`): the first
+`freeCount` picked toppings in menu order are flagged, the rest unflagged — the same rule the
+"free" badges use — so after a deselect/reselect the topping showing "+₪" is the one charged.
+History: until shoofi-server #479 / shoofi-partner #46 / shoofi-app #87 (2026-11) a flagged
+topping was free without spending a slot (the decrement sat inside `if (!isFree)`), so
+`freeCount: N` gave away up to 2N; all three pricers agreed, so the shadow drift alarm stayed
+silent. Prod estimate 2026-11-07: only anwar-alqods sold such products, ₪6 undercharged over 3
+orders (lower bound).
 
 **By-weight products** carry `product.soldByWeight: true` (whitelisted on create/update/
 create-from-mock, projected by every menu `$project`). The flag chooses the client UI (per-kg
