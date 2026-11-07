@@ -682,6 +682,17 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   compute is the `10→4` arm above. The list tabs are `1`, `2` (+`3`), `10` (+`11`), `14` and `15`
   (`list/index.v2.tsx` ~3936-4184; the `3` tab is commented out), so a `4`/`5` order is never
   listed. Cancel/reject happens outside the partner app (admin `order/update`, C4).
+- **`14` → `1` (future order release) is the partner app's own poll, not a server cron.**
+  `components/global/FutureOrderReminderGlobal.tsx` polls `GET /api/order/future-orders-ready`
+  every 2 min while the app is open; its "ابدأ التحضير" calls `POST /api/order/start-preparing`
+  (only from `14`). `utils/crons/future-order-reminder.js` (push + `future_order_start_preparing`
+  frame) exists but its start is commented out in `app.js` (~54, ~790), so nothing reminds a
+  store whose app is closed. The `14` order never moves by itself.
+- **The v3 tablet board** (`components/orders-v3/OrdersBoardV3.tsx`, shoofi-partner #50, flag
+  `ORDERS_BOARD_V3`) has columns for `1`, `2`+`3`, `10`+`11` only; `14`/`15` are listed in a
+  "مجدولة" section under the new column (one extra fetch with the same endpoint, statuses from
+  `visibleTabs`). A drive-in card shows "الزبون برّا" while `driveInArrival.arrivedAt` is set
+  and the order is not picked up (#51); the list refetches on the `drive_in_arrival` frame.
 
 ## C4. shoofi-delivery-web — the ADMIN dashboard (React web)
 Role: oversight — list/monitor, manual intervention, fraud queue, **twin group admin**, config.
