@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@fix/HIGH-RISK-backfill-invoices-by-documentid / 2026-11-06 (Known status: missing customer invoice PDF by DocumentID; public-read call sites re-counted); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -821,13 +821,16 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
 - **Awareness:** MASAV is **decoupled** from the reports — payout amounts are re-keyed into an
   Excel by a human; there is no automated report→MASAV link. Hardcoded GreenInvoice
   `businessId`/`itemId` constants exist.
-- **Awareness — a report PDF on Spaces is published, not protected.** All **8**
-  `PutObjectCommand` call sites in this repo pass `ACL: "public-read"`, with no exception:
-  `routes/payments/admin-reports.js:239` (store settlement), `routes/driver-reports.js:687`
-  (courier settlement), `utils/invoice-mail.js:123` (the customer invoice PDF),
-  `backfill-invoices.js:193` (the bulk variant — one run republishes every historical
-  invoice), `utils/images-service.js:36`, `utils/image-variants.js:127`,
-  `routes/product.js:113` and `services/social-posts/render-service.js:204`. Counting by
+- **Awareness — a report PDF on Spaces is published, not protected.** All **11**
+  `PutObjectCommand` call sites in this repo pass `ACL: "public-read"`, with no exception
+  (re-counted 2026-11-06; line numbers approximate):
+  `routes/payments/admin-reports.js` (store settlement), `routes/driver-reports.js`
+  (courier settlement), `utils/invoice-mail.js` (the customer invoice PDF),
+  `backfill-invoices.js` (the bulk variant — one run republishes every historical
+  invoice), the data change `data-changes/2026-11-06-backfill-customer-invoice-pdfs-by-document-id.js`
+  (`liveClients`, the DocumentID backfill below), `utils/images-service.js`, `utils/image-variants.js`,
+  `routes/product.js`, `services/social-posts/render-service.js` and the two in
+  `utils/extras-icons/spaces.js` (the icon map and each icon). Counting by
   grep overshoots: `routes/payments.js:14`, `routes/payments/admin.js:14` and
   `routes/payments/summaries.js:14` **import** `PutObjectCommand` and never call it — dead
   imports from the `payments.js` split. The URL handed back to the admin —
@@ -864,6 +867,30 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
   `:706` with `Cache-Control: private`) and `routes/team-tasks.js:752` both do this — and cap
   one file per document well under the 16MB BSON limit, the way
   `services/ai-tasks/constants.js:180` pins `MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024`.
+- **Awareness — a missing customer invoice PDF is found by DocumentID, not docId** (HQ #d20b39,
+  2026-11-06; `services/payments/customer-invoice-backfill.js` + the data change above). The
+  per-order receipt itself is `payments`' territory; this is the backfill.
+  - ZCredit returns the number as `ccPaymentRefData.data.ZCreditInvoiceReceiptResponse.DocumentID`
+    (and on some older orders also at `ccPaymentRefData.ZCreditInvoiceReceiptResponse.DocumentID`).
+    `routes/order.js` copies it into `ccPaymentRefData.docId` **only when the first Gmail fetch
+    fails**. An order whose fetch never finished has DocumentID only, and so does **every
+    ZCredit twin leg**: `applyCaptureSuccess` (`services/twin-order/twin-payment-service.js`)
+    writes the charge onto both orders and never fetches the PDF. `backfill-invoices.js` selects
+    on docId and misses them all.
+  - Prod 2026-11-06, all 262 `shoofi.stores` walked (hidden included): **437** DocumentID-only
+    orders in 85 stores (newest 2026-08-10), plus 64 docId orders = 501 orders, 296 documents,
+    93 stores (25 hidden). **410** of the 437 are twin legs: 205 numbers, each held by exactly
+    two orders of ONE twin group with ONE ZCredit ReferenceNumber (e.g. GCP 1263-0971 + cacao
+    5936-2669 = 40986). **0** numbers are shared by unrelated orders, platform-wide.
+  - A twin's number is ONE document covering both legs, so the shared key
+    `invoices/doc-<id>.pdf` is right for both: fetch once, link both. Anything else sharing a
+    number is a collision and is skipped — the Gmail search is `subject:<id>` and cannot say
+    whose email it is, so a per-order key would only store a possibly wrong PDF under a new name.
+  - DocumentID is a number on all 437 (code also accepts a string). **`DocumentID: 0` means ZCredit
+    failed to issue the document** (KBC 0412-2292, `ReturnCode -86 "Error signing pdf document 1"`);
+    it is never fetched. The ticket's 438 counted that one.
+  - All ZCredit document numbers come from ONE terminal: `processCreditCardPayment` reads
+    `shoofi.store {id:1}.credentials`, not a per-store terminal.
 
 ## Recipe — change a payout or invoice amount
 1. **Trace the money first**: who collected (cash/card) → who is owed → which formula line.

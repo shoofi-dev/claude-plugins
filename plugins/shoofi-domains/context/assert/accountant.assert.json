@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-backfill-invoices-by-documentid / 2026-11-06 (Known status: missing customer invoice PDF by DocumentID; public-read call sites re-counted); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -43,7 +43,9 @@
         "utils/email-validation.js",
         "docs/invoice-step-tracking.md",
         "services/invoicing/company-invoice-precheck.js",
-        "services/invoicing/company-precheck-runner.js"
+        "services/invoicing/company-precheck-runner.js",
+        "services/payments/customer-invoice-backfill.js",
+        "data-changes/2026-11-06-backfill-customer-invoice-pdfs-by-document-id.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -1128,6 +1130,26 @@
           "file": "services/database/DatabaseInitializationService.js",
           "regex": "db\\.storeReports\\.createIndex\\(\\{ 'dateRange\\.endDate': 1, 'dateRange\\.startDate': 1 \\}|db\\.storeReports = db\\.collection\\('store-reports'\\);",
           "desc": "reference §8: the store-report period index (shoofi DB only, fire-and-forget)"
+        },
+        {
+          "file": "services/payments/customer-invoice-backfill.js",
+          "regex": "\"ccPaymentRefData\\.data\\.ZCreditInvoiceReceiptResponse\\.DocumentID\",\\s*[\\r\\n]+\\s*\"ccPaymentRefData\\.ZCreditInvoiceReceiptResponse\\.DocumentID\",",
+          "desc": "Known status: a missing invoice PDF is found by DocumentID at both ZCredit paths, not by docId alone"
+        },
+        {
+          "file": "services/payments/customer-invoice-backfill.js",
+          "regex": "const oneTwinCharge = twinGroups\\.size === 1 && !twinGroups\\.has\\(null\\) && refs\\.size <= 1;",
+          "desc": "Known status: a shared number is ONE document only for one twin group with one ZCredit ReferenceNumber; anything else is a skipped collision"
+        },
+        {
+          "file": "data-changes/2026-11-06-backfill-customer-invoice-pdfs-by-document-id.js",
+          "regex": "ACL: \"public-read\"",
+          "desc": "Known status: the 11 public-read PutObjectCommand call sites include the DocumentID backfill data change"
+        },
+        {
+          "file": "utils/extras-icons/spaces.js",
+          "regex": "ACL: \"public-read\"",
+          "desc": "Known status: the extras-icon uploads are public-read too (two of the 11 call sites)"
         }
       ]
     },
