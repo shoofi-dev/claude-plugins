@@ -652,9 +652,23 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     does nothing.
   - Until 2026-11-07 taps ran for multi-store owners only, so a single-store tablet opened
     on the dashboard (found on a real iPad testing shoofi-partner#48).
-  - A cold start uses `getLastNotificationResponseAsync`, once per process. The response is
-    deduped by `notificationResponseKey`, and the navigation waits up to ~5s for the
-    navigator.
+  - **A cold-start tap must outlast the app's own startup redirect.** `screens/home/home.tsx`
+    (`goToAdminDashboard`, the initial `homeScreen` tab) runs
+    `setTimeout(() => navigate("admin-dashboard"), 0)` on mount and on every
+    `storeData.id` change, for every `isAdmin(ROLES.all)` user. The launch tap
+    (`getLastNotificationResponseAsync`, once per JS context, deduped by
+    `notificationResponseKey`) is read at the same moment, and a direct navigate lost
+    that race on a real iPad.
+    - So a tap only leaves an intent (`requestNewOrdersFromTap`,
+      `utils/notification-tap-intent.ts`). `takeTapIntent` acts on it once the navigator is
+      ready AND the home screen has called `markStartupRedirectDone`. The list then opens
+      on top of the dashboard.
+    - The intent is consumed once, and an intent older than 60s is dropped.
+    - Any new navigation the app makes on its own at startup must flush the intent the
+      same way, or it will override a tap again.
+  - Multi-store `goToStore` (switch store, then open the list) still navigates directly.
+    Its race with the same redirect, which a store switch re-triggers through
+    `storeData.id`, has not been verified on a device.
   - The component sits behind `hideHHeaderScreens`, so a tap while the menu or cart screen
     is open is not routed.
 - ⚠️ **Never seed that ledger on the badge-refresh path — it silences the alarm entirely.**

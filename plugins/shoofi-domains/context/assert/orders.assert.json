@@ -654,6 +654,8 @@
         "utils/__tests__/new-order-alarm.test.ts",
         "utils/cross-store-alerts.ts",
         "components/global/CrossStoreOrdersGlobal.tsx",
+        "utils/notification-tap-intent.ts",
+        "screens/home/home.tsx",
         "App.tsx",
         "helpers/printer/print.ts",
         "helpers/printer/index.ts",
@@ -673,6 +675,12 @@
           "takeNewOrders",
           "takeNewOrdersOnRefresh",
           "seedSeen"
+        ],
+        "utils/notification-tap-intent.ts": [
+          "decideTapIntent",
+          "requestNewOrdersFromTap",
+          "markStartupRedirectDone",
+          "takeTapIntent"
         ],
         "utils/cross-store-alerts.ts": [
           "decideNotificationTap",
@@ -733,6 +741,11 @@
           "file": "utils/new-order-alarm.ts",
           "regex": "serverReminderCount: 5,\\s*serverReminderIntervalMs: 60 \\* 1000,\\s*halfwayOffsetMs: 30 \\* 1000,\\s*urgentIntervalMs: 25 \\* 1000,\\s*urgentWindowMs: 10 \\* 60 \\* 1000,\\s*reminderIntervalMs: 5 \\* 60 \\* 1000,\\s*hardStopMs: 60 \\* 60 \\* 1000,",
           "desc": "ref C3: the repeating new-order alarm rings once a minute at :30 while the server's 5 on-the-minute reminders run, then every 25s to 10 minutes, then every 5 minutes, hard stop 1 hour after the cycle started (product decision 2026-11-07, revised at review). serverReminderCount/serverReminderIntervalMs mirror MAX_REMINDERS/REMINDER_INTERVAL_MS in shoofi-server utils/persistent-alerts.js - change them together"
+        },
+        {
+          "file": "screens/home/home.tsx",
+          "regex": "navigation\\.navigate\\(\"admin-dashboard\"\\);[\\s\\S]{0,400}?markStartupRedirectDone\\(\\);\\s*const tapRoute = takeTapIntent\\(",
+          "desc": "ref C3: the startup redirect to the dashboard flushes a pending notification-tap intent right after it, so a cold-start tap opens the new-orders list on top instead of being overridden (real iPad, 2026-11-07)"
         },
         {
           "file": "components/global/CrossStoreOrdersGlobal.tsx",
