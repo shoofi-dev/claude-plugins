@@ -248,7 +248,7 @@
         },
         {
           "file": "routes/order.js",
-          "regex": "if \\(CANCEL_STATUSES\\.includes\\(updateobj\\?\\.status\\) && order\\.order\\.receipt_method === \"DELIVERY\"\\)[\\s\\S]{0,1200}?String\\(deliveryRecord\\.status\\) !== DELIVERY_STATUS\\.CANCELLED_BY_ADMIN",
+          "regex": "if \\(isCancelStatus\\(updateobj\\?\\.status\\) && order\\.order\\.receipt_method === \"DELIVERY\"\\)[\\s\\S]{0,1200}?String\\(deliveryRecord\\.status\\) !== DELIVERY_STATUS\\.CANCELLED_BY_ADMIN",
           "desc": "CORE invariant 2: order/update cancels the bookDelivery for every cancel code (incl. 5 and 9) and skips one already at -3"
         },
         {
