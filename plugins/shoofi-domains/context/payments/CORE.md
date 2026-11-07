@@ -148,6 +148,15 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.
+12. **Background invoice work scheduled before the insert must await the inserted `_id`.**
+   In `/api/order/create` (`routes/order.js`), `let orderId = 0` is assigned only after
+   `db.orders.insertOne`. The ZCredit Apple Pay `GetSessionStatus` and HYP hosted-page
+   `setImmediate` callbacks are scheduled *before* the insert, and the handler awaits I/O in
+   between, so they run first. `getId(0)` (`lib/common.js`) silently returns a fresh ObjectId
+   that matches nothing, and the invoice `url`/`invoiceStatus` is lost without an error.
+   Await `awaitInsertedOrderId(...)` instead. It resolves right after `insertOne`, and with
+   `null` from the handler's `finally`, which then logs and skips the update. Callbacks
+   scheduled after the insert (ZCredit card, HYP_TOKEN, wallets) already have a real id.
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
