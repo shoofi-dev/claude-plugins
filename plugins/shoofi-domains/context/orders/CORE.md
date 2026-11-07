@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/HIGH-RISK-block-cancelled-to-active + shoofi-delivery-web@fix/HIGH-RISK-block-cancelled-to-active / 2026-11-06 (invariant 2: cancelled never back to active); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -53,8 +53,18 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    helper's `inferred` taste cache), and the AI helper's `deliveredOrders` counts COMPLETED
    statuses, not courier deliveries (reference §5).
 2. **Transition guards:** PENDING(`6`) only from FRAUD_REVIEW; store-accept rejects
-   already-cancelled; `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
-   not `order/update`.
+   already-cancelled (`4/7/8/9` only, by strict string compare: REJECTED `5` and a numeric
+   status get through); `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
+   not `order/update`. **A cancelled/rejected order (`4/5/7/8/9`) never goes back to
+   `1/2/3` via `order/update`:** 400 `CANCELLED_ORDER_CANNOT_REACTIVATE`
+   (`{message, code, currentStatus}`, the PENDING rule's shape), decided by
+   `isCancelledToActiveTransition` with `String()` on both sides, BEFORE the cancel-money
+   settlement and the write. The cancel already restored stock, refunded coins, released
+   coupon/promotion usage and the card hold, cancelled the delivery and cascaded the twin, and
+   nothing redoes that on the way back. Cancel to another cancel code stays allowed. The admin
+   web's status modal hides `1/2/3` for those orders (`statusOptionsFor`,
+   `order-actions/status-options.ts`). NOT covered: `order/update/all` writes `status:"1"`
+   on any `_id` with no status check, and targets `10/11/12/14/15` are not blocked.
 3. **Stock idempotency:** `decrementOrderStock`/`restoreOrderStock` gated on
    `stockDecremented && !stockRestored` + `store.isStockManagment`. Decrement **only** on
    confirmation — a failed charge must never consume stock.

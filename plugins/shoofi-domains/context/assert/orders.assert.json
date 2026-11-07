@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-block-cancelled-to-active + shoofi-delivery-web@fix/HIGH-RISK-block-cancelled-to-active / 2026-11-06 (CORE invariant 2: cancelled never back to active); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -50,7 +50,8 @@
         "services/orders/admin-access.js",
         "test/integration/orders-admin-auth.js",
         "routes/coins.js",
-        "test/integration/coins-admin-auth.js"
+        "test/integration/coins-admin-auth.js",
+        "test/integration/order-update-cancelled-cannot-reactivate.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -219,6 +220,16 @@
           "file": "routes/order.js",
           "regex": "/api/order/update/viewd",
           "desc": "store-accept endpoint (6->1 transition)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(isCancelledToActiveTransition\\(oldStatus, updateobj\\?\\.status\\)\\) \\{\\s*return res\\.status\\(400\\)\\.json\\(\\{[\\s\\S]{0,120}?code: \"CANCELLED_ORDER_CANNOT_REACTIVATE\"[\\s\\S]*?settleCancelledOrderMoney\\(\\{",
+          "desc": "CORE invariant 2: order/update refuses cancelled (4/5/7/8/9) -> active (1/2/3) with 400 CANCELLED_ORDER_CANNOT_REACTIVATE, BEFORE the cancel-money settlement and the status write"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "CANCEL_STATUSES\\.includes\\(String\\(fromStatus\\)\\) &&\\s*REACTIVATION_TARGET_STATUSES\\.includes\\(String\\(toStatus\\)\\)",
+          "desc": "CORE invariant 2: the reactivation guard String()-normalises both sides (numeric statuses exist in prod)"
         },
         {
           "file": "routes/order.js",
@@ -790,6 +801,19 @@
         {"file": "utils/http-interceptor/index.ts", "regex": "config\\.headers\\[\"Authorization\"\\] = \"Token \" \\+ token;[\\s\\S]{0,600}?config\\.headers\\[\"app-type\"\\] = \"shoofi-partner\";", "desc": "ref C3: partner requests send Token auth + app-type shoofi-partner (what storeMemberGate keys on)"},
         {"file": "utils/http-interceptor/index.ts", "regex": "if \\(error\\?\\.message\\?\\.includes\\(\"401\"\\)\\) \\{\\s*DeviceEventEmitter\\.emit\\(`OPEN_GENERAL_SERVER_ERROR_DIALOG`, \\{\\s*show: true,\\s*isSignOut: true,", "desc": "CORE invariant 18: any 401 signs the store out (resetAppState + restart) - a partner-polled route must never 401 a logged-in terminal"},
         {"file": "stores/orders/index.tsx", "regex": "const storeDB = await AsyncStorage\\.getItem\\(\"@storage_storeDB\"\\);\\s*return axiosInstance\\s*\\.get\\(api, \\{\\s*headers: \\{\\s*\"app-name\": storeDB,", "desc": "CORE invariant 18: the feed's app-name is @storage_storeDB (the token's store or a membership) - what storeMemberGate accepts"}
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/components/Cards/order-actions/status-options.ts",
+        "src/components/Cards/order-actions/__tests__/status-options.test.ts"
+      ],
+      "patterns": [
+        {
+          "file": "src/components/Cards/order-actions/useOrderActions.tsx",
+          "regex": "statusOptionsFor\\(order\\.status\\)\\.map\\(",
+          "desc": "CORE invariant 2: the order card's status modal lists statusOptionsFor(order.status), which never offers a cancelled/rejected order 1/2/3"
+        }
       ]
     }
   }
