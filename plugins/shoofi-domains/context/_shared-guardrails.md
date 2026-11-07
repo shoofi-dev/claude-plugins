@@ -106,6 +106,19 @@ step in a note. Open `{"op": "open", "work": "person", "title", "steps", "fix"}`
 says who does what in plain Hebrew; it waits for the owner in צריך אותך, and your ticket stays
 open until the owner marks it done.
 
+### An HQ code ticket may be fixed already — check main first
+The owner fixes things by hand too, outside the tickets, and the code queue can be days long (on
+2026-11-07, 56 of 58 open code tickets had never started). So a code run on an HQ ticket starts
+by fetching the repo and checking on the **current main** that the problem is still there (the code
+the ticket names, the recent commits that touched it). Fixed already → change nothing, open no
+branch and no PR, and close it: `{"op": "status", "status": "completed", "fixedBy": "<PR, commit
+or file:line>", "note": "כבר תוקן ב-main: …"}`. The board shows it as "כבר תוקן" with what fixed it.
+Two more ways a ticket learns it was fixed (shoofi-server `docs/hq.md`, *Fixed already*): the
+owner's "בדוק מה כבר טופל" sends a board's open work to its head to check the same way, and a merged
+PR into main whose title or body says `HQ #<ref>` closes that ticket by itself. So write `HQ #<ref>`
+only for a ticket the PR really fixes, and never in a docs PR's description as if it fixed one
+(docs PRs are skipped anyway).
+
 ### A new queue that waits for a human must reach HQ
 The owner sees what waits for them in one place: the admin's **Office HQ → צריך אותך**
 (shoofi-server `docs/hq.md`), built from one read-only source per queue in
