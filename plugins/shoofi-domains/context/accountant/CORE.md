@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@feat/code-coupons-filter + shoofi-delivery-web@feat/code-coupons-filter / 2026-11-07 (invariant 14 code coupons out of funder buckets, kind=code, ref); shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@feat/code-coupons-filter + shoofi-delivery-web@feat/code-coupons-filter / 2026-11-07 (invariant 14 code coupons out of funder buckets, kind=code, ref); shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -744,7 +744,35 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       (`getTaxMinistryAllocationNumber`). Never reset + re-create: `reset-invoice` does not cancel at
       the provider (Known status), so that issues a duplicate tax invoice. EZcount's ignoreApproval /
       addApprovalNumber / furtherObjection / cancel stay manual human decisions and are not exposed.
-    - `send-tax-url` stamps `taxUrlSentAt` only on a real send; every attempt is in `hyp.taxUrlSendLog`.
+    - **The owner's consent is EZcount's 3-month OAuth grant, not the שופי שופינג permission**
+      (2026-11-07, shoofi-server `services/invoicing/tax-consent.js`, `routes/tax-consent.js`, `docs/invoice-step-tracking.md`
+      "The consent: status, message and send log"). Owners and accountants see a separate, year-long
+      representative permission to שופי שופינג בע"מ in the Tax Authority portal and read it as "approved"
+      (shawerma-alarz: "פעיל" there, EZcount's `maxConsentDate` 2026-10-05). Only EZcount's consent allows
+      an allocation number. Every admin surface names it "אישור EZcount ברשות המסים — מתחדש כל 3 חודשים"
+      and says it is not the other one. Only the file's owner (ID = file number), someone authorised
+      for a company, or an authorised accountant can approve. The message names an individual's file
+      by its last 3 digits only (`******846`, between U+200E marks so an RTL line does not show it as
+      `846******`); a company number is shown in full.
+    - **One send path, one log.** `send-tax-url` (store + company), both bulk sends and the renewal
+      reminder go through `sendConsentMessage`; the admin's "העתק הודעה עם הוראות"
+      (`POST …/tax-consent/message`) logs a `copy`. Every attempt is one `hyp.taxUrlSendLog` entry
+      (last 100: who, when, channel, phone, ok from the provider's real answer, stage, template, messageId,
+      period); `taxUrlSentAt` only on a real send, never on a copy. Never add a send path that bypasses it.
+      The WhatsApp template is `tax-consent-settings.whatsappTemplate` (unset = the legacy two-parameter
+      `tax_authority_approval`; a configured name must contain `tax_authority_approval`, which is how
+      `utils/whatsapp.js` picks the partner channel and Arabic).
+    - **"בדוק עכשיו מול EZcount"** (`POST …/tax-consent/check`) drops the one-minute distributor cache,
+      re-reads, and stores the copy with `checkedAt`/`checkedBy`. A check that reaches no EZcount source
+      keeps the last good copy (`hyp.taxAuthorityLastCheckError` instead) — it never turns "valid" into
+      "unknown".
+    - **The renewal reminder messages real owners, so it is OFF by default**
+      (`tax-consent-settings{_id:"settings"}.remindersEnabled`, master-only PUT). Daily 10:00 Israel:
+      ≤ 14 days before `maxConsentDate`, then once on expiry (within 7 days). Dedupe: one successful send
+      per consent period (`maxConsentDate`) per stage. It sends nothing when the live distributor list is
+      unavailable, skips exempt issuers and hidden stores, and sends one message per shared account and phone.
+      Dry run: `GET /api/hyp/admin/tax-consent/reminders/preview`. Never turn it on in code or a migration —
+      an owner flips it. Tests: shoofi-server `test/integration/tax-consent.js`.
     - **Delivery companies get the same (2026-11-06).** A company issues invoice 1 (אשראי) and invoice 2
       (תוספות) to Shoofi from ITS OWN EZcount account (`createInvoiceOnBehalf`, company `api_key`), so the
       allocation rule applies per document: `create-company-invoice` runs `evaluateCompanyInvoicePrecheck`
