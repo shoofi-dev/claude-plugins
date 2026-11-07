@@ -274,6 +274,9 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   spacing**; that trade-off is a product call. Note the observable cadence is the same
   one the dead filter used to produce by accident (below) — the difference is that it is
   now explicit, pinned, and no longer an artefact of the cron period.
+  **The server's silence after minute 5 is no longer the whole story on the tablet.** Since
+  2026-11-07 the partner app repeats the alarm itself, from local notifications, while the
+  order waits (C3, "The new-order alarm repeats"). The server cadence above is unchanged.
   ⚠️ **The cutoff is deliberately not round.** `REMINDER_TICK_SKEW_MS = 5 * 1000`, and
   the query builds `cutoff` from `REMINDER_CUTOFF_AGE_MS` (= interval − skew), never
   `now - REMINDER_INTERVAL_MS`. Since the interval now *equals* the cron period, a flat
@@ -567,7 +570,8 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     "printer-testPrint"` (and `error.outcome` since 2026-10-29). `customerId` there is the
     `shoofi.store-users` `_id` of the tablet's user. Then the store's
     `isPrinted:false, isViewd:true` orders, which are exactly what the sweep can return.
-- **The loud new-order alarm has ONE source, and an id ledger decides whether it rings.**
+- **The loud FIRST new-order alarm has ONE source, and an id ledger decides whether it rings.**
+  (The repeats while an order waits are a separate loop, described in the next bullet.)
   `schedulePushNotification` (`utils/notification/index.ts`, `sound: 'store.wav'`) *is* the
   alarm, and its only live callers are the two in `hooks/use-notifications.ts` — the 30s poll
   and the badge refresh (`fetchUnviewedOrdersCount`). Everything else is quiet: the
@@ -582,6 +586,41 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   `takeNewOrdersOnRefresh` primes once per store per app session then rings. Both ring paths
   dedupe on order id, and both are gated on `shoofiAdminStore.storeData?.isUnviewOrdersEnabled`
   — the platform switch that owns the whole new-order ring.
+- **The new-order alarm repeats until the order is accepted** (product decision, Sari,
+  2026-11-07; shoofi-dev/shoofi-partner, branch `feat/new-order-alarm-loop`). This is not the
+  ledger above re-ringing: `newOrderAlertsStore` still announces each order once. A separate
+  loop rings "an order is waiting" while the bell's count is above 0 and
+  `isUnviewOrdersEnabled` is on.
+  - **What it is:** a series of local notifications scheduled up front. Each has an absolute
+    `DATE` trigger and a fixed identifier `new-order-alarm-<i>`, plus `new-order-alarm-now`
+    for a ring made immediately. Each plays `store.wav`, with `data.type: "new_order_alarm"`
+    and `appName`. A JS timer would not work: iOS suspends JS in the background, and the app
+    has no background task. A repeating trigger would not work either: iOS rejects repeating
+    intervals under 60s.
+  - **Numbers** (`ALARM_SETTINGS`, `utils/new-order-alarm.ts`): every **25s** for **10
+    minutes**, then every **5 minutes** until **1 hour** after the cycle started, then silence.
+    That is 34 pending notifications, against the iOS limit of 64 per app. A cycle starts at
+    the first refresh that sees a waiting order. It does not ring at that point, because
+    nothing new arrived. A NEW order's first alert restarts the cycle, with the first repeat
+    25s after that alert, so the two never land together.
+  - **Stops:** the count reaches 0. An accept on this device does it at once
+    (`ORDER_APPROVED_LOCALLY` → `newOrderAlarmApprovedLocally`). An accept on another device,
+    or a cancellation, does it at the next count refresh. Alerts switched off, and logout
+    (`stopNewOrderAlarm`, called from `stores/auth` after the token is cleared), also stop it.
+    Stopping cancels the pending series and dismisses the repeats already in the tray.
+  - **Self-heal, foreground only:** the app watches its own rings arrive
+    (`addNotificationReceivedListener`, by identifier). If none arrives within the interval
+    plus 20s, it rings itself and re-schedules. This covers Android 12+, where expo falls back
+    to inexact alarms without `SCHEDULE_EXACT_ALARM`, and the app does not request it.
+  - **Known gap:** in the background (iOS especially), JS does not run. If another tablet
+    accepts the order, or it is cancelled, this tablet keeps ringing until it comes to the
+    foreground or the hour runs out. The server sends no silent push that could cancel it.
+  - **Where:** decisions are in `decideAlarm` / `buildAlarmSeries` (`utils/new-order-alarm.ts`,
+    pure, table-tested in `utils/__tests__/new-order-alarm.test.ts`). Side effects are in
+    `utils/notification/new-order-alarm.ts`, whose state is held at module scope so it
+    survives the header unmounting. `hooks/use-notifications.ts` calls
+    `updateNewOrderAlarm` after every count fetch, only when the response is a real array:
+    a failed fetch never silences it.
 - ⚠️ **Never seed that ledger on the badge-refresh path — it silences the alarm entirely.**
   The badge refresh, not the poll, is what learns about a new order first — and it does so
   through the **push**, not a websocket frame. At creation the server sends each store user a

@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-partner@feat/new-order-alarm-loop / 2026-11-07 (ref C3: the new-order alarm repeats until accepted); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -649,6 +649,9 @@
         "hooks/use-notifications.ts",
         "stores/new-order-alerts/index.ts",
         "utils/notification/index.ts",
+        "utils/new-order-alarm.ts",
+        "utils/notification/new-order-alarm.ts",
+        "utils/__tests__/new-order-alarm.test.ts",
         "App.tsx",
         "helpers/printer/print.ts",
         "helpers/printer/index.ts",
@@ -668,6 +671,18 @@
           "takeNewOrders",
           "takeNewOrdersOnRefresh",
           "seedSeen"
+        ],
+        "utils/new-order-alarm.ts": [
+          "decideAlarm",
+          "buildAlarmSeries",
+          "ALARM_SETTINGS",
+          "new-order-alarm-"
+        ],
+        "utils/notification/new-order-alarm.ts": [
+          "updateNewOrderAlarm",
+          "newOrderAlarmApprovedLocally",
+          "stopNewOrderAlarm",
+          "store.wav"
         ],
         "utils/print-outcome.ts": [
           "classifyPrintError",
@@ -704,6 +719,26 @@
           "file": "hooks/use-notifications.ts",
           "regex": "newIds\\.length > 0 && shoofiAdminStore\\.storeData\\?\\.isUnviewOrdersEnabled",
           "desc": "the refresh ring is gated on isUnviewOrdersEnabled, the platform switch that owns the whole new-order ring and already gates the 30s poll (ref C3)"
+        },
+        {
+          "file": "utils/new-order-alarm.ts",
+          "regex": "urgentIntervalMs: 25 \\* 1000,\\s*urgentWindowMs: 10 \\* 60 \\* 1000,\\s*reminderIntervalMs: 5 \\* 60 \\* 1000,\\s*hardStopMs: 60 \\* 60 \\* 1000,",
+          "desc": "ref C3: the repeating new-order alarm rings every 25s for 10 minutes, then every 5 minutes, hard stop 1 hour after the cycle started (product decision 2026-11-07)"
+        },
+        {
+          "file": "hooks/use-notifications.ts",
+          "regex": "if \\(Array\\.isArray\\(response\\)\\) \\{\\s*updateNewOrderAlarm\\(",
+          "desc": "ref C3: the alarm loop is fed the bell's count after every fetch, only on a real list - a failed fetch must never silence it"
+        },
+        {
+          "file": "hooks/use-notifications.ts",
+          "regex": "\"ORDER_APPROVED_LOCALLY\",[\\s\\S]{0,300}?newOrderAlarmApprovedLocally\\(\\)",
+          "desc": "ref C3: accepting on this device steps the alarm's count down at once, so the last accept stops the ringing without waiting for a refresh"
+        },
+        {
+          "file": "stores/auth/index.ts",
+          "regex": "this\\.userToken = null\\s*(?://[^\\n]*\\s*)*stopNewOrderAlarm\\(\\);",
+          "desc": "ref C3: logout stops the repeating alarm, after the token is cleared so an in-flight count fetch cannot schedule it again"
         },
         {
           "file": "stores/new-order-alerts/index.ts",
