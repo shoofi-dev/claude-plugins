@@ -693,6 +693,11 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   "مجدولة" section under the new column (one extra fetch with the same endpoint, statuses from
   `visibleTabs`). A drive-in card shows "الزبون برّا" while `driveInArrival.arrivedAt` is set
   and the order is not picked up (#51); the list refetches on the `drive_in_arrival` frame.
+- **List date window.** `POST /api/order/admin/orders` drops the upper `orderDate` bound when the
+  body says `isOrderLaterSupport: true`, so a day query means "that day ONWARD". v2's 14-day
+  strip sent it for every day; v3 (#50) shows today only (live) and puts past days behind
+  "السجل", whose fetches pass `boundedDay` → `isOrderLaterSupport: false` (stores/orders
+  `getOrders`/`getOrdersFromServer`, optional last argument) to keep the day's bound.
 
 ## C4. shoofi-delivery-web — the ADMIN dashboard (React web)
 Role: oversight — list/monitor, manual intervention, fraud queue, **twin group admin**, config.
