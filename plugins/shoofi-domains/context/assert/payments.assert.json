@@ -13,6 +13,8 @@
         "utils/invoice-mail.js",
         "services/payments/invoice-config.js",
         "services/payments/order-invoices.js",
+        "utils/crons/invoice-retry-cron.js",
+        "services/payments/cancel-compensation.js",
         "utils/hyp.js",
         "lib/schemas/creditCard.json",
         "services/twin-order/twin-payment-service.js",
@@ -52,8 +54,15 @@
         "services/payments/order-invoices.js": [
           "issueInvoicesForOrder",
           "issueInvoicesForTwin",
+          "retryTwinOrderInvoices",
+          "twinAtCapture",
+          "INVOICES_HELD_FIELD",
           "reconcileToCharge",
           "customerDocType"
+        ],
+        "utils/crons/invoice-retry-cron.js": [
+          "runInvoiceRetrySweep",
+          "buildQuery"
         ],
         "utils/school-payment-methods.js": [
           "filterSchoolPaymentMethods",
@@ -88,6 +97,16 @@
         ]
       },
       "patterns": [
+        {
+          "file": "services/payments/order-invoices.js",
+          "regex": "if \\(order\\?\\.twinGroup\\?\\.groupId\\) \\{\\s*return await retryTwinOrderInvoices\\(",
+          "desc": "CORE invariant 10: a twin leg never reaches planSingleOrderInvoices — issueInvoicesForOrder routes it to the twin retry (delivery doc + combination fee on the primary only)"
+        },
+        {
+          "file": "utils/crons/invoice-retry-cron.js",
+          "regex": "\\[INVOICES_HELD_FIELD\\]: \\{ \\$exists: false \\}",
+          "desc": "CORE invariant 10: the retry cron skips an order held for review (order.invoicesHeld) until a person clears it"
+        },
         {
           "file": "routes/admin.js",
           "regex": "const invoiceQueueAdmins = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",

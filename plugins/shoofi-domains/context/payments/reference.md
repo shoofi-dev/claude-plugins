@@ -145,10 +145,16 @@ Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restric
 hangs the request (CORE invariant 11), so none of them answered.
 
 ## 6. Refunds (customer-side — you own these)
-- **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
-  `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.
-  Since HQ #1a2f9e (2026-11-03) **no client calls it** — its only caller was the removed
-  client-side refund dialog — and no store DB holds a `refundData` row. The route has no auth.
+- **`POST /api/order/addRefund` is GONE** — removed in shoofi-server 29ed5252 (HQ #7e2d32,
+  2026-11-03). It was bookkeeping only (pushed `refundData[]`, no provider reversal, no auth);
+  its only callers were the client refund dialogs removed under HQ #1a2f9e, and no store DB
+  held a `refundData` row. Do not look for it or restore it. A cancel's money is decided by
+  `settleCancelledOrderMoney` in `routes/order.js` (`cancelMoneyDecision`: `refund` →
+  `orderAuthorization.refundOrderPayment` releases a hold or flags a settled charge for a
+  person; `keep` → the charge is captured/kept and `services/payments/cancel-compensation.js`
+  issues a Shoofi-paid `COMP-*` coupon). A twin leg's refund is always flagged for a person
+  (`refund_twin_order_manual`). Note: the comment above `CANCEL_MONEY_DECISION` still says
+  KEEP's coupon is created by hand — stale since cancel-compensation.js; the code issues it.
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,
