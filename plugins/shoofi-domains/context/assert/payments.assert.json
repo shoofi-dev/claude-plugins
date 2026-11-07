@@ -89,6 +89,26 @@
       },
       "patterns": [
         {
+          "file": "services/payments/order-authorization.js",
+          "regex": "if \\(isAlreadyRefunded\\(auth\\)\\) \\{",
+          "desc": "CORE invariant 12: refundOrderPayment returns before HYP for an order that already records a refund"
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "\"paymentAuth\\.refundClaimedAt\": \\{ \\$exists: false \\},",
+          "desc": "CORE invariant 12: the atomic refund claim, so concurrent cancels credit once"
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "\\{ releaseClaim: !sentToGateway \\}",
+          "desc": "CORE invariant 12: a refund whose outcome is unknown keeps its claim and is never retried blind"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "!orderAuthorization\\.isAlreadyRefunded\\(auth\\) &&",
+          "desc": "CORE invariant 12: the cancel route's wasCharged ignores already-refunded orders"
+        },
+        {
           "file": "routes/admin.js",
           "regex": "const invoiceQueueAdmins = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",
           "desc": "CORE invariant 11: GET invoices/pending takes any dashboard role"
