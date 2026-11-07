@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/marketing-suggestions + shoofi-delivery-web@feat/marketing-suggestions / 2026-11-07 (invariant 11: «הצעות» GET /api/admin/marketing/suggestions); shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -351,8 +351,27 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
        (`services/customer-campaigns/stuck-sending.js` — the send died; see invariant 17 delete). Badges are computed, never written (menu-catalog invariant 18):
        the card shows the newest running deal and a public coupon beats it. Never "fix" a status
        here to match the stored dates; fix the channel, then this follows.
-   Pinned by `test/integration/marketing-links.js`, `test/integration/marketing-attribution.js` and
-   `test/integration/marketing-active.js` (server), `__tests__/services/marketing-events-queue.test.ts` (app).
+   - **«הצעות» = what exists now and nobody promotes; read-only, same gate** (2026-11-07, owner:
+     "a tab that shows me existing coupons or deals or new stores/products that it's suggested
+     to promote"). `GET /api/admin/marketing/suggestions` (`services/marketing/suggestions.js`,
+     `ACTIVE_ROLES`, 5-minute in-memory cache, `?refresh=1`) → `groups{coupon, deal, store_new,
+     product}` of `{kind, id, appName, code, key, title, store, why, whyInStore?, score, signals, wizard}`
+     plus `alreadyPromoted` and `sourceErrors`. `wizard` is what web `marketingNewPath` takes;
+     `whyInStore` (dishes) is the reason without the store — the tab groups dishes per store.
+     - **Only offers that already exist, only ones anyone may use:** coupons = `liveFilter` minus
+       `generate/facts.js isPersonalCoupon` (personal, gift card, one-customer, claimed), value-0
+       tags, used-up ones and handed-out codes (`isAutoApply` off with `usageLimit` 1–49 —
+       `OPEN_CODE_LIMIT`); deals = `isRunning`; new stores = `launchState` (or launching within 7
+       days; no launchDate = never); dishes = `createdAt` ≤ 14 days, visible, in stock, not in a
+       new store, none from a store with > `BULK_MENU` (15) at once (a clone / import), one per name.
+       Stores: `business_visible === true`, not `isMockStore` / `isCouponStore` / `shoofi-stories`.
+     - **"Already promoted" = a non-badge active-list row, live / scheduled / draft, on the same
+       `subject.key`.** The automatic deal and "new" badges are NOT promotions (every running deal
+       and new store has one). A store_new row is keyed `store:<app>:<app>` — the wizard's
+       store_new links the store. Never count the subject-less `marketingItems` an abandoned
+       wizard leaves; the active list already counts channels.
+   Pinned by `test/integration/marketing-links.js`, `test/integration/marketing-attribution.js`,
+   `test/integration/marketing-active.js` and `test/integration/marketing-suggestions.js` (server), `__tests__/services/marketing-events-queue.test.ts` (app).
 
 12. **Marketing pushes: opt-out and frequency cap apply inside `executeCampaign` ONLY, to
     customer-app audiences ONLY.** Every other push (order status, `feedback_request`,
