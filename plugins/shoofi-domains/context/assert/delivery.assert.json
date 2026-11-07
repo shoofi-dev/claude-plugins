@@ -40,7 +40,8 @@
         "lib/delivery/helpers.js",
         "services/delivery/admin-access.js",
         "services/delivery/response-redaction.js",
-        "services/delivery/availability.js"
+        "services/delivery/availability.js",
+        "services/delivery/courier-status.js"
       ],
       "symbols": {
         "services/delivery/availability.js": [
@@ -127,6 +128,13 @@
           "/api/delivery/delivery-only/book",
           "/api/delivery/delivery-only/list",
           "isDeliveryOnly"
+        ],
+        "services/delivery/courier-status.js": [
+          "attachCourierSummaries",
+          "notifyStoreCourierUpdated",
+          "summarizeCourier",
+          "COURIER_STATES",
+          "COURIER_SUMMARY_PROJECTION"
         ]
       },
       "patterns": [
@@ -684,6 +692,51 @@
           "file": "services/delivery/delayed-assignment.js",
           "regex": "async function createPendingDelivery\\([\\s\\S]{0,6000}?findBestAreaForLocation\\([\\s\\S]{0,300}?\\{ ignoreAreaActive: true \\}",
           "desc": "CORE 'Paused ≠ out of zone': booking a scheduled order resolves its area ignoring areas.isActive, so a scheduled order placed into a paused area is still dispatched — the reason the paused quote must carry the area's price"
+        },
+        {
+          "file": "services/delivery/courier-status.js",
+          "regex": "const COURIER_UPDATED_EVENT = \"courier_updated\";",
+          "desc": "CORE invariant 20: the store tablet's refetch frame is `courier_updated`"
+        },
+        {
+          "file": "services/delivery/courier-status.js",
+          "regex": "\\.find\\(\\{ appName, \"order\\._id\": \\{ \\$in: ids \\} \\}, \\{ projection: COURIER_SUMMARY_PROJECTION \\}\\)",
+          "desc": "CORE invariant 20: ONE read per page, scoped to the store, projected to a whitelist"
+        },
+        {
+          "file": "services/delivery/courier-status.js",
+          "regex": "\\? \\[new ObjectId\\(str\\), str\\] : \\[str\\]",
+          "desc": "CORE invariant 20: book-delivery.order._id is an ObjectId OR a hex string - the lookup asks for both"
+        },
+        {
+          "file": "services/delivery/courier-status.js",
+          "regex": "QUOTABLE_ARRIVAL_BASES = new Set\\(\\[\"current-location\", \"future-location\"\\]\\)",
+          "desc": "CORE invariants 15/20: a neutral-location arrival estimate is never quoted as a time"
+        },
+        {
+          "file": "services/delivery/courier-status.js",
+          "regex": "if \\(delivery\\.reassignedAt \\|\\| delivery\\.reassignmentMetadata\\) \\{\\s*return delivery\\.reassignmentMetadata\\?\\.pickupFeasibility \\|\\| null;",
+          "desc": "CORE invariant 20: after a reassignment only the reassignment's own feasibility describes the current courier"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "finalOrders = await attachCourierSummaries\\(\\{ appDb: req\\.app\\.db, appName, orders: finalOrders \\}\\);",
+          "desc": "CORE invariant 20: the partner order list carries `courier` on its delivery rows"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "status: DELIVERY_STATUS\\.WAITING_IN_STORE,[\\s\\S]{0,300}?waitingInStoreAt: new Date\\(\\)",
+          "desc": "CORE invariant 11: the waiting-in-store tap writes the arrival instant"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "if \\(updateResult\\.matchedCount === 0\\) \\{[\\s\\S]{0,600}?\\}\\s*// After the claim[^\\n]*\\n\\s*notifyStoreCourierUpdated\\(delivery, \\{ reason: \"assigned\" \\}\\);",
+          "desc": "CORE invariants 2/20: the store is nudged only AFTER the atomic claim wins, never on a lost race"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "db\\.bookDelivery\\.createIndex\\(\\{ 'order\\._id': 1 \\}",
+          "desc": "CORE invariant 20: the per-page courier lookup and the driver dialog are index reads, not collection scans"
         }
       ]
     },

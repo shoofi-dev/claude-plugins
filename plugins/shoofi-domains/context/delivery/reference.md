@@ -90,6 +90,28 @@ open and focus, and every call is a refusal while the platform flag is off.
 `store-delivery-only-expense.js`; `scripts/delivery-only-preflight.js` is a read-only prod
 pre-flight for stores/regions that would book at ₪0.
 
+## 2c. Courier state for the store (partner order card)
+`services/delivery/courier-status.js`; rules and emit points in CORE invariant 20. Each DELIVERY
+row of `POST /api/order/admin/orders` carries:
+
+```ts
+courier: null | {            // null = no booking for this order (not accepted / platform switch off)
+  state: "searching" | "assigned" | "arriving" | "at_store" | "picked_up" | "delivered" | "cancelled";
+  driverName: string | null;        // first word of booking.driver.fullName
+  etaToStoreMinutes: number | null; // engine estimate, current courier only, measured basis, not passed
+  etaToStoreAt: string | null;      // ISO instant of that estimate (client-side countdown)
+  cancelledBy: "driver" | "store" | "admin" | null;
+  updatedAt: string | null;         // ISO; created / reassignedAt‖assignedAt / approvedAt /
+}                                   // waitingInStoreAt / startedAt / completedAt / cancelledAt
+```
+Frame: `{type: "courier_updated", data: {orderId, bookId, deliveryId, reason, timestamp}}` to the
+booking's `appName` (`orderId` = the store order `_id` as a string, null on delivery-only).
+`reason` ∈ `searching, assigned, approved, at_store, picked_up, delivered, reassigned,
+cancelled_by_driver, cancelled_by_store, cancelled_by_admin, status_updated` — informational;
+the client refetches rather than trusting it. Tests: `test/integration/courier-status.js`,
+`test/integration/courier-updated-frame.js`. Latency (local, 55-row page, 96k bookings):
++0.5–1 ms with the `order._id` index, +~22 ms without it.
+
 ## 3. Driver assignment (`services/delivery/`)
 **Area match** (`assignDriver.js findBestAreaForLocation`): customer point →
 `areasGeometry.$geoIntersects` (dropoff candidates) → `areas` with those `geometryId` →
@@ -324,13 +346,18 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   expectedDeliveryAt, area(embedded), company(embedded), driver(embedded), bookId,
   originalBookId, appName, customerLocation, order(snapshot), twinGroupId,
   twinPickupSequence, twinAssignmentMode, twinPeer, twinDegraded, *DelayNotified*,
-  assignedAt, completedAt(Date), isReadyForPickup, readyForPickupAt}`.
+  assignedAt, approvedAt, waitingInStoreAt(Date), startedAt, completedAt(Date), cancelledAt,
+  isReadyForPickup, readyForPickupAt}`.
+  ⚠️ `order._id` is an ObjectId on partner-accept bookings and a 24-hex **string** on bookings
+  made over `POST /api/delivery/book` — query both forms (CORE invariant 20).
   ⚠️ Fields that are not what they look like (CORE invariant 11): `readyForPickupAt` exists
   only if a driver was already assigned when the store pressed ready — the full store-ready
   source is `shoofi.orderFlowEvents` `status_change` status `"3"`. `company.storeName` and
   `driver.name` are never populated — use `company.nameHE`/`nameAR`, `driver.fullName`.
-  There is **no driver-arrived-at-store field**: use the optional `delivery_waiting_in_store`
-  flow event or `driverLocationHistory` within 150 m of `storeLocation`. Assignment lag =
+  There is **no GPS-derived arrival field**: the optional "waiting in store" tap writes
+  `waitingInStoreAt` (since shoofi-server#485; absent on older status-`5` rows) and the
+  `delivery_waiting_in_store` flow event; otherwise `driverLocationHistory` within 150 m of
+  `storeLocation`. Assignment lag =
   `assignedAt − max(assignDriverAt, created)` (CORE invariant 2), never `− assignDriverAt`.
 - `store` (company) — `supportedCities[ObjectId], supportedAreas
   [{areaId,price,minOrder,eta}], isControlledByAdmin, manualAssignmentOnly, accounting,
@@ -367,6 +394,9 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   `shoofi.compensations`) and MASAV are the accountant's. You provide the delivery data; they compute pay.
 - **NOTIFICATIONS**: driver/store/customer push + WS (`driver_location_update`,
   `driver_status_updated`, `pickup_delayed`, `delivery_delayed`) via the notification domain.
+  `courier_updated` (store tablet, CORE invariant 20) is sent by delivery code itself through
+  `websocketService.sendToAppAdmins`; that transport's single-process reach is the notification
+  domain's to fix.
 
 ## C — Client repos (full-stack)
 ### C1. shoofi-shoofir — DRIVER app (the main delivery client)
@@ -487,6 +517,10 @@ The town dropdown is `react-native-dropdown-picker`, whose list renders **inline
 after it paint over it, and `zIndex` fixes only iOS while `elevation` reorders the whole
 subtree on the Urovo POS, so the quote lines below it are unmounted while it is open.
 **Partner has NO driver-assignment surface** — it books and reads, it never picks a driver.
+**Courier status on the order card (§2c):** the list rows of `POST order/admin/orders` carry
+`courier` and the server sends `courier_updated`; the v3 list
+(`screens/admin/order/list/index.v3.tsx` `WsOrderEvents`) must add that type to its refetch
+filter, and `components/orders-v3/OrderCardV3.tsx`'s memo comparator must compare `courier`.
 **Dead/inherited (leave alone):** `components|screens|stores/delivery-driver/*` (a pre-admin
 copy of the shoofir driver UI — no `isAdmin`, no reassign, no `DriverReassignModal`, and no
 navigation entry point despite being registered in `navigation/MainStackNavigator.tsx`),

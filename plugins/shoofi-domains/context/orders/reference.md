@@ -480,7 +480,9 @@ Role: executes the **delivery leg**; drives `bookDelivery` status only — never
 Role: receives orders, **accepts**, prepares, prints, and drives status forward.
 - **API client**: axios (`utils/http-interceptor/index.ts`), token `@storage_userToken`
   as `"Token …"`, `app-type: shoofi-partner`, `app-name` = `@storage_storeDB` (per-call overridable).
-- **Endpoints** (`stores/orders/index.tsx`, controller `order/`): `admin/orders` (list),
+- **Endpoints** (`stores/orders/index.tsx`, controller `order/`): `admin/orders` (list; each
+  DELIVERY row also carries `courier`, the delivery domain's summary — delivery
+  `reference.md` §2c),
   `admin/all/not-viewd` (incoming feed, when `isAdmin(ROLES.all)`, which is every prod store
   user: 394/394 carry `roles: ["all"]` on 2026-10-30), `admin/not-viewd` (the same feed for a
   store user without `all`, and before user details load), **`update/viewd` = ACCEPT** (→ `6→1`, future `14→1`,
@@ -511,7 +513,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   `isSignOut: true` → `resetAppState` + restart), so a partner-polled route must never 401 a
   logged-in terminal.
 - **Realtime**: WS `?appType=shoofi-partner`; handles `order_status_updated`,
-  `unviewed_orders_updated`, `future_order_*` (NOT `menu_refresh`). The `print_order` /
+  `unviewed_orders_updated`, `future_order_*` (NOT `menu_refresh`). The server also sends
+  `courier_updated` (delivery CORE invariant 20) on every courier event; only a list that shows
+  `courier` should refetch on it. The `print_order` /
   `print_not_printed` frames still arrive (the server sends `print_not_printed` when
   `/api/order/printed` sets `status:false`), but their `App.tsx` handlers are commented out.
   **Nothing prints from a websocket frame.**
