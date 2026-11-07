@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@data/HIGH-RISK-scrub-zcredit-payload-secrets / 2026-11-06 (Known status: ZCredit payload secrets, HQ #d20fad); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -287,6 +287,41 @@
           "file": "services/coupons/public-coupon.js",
           "regex": "const UPCOMING_WINDOW_DAYS = 30;",
           "desc": "CORE: an upcoming coupon shows only within 30 days of its start"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "CVV: paymentData\\.cvv,",
+          "desc": "CORE Known status HQ #d20fad: processCreditCardPayment puts the raw CVV in the payload that is persisted on the order"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "ccPaymentRefData: paymentResult,",
+          "desc": "CORE Known status HQ #d20fad: a failed single-order charge stores the whole paymentResult, so the secrets sit at ccPaymentRefData.paymentData.payload.*"
+        },
+        {
+          "file": "services/twin-order/twin-payment-service.js",
+          "regex": "CVV: paymentData\\.cvv,",
+          "desc": "CORE Known status HQ #d20fad: twin buildChargePayload carries the raw CVV"
+        },
+        {
+          "file": "data-changes/lib/scrub-zcredit-payload.js",
+          "regex": "const PAYLOAD_PATHS = \\[\"ccPaymentRefData\\.payload\", \"ccPaymentRefData\\.paymentData\\.payload\"\\];",
+          "desc": "CORE Known status HQ #d20fad: the scrub covers both payload paths"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(id !== undefined\\) safe\\.id = '<redacted>';",
+          "desc": "CORE Known status HQ #d20fad: redactPaymentSecrets redacts the holder's ID number on the stored copy"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "HolderID: paymentData\\?\\.id \\|\\| '',",
+          "desc": "CORE Known status HQ #d20fad: the charge still sends the real id from the request's paymentData"
+        },
+        {
+          "file": "data-changes/lib/scrub-zcredit-payload.js",
+          "regex": "const HOLDER_ID_PATH = \"paymentData\\.id\";",
+          "desc": "CORE Known status HQ #d20fad: the scrub removes a stored raw paymentData.id"
         }
       ]
     },
