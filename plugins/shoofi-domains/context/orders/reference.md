@@ -276,7 +276,12 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   now explicit, pinned, and no longer an artefact of the cron period.
   **The server's silence after minute 5 is no longer the whole story on the tablet.** Since
   2026-11-07 the partner app repeats the alarm itself, from local notifications, while the
-  order waits (C3, "The new-order alarm repeats"). The server cadence above is unchanged.
+  order waits (C3, "The new-order alarm repeats"). The server cadence above is unchanged,
+  but the tablet now **depends on it**: it places its rings half-way between these
+  on-the-minute pushes, using a copy of `MAX_REMINDERS` and `REMINDER_INTERVAL_MS`
+  (`ALARM_SETTINGS.serverReminderCount` / `serverReminderIntervalMs` in shoofi-partner).
+  Changing the cron schedule or either constant means changing that copy too, or the two
+  start ringing on top of each other again.
   ⚠️ **The cutoff is deliberately not round.** `REMINDER_TICK_SKEW_MS = 5 * 1000`, and
   the query builds `cutoff` from `REMINDER_CUTOFF_AGE_MS` (= interval − skew), never
   `now - REMINDER_INTERVAL_MS`. Since the interval now *equals* the cron period, a flat
@@ -597,20 +602,32 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     and `appName`. A JS timer would not work: iOS suspends JS in the background, and the app
     has no background task. A repeating trigger would not work either: iOS rejects repeating
     intervals under 60s.
-  - **Numbers** (`ALARM_SETTINGS`, `utils/new-order-alarm.ts`): every **25s** for **10
-    minutes**, then every **5 minutes** until **1 hour** after the cycle started, then silence.
-    That is 34 pending notifications, against the iOS limit of 64 per app. A cycle starts at
-    the first refresh that sees a waiting order. It does not ring at that point, because
-    nothing new arrived. A NEW order's first alert restarts the cycle, with the first repeat
-    25s after that alert, so the two never land together.
+  - **Numbers** (`ALARM_SETTINGS`, `utils/new-order-alarm.ts`). Every time comes from one
+    deterministic grid per cycle (`alarmCycleGrid`):
+    1. **While the server's reminder window runs**, one local ring a minute at **:30
+       wall-clock**, half-way between the server pushes. The server cron runs every minute at
+       second :00 and sends 5 reminders from the first :00 after creation (above), so the
+       window ends 4–5 min after the order. Together with the server, the tablet rings about
+       every 30s, never stacked, and still once a minute if a push never arrives.
+    2. **From 30s after the server's 5th reminder until 10 min**, every **25s**.
+    3. **Every 5 min until 1 hour** after the cycle started, then silence.
+
+    That is 26–28 pending notifications, depending on the second of the minute the cycle
+    starts; the iOS limit is 64 per app. Changed on 2026-11-07 at Sari's review: the first
+    version rang every 25s from the start, on top of the server pushes (about 3 rings a
+    minute). The :30 grid assumes the tablet's clock is close to the server's; a skewed
+    clock only moves local rings toward a push.
+    A cycle starts at the first refresh that sees a waiting order. It does not ring then,
+    because nothing new arrived. A NEW order's first alert restarts the cycle, and no local
+    repeat lands within 20s of that alert (`minGapAfterFromMs`).
   - **Stops:** the count reaches 0. An accept on this device does it at once
     (`ORDER_APPROVED_LOCALLY` → `newOrderAlarmApprovedLocally`). An accept on another device,
     or a cancellation, does it at the next count refresh. Alerts switched off, and logout
     (`stopNewOrderAlarm`, called from `stores/auth` after the token is cleared), also stop it.
     Stopping cancels the pending series and dismisses the repeats already in the tray.
   - **Self-heal, foreground only:** the app watches its own rings arrive
-    (`addNotificationReceivedListener`, by identifier). If none arrives within the interval
-    plus 20s, it rings itself and re-schedules. This covers Android 12+, where expo falls back
+    (`addNotificationReceivedListener`, by identifier). If the next grid ring has not arrived
+    20s after it was due, the app rings itself and re-schedules on the same grid. This covers Android 12+, where expo falls back
     to inexact alarms without `SCHEDULE_EXACT_ALARM`, and the app does not request it.
   - **Known gap:** in the background (iOS especially), JS does not run. If another tablet
     accepts the order, or it is cancelled, this tablet keeps ringing until it comes to the

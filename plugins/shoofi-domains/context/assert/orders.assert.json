@@ -675,6 +675,8 @@
         "utils/new-order-alarm.ts": [
           "decideAlarm",
           "buildAlarmSeries",
+          "alarmCycleGrid",
+          "serverReminderTimes",
           "ALARM_SETTINGS",
           "new-order-alarm-"
         ],
@@ -722,8 +724,8 @@
         },
         {
           "file": "utils/new-order-alarm.ts",
-          "regex": "urgentIntervalMs: 25 \\* 1000,\\s*urgentWindowMs: 10 \\* 60 \\* 1000,\\s*reminderIntervalMs: 5 \\* 60 \\* 1000,\\s*hardStopMs: 60 \\* 60 \\* 1000,",
-          "desc": "ref C3: the repeating new-order alarm rings every 25s for 10 minutes, then every 5 minutes, hard stop 1 hour after the cycle started (product decision 2026-11-07)"
+          "regex": "serverReminderCount: 5,\\s*serverReminderIntervalMs: 60 \\* 1000,\\s*halfwayOffsetMs: 30 \\* 1000,\\s*urgentIntervalMs: 25 \\* 1000,\\s*urgentWindowMs: 10 \\* 60 \\* 1000,\\s*reminderIntervalMs: 5 \\* 60 \\* 1000,\\s*hardStopMs: 60 \\* 60 \\* 1000,",
+          "desc": "ref C3: the repeating new-order alarm rings once a minute at :30 while the server's 5 on-the-minute reminders run, then every 25s to 10 minutes, then every 5 minutes, hard stop 1 hour after the cycle started (product decision 2026-11-07, revised at review). serverReminderCount/serverReminderIntervalMs mirror MAX_REMINDERS/REMINDER_INTERVAL_MS in shoofi-server utils/persistent-alerts.js - change them together"
         },
         {
           "file": "hooks/use-notifications.ts",
