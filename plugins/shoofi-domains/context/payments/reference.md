@@ -135,12 +135,19 @@ role check, and no client calls any of them.
 | Route | Roles | What it does |
 |---|---|---|
 | `GET /api/admin/invoices/pending` | `DASHBOARD_ROLES` | the size of this process's in-memory queue (one instance; prod runs two) |
-| `POST /api/admin/invoices/retry` `{docId}` | master, admin | queues one `docId` |
+| `POST /api/admin/invoices/retry` `{docId, appName?, orderId?}` | master, admin | queues one order. Without appName/orderId the docId is looked up across every store DB: 404 none, 409 two or more |
 | `POST /api/admin/invoices/process-all` | master, admin | queues every `invoiceStatus:"pending"` order in the **`app-name` header's** DB (one store, `shoofi` when absent) |
-| `POST /api/admin/invoices/webhook` `{docId, secret}` | master, admin | fetches now, falls back to the queue. Also needs `secret === INVOICE_WEBHOOK_SECRET`, which is not in `.env.production` (the DO app spec was not checked). No provider calls it. |
+| `POST /api/admin/invoices/webhook` `{docId, secret, appName?, orderId?}` | master, admin | fetches now, falls back to the queue. Also needs `secret === INVOICE_WEBHOOK_SECRET`, which is not in `.env.production` (the DO app spec was not checked). No provider calls it. |
 
-The queue keeps the whole `req` and reads only `req.app.db` and the `app-name` header from
-it. It makes no HTTP call that carries request headers. `retry` puts a numeric `docId` into
+**The queue names the order, never the request's store.** Every entry point takes
+`(docId, { appName, orderId }, req)`, where orderId is the order's `_id`; it keeps only
+`req.app.db`. It is keyed `${appName}:${orderId}`, and every write (url + completed,
+needs_review, failed) is `{ _id }` in `getOrInitializeDb(appName)`. With either missing it
+skips and logs: no `shoofi` fallback, no match by docId. Until 2026-11 it took the DB from the
+`app-name` header. The ZCredit Apple Pay callback has none, so it wrote to `shoofi`, matched
+nothing and left 22 APPLEPAY orders `pending` with no url (2026-03-16..08-24); and docId-keyed
+entries collided across stores (`utils/invoice-mail.js` `orderWriteTarget`,
+`utils/invoice-order-target.js`). It makes no HTTP call that carries request headers. `retry` puts a numeric `docId` into
 the Gmail query (`subject:"<docId>"`, exact Subject match, CORE invariant 12) and the public
 Spaces key (`invoices/doc-<docId>.pdf`, never overwritten).
 Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restrict`, which

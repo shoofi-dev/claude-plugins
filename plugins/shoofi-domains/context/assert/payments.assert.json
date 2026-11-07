@@ -154,6 +154,11 @@
           "desc": "CORE invariant 12: a refused receipt flags the order needs_review (not pending, not completed)"
         },
         {
+          "file": "utils/invoice-mail.js",
+          "regex": "return \\{ db, filter: \\{ _id: t\\.orderId \\}, appName: t\\.appName \\};",
+          "desc": "reference §5: every invoice-queue write is by the order's _id in its own store DB, never by docId or the app-name header"
+        },
+        {
           "file": "routes/order.js",
           "regex": "CommitFullTransaction",
           "desc": "ZCredit charge call (money-in path)"
