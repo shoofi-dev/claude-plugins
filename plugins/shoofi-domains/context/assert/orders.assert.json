@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@fix/HIGH-RISK-block-cancelled-to-active + shoofi-delivery-web@fix/HIGH-RISK-block-cancelled-to-active / 2026-11-06 (CORE invariant 2: cancelled never back to active); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-block-cancelled-to-active + shoofi-delivery-web@fix/HIGH-RISK-block-cancelled-to-active / 2026-11-07 (CORE invariant 2: cancelled never leaves the cancelled bucket, viewd refuses 5, courier cancel covers 5/9); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -224,12 +224,32 @@
         {
           "file": "routes/order.js",
           "regex": "if \\(isCancelledToActiveTransition\\(oldStatus, updateobj\\?\\.status\\)\\) \\{\\s*return res\\.status\\(400\\)\\.json\\(\\{[\\s\\S]{0,120}?code: \"CANCELLED_ORDER_CANNOT_REACTIVATE\"[\\s\\S]*?settleCancelledOrderMoney\\(\\{",
-          "desc": "CORE invariant 2: order/update refuses cancelled (4/5/7/8/9) -> active (1/2/3) with 400 CANCELLED_ORDER_CANNOT_REACTIVATE, BEFORE the cancel-money settlement and the status write"
+          "desc": "CORE invariant 2: order/update refuses cancelled (4/5/7/8/9) -> any non-cancel status with 400 CANCELLED_ORDER_CANNOT_REACTIVATE, BEFORE the cancel-money settlement and the status write"
         },
         {
           "file": "routes/order.js",
-          "regex": "CANCEL_STATUSES\\.includes\\(String\\(fromStatus\\)\\) &&\\s*REACTIVATION_TARGET_STATUSES\\.includes\\(String\\(toStatus\\)\\)",
-          "desc": "CORE invariant 2: the reactivation guard String()-normalises both sides (numeric statuses exist in prod)"
+          "regex": "if \\(isCancelledToActiveTransition\\(oldStatus, updateobj\\?\\.status\\)\\) \\{[\\s\\S]{0,600}?if \\(updateobj\\?\\.status === ORDER_STATUS\\.PENDING && oldStatus !== ORDER_STATUS\\.FRAUD_REVIEW\\)",
+          "desc": "CORE invariant 2: the cancelled-order guard runs BEFORE the '6 only from 13' rule, so 7 -> 13 -> 6 cannot launder a cancelled order"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const isCancelStatus = \\(status\\) =>\\s*status !== undefined && status !== null && CANCEL_STATUSES\\.includes\\(String\\(status\\)\\);",
+          "desc": "CORE invariant 2: isCancelStatus String()-normalises over CANCEL_STATUSES (numeric statuses exist in prod)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const isCancelledToActiveTransition = \\(fromStatus, toStatus\\) =>\\s*isCancelStatus\\(fromStatus\\) &&\\s*toStatus !== undefined &&\\s*toStatus !== null &&\\s*!isCancelStatus\\(toStatus\\);",
+          "desc": "CORE invariant 2: cancelled -> ANY non-cancel status is refused (1/2/3, 6, 13, 10-12, 14/15, 0); only cancel -> cancel passes"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(isCancelStatus\\(existingOrder\\.status\\)\\) \\{[\\s\\S]{0,900}?error: \"ORDER_CANCELLED\"",
+          "desc": "CORE invariant 2: store-accept (update/viewd) refuses all of 4/5/7/8/9, String()-normalised, with error ORDER_CANCELLED"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(CANCEL_STATUSES\\.includes\\(updateobj\\?\\.status\\) && order\\.order\\.receipt_method === \"DELIVERY\"\\)[\\s\\S]{0,1200}?String\\(deliveryRecord\\.status\\) !== DELIVERY_STATUS\\.CANCELLED_BY_ADMIN",
+          "desc": "CORE invariant 2: order/update cancels the bookDelivery for every cancel code (incl. 5 and 9) and skips one already at -3"
         },
         {
           "file": "routes/order.js",
@@ -812,7 +832,17 @@
         {
           "file": "src/components/Cards/order-actions/useOrderActions.tsx",
           "regex": "statusOptionsFor\\(order\\.status\\)\\.map\\(",
-          "desc": "CORE invariant 2: the order card's status modal lists statusOptionsFor(order.status), which never offers a cancelled/rejected order 1/2/3"
+          "desc": "CORE invariant 2: the order card's status modal lists statusOptionsFor(order.status), which offers a cancelled/rejected order only cancel codes"
+        },
+        {
+          "file": "src/components/Cards/order-actions/status-options.ts",
+          "regex": "if \\(!isCancelledOrRejected\\(currentStatus\\)\\) return all;\\s*return all\\.filter\\(\\(\\[value\\]\\) => isCancelledOrRejected\\(value\\)\\);",
+          "desc": "CORE invariant 2: a cancelled/rejected order is offered ONLY cancel codes (not 1/2/3, not 6, not 13)"
+        },
+        {
+          "file": "src/components/Cards/order-actions/OrderActionsMenu.tsx",
+          "regex": "export const CANCELED_STATUSES = CANCELLED_OR_REJECTED_STATUSES;[\\s\\S]*\\{!isCancelledOrRejected\\(order\\.status\\) && \\(",
+          "desc": "CORE invariant 2: the 'cancel order' gate uses the same 4/5/7/8/9 list (REJECTED included), String()-normalised"
         }
       ]
     }
