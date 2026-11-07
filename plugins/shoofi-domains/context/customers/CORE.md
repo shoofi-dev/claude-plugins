@@ -355,8 +355,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
      "a tab that shows me existing coupons or deals or new stores/products that it's suggested
      to promote"). `GET /api/admin/marketing/suggestions` (`services/marketing/suggestions.js`,
      `ACTIVE_ROLES`, 5-minute in-memory cache, `?refresh=1`) → `groups{coupon, deal, store_new,
-     product}` of `{kind, id, appName, code, key, title, store, why, score, signals, wizard}`
-     plus `alreadyPromoted` and `sourceErrors`. `wizard` is what web `marketingNewPath` takes.
+     product}` of `{kind, id, appName, code, key, title, store, why, whyInStore?, score, signals, wizard}`
+     plus `alreadyPromoted` and `sourceErrors`. `wizard` is what web `marketingNewPath` takes;
+     `whyInStore` (dishes) is the reason without the store — the tab groups dishes per store.
      - **Only offers that already exist, only ones anyone may use:** coupons = `liveFilter` minus
        `generate/facts.js isPersonalCoupon` (personal, gift card, one-customer, claimed), value-0
        tags, used-up ones and handed-out codes (`isAutoApply` off with `usageLimit` 1–49 —
