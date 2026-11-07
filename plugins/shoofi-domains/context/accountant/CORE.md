@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -416,7 +416,18 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     each row's `funder`. Rule: `services/coupons/coupon-funder.js` (`funderOf` for one coupon,
     `funderFilter` for the same rule as Mongo buckets, `activeNowFilter`, `liveFilter`,
     `expiredFilter`). Prod 2026-11-07: 14,230 coupons switched on, 13,620 of them expired —
-    the bare flag listed them all under «פעילים». **It is a display/filter rule, NOT a billing path.** Settlement never
+    the bare flag listed them all under «פעילים».
+    - **Gift cards (`isPurchasedCoupon`) are outside every funder bucket** (`funderOf` → null,
+      `funderFilter` excludes `isPurchasedCoupon ∈ [true,'true']`): a customer paid for them, so
+      they are nobody's giveaway (owner 2026-11-07: «שופי» = coupons Shoofi made for all
+      customers; prod: 26 of the 42 «שופי» rows were gift cards → 16). They have their own filter,
+      **`kind=general|personal|gift`** (`kindFilter`, any other value → 400), which partitions
+      every coupon (prod 2026-11-07: 99 / 14,290 / 26). A gift card carries
+      `isCustomerSpecific: false`, so `general` must exclude it explicitly. Each gift row also
+      carries `giftCard` = `giftCardBalance`: value − SUM(`couponUsages.discountAmount`) of the
+      code, and the holder (`buyer` until someone else redeems it, then `recipient`). Display
+      only; the wallet's own per-user balance (`routes/coupon.js` wallet) is unchanged.
+    **It is a display/filter rule, NOT a billing path.** Settlement never
     calls it. It restates what `stores-export-new` already does, so if settlement changes,
     this file follows; never the other way round.
     - **Share:** `storePercent` out of 100 for `splitType: 'percentage'` (resolved per order by

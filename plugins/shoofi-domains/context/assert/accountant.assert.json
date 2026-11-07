@@ -151,7 +151,11 @@
           "funderFilter",
           "activeNowFilter",
           "liveFilter",
-          "expiredFilter"
+          "expiredFilter",
+          "KINDS",
+          "kindFilter",
+          "isGiftCard",
+          "giftCardBalance"
         ],
         "utils/coupon-discount.js": [
           "DELIVERY_PRICE_TYPE",
@@ -555,8 +559,18 @@
         },
         {
           "file": "services/coupons/coupon-funder.js",
-          "regex": "coupon\\.isCustomerSpecific === true \\|\\| !\\(Number\\(coupon\\.value\\) > 0\\)\\) return null;",
-          "desc": "CORE invariant 14: customer-specific coupons (never billed to a store) and value-0 tag coupons are outside the funder classification"
+          "regex": "coupon\\.isCustomerSpecific === true \\|\\| isGiftCard\\(coupon\\) \\|\\| !\\(Number\\(coupon\\.value\\) > 0\\)\\) return null;",
+          "desc": "CORE invariant 14: customer-specific coupons (never billed to a store), gift cards (a customer bought them) and value-0 tag coupons are outside the funder classification"
+        },
+        {
+          "file": "services/coupons/coupon-funder.js",
+          "regex": "const global = \\{ isCustomerSpecific: \\{ \\$ne: true \\}, \\.\\.\\.notGiftCard, value: \\{ \\$gt: 0 \\} \\};",
+          "desc": "CORE invariant 14: every Mongo funder bucket excludes gift cards (isPurchasedCoupon $nin [true, 'true']) — «שופי» lists only coupons Shoofi made for all customers"
+        },
+        {
+          "file": "services/coupons/coupon-funder.js",
+          "regex": "if \\(kind === 'gift'\\) return \\[\\{ isPurchasedCoupon: \\{ \\$in: FLAG_ON \\} \\}\\];\\s*[\\r\\n]+\\s*if \\(kind === 'personal'\\) return \\[\\{ isCustomerSpecific: true \\}, notGiftCard\\];\\s*[\\r\\n]+\\s*if \\(kind === 'general'\\) return \\[\\{ isCustomerSpecific: \\{ \\$ne: true \\} \\}, notGiftCard\\];",
+          "desc": "CORE invariant 14: kind=gift|personal|general partitions every coupon; a gift card carries isCustomerSpecific:false, so general and personal both exclude it"
         },
         {
           "file": "services/coupons/coupon-funder.js",
@@ -597,6 +611,16 @@
           "file": "routes/coupon.js",
           "regex": "funder: funderOf\\(coupon\\)",
           "desc": "CORE invariant 14: each admin coupons row carries its funder, from the same rule as the filter"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "if \\(!KINDS\\.includes\\(req\\.query\\.kind\\)\\) \\{\\s*[\\r\\n]+\\s*return res\\.status\\(400\\)[\\s\\S]{0,200}and\\.push\\(\\.\\.\\.kindFilter\\(req\\.query\\.kind\\)\\);",
+          "desc": "CORE invariant 14: GET /api/admin/coupons kind=general|personal|gift filters through kindFilter ($and-merged); any other value is a 400"
+        },
+        {
+          "file": "routes/coupon.js",
+          "regex": "const balance = giftCardBalance\\(coupon, spentByCode\\[coupon\\.code\\]\\);",
+          "desc": "CORE invariant 14: a gift-card row carries giftCard = value minus every couponUsages.discountAmount of its code, and its holder (display only)"
         },
         {
           "file": "utils/coupon-discount.js",
