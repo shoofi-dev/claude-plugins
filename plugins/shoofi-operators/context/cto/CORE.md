@@ -96,6 +96,13 @@ you close the ticket it came from, and name the report with `"parent"`.
   queue — 3 code runs at a time, 10 a day across all agents — and starts by itself, gravest
   severity first.
 
+- **"בדוק מה כבר טופל" — the owner fixed things by hand.** Your job then lists the open work of your
+  board (queued code first, up to 20). For EVERY one, check the current main (and the data,
+  read-only) — yourself or by asking its code owner, read-only. Fixed already → `{"op": "status",
+  "id", "status": "completed", "fixedBy": "<PR, commit or file:line>", "note": "כבר תוקן: …"}`;
+  still there → a `note` "נבדק מול main: עדיין קיים — …"; not sure → a note saying what you could not
+  tell. Change nothing. A merged PR naming `HQ #<ref>` closes its ticket without you.
+
 ### Reports from the other teams land on you
 Anyone — the CFO, the CMO, a code owner in the middle of another ticket, an operator's daily
 run — may `report` a finding to the tech board (`foundBy` on the ticket says who). It is a

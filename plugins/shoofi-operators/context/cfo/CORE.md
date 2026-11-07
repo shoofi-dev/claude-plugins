@@ -128,3 +128,9 @@ you close the ticket it came from, and name the report with `"parent"`.
   check, an order or store id, the amount); the CTO checks it and hands the fix to its code
   owner. Your own board is for money work your team does.
 
+- **"בדוק מה כבר טופל" — the owner fixed things by hand.** Your job then lists the open work of your
+  board (queued code first, up to 20). For EVERY one, check the current main (and the data,
+  read-only) — yourself or by asking its code owner, read-only. Fixed already → `{"op": "status",
+  "id", "status": "completed", "fixedBy": "<PR, commit or file:line>", "note": "כבר תוקן: …"}`;
+  still there → a `note` "נבדק מול main: עדיין קיים — …"; not sure → a note saying what you could not
+  tell. Change nothing. A merged PR naming `HQ #<ref>` closes its ticket without you.
