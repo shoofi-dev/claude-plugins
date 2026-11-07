@@ -136,7 +136,19 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   Not handled: `degradeToSingle` with `keepSide:'secondary'` moves the FULL primary fee onto the
   kept order (`$inc total`) while the primary's coupon usage stays. This was already true for
   every delivery coupon before this change.
-- **Dispatch**: longer-prep side dispatched first; second side revealed on first accept.
+- **Prep range (customer ETA)**: `/quote` returns `twinPrepRange` = the SLOWER side's
+  `minReady`/`maxReady` + `twinDeliveryBufferMin` (plus `primaryReady`/`secondaryReady`); the
+  app's checkout adds the primary's courier area ETA on top (`shoofi-app
+  components/address/index.tsx`). Each side's range includes that store's active extra prep time
+  (`activePrepExtraMinutes`, `prepExtra` — menu-catalog CORE invariant 30), read from the RAW
+  per-store doc. `/place` and `/digital-place-pending` embed each side's store doc as
+  `order.storeData` through `withPrepExtraReadyRange`, because the twin header's pending
+  countdown (`OrderTimer`, status `6`/`13`) reads `storeData.maxReady` — a single-store order's
+  snapshot is the client's already-raised copy from `POST /api/store`. The stored store doc is
+  never raised. Test: `test/integration/twin-prep-extra.js`.
+- **Dispatch**: longer-prep side dispatched first; second side revealed on first accept. The
+  prep times are the measured 7-day `avgPrepTime` (`twin-prep-time-service.js`, growth
+  snapshots), not `minReady`/`maxReady`, so extra prep time does not change the order.
 - **Cancel/degrade**: `cascadeCancel` (both), `degradeToSingle` (keep one, record
   `degrade.refundOwed`), `undoDegrade` (bails if refund cleared).
 - Never route twin peer transitions through `/api/order/update` — use the services (recursion).
