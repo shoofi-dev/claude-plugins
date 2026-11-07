@@ -201,7 +201,11 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **The one conflict with a coupon**: a delivery deal and a delivery coupon
       (`discountType: 'delivery'` or `type: 'free_delivery'`) never both apply — the larger
       wins, a tie goes to the deal, and the dropped coupon is not sent so it is not spent
-      (`resolveDeliveryConflict`; the app picks first, creation re-checks).
+      (`resolveDeliveryConflict`; the app picks first, creation re-checks). The app's flag for a
+      coupon it shows but does not send is `couponSuppressed` (`components/total-price/index.tsx`
+      → `promotionsStore.checkoutSelection` → `use-checkout-submit.ts`). Since shoofi-app#87 it also
+      covers a delivery coupon on a pickup or drive-in order (payments reference "Coupons"). The
+      server has no matching check for that case.
     - **Uses** are one row per (order, promotion) in `shoofi.promotionRedemptions` (unique,
       idempotent), written at the four `couponUsages` write points with the same status gates
       and released on cancel. NOT `couponUsages` — settlement and every coupon cap read that.
