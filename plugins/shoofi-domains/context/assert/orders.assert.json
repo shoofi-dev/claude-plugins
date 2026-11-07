@@ -652,6 +652,8 @@
         "utils/new-order-alarm.ts",
         "utils/notification/new-order-alarm.ts",
         "utils/__tests__/new-order-alarm.test.ts",
+        "utils/cross-store-alerts.ts",
+        "components/global/CrossStoreOrdersGlobal.tsx",
         "App.tsx",
         "helpers/printer/print.ts",
         "helpers/printer/index.ts",
@@ -671,6 +673,11 @@
           "takeNewOrders",
           "takeNewOrdersOnRefresh",
           "seedSeen"
+        ],
+        "utils/cross-store-alerts.ts": [
+          "decideNotificationTap",
+          "ORDER_WAITING_NOTIFICATION_TYPES",
+          "notificationResponseKey"
         ],
         "utils/new-order-alarm.ts": [
           "decideAlarm",
@@ -726,6 +733,11 @@
           "file": "utils/new-order-alarm.ts",
           "regex": "serverReminderCount: 5,\\s*serverReminderIntervalMs: 60 \\* 1000,\\s*halfwayOffsetMs: 30 \\* 1000,\\s*urgentIntervalMs: 25 \\* 1000,\\s*urgentWindowMs: 10 \\* 60 \\* 1000,\\s*reminderIntervalMs: 5 \\* 60 \\* 1000,\\s*hardStopMs: 60 \\* 60 \\* 1000,",
           "desc": "ref C3: the repeating new-order alarm rings once a minute at :30 while the server's 5 on-the-minute reminders run, then every 25s to 10 minutes, then every 5 minutes, hard stop 1 hour after the cycle started (product decision 2026-11-07, revised at review). serverReminderCount/serverReminderIntervalMs mirror MAX_REMINDERS/REMINDER_INTERVAL_MS in shoofi-server utils/persistent-alerts.js - change them together"
+        },
+        {
+          "file": "components/global/CrossStoreOrdersGlobal.tsx",
+          "regex": "const tapsEnabled = authStore\\.isLoggedIn\\(\\) && userDetailsStore\\.isAdmin\\(\\);[\\s\\S]*if \\(!tapsEnabled\\) return;[\\s\\S]*decideNotificationTap\\(",
+          "desc": "ref C3: notification taps are routed for EVERY store user, not only multi-store owners (a single-store iPad opened on the dashboard when a new-order alarm was tapped, 2026-11-07)"
         },
         {
           "file": "hooks/use-notifications.ts",

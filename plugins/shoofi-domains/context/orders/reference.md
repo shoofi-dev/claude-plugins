@@ -638,6 +638,25 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     survives the header unmounting. `hooks/use-notifications.ts` calls
     `updateNewOrderAlarm` after every count fetch, only when the response is a real array:
     a failed fetch never silences it.
+- **Tapping an "order is waiting" notification opens `admin-new-orders`, for every store
+  user.** The only tap handler is in `components/global/CrossStoreOrdersGlobal.tsx`
+  (`hooks/use-notifications.ts` only logs), and the decision is `decideNotificationTap`
+  (`utils/cross-store-alerts.ts`).
+  - The four kinds are `ORDER_WAITING_NOTIFICATION_TYPES`: the server's `new_order_alert`
+    (creation) and `order_reminder`, and the app's `new_order_local` (the first alert, set
+    in `schedulePushNotification`) and `new_order_alarm` (the repeats).
+  - A **multi-store** owner keeps the cross-store rule: another member store → switch to it,
+    which then opens its list; the active store → open the list; any type that names a store.
+  - A **single-store** owner gets the list for those four kinds. It opens even without
+    `appName` (there is only one store it can be about), and a payload naming another store
+    does nothing.
+  - Until 2026-11-07 taps ran for multi-store owners only, so a single-store tablet opened
+    on the dashboard (found on a real iPad testing shoofi-partner#48).
+  - A cold start uses `getLastNotificationResponseAsync`, once per process. The response is
+    deduped by `notificationResponseKey`, and the navigation waits up to ~5s for the
+    navigator.
+  - The component sits behind `hideHHeaderScreens`, so a tap while the menu or cart screen
+    is open is not routed.
 - ⚠️ **Never seed that ledger on the badge-refresh path — it silences the alarm entirely.**
   The badge refresh, not the poll, is what learns about a new order first — and it does so
   through the **push**, not a websocket frame. At creation the server sends each store user a
