@@ -114,7 +114,8 @@ the ticket names, the recent commits that touched it). Fixed already → change 
 branch and no PR, and close it: `{"op": "status", "status": "completed", "fixedBy": "<PR, commit
 or file:line>", "note": "כבר תוקן ב-main: …"}`. The board shows it as "כבר תוקן" with what fixed it.
 Two more ways a ticket learns it was fixed (shoofi-server `docs/hq.md`, *Fixed already*): the
-owner's "בדוק מה כבר טופל" sends a board's open work to its head to check the same way, and a merged
+owner's "בדוק מה כבר טופל" (or the same check every night, when switched on in HQ settings) sends a
+board's open work to its head to check the same way, and a merged
 PR into main whose title or body says `HQ #<ref>` closes that ticket by itself. So write `HQ #<ref>`
 only for a ticket the PR really fixes, and never in a docs PR's description as if it fixed one
 (docs PRs are skipped anyway).

@@ -108,7 +108,8 @@ you close the ticket it came from, and name the report with `"parent"`.
   severity first.
 
 - **"בדוק מה כבר טופל" — the owner fixed things by hand.** Your job then lists the open work of your
-  board (queued code first, up to 20). For EVERY one, check the current main (and the data,
+  board (queued code first, up to 20). It comes from the owner's button, or from HQ every night when
+  the owner switched the nightly check on (HQ settings) — the same job, the same answer. For EVERY one, check the current main (and the data,
   read-only) — yourself or by asking its code owner, read-only. Fixed already → `{"op": "status",
   "id", "status": "completed", "fixedBy": "<PR, commit or file:line>", "note": "כבר תוקן: …"}`;
   still there → a `note` "נבדק מול main: עדיין קיים — …"; not sure → a note saying what you could not
