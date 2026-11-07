@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@fix/HIGH-RISK-backfill-invoices-by-documentid / 2026-11-06 (Known status: missing customer invoice PDF by DocumentID; public-read call sites re-counted); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@fix/HIGH-RISK-backfill-invoices-by-documentid / 2026-11-07 (Known status: missing customer invoice PDF by DocumentID, verify-first, exempt twin pairs OPEN; public-read call sites re-counted); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -827,8 +827,8 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
   `routes/payments/admin-reports.js` (store settlement), `routes/driver-reports.js`
   (courier settlement), `utils/invoice-mail.js` (the customer invoice PDF),
   `backfill-invoices.js` (the bulk variant — one run republishes every historical
-  invoice), the data change `data-changes/2026-11-06-backfill-customer-invoice-pdfs-by-document-id.js`
-  (`liveClients`, the DocumentID backfill below), `utils/images-service.js`, `utils/image-variants.js`,
+  invoice), `services/payments/customer-invoice-backfill.js` (`openLiveClients` with
+  `write: true`, used only by the DocumentID backfill's apply step below), `utils/images-service.js`, `utils/image-variants.js`,
   `routes/product.js`, `services/social-posts/render-service.js` and the two in
   `utils/extras-icons/spaces.js` (the icon map and each icon). Counting by
   grep overshoots: `routes/payments.js:14`, `routes/payments/admin.js:14` and
@@ -868,7 +868,8 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
   one file per document well under the 16MB BSON limit, the way
   `services/ai-tasks/constants.js:180` pins `MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024`.
 - **Awareness — a missing customer invoice PDF is found by DocumentID, not docId** (HQ #d20b39,
-  2026-11-06; `services/payments/customer-invoice-backfill.js` + the data change above). The
+  2026-11-06/07; `services/payments/customer-invoice-backfill.js` +
+  `data-changes/2026-11-07-verify-customer-invoice-pdfs-by-document-id.js`). The
   per-order receipt itself is `payments`' territory; this is the backfill.
   - ZCredit returns the number as `ccPaymentRefData.data.ZCreditInvoiceReceiptResponse.DocumentID`
     (and on some older orders also at `ccPaymentRefData.ZCreditInvoiceReceiptResponse.DocumentID`).
@@ -891,6 +892,54 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     it is never fetched. The ticket's 438 counted that one.
   - All ZCredit document numbers come from ONE terminal: `processCreditCardPayment` reads
     `shoofi.store {id:1}.credentials`, not a per-store terminal.
+  - **Scope (2026-11-07):** DocumentID present AND no `url`, no `docId`, no `invoices[]`
+    (`buildBackfillSelection`). The 64 docId orders stay with `backfill-invoices.js` and the live
+    retry queue, which key on docId. `invoices[]` is manual invoicing's per-order EZcount
+    documents (`services/payments/order-invoices.js`; 14,534 orders carry it, none of the 437).
+    Prod dry run 2026-11-07: 437 orders, 85 stores, 232 documents (205 twin + 27 single, 0
+    collisions), 226 documents / 425 orders to verify.
+  - **Verify first, never "first Gmail hit".** `subject:<id>` is a search, and the live fetch
+    takes the first result. Three steps:
+    1. The verify data change writes nothing. Its only target matches no document, so HQ's
+       apply guard refuses any order write. Per document it checks:
+       - S3 HeadObject: the key exists → `key_exists`, never overwritten.
+       - The number is WHOLE in the Subject, so 500 does not match 5001.
+       - Exactly one email, with exactly one PDF.
+       - Gmail `internalDate` within −60 min / +24 h of `created`.
+       - The charge (`payload.TransactionSum`: the combined charge for a twin, never a leg's
+         `total`) stated in the email body.
+
+       No amount in the body → `unverified`, never `ok`. The PDF is sha256-hashed, never parsed
+       (no PDF library on the server).
+    2. A person checks the run's `sample` against ZCredit and Gmail.
+    3. A follow-up file from `makeApplyChange`, with that person's approval: the run id, the
+       checker, every sample id and `mismatches: []`. Without it, apply refuses everything.
+       With it, apply re-verifies and uploads only the SAME email and the SAME PDF bytes.
+       `unverified` is uploaded only with `acceptUnverifiedAmount: true`. It stamps
+       `ccPaymentRefData.docId` (a number, as ZCredit returns DocumentID), `url` and
+       `invoiceStatus: "completed"`.
+
+    Step 3 cannot ship with step 1: HQ plans a file once, runs it once, and at autonomy
+    `data` runs it by itself.
+  - **OPEN — needs a person's decision: 6 twin pairs with a VAT-exempt store**
+    (`exempt_store_twin_needs_decision`; exempt read from the per-store `store {id:1}`,
+    invariant 4). Each pair's ONE central ZCredit document is a tax invoice-receipt (Type 0)
+    at TaxRate 18 over the whole combined charge, the exempt store's sale included. All 6
+    have the exempt store as primary, and the twin document follows the primary's status, so
+    the store was not exempt (or not recorded so) when charged. Linking that document hands the
+    exempt store's customer a VAT document for a sale that store may not charge VAT on. The
+    pairs, as document / exempt store / orders:
+
+    | Document | Exempt store | Orders |
+    |---|---|---|
+    | 27987 | vapego | vapego 0224-1477 + burger-vibes 9774-3440 |
+    | 32533 | vapego | vapego 8518-7632 + supermarket-alosra 1401-9791 |
+    | 39955 | vapego | vapego 8692-6891 + anwar-alqods 6820-8910 |
+    | 37565 | abuissa-grills | abuissa-grills 7218-1241 + shnetzel-nadeem 1725-2298 |
+    | 33356 | pizza-pizza | pizza-pizza 4194-8270 + frosty 3723-5595 |
+    | 40405 | Fit-food | Fit-food 2798-6473 + time-out 9840-6115 |
+
+    The backfill excludes them; nothing is linked until a person rules.
 
 ## Recipe — change a payout or invoice amount
 1. **Trace the money first**: who collected (cash/card) → who is owed → which formula line.

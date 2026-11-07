@@ -137,8 +137,10 @@ background queue's success writes `invoiceStatus: "completed"` but **never `url`
 fetches at all** (`applyCaptureSuccess`, `services/twin-order/twin-payment-service.js`): both
 legs carry the one document's `DocumentID` and no url. To find every order that misses its PDF,
 read `DocumentID` too — `services/payments/customer-invoice-backfill.js` (accountant CORE,
-"a missing customer invoice PDF is found by DocumentID"; prod 2026-11-06: 437 such orders, 410
-of them twin legs).
+"a missing customer invoice PDF is found by DocumentID"; prod 2026-11-07: 437 such orders, 410
+of them twin legs). That backfill never trusts the first `subject:<id>` hit the live fetch
+takes: a verify-only data change checks number, date, amount and the S3 key first, and a
+person samples it before anything is uploaded.
 
 **Admin routes** (`routes/admin.js`, CORE invariant 11). Every one is `auth.required` plus a
 role check, and no client calls any of them.
