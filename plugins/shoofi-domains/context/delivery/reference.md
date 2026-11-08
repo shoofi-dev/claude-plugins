@@ -40,7 +40,7 @@ if it supports **BOTH** `store.supportedCities` (ObjectId[] — permission) **AN
 unique** (first4+last4 of `originalOrderId`; 88 bookIds shared across stores in prod,
 2026-11-08) — an order's row is located by `originalBookId` through
 `deliveryRowFilterForOrder` (`utils/delivery-row.js`), never by `bookId` alone (CORE
-invariant 20; orders CORE invariant 22).
+invariant 20; orders CORE invariant 23).
 **Status constants are authoritative in `consts/consts.js`** (`DELIVERY_STATUS`):
 `1` WAITING_FOR_APPROVE → `2` APPROVED → `3` COLLECTED_FROM_RESTAURANT (pickup) →
 `4` DELIVERED; `5` WAITING_IN_STORE; cancels `-1` by-driver, `-2` by-store, `-3` by-admin.

@@ -531,7 +531,7 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     the same store reuses a short number too. `originalBookId` (= `order.originalOrderId`) is on
     every row created since 2025-12-12 and never collided. The order side locates "this order's
     row" only through `deliveryRowFilterForOrder` (`utils/delivery-row.js`, orders CORE invariant
-    22): `{originalBookId, bookId}`, or `{bookId, appName}` for a legacy order, never `bookId`
+    23): `{originalBookId, bookId}`, or `{bookId, appName}` for a legacy order, never `bookId`
     alone. The same rule applies on this side, and two **writes** here still break it, because
     their caller sends nothing else: `POST /api/delivery/admin/cancel` (delivery-web
     `CardOrder.tsx` → `{bookId, cancelReason, cancelledBy}`) and `POST /api/delivery/update` →
