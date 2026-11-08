@@ -112,7 +112,8 @@ wins, a tie goes to the deal). Settlement readers of the snapshot are the `accou
   `customerId, ccToken, last4Digits, ccType, holderName, cvv, provider(ZCREDIT|HYP),
   isDefault, isActive, tokef, hypTransId`.
 - Server persists only **token + last4** (full PAN transits only `validate-card` and
-  client→ZCredit). ZCredit token from `ValidateCard`; HYP token = 19-digit permanent
+  client→ZCredit). `validate-card` requires the customer's token and is rate-limited per
+  customer (CORE invariant 12). ZCredit token from `ValidateCard`; HYP token = 19-digit permanent
   token from `getToken` (J5 hosted flow), charged with the soft protocol.
 
 ## 5. Per-order customer receipt (invoicing you own)

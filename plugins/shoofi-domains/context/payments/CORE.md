@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/HIGH-RISK-validate-card-require-auth + shoofi-app@fix/HIGH-RISK-validate-card-send-token / 2026-11-08 (invariant 12 validate-card auth + rate limit); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -155,6 +155,22 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.
+12. **`POST /api/payments/validate-card` needs a logged-in caller and is rate-limited.**
+   It runs ZCredit `ValidateCard` on the platform terminal (invariant 1), so an open route
+   is a card-testing oracle for anyone on the internet. Until HQ #23bf01 (2026-11-08) it had
+   no auth. Now: `auth.required` + `express-rate-limit` keyed on `req.auth.id`,
+   `VALIDATE_CARD_RATE_LIMIT` = 10 per 15 min, in process memory (a restart resets it; each
+   instance counts on its own). No token → 401, over the limit → 429; neither reaches ZCredit.
+   - The only caller is shoofi-app `components/credit-card/api/validate-card.ts` (add-card
+     form; the card is saved right after through the authed `POST /api/credit-cards`, so every
+     path is logged in). shoofi-partner and shoofi-shoofir have a `validate-card.ts` too, but
+     theirs posts to ZCredit directly and never reaches this route.
+   - ⚠️ **The app sends its token by hand, NOT through `axiosInstance`.** That instance's error
+     interceptor posts `JSON.stringify(error)` to the client-error log, and an axios error
+     carries `config.data`: the full card number. Never route a PAN-carrying request through
+     it. For the same reason the server never logs the axios error object here (it holds the
+     terminal password too) and does not echo ZCredit's error body (`error: "provider_error"`).
+   - Pinned by `test/integration/validate-card-auth.js`.
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
