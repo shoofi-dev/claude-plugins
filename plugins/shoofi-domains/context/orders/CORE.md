@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -597,6 +597,50 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests: `test/integration/order-shipping-price-check.js`. It covers each exemption, active
       and paused areas, unresolved cases, a throwing lookup, a lookup that never answers (the
       create response is not held), and a failed flag write.
+
+21. **`order.isFirstOrderAtStore` IS DECIDED ONCE, AT INSERT, AND ABSENT MEANS "UNKNOWN", NEVER
+    "FIRST"** (`services/orders/first-order-at-store.js`, shoofi-server#508, the partner tablet's "new customer"
+    badge, partner redesign item 15, approved by Sari 2026-11-08).
+    - **Meaning:** `true` = no earlier order of this `customerId` in THIS store's db counts;
+      `false` = one does; **absent** = unknown (the lookup threw or hit `maxTimeMS` 2000, no
+      customer id, or the order predates the field: no backfill). A reader shows the badge only
+      on `=== true`.
+    - **What counts:** every status except cancelled/rejected (`4 5 7 8 9`) and the uncharged
+      `"0"` attempt, plus the charged-never-finalised orphan (`"0"` with
+      `ccPaymentRefData.status === "success"`, the create route's idempotency `chargeLanded` rule).
+      A superseded Apple Pay placeholder (`supersededBySessionId`) never counts. So pending,
+      fraud review (`13`), future/ramadan (`14`/`15`) and school orders all count.
+    - **Identity = `customerId`, not the phone.** Customers are found by phone at login, deleting
+      an account is a soft `isDeleted` that the next login reverses on the SAME document, and
+      there is no phone-change or merge flow, so one phone keeps one `_id`. `orders.customerId`
+      is a string in prod (checked 2026-11-08), and the ObjectId form is matched as well.
+      `customerDetails.phone` is an unindexed snapshot.
+    - **Every inserter sets it, right before its `insertOne`:** `/api/order/create` (decided
+      before the `orderDoc` build, `applyFirstOrderFlag` after it, because the build spreads
+      `...parsedBodey` and a client-sent value must be overwritten or removed), and twin `/place`
+      + `/digital-place-pending` (both legs decided before either insert, each **in its own
+      store's db**, so the legs never count each other). Card, cash, Apple Pay, HYP, school,
+      the For-you chat (which goes through the normal create) and idempotent retries all use those
+      three routes. Nothing writes the field later: amend, accept, `update-delay`, the Apple Pay
+      finalize and session repoint all `$set` named fields, and `/api/order/update` is
+      whitelisted. So a reprint or a history view shows what was decided at insert, even after a
+      later cancel. `test/integration/first-order-at-store.js` fails when a new
+      `orders.insertOne` in production code has no `applyFirstOrderFlag` before it.
+    - **Cost:** one `findOne`, `_id` projection, stopping at the first match, on
+      `{ customerId: 1 }` (`customerId_idx`). `DatabaseInitializationService` creates it on every
+      store db at boot, fire-and-forget and never awaited before an insert. Before this change
+      only the one-off `utils/create-orders-indexes.js` made it, and prod had it on 1 of 262 store
+      dbs (2026-11-08). The largest `orders` collection is ~9.6k docs, so the index build is small
+      (Mongo 8.0, non-blocking builds).
+    - **Who reads it:** the partner's `admin/orders`, `admin/not-viewd` and `admin/all/not-viewd`
+      return whole documents, so the field is there with no projection change. The websocket
+      frames (`unviewed_orders_updated`, `order_status_updated`, `new_order_alert`) carry no
+      order body: they only trigger a refetch. `POST /api/order/admin/history` (shoofi-server#497,
+      open on 2026-11-08) projects its rows and does NOT carry it. Add it to `HISTORY_PROJECTION`
+      and `toHistoryRow` if the history tab wants the badge. It is not in `customers.orders[]`.
+    - **Secondary feature (invariant 6):** the lookup never throws into the create path. A
+      failure is a `logger.warn` (`[first-order-at-store] lookup failed`) and the order is
+      inserted without the field.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
