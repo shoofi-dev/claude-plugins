@@ -710,7 +710,11 @@
           "sendDataTimeoutMs",
           "sendDataWrapperTimeoutMs",
           "printCopyWithRetry",
-          "outcomeCountsAsPrinted"
+          "outcomeCountsAsPrinted",
+          "shouldReportPrintFailure"
+        ],
+        "utils/print-failure-notice.ts": [
+          "printFailureNoticeGate"
         ],
         "utils/print-attempts.ts": [
           "autoPrintSweepStatuses",
