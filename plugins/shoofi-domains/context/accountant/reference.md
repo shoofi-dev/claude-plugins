@@ -1,6 +1,6 @@
 # Accountant / Settlement / Payouts — Domain Context
 
-> last-verified §4 (partner/summary + daily-orders: gross only, reports-role restricted shape, the report's coupon credit + compensation window): shoofi-server@fix/partner-summary-figures / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
+> last-verified §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
 
 > **Who you are:** the agent that owns **money OUT + the books** — computing what stores
 > and delivery companies/drivers are owed, issuing tax invoices, and generating bank
@@ -65,8 +65,10 @@ totalForTransfer = creditCardRevenue + driveInCreditCard - totalOutcomes   ← t
 totalForInvoice  = creditCardRevenue + driveInCreditCard                    ← tax-invoice gross
 balance          = totalForTransfer   (no VAT adjustment for any businessType — CORE invariant 1)
 ```
-Revenue comes from an internal self-call to **`stores-export-new`** (§4, the real engine). The
-POST forwards the generating admin's `authorization` + `app-type` (`selfCallHeaders`,
+Revenue comes from an internal self-call to **`stores-export-new`** (§4, the real engine; its
+per-store body is `services/payments/store-sales.js` since 2026-11). The engine's optional
+`sources` argument replaces its reads with in-process readers — only the partner screen passes
+them (§4, CORE invariant 17). The POST forwards the generating admin's `authorization` + `app-type` (`selfCallHeaders`,
 `services/payments/settlement-access.js`), and a 401/403 from it throws (`throwIfSelfCallRefused`)
 instead of saving the report on ₪0 card revenue (CORE invariant 17).
 Commission base = the FINAL items price charged (CORE invariant 3). `vat = calculateVAT(totalCommission)` (`utils/vat.js`).
@@ -165,13 +167,17 @@ This recipient rule is the STORE path only. Driver reports pick their recipients
 
 ## 4. Financial dashboards + the revenue engine — `routes/payments/{admin,summaries}.js`
 Read-only aggregations: `admin.js` `/overview`, `/partners` (flat 15%), `/drivers`, `/analytics`.
-**`POST /stores-export-new` (`admin.js`) is the real revenue source** feeding store reports:
+**`POST /stores-export-new` (`admin.js`) is the real revenue source** feeding store reports
+(the per-store body: `services/payments/store-sales.js` `computeStoreSalesRow` → `buildStoreSalesRow`):
 per store, over `orders` with `status ∈ {"2","3","10","11","12"}` (completed) in range —
 commission base = the charged `orderPrice` (CORE invariant 3 — not pre-discount since 2026-08-04), revenue by method **minus coins**
 (`orderPrice - coinsValue`), coupon split from per-source `couponUsages` docs. `summaries.js`
-serves partner/driver self-service views via `calc.js`. The partner ones are GROSS sales only
-(no commission/earnings since 2026-11); their coupon credit and compensation lines reuse the
-report's `shoofiCouponCredit` and `storeCompensationWindow` (CORE invariant 17).
+serves partner/driver self-service views. The partner ones (`partner/summary`,
+`partner/daily-orders`) are **the store report itself**: `services/payments/partner-summary.js`
+runs `generateStoreReportData` in-process over the requested window (a month = that month's
+report, line for line) and slices the same data into business days / single orders through the
+same engine. Commission, VAT, contract charges, carry-over and the transfer are month-only
+(`MONTH_ONLY`). Response shape and the v1 field mapping: CORE invariant 17.
 
 **Who may call them** (CORE invariant 17). `overview`, `partners`, `analytics`, `stores-export`,
 `drivers` and `delivery-company-drivers` are MASTER_ONLY on `utils/restricted-admin-routes.js`.
@@ -612,7 +618,7 @@ approves, sends reports, and exports the MASAV Excel. (Full-stack: server comput
    10580, both ₪545.04). Our DB knows only the later one. Unless cancelled at HYP, those stores were
    invoiced twice for June. Found 2026-09-27 — needs a human to check HYP and decide.
 
-9. **Percentage-split percentage coupons are billed as percent points** (`routes/payments/admin.js:1190-1191`,
+9. **Percentage-split percentage coupons are billed as percent points** (`services/payments/store-sales.js:202-203`,
    CORE invariant 7 + Known status). Found 2026-10-26 while designing coupon drafts; ₪0 exposure in prod
    today (2 coupons, both `storePercent: 0`). Drafts exclude `store_percentage_off`; the ordinary form
    does not. Needs an owner ruling before either path makes one with a store share.
