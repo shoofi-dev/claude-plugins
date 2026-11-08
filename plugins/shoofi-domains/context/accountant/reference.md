@@ -1,6 +1,6 @@
 # Accountant / Settlement / Payouts — Domain Context
 
-> last-verified §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
+> last-verified §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
 
 > **Who you are:** the agent that owns **money OUT + the books** — computing what stores
 > and delivery companies/drivers are owed, issuing tax invoices, and generating bank
@@ -254,9 +254,20 @@ since then every `/api/hyp/admin` write is in `services/audit/admin-audit-routes
      `ua_uuid` is NOT sent on settlement documents (see the bullet above).
   2. *Tax Authority approval* by the OWNER: `taxMinistryURL` (…/front/auth/igniteTaxAuthorityOauth2/<u_uuid>,
      from the distributor list or `getBusinessData.taxAuthorityURL`), sent by `send-tax-url` /
-     `bulk/send-tax-urls` with WhatsApp template `tax_authority_approval`. It **expires**:
+     `bulk/send-tax-urls` / the renewal reminder through `sendConsentMessage`
+     (`services/invoicing/tax-consent.js`): WhatsApp template `tax-consent-settings.whatsappTemplate`
+     (`[name, who, link]`, Arabic) or, while unset, `tax_authority_approval` (`[name, link]`). It **expires**:
      `maxConsentDate`, ≈ 3 months after approval (91–95 days after `taxUrlSentAt` on prod). Renewal =
-     the owner opens the same URL again.
+     the owner opens the same URL again. **It is not the representative permission to שופי שופינג בע"מ**
+     ("חשבונית ישראל – בקשת מספר הקצאה", ≈ 1 year) that owners see in the Tax Authority portal; only this
+     one lets EZcount allocate. Only the owner whose ID is the file number, someone authorised for a
+     company, or an authorised accountant can approve (raneen-sweets, file 040934846, never approved —
+     likely logged in with another person's ID). The instructions text (`INSTRUCTIONS_TEMPLATE_AR`, the
+     Meta submission) is in shoofi-server `docs/invoice-step-tracking.md`; the admin's "copy" renders
+     the same text. Admin routes (`routes/tax-consent.js`): `GET|POST …/{stores/:storeId|delivery-companies/:companyId}/tax-consent[/check|/message]`,
+     `GET|PUT /api/hyp/admin/tax-consent/settings` (PUT master only), `GET /api/hyp/admin/tax-consent/reminders/preview`.
+     Renewal reminder: `services/invoicing/tax-consent-reminders.js` + `utils/crons/tax-consent-reminder-cron.js`,
+     off unless `remindersEnabled` (CORE invariant 19).
   3. *Validity* — `GET /v2/api/distributors/users` (distributor key: `isHaveAccessTokenAndValid`,
      `maxConsentDate`, `taxMinistryURL`, all stores incl. OAuth) and `GET /api/users/getBusinessData`
      (store key: same + `isTaxAuthorityUserLocked`, `u_comp_type`; 401 `insufficient_scope` for OAuth
@@ -423,7 +434,8 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   problems[{code, severity block|warn, messageHe, nextActionHe, action, field?}], taxAuthority, at, by}}`
   (CORE invariant 19; shoofi-server `docs/invoice-step-tracking.md`). The list route adds a computed
   `taxAuthority{approvalState, maxConsentDate, isLocked, taxMinistryURL, taxUrlSentAt, lastTaxUrlSend}`
-  per row (plus `ezcountBusinessType`), and **`derived`**:
+  per row (plus `ezcountBusinessType`; since 2026-11-07 also `daysLeft`, `checkedBy` and
+  `sends{total, sent, copied, failed, reminders, last, lastOk}` from `summarizeSendLog`), and **`derived`**:
   `{category, problems[{key, code, severity fail|block|warn, title, detail, actionId, source facts|steps}],
   steps[{key, state ok|failed|blocked|pending|na|warn, sub, title}], nextAction{actionId, tone}, history[]
   (recorded + synthesized `legacy: true` entries), taxAuthority, facts{businessType, ezcountBusinessType,
@@ -487,14 +499,20 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   `bankAccount{bank,branch,accountNumber,companyId,
   businessType('exempt'|'licensed')}`, `billingContacts[]`, `contract{commissionTiers[],
   coinsCommissionPercent, monthlyPayments[], onetimePayments[]}`, `store.hyp{ua_uuid,api_key,access_token,status,
-  connectionMethod, taxUrlSentAt (only on a real send since 2026-11), taxUrlSendLog[] (last 20: at, by,
-  phone, method, ok, error), taxAuthority{checkedAt, source business_data|distributor, matched,
-  isHaveAccessTokenAndValid, maxConsentDate, isLocked, ezcountBusinessType, ezcountCrn, taxMinistryURL,
-  businessDataUnavailable oauth_scope|error, lookupError, approvalState, raw}}`. `businessType` values in prod:
+  connectionMethod, taxUrlSentAt (only on a real send since 2026-11; never on a copy), taxUrlSendLog[] (last 100
+  since 2026-11-07: at, by{id,name}, channel whatsapp|sms|copy, method (= channel), phone, ok, error, stage
+  manual|bulk|copy|reminder_before_expiry|reminder_expired, template, messageId, period; older entries have
+  only at, by, phone, method, ok, error), taxAuthority{checkedAt, checkedBy, checkedVia live_check, source
+  business_data|distributor, matched, isHaveAccessTokenAndValid, maxConsentDate, isLocked, ezcountBusinessType,
+  ezcountCrn, taxMinistryURL, businessDataUnavailable oauth_scope|error, lookupError, approvalState, raw},
+  taxAuthorityLastCheckError{at, by, error}|null}`. `businessType` values in prod:
   `authorized_dealer` | `company` | `exempt` (and legacy `licensed`); 46 stores had none on 2026-11-05.
   Who may write it: `POST /api/store/update` takes `accounting` (and `hyp`, `coinsSettings`) only from a
   dashboard token. A partner token's write is cut to its store-management toggles (menu-catalog CORE
   invariant 28). The billing-contacts screen saves through that route with the admin's own token.
+- **`shoofi.tax-consent-settings`** — one doc `{_id:"settings", remindersEnabled (default false — the
+  renewal reminder sends nothing), whatsappTemplate (null = legacy `tax_authority_approval`), updatedAt,
+  updatedBy}`. Written only by `PUT /api/hyp/admin/tax-consent/settings` (master).
 - **`shoofi.amazonconfigs`** — `{app:"greeninvoice"|"hyp"|"invoiceProvider"|"amazon"}` (provider creds/switch; never print).
   `{app:"hyp"}` also carries `CUSTOMER_DOC_UA_UUID` (customer-document sub-account; empty = don't send)
   and `USE_DEMO`/`API_ENDPOINT`/`DEMO_ENDPOINT`. **No admin UI edits this document** — prod changes are a manual Mongo write.
@@ -533,7 +551,14 @@ per-store result.
 (`driver-reports/DriverReportsList.tsx`, 2026-11-06) uses the same row and components through
 `companyRowModel.ts`: dots דוח → אשראי → תוספות → הקצאה → שליחה, the report's own WhatsApp folded into
 the דוח dot; same chips, pre-check (`/hyp/admin/driver-reports/invoice-precheck`) and results modal;
-`DriverReportDetail.tsx` shows the stepper and the history. `hyp/HypManagement.tsx` shows each
+`DriverReportDetail.tsx` shows the stepper and the history. The "רשות המסים ומסמכים" panel of both
+lists opens with `components/tax-consent/TaxConsentBox.tsx` (2026-11-07; also on the store and company
+HYP connection panels, `accounting/HypConnection.tsx`, `driver-reports/CompanyHypConnection.tsx`): "אישור
+EZcount ברשות המסים — מתחדש כל 3 חודשים", state, expiry and days left, a note that it is not the
+שופי שופינג permission, who must approve, "נבדק: …", "נשלח N פעמים, אחרון: … ע"י …", and the buttons
+"בדוק עכשיו מול EZcount" and "העתק הודעה עם הוראות" (the bare-link copy button is gone — copies go
+through the logged route). It fetches `GET …/tax-consent` itself; the approval lines left the
+documents list. `hyp/HypManagement.tsx` shows each
 store's approval expiry and expired / expiring / locked counts. This is where a human generates,
 approves, sends reports, and exports the MASAV Excel. (Full-stack: server computes, admin drives.)
 
