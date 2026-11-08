@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@feat/store-closed-until (invariant 31 — special hours closedUntil / closedDays on isStoreClose, the same cron; invariant 28 partner fields; /api/store/holiday/* removed) / 2026-11-08; shoofi-server@feat/timed-busy-prep-extra (invariant 30 — timed busy busyUntil, extra prep time prepExtra, the expiry cron; invariant 28 partner fields) / 2026-11-07; shoofi-server@feat/prep-time-suggestion-field (invariant 28 — prepTimeSuggestion, a partner store field) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 — outOfStoreUntil, the 07:00 restore, store-wide outOfStockExtras) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -13,7 +13,10 @@ Products, categories, menu assembly, options/extras, availability & stock, catal
 Server: `routes/menu.js`, `routes/product.js` (and its gate `services/catalog/product-access.js`), `routes/category.js`, the catalog slice of
 `routes/store.js` (the category gate `services/catalog/category-access.js`, the public store card
 `services/catalog/public-store.js` — invariant 27, and who may save the store document,
-`services/catalog/store-update-access.js` — invariant 28), `routes/translations.js`,
+`services/catalog/store-update-access.js` — invariant 28; timed busy and extra prep time,
+`services/catalog/store-timed-status.js` + `utils/crons/store-timed-status-cron.js` — invariant 30,
+and special hours on the same two files — invariant 31),
+`routes/translations.js`,
 `services/translations/owned-translations.js` (rows
 written by code — invariant 24), `routes/global-search.js`, `utils/menu-cache.js`,
 `utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`,
@@ -73,6 +76,13 @@ boundary and say so in the PR.
    `{ isInStore:false, outOfStockByQuantity:true }`. **Human-confirmed: applies to ALL products,
    no exceptions.** Decrement only on order confirmation; restore only re-enables products that
    were `outOfStockByQuantity` (never un-hides a manual disable).
+   **Timed "off until…"** (`outOfStoreUntil`) is a separate, manual switch, and only the 07:00
+   Asia/Jerusalem cron turns it back on (`restoreTemporaryOutOfStoreProducts`,
+   `utils/crons/products-in-store-update.js`): nothing checks it at read time, so a product whose
+   time has passed stays off until the next 07:00 run. `GET /api/menu` projects it for
+   `shoofi-partner` / `shoofi-admin` only (never the customer menu or its cache).
+   **Sold-out extras** (`store.outOfStockExtras`) are store-wide by option `nameAR` — there is no
+   per-product switch. Detail: reference §5.
 5. **`supportedCategoryIds` are STRINGS**, compared via `{$toString:'$_id'}`. Don't switch to
    ObjectId comparison without a data migration.
 6. **Product ordering** comes from `categoryOrders[categoryId]`, falling back to legacy `order`.
@@ -862,6 +872,14 @@ boundary and say so in the PR.
       cleared before. Six still clear only the regular key, not `_schoolProject`, which breaks
       invariant 2 and predates the gate: `update/activeTastes`, `update/order`,
       `update/order-per-category`, `bulk-reorder`, `reset-order/:categoryId`, `migrate-orders`.
+    - **`POST /api/store/out-of-stock-extras`** (`routes/store.js`, the sold-out options list)
+      takes `PRODUCT_ADMIN_OR_OWN_STORE` too. It had no auth until 2026-11-08. Its only caller is
+      shoofi-partner `stores/menu` `updateOutOfStockExtras` (`Token`). Two bodies
+      (`services/catalog/out-of-stock-extras.js`): the whole list
+      `{ outOfStockExtras: [...] }`, which installed partner builds send and is `$set` as sent
+      (last writer wins between tablets), or one option `{ name: "<nameAR>", outOfStock: bool }`,
+      which does `$addToSet` / `$pull` so concurrent toggles all land. Both clear both cache keys.
+      Tests: `test/integration/out-of-stock-extras-auth.js`. Detail: reference §7.
 
 27. **CATEGORY AND EXPLORE ADMIN ROUTES ARE DASHBOARD-ONLY. THE HOME'S READS STAY PUBLIC, AND NO
     PUBLIC STORE LIST SENDS A STORE'S SECRETS** (`services/catalog/category-access.js`, `services/catalog/public-store.js`,
@@ -939,11 +957,12 @@ boundary and say so in the PR.
       tokens get 403, and no token gets 401. The own-store check is a copy of `ownStoreGate` in
       `services/catalog/product-access.js` (shoofi-server #346); fold the two together once both
       have merged.
-    - **What a partner writes:** only `PARTNER_STORE_FIELDS`: `isStoreClose`, `isOpen`, `isBusy`,
+    - **What a partner writes:** only `PARTNER_STORE_FIELDS`: `isStoreClose`, `isOpen`, `isBusy`, `busyUntil`, `prepExtra` (invariant 30),
+      `closedUntil`, `closedDays` (invariant 31; `closedDaysApplied` is the cron's, never a client's),
       `openHours`, `creditcard_support`, `cash_support`, `takeaway_support`,
       `delivery_support`, `isOrderLaterSupport`, `drive_in_support`, `invoicePrintCount`,
-      `ramadanSettings`. Those are exactly the controls of the partner app's store-management
-      screen and header (`screens/admin/store-managment`, `components/layout/header`). The
+      `ramadanSettings`, `prepTimeSuggestion`. Those are exactly the controls of the partner app's
+      store-management screen and header (`screens/admin/store-managment`, `components/layout/header`). The
       app posts its WHOLE copy of `POST /api/store` on every save, wrapped as `{ data }`. Each
       key outside the list is left out of the write, so it keeps its stored value; nothing the
       owner can edit is lost. **Add a key only when a partner screen edits it, never because the
@@ -960,6 +979,17 @@ boundary and say so in the PR.
       so a store without one keeps none after a partner save. A dropped key whose value differs
       from the stored one is logged as
       `store update: partner write left out fields the partner app cannot edit`.
+    - **`prepTimeSuggestion`** (added 2026-11-07, shoofi-partner #47): the switch for the v3
+      new-order screen's pre-selected prep time (the last time picked on that device today, else
+      `defaultMinutes`; it never accepts by itself). The partner reads
+      `storeData.prepTimeSuggestion` from `POST /api/store` (it passes `sanitizeStoreForPublic`,
+      no allowlist) and treats anything but `enabled === false` as ON, so a store without the key
+      has it on. `POST /api/store/update` stores it as `{ enabled: boolean, defaultMinutes?: slot }`
+      for EVERY caller via `normalizePrepTimeSuggestion` (`services/catalog/prep-time-suggestion.js`,
+      `PREP_TIME_SLOTS` = 10 15 20 25 30 35 40 45 60, the partner's slots): a `defaultMinutes` off
+      the slots and any other key are left out; a value without a boolean `enabled` is not written
+      at all (the stored one stays, logged `store update: invalid prepTimeSuggestion not written`).
+      No admin-web control; the admin form re-posts the loaded document, so it keeps the value.
     - **Status change** compares only keys the request writes (`writes(key)`), because a partner
       write never carries `business_visible` and the rest. The explore cache is cleared and the
       closed/busy SMS sent only for a real change.
@@ -1012,6 +1042,105 @@ boundary and say so in the PR.
       and on top of `ENABLE_CRONS` it runs only when `shoofi.store {id:1}.isExtrasIconsSyncEnabled
       === true`. `extrasIconsSyncDryRun === true` makes it a dry run that calls the model but writes
       only its run record. Both fields are server-only, not in `SHOOFI_CONFIG_PUBLIC_FIELDS`.
+
+30. **A TIMED BUSY ENDS BY ITSELF; EXTRA PREP TIME KEEPS THE STORE OPEN AND RAISES ONLY WHAT
+    CUSTOMERS SEE** (`services/catalog/store-timed-status.js`, `utils/crons/store-timed-status-cron.js`,
+    `docs/store-timed-status.md`; added 2026-11-07 for the partner's v3 header status sheet,
+    shoofi-partner `helpers/store/store-status.ts`). Two fields on `<appName>.store {id:1}`, both in
+    `PARTNER_STORE_FIELDS` (invariant 28):
+    - **`busyUntil`** — ISO string, stored as UTC `toISOString()`, or null. With `isBusy: true` the
+      pause ends at that instant; null/absent is the old busy, until switched off. Busy still means
+      **no ordering now** (the customer app treats it like closed). The partner offers 30 min, 1 h
+      and "until back".
+    - **`prepExtra`** — `{ minutes: 10 | 20, until: ISO }` or null (`PREP_EXTRA_MINUTES`). While
+      `until` is ahead the store stays open, `POST /api/store` raises `minReady`/`maxReady` by
+      `minutes` for customer-facing callers, and the partner's v3 new-order screen adds them to its
+      suggested prep time (`suggestPrepMinutes` `busyExtra`, `activePrepExtra`).
+    - **Writes** (`POST /api/store/update`, EVERY caller — partner and the admin StoreData form both
+      post their whole copy): `normalizeTimedStatusWrite` runs after `currentStore` is read and
+      before the status-change check. `busyUntil` must be null or an ISO date-time at most 24 h
+      ahead, `prepExtra.until` in (now, now + 4 h], each +5 min clock skew (`CLOCK_SKEW_MS`); junk is
+      **not written** (stored value stays, `warn` "store update: timed status value not written as
+      sent"). A `busyUntil` already past in a write that carries `isBusy: true` is a stale copy of an
+      ended pause and becomes `isBusy: false, busyUntil: null` (`info`), so an echo never switches
+      busy back on; an ended `prepExtra` is not written. `isBusy` written as anything but true also
+      writes `busyUntil: null` when one exists; a future `busyUntil` on a store not busy after the
+      write is not written. No key is added to a store that never had one.
+    - **Reads** (`POST /api/store`): `effectiveTimedStatus` for every caller (an ended pause reads
+      `isBusy: false, busyUntil: null`, ended/malformed `prepExtra` reads null), then
+      `withPrepExtraReadyRange` ONLY when the caller is not a verified admin and not
+      `app-type: shoofi-partner` (`isCustomerFacing`). **Never raise the range for the admin or the
+      partner:** both post their copy back, and a raised `minReady`/`maxReady` written back would stay
+      raised for good. (The admin form loads `GET /api/store/get/:appName`, raw.) Every ready range
+      the customer app shows reads `storeData.minReady/maxReady` (+ the delivery area's
+      `minETA/maxETA`), and the order snapshot's `storeData.maxReady` drives the order timer, so the
+      raised range needs no app change. **Not covered:** twin orders compute `twinPrepRange` in
+      `routes/twin-order.js` from the raw store docs (orders domain), without the extra minutes.
+    - **Expiry is a cron, not a read check in every reader.** `isBusy` is read raw by explore
+      ranking (and its cache), twin eligibility, For you `open-stores.js`, the public coupon page,
+      the store-status report and `RestaurantAvailabilityService`. The cron clears the stored flag
+      so all of them stay right: every minute (`* * * * *`, lock `cron:store-timed-status`, TTL 55 s,
+      `ENABLE_CRONS`), each `shoofi.stores` entry → `timedStatusExpiry`: an ended pause →
+      `isBusy: false, busyUntil: null`; a `busyUntil` on a store not busy → null; ended/malformed
+      `prepExtra` → null. The `$set` filters on the values it read (`busyUntil`, `prepExtra.minutes`,
+      `prepExtra.until` — dotted, because whole-subdocument equality is field-order-sensitive), so
+      an owner who extended the pause in between wins. Per changed store: a `store-update-history`
+      row (`source: "store-timed-status-cron"`, stamped at `busyUntil` so `busy-time.js` closes the
+      interval at the real end), `clearExploreCacheForStore` when busy ended, `store_refresh` to
+      customers and `store_updated` to the store's partner tablets (both refetch `POST /api/store`).
+      Side effects are swallowed and logged. Worst case for raw readers: ~1 minute after
+      `busyUntil`, plus the home's v2 explore cache TTL (5 min), which `clearExploreCacheForStore`
+      does not reach — the same as any status change.
+
+31. **A PLANNED CLOSURE IS THE MANUAL-CLOSE SWITCH, FLIPPED BY THE CRON; CUSTOMERS SEE ONLY
+    `isStoreClose` + `closedUntil`** (`services/catalog/store-timed-status.js`,
+    `utils/crons/store-timed-status-cron.js`, `docs/store-timed-status.md` "Special hours"; added
+    2026-11-08, partner redesign item 14: "closed until a time" and "closed on these dates", not
+    different hours on a date). Fields on `<appName>.store {id:1}`:
+    - **`closedUntil`** — ISO (UTC) or null; meaningful only with `isStoreClose: true`, the closure
+      ends at that instant; null/absent = closed until reopened (the old behaviour). Partner field.
+    - **`closedDays`** — `["YYYY-MM-DD"]`, Israel business dates; unique, sorted, today..+365, ≤ 60.
+      Partner field.
+    - **`closedDaysApplied`** — `"YYYY-MM-DD"`, the latest planned date the cron applied (a
+      high-water mark). **Server-owned: removed from every write**, stripped from every non-admin
+      read.
+    - **Why `isStoreClose`:** every open-now reader already honours it (`POST /api/store` `isOpen`,
+      `RestaurantAvailabilityService`, `public-coupon.js`, the support agent's `find-store`, the
+      admin-issues competitor check, the open reminder). Do not add a parallel "closed" flag that
+      each of them would have to learn.
+    - **Writes** (`normalizeClosureWrite`, inside `normalizeTimedStatusWrite`, every caller): the
+      busyUntil rules with `isStoreClose` (≤ 60 days ahead +5 min skew; an echo of the stored value
+      is kept at any distance; reopening writes `closedUntil: null`; a future end on a store not
+      closed is not written). A past `closedUntil` with `isStoreClose: true` is a stale copy and
+      becomes open — **unless the store is closed now under a newer setting**, then the write
+      changes neither field. `closedDays`: any malformed date, > +365 or > 60 dates → not written;
+      dates before the store's current business day are dropped (`info`).
+    - **Reads:** `effectiveTimedStatus` reads a closure past `closedUntil` as open and the computed
+      `isOpen` uses `isClosedNow`. `withoutClosurePlan`: customers get no `closedDays`, the partner
+      gets them, only the admin gets `closedDaysApplied`. Store cards
+      (`getAvailableStores` → explore v1/v2 `storesMap`, `available-stores`, twin eligible stores,
+      For you open stores) carry `store.closedUntil` = `activeClosedUntil` (end of a closure in
+      force, else null). Explore v2 caches cards 5 min: a past `closedUntil` there means "no end".
+    - **The cron** (same sweep and lock as invariant 30, after busy/prep, `closureTransition`):
+      reopen at `closedUntil`; a planned day is **due** when it is the store's current business day
+      or, once that day's hours have ended, the next one, and is after `closedDaysApplied`. Due +
+      open → `isStoreClose: true, closedUntil: reopenAfter(...)` (the next opening by the hours that
+      is not itself planned, in that date's own UTC offset); due + closed with an earlier end →
+      extended; due + closed with no end or a later one → unchanged; always
+      `closedDaysApplied: <latest due>`. Past planned dates are `$pull`ed. The `$set` filters on
+      `isStoreClose`, `closedUntil`, `closedDaysApplied` and the due day in `closedDays`. Side
+      effects for reopen/close/extend only: history row (`isStatusChanging`), explore clear,
+      `store_refresh` + `store_updated`. **No SMS** (the manual route's "store closed" text is not
+      sent for a plan). An owner who reopens is not closed again that day (high-water mark).
+    - **Business day:** `currentBusinessDay` = `getBusinessDateKey` (`utils/store-service.js`, from
+      the queried instant and the store's own hours, closed gaps snapped) — NOT `routes/order.js`
+      `getBusinessDayBoundaries`, which picks the overnight branch from the wall clock — plus a
+      guard: while the day before's window is still open, it is still the day before (the snapped
+      key alone calls 00:30 "today" when today is off by the hours after an overnight night).
+      Malformed hours → `utils/business-day.js` `businessDayKey` (07:00). Pinned by
+      `test/integration/store-closed-until.js`.
+    - **`holidayDates` is dead.** `POST /api/store/holiday/add|delete` had no auth, no reader and
+      no client caller ever; removed 2026-11-08. Never revive them for planned days.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
