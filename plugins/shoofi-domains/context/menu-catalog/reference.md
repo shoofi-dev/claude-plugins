@@ -129,7 +129,8 @@ left out keeps its stored value; a nested object (`coinsSettings`, `accounting`)
   (`PUT /api/shoofiAdmin/stores/:storeId/billing-contacts`, forwards the admin's token).
 - **Partner** (`Token` + `app-type: shoofi-partner`, own store only): `PARTNER_STORE_FIELDS`, i.e.
   `isStoreClose isOpen isBusy openHours creditcard_support cash_support takeaway_support
-  delivery_support isOrderLaterSupport drive_in_support invoicePrintCount ramadanSettings`.
+  delivery_support isOrderLaterSupport drive_in_support invoicePrintCount ramadanSettings
+  prepTimeSuggestion`.
   The partner app posts `{ data: <its whole storeData> }` from `screens/admin/store-managment`
   `onSave` and the header open/close/busy toggles. That copy is `POST /api/store`'s answer:
   the stored keys minus `SENSITIVE_STORE_FIELDS`, plus `workingHours`, `isDeliveryOpen`,
@@ -138,6 +139,10 @@ left out keeps its stored value; a nested object (`coinsSettings`, `accounting`)
   nothing. With no `coinsSettings` stored it carries the app's `defaultCoinsSettings`
   (`enabled: false`); the coins toggle has been commented out of the screen since 2026-05-27.
 - `invoicePrintCount` missing or invalid in the request is written as `1`, for any caller.
+- `prepTimeSuggestion` — `{ enabled: boolean, defaultMinutes?: 10|15|20|25|30|35|40|45|60 }`, the
+  partner's v3 new-order screen switch (absent = on). Normalised for any caller by
+  `normalizePrepTimeSuggestion` (`services/catalog/prep-time-suggestion.js`): an off-slot
+  `defaultMinutes` and unknown keys are dropped; no boolean `enabled` = the key is not written.
 - `isStockManagment === true` in the write runs the stock backfill (§5), so only a dashboard save
   can run it.
 
