@@ -1,6 +1,6 @@
 # Accountant / Settlement / Payouts — Domain Context
 
-> last-verified §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
+> last-verified §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
 
 > **Who you are:** the agent that owns **money OUT + the books** — computing what stores
 > and delivery companies/drivers are owed, issuing tax invoices, and generating bank
@@ -293,6 +293,17 @@ since then every `/api/hyp/admin` write is in `services/audit/admin-audit-routes
   not set, and the `send` step carries `details.storeInvoice: 'not_required'`. The single-report GET
   carries `invoiceStatus` (like the list rows). The admin web's `invoice-steps/sendInvoiceGate.ts` uses
   it, so the page offers "לא נדרשת" instead of a "צור חשבונית חנות" that can only fail.
+- **`send-invoice` when Shoofi owes the store** (`shoofiInvoiceRequiredForSend` false: numeric
+  `totalOutcomes ≤ 0`). There is no Shoofi document, so {{3}} is `NO_SHOOFI_INVOICE_TEMPLATE_TEXT`
+  ("لا يوجد هذا الشهر (الكوبونات الممولة من شوفي أكبر من العمولة)"). Shoofi's link probe is skipped;
+  the store document's allocation and link checks run as usual. Both `hypStoreInvoiceSent` and
+  `hypInvoiceSent` are set, and the `send` step carries `details.shoofiInvoice: 'not_required'`. No
+  document at all → 400 `NO_INVOICES_TO_SEND`, not recorded. The admin web decides the route, whether
+  a report has anything to send, and "unsent" in `invoice-steps/invoiceRouting.ts` (`isHypReport`,
+  `hasSendableInvoice`, `isInvoiceUnsent`, `sendInvoiceEndpoint`). The bulk send modal, the per-row
+  action, the row's ⋯ menu and the report page all use it. The page shows "לא נדרשת — הקופונים של
+  שופי גדולים מהעמלה (שופי חייבת לחנות)" (or "אין סכום לחיוב בתקופה" at exactly ₪0) with a send
+  button, instead of "צור חשבונית מס".
 - Invoice fields land on `storeReports` (`greenInvoice*`, `hyp*Invoice*`, `invoiceProvider`).
 
 ## 6. Driver / delivery-company settlement — `routes/driver-reports.js`
