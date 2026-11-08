@@ -181,7 +181,8 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 - **`delivery-company.bookDelivery`** (Mongo collection `book-delivery`) carries three order keys:
   `bookId` = the order's short `orderId`, `originalBookId` = its full `originalOrderId`, and
   `appName` = the store's DB name. It mirrors `DELIVERY_STATUS` (`1` waiting_approve … `3`
-  collected/pickup … `4` delivered). CORE invariant 22.
+  collected/pickup … `4` delivered). CORE invariants 22 (matching a delivery) and 23 (locating an
+  order's row: `deliveryRowFilterForOrder(order, appName)`, `utils/delivery-row.js`).
   - **The short number is not unique, across stores or within one.** `orderId` is the first 4 +
     last 4 digits of the 14-digit `originalOrderId` (`generatedOrderId`, `routes/order.js`; the
     twin routes cut it the same way), roughly 5×10^7 values. Prod on 2026-11-08: 88 `bookId`s were
@@ -224,22 +225,19 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
       1096-8335 never reached the customer's ActiveOrders screen or tab-bar bubble, because
       burger-house had a delivered 1096-8335 from 2026-09-21. The customer ordered again. Fixed in
       shoofi-dev/shoofi-server#513. Tests: `test/integration/customer-active-orders-per-store.js`.
-  - Also keyed on the full id: the `update-delay` lookups (`findOne({ originalBookId })`), the
-    twin `group/:groupId/full` read and the twin `assign-driver` lookup, which tries
-    `originalBookId` first. `routes/order-comment-to-courier.js` pairs `bookId` + `leg.appName`.
-  - **Still keyed on `bookId` alone (found 2026-11-08, not fixed here):**
-    - **Writes (being fixed separately, 2026-11-08):** in `POST /api/order/update`
-      (`routes/order.js`), the ready-for-pickup branch (status `3`) and the cancel branch
-      (`4`/`7`/`8`) both `findOne` and `updateOne({ bookId: order.orderId })`. The cancel branch
-      can mark ANOTHER order's row cancelled and leave this order's courier booked.
-    - `syncDeliverySnapshot` (`routes/order-amend.js`) reads and overwrites the snapshot the same
-      way.
-    - **Admin and support reads:** `routes/admin/order-monitoring.js` (`findOne({ bookId })`),
-      `POST /api/delivery/orders/batch` (no caller), the `assign-driver` fallback in
-      `routes/twin-order.js`, and `update-address-to-current-location` (`routes/customer.js`,
-      `$or` with `bookId`).
-    - `GET /api/delivery/book/:bookId` is owner-scoped for a mobile token (delivery CORE).
-    - A bare `updateOne` on a shared number hits whichever row Mongo returns first.
+  - **Located with `deliveryRowFilterForOrder`** (CORE invariant 23, shoofi-server#514, merged
+    2026-11-08): `/api/order/update` cancel and ready-for-pickup (find, then write by `_id`),
+    `update-delay`, order-amend `syncDeliverySnapshot`, twin `cascadeCancel` / `degradeToSingle` /
+    `undoDegrade` (via `legDeliveryFilter`), twin `group/:groupId/full` and `assign-driver`,
+    support `update-address-to-current-location`, admin order-monitoring `computeOrderDelays`,
+    support-agent `find_order`. `routes/order-comment-to-courier.js` pairs `bookId` + `leg.appName`.
+  - **Still keyed on `bookId` alone:** delivery-side, need a delivery-web change (delivery CORE
+    invariant 20): the writes `POST /api/delivery/admin/cancel` (delivery-web sends only `bookId`)
+    and `POST /api/delivery/update` → `updateDelivery`; the reads `GET /api/delivery/book/:bookId`
+    (owner-scoped for a mobile token), `GET /api/delivery/order/:id`, `POST /api/delivery/orders/batch`
+    (no caller), the impersonation driver lookup in `routes/shoofi-admin-users.js`, and the
+    analytics `bookId: {$in}` joins (live-ops, churn-360, support-analytics). A bare `updateOne`
+    on a shared number hits whichever row Mongo returns first.
 - **`shoofi.twinOrderGroups`** links `orders.twinGroup` ↔ group `primary`/`secondary`.
 - **`orders.marketingTouch`** (optional, top level) =
   `{ kind, placement, itemId, campaignId?, linkType?, at: Date }`: the last marketing
