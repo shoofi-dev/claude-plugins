@@ -178,8 +178,68 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   - **`order_viewed` `metadata.previousStatus` is always wrong** — `/update/viewd` reads it
     from the order re-fetched *after* its `$set`, so it equals the new status. Pre-accept
     status (normally `6`) is not recorded there; take it from the prior event.
-- **`delivery-company.bookDelivery`** keyed by `bookId` = order `orderId`; mirrors
-  `DELIVERY_STATUS` (`1` waiting_approve … `3` collected/pickup … `4` delivered).
+- **`delivery-company.bookDelivery`** (Mongo collection `book-delivery`) carries three order keys:
+  `bookId` = the order's short `orderId`, `originalBookId` = its full `originalOrderId`, and
+  `appName` = the store's DB name. It mirrors `DELIVERY_STATUS` (`1` waiting_approve … `3`
+  collected/pickup … `4` delivered). CORE invariant 22.
+  - **The short number is not unique, across stores or within one.** `orderId` is the first 4 +
+    last 4 digits of the 14-digit `originalOrderId` (`generatedOrderId`, `routes/order.js`; the
+    twin routes cut it the same way), roughly 5×10^7 values. Prod on 2026-11-08: 88 `bookId`s were
+    shared by 2+ stores out of 106,071 rows, the newest collision from 2026-11-07; and 12
+    (appName, orderId) pairs in `customers.orders[]` belonged to two different orders (GCP
+    "0880-8715", GCP "4587-1395", cacao "7660-8910", …). The full id had 0 collisions across
+    173,659 orders.
+  - **Who writes what.** Every booking writes `bookId: order.orderId`,
+    `originalBookId: order.originalOrderId` and `appName: storeData.appName || order.appName`
+    together: store accept `POST /api/order/update/viewd`, twin sides included, and
+    `POST /api/order/start-preparing`. `originalBookId` is on all 85,304
+    rows created since 2025-12-12. The 20,771 rows without it are all older; the newest is from
+    2025-12-12. The one duplicate `originalBookId` is a single vapego order booked twice (one row
+    `-3`), not a collision. `services/delivery/book-delivery.js` **invents a random
+    `originalBookId`** when the booking passed none, so a row having one does not prove it came
+    from an order. Delivery-only bookings use `String(idempotencyKey)`. 96 rows carry the
+    `appName` fallback `"shoofi-app"`. Every `created` is an offset string (106,076 of 106,076),
+    and a booking is always made after its order. Across the past 14 days' delivered rows, the
+    gap from order to booking ran from +5 s upward, and none was negative.
+  - **No index on `originalBookId`** (indexes: `bookId`, `{bookId, status, completedAt}`,
+    `created`, `order._id`, …). On 2026-11-08 an `$or` with an `originalBookId` branch scanned
+    104,734 docs (339 ms). Query on `bookId` and compare the full id in code. The order's own row
+    always shares its `bookId`, so it is always in that result.
+  - **Matched correctly:** `filterOutDeliveredOrders` (`utils/active-orders.js`, behind
+    `GET /api/order/customer-active-orders`).
+    - It reads delivered rows by `bookId ∈ …, appName ∈ …` (indexed) and projects `bookId`,
+      `appName`, `originalBookId` and `created`. It groups the rows by exact `appName|bookId`,
+      because the two `$in`s are a cross product.
+    - A row is the order's delivery (`isDeliveryOfOrder`) when `originalBookId ===
+      order.originalOrderId`.
+    - **Only if either side lacks the full id**, it accepts a row booked no more than
+      `BOOKING_BEFORE_ORDER_MARGIN_MINUTES` (10) before the order (`isBookedAfterOrder`). A row
+      whose `created` is missing or unreadable is not accepted. That rules out every older
+      same-store row, including all legacy rows without `originalBookId`.
+    - The endpoint passes the store DB it read each order from (`appNameOf`), falling back to
+      `order.appName`.
+    - Kept, never dropped: an order with no known store, and every order when the delivery DB
+      read throws.
+    - History: before the fix it matched on `bookId` alone. On 2026-11-08 GCP's live CASH order
+      1096-8335 never reached the customer's ActiveOrders screen or tab-bar bubble, because
+      burger-house had a delivered 1096-8335 from 2026-09-21. The customer ordered again. Fixed in
+      shoofi-dev/shoofi-server#513. Tests: `test/integration/customer-active-orders-per-store.js`.
+  - Also keyed on the full id: the `update-delay` lookups (`findOne({ originalBookId })`), the
+    twin `group/:groupId/full` read and the twin `assign-driver` lookup, which tries
+    `originalBookId` first. `routes/order-comment-to-courier.js` pairs `bookId` + `leg.appName`.
+  - **Still keyed on `bookId` alone (found 2026-11-08, not fixed here):**
+    - **Writes (being fixed separately, 2026-11-08):** in `POST /api/order/update`
+      (`routes/order.js`), the ready-for-pickup branch (status `3`) and the cancel branch
+      (`4`/`7`/`8`) both `findOne` and `updateOne({ bookId: order.orderId })`. The cancel branch
+      can mark ANOTHER order's row cancelled and leave this order's courier booked.
+    - `syncDeliverySnapshot` (`routes/order-amend.js`) reads and overwrites the snapshot the same
+      way.
+    - **Admin and support reads:** `routes/admin/order-monitoring.js` (`findOne({ bookId })`),
+      `POST /api/delivery/orders/batch` (no caller), the `assign-driver` fallback in
+      `routes/twin-order.js`, and `update-address-to-current-location` (`routes/customer.js`,
+      `$or` with `bookId`).
+    - `GET /api/delivery/book/:bookId` is owner-scoped for a mobile token (delivery CORE).
+    - A bare `updateOne` on a shared number hits whichever row Mongo returns first.
 - **`shoofi.twinOrderGroups`** links `orders.twinGroup` ↔ group `primary`/`secondary`.
 - **`orders.marketingTouch`** (optional, top level) =
   `{ kind, placement, itemId, campaignId?, linkType?, at: Date }`: the last marketing

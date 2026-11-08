@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -646,6 +646,28 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       change the other.**
     - Response `{ date, window: { start, end }, orders, truncated, totals }`, top level (no
       `{message, data}` envelope; the partner reads `res?.data || res`).
+
+22. **THE SHORT ORDER NUMBER IS NOT UNIQUE. MATCH A DELIVERY ON `originalOrderId` ↔
+    `originalBookId`.** `orderId` / `bookDelivery.bookId` ("1096-8335") is the first 4 + last 4
+    digits of the 14-digit `originalOrderId` (`generatedOrderId`, `routes/order.js`), about 5×10^7
+    values, and it collides **across stores and within one store**. On 2026-11-08, 88 numbers in
+    prod `book-delivery` were shared by 2+ stores out of 106,071 rows, and 12 (appName, orderId)
+    pairs in `customers.orders[]` belonged to two different orders (GCP "0880-8715", GCP
+    "4587-1395", cacao "7660-8910", …). The full `originalOrderId` had 0 collisions across 173,659
+    orders. Every booking writes it as `originalBookId` beside `bookId` and `appName`. It is on
+    every row created since 2025-12-12 (85,304 of 106,075), and on 2026-11-08 3,989 of the 3,998
+    delivered rows from the past 14 days matched their order on it. The other 9 had no store
+    order under that number, and none mismatched.
+    So: **identify an order's delivery by `originalBookId === order.originalOrderId`** (plus
+    `appName` as a guard). Fall back to `appName` + `bookId` only when one side lacks the full
+    id, and then only to a row booked after the order. A lookup by `bookId` alone can read or
+    write another order's delivery. Incident 2026-11-08: the customer's active-orders list
+    (`filterOutDeliveredOrders`, `utils/active-orders.js`) hid GCP's live 1096-8335 behind
+    burger-house's delivered 1096-8335. The customer ordered again, and the store cancelled the
+    duplicate. An order whose store is unknown is kept, because over-inclusive is the safe side.
+    `originalBookId` has **no index**: query on the indexed `bookId` and compare the full id in
+    code (the order's own row always has `bookId === order.orderId`). Paths that still key on
+    `bookId` alone are listed in reference §5 (`delivery-company.bookDelivery`).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
