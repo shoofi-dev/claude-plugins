@@ -85,7 +85,8 @@ Accessors are defined in `services/database/DatabaseInitializationService.js`.
   to categories), legacy `categoryId`/`subCategoryId`/`order`, and
   `categoryOrders` (map `{ [categoryId]: index }`, the current ordering source).
 - **Availability/stock:** `isInStore`, `quantity`, `outOfStockByQuantity`,
-  `outOfStoreUntil` (timed reopen), `isHidden` (catalog visibility).
+  `outOfStoreUntil` (timed reopen — an offset date string, cleared only by the 07:00 cron; §5),
+  `isHidden` (catalog visibility).
 - **Options:** `extras` (embedded, see §4), `others` (JSON blob).
 - **Kind / combo (`docs/combo-deals.md`):** `productType` (`"combo"`; absent / `""` /
   `"regular"` are regular) and `combo: { sections[{ id, nameAR, nameHE, order, count,
@@ -561,6 +562,38 @@ only re-enables products that were `outOfStockByQuantity`, never un-hides manual
 disables). Enabling stock management takes the whole catalog out of stock until
 real quantities are entered. Details: `docs/stock-management.md`.
 
+**Timed "off until…" — `outOfStoreUntil`** (a manual switch, separate from the stock invariant):
+- **Written** by `POST /api/admin/product/update/isInStore` and `…/isInStore/byCategory`
+  (`routes/product.js`): `isInStore: true` → `outOfStoreUntil: null`; `isInStore: false` with
+  `outOfStoreUntil` in the body → stored as `moment(body.outOfStoreUntil).utcOffset(getUTCOffset()).format()`
+  (an offset string, e.g. `2026-11-09T06:59:00+02:00`, not a BSON date); `isInStore: false`
+  without one → `null` (off until someone switches it back on).
+- **Cleared ONLY by the 07:00 cron** — `restoreTemporaryOutOfStoreProducts`
+  (`utils/crons/products-in-store-update.js`, `cron.schedule('0 7 * * *', …, { timezone:
+  "Asia/Jerusalem" })`, Redis lock `cron:restore-temporary-out-of-store-products`, started from
+  `app.js` only under `NODE_ENV=production` + `ENABLE_CRONS=true`). Per store it finds
+  `isInStore: false` products whose `outOfStoreUntil` (date, or a string `$convert`ed to one)
+  is `<= now`, `$set: { isInStore: true }` + `$unset: { outOfStoreUntil }`, then emits
+  `products_bulk_updated` (partner) and `menu_refresh` (customers).
+- **No read-time check anywhere** — not the menu, not `utils/order-stock.js`, not the pricer. A
+  product whose time passed at 15:00 stays off until the next 07:00 run; a time set for after
+  07:00 waits a full extra day. That is why the partner's "until the morning" sends one minute
+  before the next 07:00 Asia/Jerusalem.
+- **Who sees it:** `GET /api/menu` projects `outOfStoreUntil` for `shoofi-partner` /
+  `shoofi-admin` only (`...(isAdminApp ? { outOfStoreUntil: 1 } : {})` in the products `$lookup`
+  `$project`), so the partner stock screen can say when the product comes back. The customer
+  menu, `POST /api/menu/refresh` and the menu cache never carry it. The store-analytics
+  "unavailable" reasons read it from their own projections.
+- *Observed gap, not fixed:* the cron clears only `menuCache.clearStore(appName)`, not the
+  `_schoolProject` key (CORE invariant 2), so a school-project menu can show the product off for
+  up to the 5-minute TTL after the restore.
+
+**Sold-out extras — `store.outOfStockExtras`** is ONE store-wide list of option `nameAR`s on the
+per-store `store` doc (`GET`/`POST` in `routes/store.js`, surfaced as `outOfStockExtras` in the
+menu response). There is **no per-product switch**: marking `"حمص"` sold out greys it out in
+every product of that store that has an option with that exact `nameAR`, and cannot sell it out
+in one product only (§4 for the exact-match rule).
+
 ## 6. Caching — the easiest thing to get wrong
 `utils/menu-cache.js` = `MenuCache` singleton (Redis or in-memory Map, 5-min TTL,
 keys `menu:${storeId}`). Menu cache is **customer-only** — `shoofi-partner` /
@@ -610,7 +643,7 @@ Adding the next feature: append its token to the list, add its strip, keep the s
 the cache read.
 
 ## 7. Key endpoints (quick reference)
-- `GET  /api/menu` — **the** customer menu fetch (assembly + discount + optional general-categories + combo snapshots). **Source of truth.** Combos reach a customer only with `x-client-features: combo` (§6b).
+- `GET  /api/menu` — **the** customer menu fetch (assembly + discount + optional general-categories + combo snapshots). **Source of truth.** Combos reach a customer only with `x-client-features: combo` (§6b). `shoofi-partner` / `shoofi-admin` bypass the cache, see hidden products/categories, and alone get `outOfStoreUntil` on each product (§5).
 - `POST /api/menu/search` — cross-store product/store search (regex on `nameAR/nameHE`, geo via `delivery-company.cities`). See `docs/menu-search.md`.
 - `GET  /api/menu/mock` — template/mock store menu (dedup vs current store); never offers a combo.
 - `POST /api/menu/clear-cache[/:storeId]`, `GET /api/menu/cache-stats`
