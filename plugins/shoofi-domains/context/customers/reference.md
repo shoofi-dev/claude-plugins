@@ -640,8 +640,10 @@ contacts and the download-link SMS.
 - Every entry takes every dashboard role. It shuts out anonymous callers and
   customer/partner/driver tokens without narrowing any staff member. Viewers edit stores
   today, and whether they should is a product call.
-- `GET store/z-cr` stays open (`OPEN_ROUTES`): all three apps read it at startup, before
-  login. The apps' `shoofiAdminStore` otherwise only calls `available-stores`, and their
+- `GET store/z-cr` stays open (`OPEN_ROUTES`) but returns `{}` (HQ #23bf02): installed
+  customer and partner builds call it after login and sign out on any 401, which is what
+  removing it would produce (`GET store/:id` captures the path). Delete route + entry together
+  once no live build calls it. The ZCredit key moved server-side (payments reference, "App — shoofi-app"). The apps' `shoofiAdminStore` otherwise only calls `available-stores`, and their
   `store/update` is `/api/store/update`.
 - `test/integration/admin-token-routes.js` checks every entry against
   `docs/routes-baseline.txt`, so a rename can't silently un-gate it.

@@ -50,9 +50,9 @@ For these: write the analysis + the exact diff you *would* make + the risks, ope
 - **ZCredit** — cards + Apple/Google Pay. Hardcoded API URLs, inline `axios`. Calls:
   `ValidateCard`, **`CommitFullTransaction`** (charge — `order.js`,
   `twin-payment-service.js/111`), `GetTransactionStatusByReferenceId`
-  (`order.js`), **`GetSessionStatus`** (Apple/Google verify). No server-side
-  `CreateSession` — the web-checkout session is created **client-side**; the server only
-  verifies by `SessionId` and receives the `zcredit-apple-pay-callback`.
+  (`order.js`), **`GetSessionStatus`** (Apple/Google verify), and `WebCheckout/CreateSession` (server-side,
+  `services/payments/zcredit-wallet-session.js`, HQ #23bf02 — the client no longer holds the
+  API key). The server verifies by `SessionId` and receives the `zcredit-apple-pay-callback`.
 - **HYP / EZcount** — two hats: (a) **Pay/charge** via `utils/hyp-pay.js` → `pay.hyp.co.il`
   (`APISign SIGN`, `VERIFY`, `getToken`, `action=soft` token charge); (b) **Invoicing/OAuth**
   via `utils/hyp.js` → `api.ezcount.co.il` (createInvoice, distributor accounts, OAuth).
@@ -218,9 +218,16 @@ hangs the request (CORE invariant 11), so none of them answered.
     an expired default that is already set is still preselected at checkout). Delete confirms
     in an in-app sheet (`components/credit-card/DeleteCardSheet.tsx`). Adding a card from the
     profile uses the same HYP hosted page (platform `hyp_enabled`, no store needed).
-- **Apple/Google Pay**: ZCredit WebCheckout session created **client-side** (`screens/checkout/
-  index.tsx`, `data/zcredit-config.ts`) with `zcredit_api_key`; heavy dedup/retry guards;
-  server verifies & captures. Google Pay routed through the ZCredit web-view (native button disabled).
+- **Apple/Google Pay**: live traffic is HYP (`shoofi.store {id:1}.walletPaymentConfig.provider:
+  "hyp"`, `enableForAllStores`, since 2026-08-26 → `HYP_APPLEPAY`/`HYP_GOOGLEPAY`). The ZCredit
+  path (`APPLEPAY`) survives only for stores forced off HYP and old app builds (1.0.22). Its
+  WebCheckout session is created **server-side** by `POST /api/order/zcredit-wallet-session`
+  (customer `Token` only; shoofi-server `services/payments/zcredit-wallet-session.js`), which adds
+  `zcredit_api_key` and the callback URL and returns only `{sessionId, sessionUrl}`. The client
+  never holds the key: `GET /api/shoofiAdmin/store/z-cr` returns `{}` and stays in `OPEN_ROUTES`
+  only because a 401 on it signs installed apps out. Heavy dedup/retry guards in
+  `screens/checkout/index.tsx`; server verifies & captures. Google Pay routed through the ZCredit
+  web-view (native button disabled).
 - **What the client sends**: CC → `paymentData.ccToken` (+cvv/id) into `order/create`; the
   **actual charge is server-side** (`use-checkout-charge-cc.ts` is a deprecated no-op). Apple
   Pay → no card token, just session id; server reads the ZCredit session for the amount.
