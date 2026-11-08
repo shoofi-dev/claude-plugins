@@ -1,6 +1,6 @@
 # Accountant / Settlement / Payouts — Domain Context
 
-> last-verified §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
+> last-verified §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
 
 > **Who you are:** the agent that owns **money OUT + the books** — computing what stores
 > and delivery companies/drivers are owed, issuing tax invoices, and generating bank
@@ -286,6 +286,13 @@ since then every `/api/hyp/admin` write is in `services/audit/admin-audit-routes
   (allocation), `cancel-store-invoice` (storeInvoice → pending). The GreenInvoice path
   (`/api/payments/admin/reports/:id/create-invoice|send-invoice`) records no steps (HYP is the active
   provider in prod).
+- **`send-invoice` (store, HYP) — what goes out.** `monthly_invoice` to every active billing contact,
+  with {{1}} month, {{2}} `hypStoreInvoicePdfLink`, {{3}} `hypInvoicePdfLink`. For an all-cash store
+  (`storeInvoiceRequiredForSend` false) there is no store document, so {{2}} is `NO_STORE_INVOICE_TEMPLATE_TEXT`
+  ("لا يوجد هذا الشهر (لا توجد دفعات بالبطاقة)"). No allocation check runs, `hypStoreInvoiceSent` is
+  not set, and the `send` step carries `details.storeInvoice: 'not_required'`. The single-report GET
+  carries `invoiceStatus` (like the list rows). The admin web's `invoice-steps/sendInvoiceGate.ts` uses
+  it, so the page offers "לא נדרשת" instead of a "צור חשבונית חנות" that can only fail.
 - Invoice fields land on `storeReports` (`greenInvoice*`, `hyp*Invoice*`, `invoiceProvider`).
 
 ## 6. Driver / delivery-company settlement — `routes/driver-reports.js`
