@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@fcbbfdf1 + shoofi-partner@feat/payments-v3 / 2026-11-08 (invariant 17 what partner/summary means: gross, 15% placeholder, no reports-role check; partner v3 «المبيعات»); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@feat/code-coupons-filter + shoofi-delivery-web@feat/code-coupons-filter / 2026-11-07 (invariant 14 code coupons out of funder buckets, kind=code, ref); shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@fix/partner-summary-figures + shoofi-partner@feat/payments-v3 / 2026-11-08 (invariant 17 what partner/summary means: gross only, no flat-15% fields, reports-role restricted shape, the report's coupon credit + compensation window; ref §4; partner v3 «المبيعات»); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@feat/code-coupons-filter + shoofi-delivery-web@feat/code-coupons-filter / 2026-11-07 (invariant 14 code coupons out of funder buckets, kind=code, ref); shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -623,20 +623,43 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       `storeUsers` doc's `appName` IS the `app-name` header — the handlers pick the store DB from
       that header, so the gate is what stops a partner reading another store. Caller:
       shoofi-partner `screens/admin/payments` (summary, daily-orders); nothing calls `details`.
-      **What `partner/summary` means (verified 2026-11-08) — gross sales, never a payout:**
-      completed orders (`2,3,10,11,12`) by business day of `created`; `totalRevenue` =
-      `orderPrice` + drive-in (no delivery fee; coins, Shoofi coupons and drive-in are "of
-      which" lines INSIDE it); card/cash = how the customer paid. `totalCommission` /
-      `partnerEarnings` and the daily `commission`/`earnings` are a **flat-15% placeholder**
-      (`calculateCommission`, daily ones on pre-discount `originalOrderPrice`) that contradicts
-      the store report — never show them as "what you get". `totalShoofiCoupons` uses the nominal
-      `shoofiDiscount` (not `shoofiCouponCredit`, overstated for partial-use coupons); the
-      `compensation` block windows on `items.approvedAt` (not `storeCompensationWindow`, misses
-      items created straight as approved) and has no `compensationFor: 'shoofi'`. There is **no
-      `reports`-role check** on the server (only the partner tile is hidden). The partner v3
-      screen «المبيعات» (`screens/admin/payments/index.v3.tsx`, flag `PAYMENTS_V3`) shows
-      gross + card/cash + coins/drive-in only and points to the monthly report for the transfer;
-      `totalRevenue` ties out with the «السجل» totals (`/api/order/admin/history`).
+      **What `partner/summary` means (shoofi-server `fix/partner-summary-figures`, 2026-11-08) —
+      gross sales, never a payout:** completed orders (`2,3,10,11,12`) by business day of
+      `created`; `totalRevenue` = `orderPrice` + drive-in (no delivery fee; coins, Shoofi coupons
+      and drive-in are "of which" lines INSIDE it); card/cash = how the customer paid (an order
+      with no / another method is in the total and in neither split). Every rule lives in
+      `services/payments/partner-summary.js`, and each money figure is the store report's own:
+      - **Who sees figures:** a dashboard role, or a store user with the partner `reports` role
+        (`canSeeStoreTotals` → `storeUserHasRole(me, ['reports'])`, the `requireStoreRole`
+        predicate; the gate leaves the token's storeUsers doc on `req.partnerStoreUser`). Anyone
+        else gets **200** `{ summary: null, dailyData: [], restricted: true }` /
+        daily-orders `{ date, orders: [], totalOrders: 0, restricted: true }` with nothing read —
+        never a 403. A full answer carries `restricted: false`. The partner tile is hidden
+        behind the same role, so no caller that can open the screen loses data.
+      - **No flat-15% figures:** `totalCommission`, `partnerEarnings` and the daily
+        `commission`/`earnings` were REMOVED (no client rendered them). Never re-add a "what
+        you get" figure here; the transfer is the monthly report. (`partner/details`, which no
+        client calls, still carries a flat-15% `commission`/`earnings` per order.)
+      - **`totalShoofiCoupons`** = `couponsFromShoofi`'s rule per order: `shoofiCouponCredit`
+        (min(nominal, applied), percentage base `originalOrderPrice`, the customer-specific
+        `coupon.value` fallback kept) + `full_discount`'s Shoofi items share
+        (`getFullDiscountMatrix` on the order snapshot — the report reads `couponUsages`).
+      - **`compensation`** = the report's lines over `storeCompensationWindow` for the period's
+        calendar days (`periodCalendarDays`, the switch `getDateRange` runs), `createdAt` in
+        `[start, endExclusive)`, keyed on `order.storeData.appName`, `status === 1`,
+        `approvedAmount`: `totalApproved` = `compensationsFromShoofi`, `totalPaidToCustomers` /
+        `totalPaidToDrivers` / `totalPaidToShoofi` (new) = `compensationsTo{Customers,Drivers,Shoofi}`.
+        `approvedAt` no longer decides (items created straight as approved have none). Carry-over
+        compensations are earlier periods' money and are not shown.
+      - **`partner/daily-orders`** reads the store from the gated `app-name` (a body
+        `storeId`/`partnerId` is ignored); per row `driveIn` (the same fallback chain),
+        `amount` = `orderPrice + driveIn` (Σ `amount` = that day's `totalRevenue`),
+        `paymentMethod` = the raw method or `null` (never a default `CASH`), and `compensation`
+        = the day's `storeCompensationWindow`, `compensationFor: 'business'`, status 1.
+      The partner v3 screen «المبيعات» (`screens/admin/payments/index.v3.tsx`, flag
+      `PAYMENTS_V3`) shows gross + card/cash + coins/drive-in only and points to the monthly
+      report for the transfer; `totalRevenue` ties out with the «السجل» totals
+      (`/api/order/admin/history`).
       `driver/{summary,details}` (`driverEarningsAccess`): a dashboard role (the admin תשלומי נהגים
       screen reads any driver); a `shoofi-shoofir` token whose id IS the body `driverId`; or that
       driver's delivery-company admin — `role: "admin"`, company `isControlledByAdmin`, same
