@@ -178,8 +178,12 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   - **`order_viewed` `metadata.previousStatus` is always wrong** — `/update/viewd` reads it
     from the order re-fetched *after* its `$set`, so it equals the new status. Pre-accept
     status (normally `6`) is not recorded there; take it from the prior event.
-- **`delivery-company.bookDelivery`** keyed by `bookId` = order `orderId`; mirrors
-  `DELIVERY_STATUS` (`1` waiting_approve … `3` collected/pickup … `4` delivered).
+- **`delivery-company.bookDelivery`** (collection `book-delivery`) — one row per delivery:
+  `bookId` = order `orderId` (the SHORT number — **not unique**, never a key on its own),
+  `originalBookId` = order `originalOrderId` (the identity; on every row since 2025-12-12).
+  Locate an order's row with `deliveryRowFilterForOrder(order, appName)`
+  (`utils/delivery-row.js`, CORE invariant 22). Mirrors `DELIVERY_STATUS` (`1` waiting_approve …
+  `3` collected/pickup … `4` delivered).
 - **`shoofi.twinOrderGroups`** links `orders.twinGroup` ↔ group `primary`/`secondary`.
 - **`orders.marketingTouch`** (optional, top level) =
   `{ kind, placement, itemId, campaignId?, linkType?, at: Date }`: the last marketing

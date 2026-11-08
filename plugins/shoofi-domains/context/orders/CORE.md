@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 22); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -18,6 +18,7 @@ customer order history, order crons, and the order-side wiring of secondary feat
 Server: `routes/order.js`, `routes/twin-order.js`, `routes/order-fraud-*.js`,
 `routes/admin/order-monitoring.js`, `services/twin-order/*`, `utils/order-stock.js`,
 `utils/order-pricing.js` + `utils/order-pricing-shadow.js`, `routes/order-amend.js`,
+`utils/delivery-row.js` (how an order finds its delivery row, invariant 22),
 `services/coupons/delivery-price-enforcement.js` + `services/twin-order/twin-delivery-price.js`
 (the order-side guard for fixed-delivery-price coupons, invariant 14), `utils/marketing-touch.js`
 (order-side marketing attribution, invariant 15), `services/marketing/order-facts.js` +
@@ -646,6 +647,59 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       change the other.**
     - Response `{ date, window: { start, end }, orders, truncated, totals }`, top level (no
       `{message, data}` envelope; the partner reads `res?.data || res`).
+
+22. **A DELIVERY ROW IS LOCATED BY `originalOrderId` ↔ `originalBookId`. `bookId` ALONE IS NEVER
+    A KEY.** The short order number (`order.orderId` = `bookDelivery.bookId`, `"1096-8335"`) is
+    the first and last four digits of `originalOrderId` (`"1096-217289-8335"`,
+    `generateUniqueOrderId` in `routes/order.js`, `generateOrderId` in `routes/twin-order.js`),
+    so it repeats, and `delivery-company.book-delivery` is one collection for every store.
+    Prod, 2026-11-08: **88** bookIds shared by two or more stores, and **12** (appName, short
+    number) pairs in `customers.orders[]` used by two different orders of the SAME store. The
+    full id: 0 collisions in 173,659 orders. A path that finds and writes "this order's row" by
+    `bookId` cancels another store's courier (and leaves its own driving), tells the wrong
+    driver an order is ready, or overwrites another order's snapshot.
+    - **The one helper:** `deliveryRowFilterForOrder(order, appName)` in `utils/delivery-row.js`
+      (shoofi-server `fix/delivery-row-by-original-order-id`). Order has `originalOrderId` →
+      `{ originalBookId, bookId }` (the `bookId` only rides the `{bookId:1}` index; there is no
+      `originalBookId` index, and it can only narrow the match). Legacy order without it →
+      `{ bookId, appName }`. Neither → `null`, and the caller leaves the delivery side alone.
+      **No branch returns `bookId` on its own.** No `appName` on the first branch on purpose:
+      ~100 rows written before mid-2026 carry `appName: "shoofi-app"` instead of the store.
+    - **Data it rests on (prod, 2026-11-08):** 85,305 of 106,076 rows carry `originalBookId`,
+      every row created since 2025-12-12 (older rows lack it); on every
+      one of them `bookId === order.orderId` and `originalBookId === order.originalOrderId`;
+      every twin row (2,750) has it. A legacy ROW of an order that HAS `originalOrderId` is
+      deliberately not matched — widening to it re-admits the same-store collision.
+    - **Find, then write by `_id`.** Where a path reads the row and then writes it, the write is
+      `{ _id: row._id }`, so the row whose driver is notified is the row that changed:
+      `/api/order/update` cancel (`4`/`7`/`8` → delivery `-3`) and ready-for-pickup (`3` →
+      `isReadyForPickup`), `/api/order/update-delay`, and order-amend `syncDeliverySnapshot`.
+    - **Twin legs** are two orders with their own `originalOrderId` and their own row, so the
+      same filter works per leg. The group document stores only each leg's SHORT number, so
+      `services/twin-order/twin-group-service.js` resolves a leg through `legDeliveryFilter`
+      (loads the leg's order by `orderObjectId` for `originalOrderId`; falls back to
+      `{bookId, appName: leg.appName}`) in `cascadeCancel`, `degradeToSingle` and `undoDegrade`.
+      The twin admin group read (`GET /api/twin-order/admin/group/:groupId/full`) and
+      `POST /api/twin-order/admin/assign-driver` use the helper too (the latter keeps its
+      last-ditch `{twinGroupId, appName}` lookup).
+    - **Also on the helper (reads):** support's `update-address-to-current-location`
+      (`routes/customer.js`, `$or` of the helper filter and `order._id`, then written by `_id`),
+      admin order-monitoring `computeOrderDelays`, support-agent `find_order`.
+    - **One row per order is still assumed.** A re-booked order can hold two rows with the same
+      `originalBookId` (prod: one, vapego, statuses `-3` and `4`). These paths touch the first
+      one found, exactly as before; they do not choose between them.
+    - **Still keyed on `bookId` alone — delivery-side, need a client change, not fixed here:**
+      `POST /api/delivery/admin/cancel` (delivery-web sends only `bookId`) and
+      `POST /api/delivery/update` → `updateDelivery` (`services/delivery/book-delivery.js`)
+      are WRITES; `GET /api/delivery/book/:bookId` (customer-scoped for mobile callers, sorted
+      newest), `GET /api/delivery/order/:id`, `POST /api/delivery/orders/batch` (dashboard-only,
+      no client calls it), the impersonation driver lookup in `routes/shoofi-admin-users.js`,
+      and the analytics `bookId: {$in}` joins (live-ops, churn-360, support-analytics,
+      `utils/active-orders.js`) are reads. Delivery CORE invariant 20.
+    - Tests: `test/integration/delivery-row-by-original-order-id.js` (helper; cancel/ready with
+      a cross-store and a same-store decoy inserted first; legacy fallback; twin cascade,
+      degrade and undo; a source pin that the order-side files never regrow a
+      `bookDelivery.x({ bookId … })` key) and the amend case in `test/integration/order-amend.js`.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

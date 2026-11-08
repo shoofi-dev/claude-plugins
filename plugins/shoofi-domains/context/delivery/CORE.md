@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -524,6 +524,24 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
       and unauthenticated. **82 routes in `geography.js`, `company.js` and `driver.js` are still
       ungated.** They are pinned as `NOT_YET_GATED` in
       `test/integration/delivery-driver-loop-admin-auth.js`, so the list can only shrink.
+
+20. **`bookId` is a short display number, not an identity — locate an order's row by
+    `originalBookId`.** `bookId` = the order's `orderId` = first4+last4 of `originalOrderId`, so it
+    repeats: 88 bookIds in prod `book-delivery` belong to two or more stores (2026-11-08), and
+    the same store reuses a short number too. `originalBookId` (= `order.originalOrderId`) is on
+    every row created since 2025-12-12 and never collided. The order side locates "this order's
+    row" only through `deliveryRowFilterForOrder` (`utils/delivery-row.js`, orders CORE invariant
+    22): `{originalBookId, bookId}`, or `{bookId, appName}` for a legacy order, never `bookId`
+    alone. The same rule applies on this side, and two **writes** here still break it, because
+    their caller sends nothing else: `POST /api/delivery/admin/cancel` (delivery-web
+    `CardOrder.tsx` → `{bookId, cancelReason, cancelledBy}`) and `POST /api/delivery/update` →
+    `updateDelivery` in `services/delivery/book-delivery.js` (`findOne`+`updateOne` by `bookId`).
+    Fixing them is a server + delivery-web change: send the order's `originalOrderId` (or the
+    row's `_id`) and key on that. Reads with the same weakness:
+    `GET /api/delivery/book/:bookId` (a mobile caller only sees its own rows; a dashboard caller
+    gets the newest of any store's) and `POST /api/delivery/orders/batch` (no caller). The
+    custom-delivery cancel (`/api/order/update-custom-delivery` → `updateDelivery`) is safe: its
+    `bookId` is the row's own `_id` string.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
