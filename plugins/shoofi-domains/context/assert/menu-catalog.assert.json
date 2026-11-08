@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 misheard dish name, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 outOfStoreUntil admin-only projection + 07:00 restore) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 misheard dish name, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -28,6 +28,8 @@
         "services/catalog/import-index.js",
         "services/catalog/product-access.js",
         "test/integration/product-admin-auth.js",
+        "services/catalog/out-of-stock-extras.js",
+        "test/integration/out-of-stock-extras-auth.js",
         "utils/order-pricing.js",
         "routes/admin/menu-import-issues.js",
         "docs/menu-import-issues.md",
@@ -107,6 +109,8 @@
         "services/catalog/extras-catalog.js",
         "services/catalog/extras-icons-sync.js",
         "utils/crons/extras-icons-sync-cron.js",
+        "utils/crons/products-in-store-update.js",
+        "test/integration/menu-admin-out-of-store-until.js",
         "routes/admin/extras-catalog.js",
         "scripts/seed-extras-catalog.js",
         "docs/extras-icons.md",
@@ -470,6 +474,26 @@
       },
       "patterns": [
         {
+          "file": "routes/menu.js",
+          "regex": "\\.\\.\\.\\(isAdminApp \\? \\{ outOfStoreUntil: 1 \\} : \\{\\}\\)",
+          "desc": "doc CORE invariant 4 / reference §5: GET /api/menu projects outOfStoreUntil for partner/admin only, never the customer menu or its cache"
+        },
+        {
+          "file": "utils/crons/products-in-store-update.js",
+          "regex": "cron\\.schedule\\('0 7 \\* \\* \\*'",
+          "desc": "doc CORE invariant 4 / reference §5: outOfStoreUntil is cleared only by the daily 07:00 restore"
+        },
+        {
+          "file": "utils/crons/products-in-store-update.js",
+          "regex": "timezone: \"Asia/Jerusalem\"",
+          "desc": "doc reference §5: the 07:00 restore runs on Israel time"
+        },
+        {
+          "file": "utils/crons/products-in-store-update.js",
+          "regex": "\\$unset: \\{ outOfStoreUntil: \"\" \\}",
+          "desc": "doc reference §5: the restore sets isInStore true and unsets outOfStoreUntil"
+        },
+        {
           "file": "services/catalog/product-access.js",
           "regex": "const PRODUCT_ADMIN = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",
           "desc": "doc CORE invariant 26: dashboard-only product routes take any dashboard role (viewer and accountant included)"
@@ -493,6 +517,21 @@
           "file": "services/catalog/product-access.js",
           "regex": "if \\(ownAppName && req\\.headers\\[\"app-name\"\\] === ownAppName\\) \\{",
           "desc": "doc CORE invariant 26: a partner passes only when app-name IS its own store"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "router\\.post\\(\"/api/store/out-of-stock-extras\", \\.\\.\\.PRODUCT_ADMIN_OR_OWN_STORE, async[\\s\\S]{0,1200}menuCache\\.clearStore\\(schoolCacheKey\\)",
+          "desc": "doc CORE invariant 26 / reference §7: the sold-out options write runs the product own-store gate and clears both menu cache keys"
+        },
+        {
+          "file": "services/catalog/out-of-stock-extras.js",
+          "regex": "\\? \\{ \\$addToSet: \\{ outOfStockExtras: parsed\\.name \\} \\}\\n\\s*: \\{ \\$pull: \\{ outOfStockExtras: parsed\\.name \\} \\}",
+          "desc": "doc CORE invariant 26 / reference §7: the one-option body is an atomic $addToSet / $pull, so concurrent tablets don't overwrite each other"
+        },
+        {
+          "file": "services/catalog/out-of-stock-extras.js",
+          "regex": "await db\\.store\\.updateOne\\(\\{ id: 1 \\}, \\{ \\$set: \\{ outOfStockExtras: parsed\\.list \\} \\}\\);",
+          "desc": "doc reference §7: the legacy whole-list body is still $set as sent (installed partner builds)"
         },
         {
           "file": "routes/product.js",
