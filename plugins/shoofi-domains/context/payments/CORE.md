@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/HIGH-RISK-refund-idempotency-guard / 2026-11-06 (invariant 12 — refund at most once per order); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -148,6 +148,18 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.
+12. **A customer refund is issued at most once per order.** `refundOrderPayment`
+   (`services/payments/order-authorization.js`) returns `{ success: true, alreadyRefunded }`
+   with no HYP call and no write when `isAlreadyRefunded(paymentAuth)` holds: any of
+   `refundedAmount > 0`, `refundTransId` or `refundedAt`. A partial earlier refund counts,
+   because this path only refunds the whole order. Two concurrent cancels are serialised by an
+   atomic claim, `paymentAuth.refundClaimedAt`, taken just before `zikoyAPI` (the filter requires
+   both it and `refundedAt` to be absent). The loser returns `alreadyClaimed` and writes nothing.
+   A refusal from HYP releases the claim, so a retry is allowed. A throw after the request was
+   sent keeps the claim, because the outcome is unknown: the order is flagged `refund_error` and a
+   person checks HYP. `settleCancelledOrderMoney`'s `wasCharged` (`routes/order.js`) reads the
+   same helper. **Never call `refundTransaction` for an order outside this function.**
+   (HQ #d20d40, 2026-11-06)
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
