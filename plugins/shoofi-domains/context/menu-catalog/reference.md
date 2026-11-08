@@ -145,6 +145,11 @@ left out keeps its stored value; a nested object (`coinsSettings`, `accounting`)
   reads ended values as ended and, for customer-facing callers only, returns `minReady`/`maxReady`
   raised by the active `prepExtra.minutes`. Ended values are cleared in the DB by the one-minute
   `utils/crons/store-timed-status-cron.js`.
+- `closedUntil` (ISO or null, with `isStoreClose`) and `closedDays` (`["YYYY-MM-DD"]`) — special
+  hours (CORE invariant 31), also in `PARTNER_STORE_FIELDS`; `closedDaysApplied` (`"YYYY-MM-DD"`) is
+  written only by the cron. Same normaliser and cron; customers read only `isStoreClose` +
+  `closedUntil` (`POST /api/store`, and `store.closedUntil` on every store card). `holidayDates`
+  (and `/api/store/holiday/*`, removed 2026-11-08) is dead.
 
 ⚠️ **`hasGeneralCategories` lives in TWO documents and they drift.** `GET /api/menu`
 reads it from this per-store `store {id:1}` doc (`routes/menu.js`), but the admin
