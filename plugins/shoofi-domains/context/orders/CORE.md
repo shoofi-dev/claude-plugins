@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/HIGH-RISK-block-cancelled-to-active + shoofi-delivery-web@fix/HIGH-RISK-block-cancelled-to-active / 2026-11-07 (invariant 2: cancelled never leaves the cancelled bucket, viewd refuses 5, courier cancel covers 5/9); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -53,8 +53,27 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    helper's `inferred` taste cache), and the AI helper's `deliveredOrders` counts COMPLETED
    statuses, not courier deliveries (reference §5).
 2. **Transition guards:** PENDING(`6`) only from FRAUD_REVIEW; store-accept rejects
-   already-cancelled; `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
-   not `order/update`.
+   already-cancelled (`4/5/7/8/9`, `isCancelStatus`, `String()`-normalised; 400
+   `{message, error:"ORDER_CANCELLED", status}`, nothing written); `start-preparing` only
+   from `14`. **ACCEPT is `order/update/viewd`**, not `order/update`. **A cancelled/rejected
+   order (`4/5/7/8/9`) never leaves the cancelled bucket via `order/update`:** any non-cancel
+   target (`1/2/3`, `6`, `13`, `10/11/12`, `14/15`, `0`) is 400
+   `CANCELLED_ORDER_CANNOT_REACTIVATE` (`{message, code, currentStatus}`), decided by
+   `isCancelledToActiveTransition` (= `isCancelStatus(from) && !isCancelStatus(to)`, both
+   `String()`-normalised over `CANCEL_STATUSES`), checked BEFORE the "6 only from 13" rule
+   (so `7 → 13 → 6` can no longer launder a cancelled order) and before the cancel-money
+   settlement and the write. The cancel already restored stock, refunded coins, released
+   coupon/promotion usage and the card hold, cancelled the delivery and cascaded the twin, and
+   nothing redoes that on the way back. Cancel to another cancel code stays allowed. There is
+   **no** restore/reactivate action (pending a product decision) — don't add a bypass flag to
+   this route; a restore must be its own action that re-takes stock, coins, coupon/promotion
+   usage and payment. The courier-cancel block in `order/update` cancels the `bookDelivery`
+   (→ `-3`) for every `CANCEL_STATUSES` code (it used to miss `5` and `9`), and skips a
+   delivery already at `-3` so a cancel → cancel re-code doesn't re-stamp it or push the
+   courier twice. The admin web's status modal offers a cancelled order only cancel codes
+   (`statusOptionsFor`, `order-actions/status-options.ts`). NOT covered: `order/update/all`
+   writes `status:"1"` on any `_id` with no status check; twin `undoDegrade` deliberately
+   reactivates the degraded side (re-decrements stock, bails if the refund completed).
 3. **Stock idempotency:** `decrementOrderStock`/`restoreOrderStock` gated on
    `stockDecremented && !stockRestored` + `store.isStockManagment`. Decrement **only** on
    confirmation — a failed charge must never consume stock.
