@@ -85,7 +85,8 @@ Accessors are defined in `services/database/DatabaseInitializationService.js`.
   to categories), legacy `categoryId`/`subCategoryId`/`order`, and
   `categoryOrders` (map `{ [categoryId]: index }`, the current ordering source).
 - **Availability/stock:** `isInStore`, `quantity`, `outOfStockByQuantity`,
-  `outOfStoreUntil` (timed reopen), `isHidden` (catalog visibility).
+  `outOfStoreUntil` (timed reopen — an offset date string, cleared only by the 07:00 cron; §5),
+  `isHidden` (catalog visibility).
 - **Options:** `extras` (embedded, see §4), `others` (JSON blob).
 - **Kind / combo (`docs/combo-deals.md`):** `productType` (`"combo"`; absent / `""` /
   `"regular"` are regular) and `combo: { sections[{ id, nameAR, nameHE, order, count,
@@ -128,7 +129,8 @@ left out keeps its stored value; a nested object (`coinsSettings`, `accounting`)
   (`PUT /api/shoofiAdmin/stores/:storeId/billing-contacts`, forwards the admin's token).
 - **Partner** (`Token` + `app-type: shoofi-partner`, own store only): `PARTNER_STORE_FIELDS`, i.e.
   `isStoreClose isOpen isBusy openHours creditcard_support cash_support takeaway_support
-  delivery_support isOrderLaterSupport drive_in_support invoicePrintCount ramadanSettings`.
+  delivery_support isOrderLaterSupport drive_in_support invoicePrintCount ramadanSettings
+  prepTimeSuggestion`.
   The partner app posts `{ data: <its whole storeData> }` from `screens/admin/store-managment`
   `onSave` and the header open/close/busy toggles. That copy is `POST /api/store`'s answer:
   the stored keys minus `SENSITIVE_STORE_FIELDS`, plus `workingHours`, `isDeliveryOpen`,
@@ -137,6 +139,10 @@ left out keeps its stored value; a nested object (`coinsSettings`, `accounting`)
   nothing. With no `coinsSettings` stored it carries the app's `defaultCoinsSettings`
   (`enabled: false`); the coins toggle has been commented out of the screen since 2026-05-27.
 - `invoicePrintCount` missing or invalid in the request is written as `1`, for any caller.
+- `prepTimeSuggestion` — `{ enabled: boolean, defaultMinutes?: 10|15|20|25|30|35|40|45|60 }`, the
+  partner's v3 new-order screen switch (absent = on). Normalised for any caller by
+  `normalizePrepTimeSuggestion` (`services/catalog/prep-time-suggestion.js`): an off-slot
+  `defaultMinutes` and unknown keys are dropped; no boolean `enabled` = the key is not written.
 - `isStockManagment === true` in the write runs the stock backfill (§5), so only a dashboard save
   can run it.
 - `busyUntil` (ISO or null) and `prepExtra` (`{ minutes: 10|20, until: ISO }` or null) — timed busy
@@ -567,6 +573,38 @@ only re-enables products that were `outOfStockByQuantity`, never un-hides manual
 disables). Enabling stock management takes the whole catalog out of stock until
 real quantities are entered. Details: `docs/stock-management.md`.
 
+**Timed "off until…" — `outOfStoreUntil`** (a manual switch, separate from the stock invariant):
+- **Written** by `POST /api/admin/product/update/isInStore` and `…/isInStore/byCategory`
+  (`routes/product.js`): `isInStore: true` → `outOfStoreUntil: null`; `isInStore: false` with
+  `outOfStoreUntil` in the body → stored as `moment(body.outOfStoreUntil).utcOffset(getUTCOffset()).format()`
+  (an offset string, e.g. `2026-11-09T06:59:00+02:00`, not a BSON date); `isInStore: false`
+  without one → `null` (off until someone switches it back on).
+- **Cleared ONLY by the 07:00 cron** — `restoreTemporaryOutOfStoreProducts`
+  (`utils/crons/products-in-store-update.js`, `cron.schedule('0 7 * * *', …, { timezone:
+  "Asia/Jerusalem" })`, Redis lock `cron:restore-temporary-out-of-store-products`, started from
+  `app.js` only under `NODE_ENV=production` + `ENABLE_CRONS=true`). Per store it finds
+  `isInStore: false` products whose `outOfStoreUntil` (date, or a string `$convert`ed to one)
+  is `<= now`, `$set: { isInStore: true }` + `$unset: { outOfStoreUntil }`, then emits
+  `products_bulk_updated` (partner) and `menu_refresh` (customers).
+- **No read-time check anywhere** — not the menu, not `utils/order-stock.js`, not the pricer. A
+  product whose time passed at 15:00 stays off until the next 07:00 run; a time set for after
+  07:00 waits a full extra day. That is why the partner's "until the morning" sends one minute
+  before the next 07:00 Asia/Jerusalem.
+- **Who sees it:** `GET /api/menu` projects `outOfStoreUntil` for `shoofi-partner` /
+  `shoofi-admin` only (`...(isAdminApp ? { outOfStoreUntil: 1 } : {})` in the products `$lookup`
+  `$project`), so the partner stock screen can say when the product comes back. The customer
+  menu, `POST /api/menu/refresh` and the menu cache never carry it. The store-analytics
+  "unavailable" reasons read it from their own projections.
+- *Observed gap, not fixed:* the cron clears only `menuCache.clearStore(appName)`, not the
+  `_schoolProject` key (CORE invariant 2), so a school-project menu can show the product off for
+  up to the 5-minute TTL after the restore.
+
+**Sold-out extras — `store.outOfStockExtras`** is ONE store-wide list of option `nameAR`s on the
+per-store `store` doc (`GET`/`POST` in `routes/store.js`, surfaced as `outOfStockExtras` in the
+menu response). There is **no per-product switch**: marking `"حمص"` sold out greys it out in
+every product of that store that has an option with that exact `nameAR`, and cannot sell it out
+in one product only (§4 for the exact-match rule).
+
 ## 6. Caching — the easiest thing to get wrong
 `utils/menu-cache.js` = `MenuCache` singleton (Redis or in-memory Map, 5-min TTL,
 keys `menu:${storeId}`). Menu cache is **customer-only** — `shoofi-partner` /
@@ -616,7 +654,7 @@ Adding the next feature: append its token to the list, add its strip, keep the s
 the cache read.
 
 ## 7. Key endpoints (quick reference)
-- `GET  /api/menu` — **the** customer menu fetch (assembly + discount + optional general-categories + combo snapshots). **Source of truth.** Combos reach a customer only with `x-client-features: combo` (§6b).
+- `GET  /api/menu` — **the** customer menu fetch (assembly + discount + optional general-categories + combo snapshots). **Source of truth.** Combos reach a customer only with `x-client-features: combo` (§6b). `shoofi-partner` / `shoofi-admin` bypass the cache, see hidden products/categories, and alone get `outOfStoreUntil` on each product (§5).
 - `POST /api/menu/search` — cross-store product/store search (regex on `nameAR/nameHE`, geo via `delivery-company.cities`). See `docs/menu-search.md`.
 - `GET  /api/menu/mock` — template/mock store menu (dedup vs current store); never offers a combo.
 - `POST /api/menu/clear-cache[/:storeId]`, `GET /api/menu/cache-stats`
@@ -636,6 +674,7 @@ the cache read.
 - `GET /api/shoofiAdmin/explore/categories-with-stores-v2` and v1 **[public]** — the home, store cards through `toPublicStore` (no `accounting`); `/api/shoofiAdmin/explore/{clear-cache, clear-cache-keys, cache-stats, debug-area}` **[admin]**
 - `GET /api/store/get/:appName` **[admin]** — the whole per-store `store` document, payment credentials included (it had no auth). Admin web only; the server reads `db.store` directly instead of calling it.
 - `POST /api/store/update` — save the per-store `store` document (`$set` per key). Its own gate, not `CATALOG_ADMIN`: `auth.required` + `storeUpdateGate` — any dashboard role, any key; a partner token for its own `app-name` only, cut to `PARTNER_STORE_FIELDS`; customer/driver 403, no token 401. Answers `200 { message: "Successfully saved" }` either way (§2 `store`, CORE invariant 28).
+- `POST /api/store/out-of-stock-extras` **[admin|own store]** (`PRODUCT_ADMIN_OR_OWN_STORE`, no auth before 2026-11-08) — the store-wide sold-out options list (`store{id:1}.outOfStockExtras`, option `nameAR`s, exact match). Body `{ name: "<option nameAR>", outOfStock: true|false }` → `$addToSet` / `$pull` (atomic, `name` stored untrimmed), reply `200 { message, outOfStockExtras: <stored list after the write> }`, `404` when the store DB has no `store{id:1}`. Legacy body `{ outOfStockExtras: [...] }` → `$set` as sent, reply echoes it (installed partner builds; last writer wins between two tablets). `400` for both forms in one body, a non-array list, a missing/blank `name` or a non-boolean `outOfStock`. Both forms clear both menu cache keys and send `menu_refresh` (`action: extras_stock_updated`) to customers and `extras_stock_updated` to the store's partner admins. `GET /api/store/out-of-stock-extras` stays public (the same list the menu response carries).
 - Public store lists through `toPublicStore` (no `accounting`/`hyp`/`credentials`/`fraudConfig`): explore v1/v2, `POST /api/shoofiAdmin/available-stores` (store + each `deliveryCompanies[].company`), `POST /api/menu/search`, `POST /api/twin-order/eligible-stores`, `POST /api/for-you/suggest` cards.
 - `GET /api/admin/categories/:page?` — **no auth** still (delivery-web `get-categories.ts` sends no token). The legacy expressCart `GET /category/:cat/:pageNum?` is removed (2026-10-30).
 - `POST /api/admin/menu-import-issues` — record one import run's issues (whole run, one call)
