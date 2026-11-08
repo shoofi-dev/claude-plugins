@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -709,14 +709,17 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **One row per order is still assumed.** A re-booked order can hold two rows with the same
       `originalBookId` (prod: one, vapego, statuses `-3` and `4`). These paths touch the first
       one found, exactly as before; they do not choose between them.
-    - **Still keyed on `bookId` alone — delivery-side, need a client change, not fixed here:**
-      `POST /api/delivery/admin/cancel` (delivery-web sends only `bookId`) and
-      `POST /api/delivery/update` → `updateDelivery` (`services/delivery/book-delivery.js`)
-      are WRITES; `GET /api/delivery/book/:bookId` (customer-scoped for mobile callers, sorted
-      newest), `GET /api/delivery/order/:id`, `POST /api/delivery/orders/batch` (dashboard-only,
-      no client calls it), the impersonation driver lookup in `routes/shoofi-admin-users.js`,
-      and the analytics `bookId: {$in}` joins (live-ops, churn-360, support-analytics,
-      `utils/active-orders.js`) are reads. Delivery CORE invariant 20.
+    - **The delivery-side WRITES no longer key on `bookId` alone (2026-11-08).** These are
+      `POST /api/delivery/admin/cancel` and `POST /api/delivery/update` → `updateDelivery`. They
+      go through `locateDeliveryRow` (`services/delivery/delivery-row-locator.js`), which tries,
+      in order: the row's `deliveryId`, then `originalBookId` + `bookId`, then legacy `bookId`
+      (+ `appName`). A shared legacy number writes its single live row or is refused with a 409.
+      delivery-web's cancel sends `deliveryId`. Delivery CORE invariant 20.
+    - **Still keyed on `bookId` alone, all READS:** `GET /api/delivery/book/:bookId`
+      (customer-scoped for mobile callers, sorted newest), `GET /api/delivery/order/:id`,
+      `POST /api/delivery/orders/batch` (dashboard-only, no client calls it), the impersonation
+      driver lookup in `routes/shoofi-admin-users.js`, and the analytics `bookId: {$in}` joins
+      (live-ops, churn-360, support-analytics, `utils/active-orders.js`).
     - Tests: `test/integration/delivery-row-by-original-order-id.js` (helper; cancel/ready with
       a cross-store and a same-store decoy inserted first; legacy fallback; twin cascade,
       degrade and undo; a source pin that the order-side files never regrow a
