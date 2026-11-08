@@ -783,6 +783,16 @@
         },
         {
           "file": "utils/print-outcome.ts",
+          "regex": "onSettled\\?\\.\\(lastAttempt, outcome\\);",
+          "desc": "doc CORE invariant 17: printer-testPrint is logged once per copy from onSettled, not per attempt"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "printerFailureNotice\\.reportFailure\\(\\);",
+          "desc": "doc CORE invariant 17: a failed copy feeds the non-blocking printer banner, never OPEN_GENERAL_SERVER_ERROR_DIALOG"
+        },
+        {
+          "file": "utils/print-outcome.ts",
           "regex": "export const SEND_DATA_TIMEOUT_FLOOR_MS = 30000;",
           "desc": "doc reference C3 Auto-print: 30s floor on the native sendData timeout"
         },

@@ -438,7 +438,14 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     So: never make a print path's success depend on Epson's completion callback alone, and
     never drop the sweep's date or cap. A stuck order is diagnosed from
     `<store>.client-error` `source: "printer-testPrint"` rows (they now carry `outcome`),
-    plus the store's only `isPrinted:false, isViewd:true` orders.
+    plus the store's only `isPrinted:false, isViewd:true` orders. From the auto-print path
+    that is ONE row per failed or unconfirmed COPY, not per attempt, carrying `attempt`
+    (App.tsx logs from `printCopyWithRetry`'s `onSettled`; `shouldReportCopyOutcome`).
+    Rows before this change count every failed copy twice. A failed copy shows a
+    NON-blocking banner once per print session (`utils/print-failure-notice.ts`,
+    `PrinterFailureBannerGlobal`), re-armed by the next printed copy. Never route a print
+    failure to `OPEN_GENERAL_SERVER_ERROR_DIALOG`: that modal blocks the tablet and its
+    "close" restarts the app mid-batch, which is why the old emits were disabled.
 18. **THE STORE-CALENDAR AND ORDER-ADMIN READS ARE GATED PER AUDIENCE, AND THE PARTNER GATE IS
     STORE MEMBERSHIP, NOT "THE TOKEN'S OWN STORE"** (shoofi-server `services/orders/admin-access.js`).
     Until 2026-10-30, anyone who sent a store's `app-name` could close its hours, or read its

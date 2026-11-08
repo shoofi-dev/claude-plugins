@@ -638,7 +638,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     ticket line. To see the exact printed image on a simulator, run Metro with
     `EXPO_PUBLIC_DUMP_INVOICE=1`: the capture is logged as a data-uri.
   - **Diagnosing a loop**: `<store>.client-error` rows with `error.source:
-    "printer-testPrint"` (and `error.outcome` since 2026-10-29). `customerId` there is the
+    "printer-testPrint"` (and `error.outcome` since 2026-10-29; auto-print logs one row per
+    failed copy with `error.attempt` since the printer-banner change, earlier rows are one
+    per attempt, i.e. ~2x). `customerId` there is the
     `shoofi.store-users` `_id` of the tablet's user. Then the store's
     `isPrinted:false, isViewd:true` orders, which are exactly what the sweep can return.
 - **The loud new-order alarm has ONE source, and an id ledger decides whether it rings.**
