@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-applepay-inline-ccpaymentrefdata / 2026-11-06 (reference 3 inline Apple Pay variant); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -88,6 +88,16 @@
         ]
       },
       "patterns": [
+        {
+          "file": "routes/order.js",
+          "regex": "\"\\[applepay\\] session has no InvoiceRecieptNumber\"",
+          "desc": "reference 3 inline Apple Pay: an empty receipt number logs and keeps the session data as ccPaymentRefData (HQ #d20b90)"
+        },
+        {
+          "file": "test/integration/applepay-session-no-receipt-number.js",
+          "regex": "t\\.truthy\\(order\\.ccPaymentRefData",
+          "desc": "reference 3 inline Apple Pay: the regression test that pins ccPaymentRefData is saved"
+        },
         {
           "file": "routes/admin.js",
           "regex": "const invoiceQueueAdmins = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",
