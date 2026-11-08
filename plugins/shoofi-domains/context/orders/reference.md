@@ -20,7 +20,9 @@ Primary files: `routes/order.js` (~7k lines), `routes/twin-order.js`,
 `routes/order-origin-validator.js`, `routes/admin/order-monitoring.js`,
 `routes/admin/twin-order-config.js`, `services/twin-order/*`,
 `utils/order-stock.js` (stock semantics), `utils/crons/*order*`,
-`services/monitoring/centralized-flow-monitor.js`. Status constants: `consts/consts.js`.
+`services/monitoring/centralized-flow-monitor.js`, `routes/order-history.js` +
+`services/orders/order-history.js` (the partner's one-day history, CORE invariant 21).
+Status constants: `consts/consts.js`.
 
 **⚠️ HIGH-RISK code (change via draft PR flagged HIGH-RISK; never merge):**
 - `POST /api/order/create` — the creation pipeline (`order.js`)
@@ -486,7 +488,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   store user without `all`, and before user details load), **`update/viewd` = ACCEPT** (→ `6→1`, future `14→1`,
   sends `readyMinutes` — not persisted, §2), `update` (forward/back status + note), `update-item-collected`,
   `start-preparing` / `update-start-preparing`, `update-delay`, `printed`,
-  `book-delivery`, `*-custom-delivery`, `addRefund`, `future-orders-ready`, `drive-in-arrival-confirm`.
+  `book-delivery`, `*-custom-delivery`, `addRefund`, `future-orders-ready`, `drive-in-arrival-confirm`,
+  and `admin/history` (`getOrderHistory(date)`, the v3 history tab; on shoofi-partner
+  `feat/orders-board-v3`, not on `main` as of 2026-11-08).
 - **Transition rule**: ACCEPT goes through **`order/update/viewd`** (NOT `order/update`);
   all other forward/back transitions use `order/update` with an explicit `status` the
   client computes (`1→3` delivery / `1→2` takeaway; `3→11`; `2→11|10`; `15→1`).
@@ -507,6 +511,10 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   one of its phone's memberships. Even mid-`switchStore` (store first, token second) it passes.
   `admin/my-stores/new-orders-count` (`utils/cross-store-alerts`) stays `auth.required`: it is
   token-scoped and ignores the header.
+  `admin/history` is the other way round: `auth.required` + `requireStoreMembership()` (the
+  store-analytics gate, `routes/order-history.js`), partner-only, and the `reports` role only
+  decides whether `totals` is filled. A store user without it gets the list and `totals: null`,
+  never a 403 (CORE invariant 21).
   **Any 401 signs the store out** (`utils/http-interceptor` → `OPEN_GENERAL_SERVER_ERROR_DIALOG`
   `isSignOut: true` → `resetAppState` + restart), so a partner-polled route must never 401 a
   logged-in terminal.
@@ -537,7 +545,15 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     order came back on every sweep on every day.
   - **Business day**: the server picks the window with `getBusinessDayBoundaries` from
     wall-clock now. For "today" that is the current business day, including the overnight
-    tail. One known gap: on a store with normal (non-overnight) hours, an order whose
+    tail. ⚠️ **Known bug (not fixed, noted 2026-11-08 in shoofi-server `feat/partner-order-history`):**
+    the overnight branch tests the CURRENT clock time, not the date asked. When the weekday
+    before `ordersDate` has overnight hours and the request is made before that close + 90 min
+    (any date, e.g. 01:30 for a 01:00 close), it returns the business day BEFORE `ordersDate`
+    (start = its opening the evening before, end = its close on `ordersDate`). Right for "today"
+    just after midnight, which is what it was written for; wrong for any other date asked in
+    that window. A new day-scoped reader must use
+    `utils/store-service.js` `getBusinessDayBoundariesForDateRange` instead (as `admin/history`
+    and the payments screen do). One known gap: on a store with normal (non-overnight) hours, an order whose
     `orderDate` falls after midnight but before the next opening is outside the sweep. Its
     accept-time explicit print is unaffected.
   - **Driver result** (`helpers/printer/index.ts` `printImagesWithOutcome`): `"printed" |
