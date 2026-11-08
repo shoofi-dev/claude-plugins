@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@feat/store-closed-until (invariant 31 — special hours closedUntil / closedDays on isStoreClose, the same cron; invariant 28 partner fields; /api/store/holiday/* removed) / 2026-11-08; shoofi-server@feat/timed-busy-prep-extra (invariant 30 — timed busy busyUntil, extra prep time prepExtra, the expiry cron; invariant 28 partner fields) / 2026-11-07; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@feat/store-closed-until (invariant 31 — special hours closedUntil / closedDays on isStoreClose, the same cron; invariant 28 partner fields; /api/store/holiday/* removed) / 2026-11-08; shoofi-server@feat/timed-busy-prep-extra (invariant 30 — timed busy busyUntil, extra prep time prepExtra, the expiry cron; invariant 28 partner fields) / 2026-11-07; shoofi-server@feat/prep-time-suggestion-field (invariant 28 — prepTimeSuggestion, a partner store field) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 — outOfStoreUntil, the 07:00 restore, store-wide outOfStockExtras) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -76,6 +76,13 @@ boundary and say so in the PR.
    `{ isInStore:false, outOfStockByQuantity:true }`. **Human-confirmed: applies to ALL products,
    no exceptions.** Decrement only on order confirmation; restore only re-enables products that
    were `outOfStockByQuantity` (never un-hides a manual disable).
+   **Timed "off until…"** (`outOfStoreUntil`) is a separate, manual switch, and only the 07:00
+   Asia/Jerusalem cron turns it back on (`restoreTemporaryOutOfStoreProducts`,
+   `utils/crons/products-in-store-update.js`): nothing checks it at read time, so a product whose
+   time has passed stays off until the next 07:00 run. `GET /api/menu` projects it for
+   `shoofi-partner` / `shoofi-admin` only (never the customer menu or its cache).
+   **Sold-out extras** (`store.outOfStockExtras`) are store-wide by option `nameAR` — there is no
+   per-product switch. Detail: reference §5.
 5. **`supportedCategoryIds` are STRINGS**, compared via `{$toString:'$_id'}`. Don't switch to
    ObjectId comparison without a data migration.
 6. **Product ordering** comes from `categoryOrders[categoryId]`, falling back to legacy `order`.
@@ -865,6 +872,14 @@ boundary and say so in the PR.
       cleared before. Six still clear only the regular key, not `_schoolProject`, which breaks
       invariant 2 and predates the gate: `update/activeTastes`, `update/order`,
       `update/order-per-category`, `bulk-reorder`, `reset-order/:categoryId`, `migrate-orders`.
+    - **`POST /api/store/out-of-stock-extras`** (`routes/store.js`, the sold-out options list)
+      takes `PRODUCT_ADMIN_OR_OWN_STORE` too. It had no auth until 2026-11-08. Its only caller is
+      shoofi-partner `stores/menu` `updateOutOfStockExtras` (`Token`). Two bodies
+      (`services/catalog/out-of-stock-extras.js`): the whole list
+      `{ outOfStockExtras: [...] }`, which installed partner builds send and is `$set` as sent
+      (last writer wins between tablets), or one option `{ name: "<nameAR>", outOfStock: bool }`,
+      which does `$addToSet` / `$pull` so concurrent toggles all land. Both clear both cache keys.
+      Tests: `test/integration/out-of-stock-extras-auth.js`. Detail: reference §7.
 
 27. **CATEGORY AND EXPLORE ADMIN ROUTES ARE DASHBOARD-ONLY. THE HOME'S READS STAY PUBLIC, AND NO
     PUBLIC STORE LIST SENDS A STORE'S SECRETS** (`services/catalog/category-access.js`, `services/catalog/public-store.js`,
@@ -946,8 +961,8 @@ boundary and say so in the PR.
       `closedUntil`, `closedDays` (invariant 31; `closedDaysApplied` is the cron's, never a client's),
       `openHours`, `creditcard_support`, `cash_support`, `takeaway_support`,
       `delivery_support`, `isOrderLaterSupport`, `drive_in_support`, `invoicePrintCount`,
-      `ramadanSettings`. Those are exactly the controls of the partner app's store-management
-      screen and header (`screens/admin/store-managment`, `components/layout/header`). The
+      `ramadanSettings`, `prepTimeSuggestion`. Those are exactly the controls of the partner app's
+      store-management screen and header (`screens/admin/store-managment`, `components/layout/header`). The
       app posts its WHOLE copy of `POST /api/store` on every save, wrapped as `{ data }`. Each
       key outside the list is left out of the write, so it keeps its stored value; nothing the
       owner can edit is lost. **Add a key only when a partner screen edits it, never because the
@@ -964,6 +979,17 @@ boundary and say so in the PR.
       so a store without one keeps none after a partner save. A dropped key whose value differs
       from the stored one is logged as
       `store update: partner write left out fields the partner app cannot edit`.
+    - **`prepTimeSuggestion`** (added 2026-11-07, shoofi-partner #47): the switch for the v3
+      new-order screen's pre-selected prep time (the last time picked on that device today, else
+      `defaultMinutes`; it never accepts by itself). The partner reads
+      `storeData.prepTimeSuggestion` from `POST /api/store` (it passes `sanitizeStoreForPublic`,
+      no allowlist) and treats anything but `enabled === false` as ON, so a store without the key
+      has it on. `POST /api/store/update` stores it as `{ enabled: boolean, defaultMinutes?: slot }`
+      for EVERY caller via `normalizePrepTimeSuggestion` (`services/catalog/prep-time-suggestion.js`,
+      `PREP_TIME_SLOTS` = 10 15 20 25 30 35 40 45 60, the partner's slots): a `defaultMinutes` off
+      the slots and any other key are left out; a value without a boolean `enabled` is not written
+      at all (the stored one stays, logged `store update: invalid prepTimeSuggestion not written`).
+      No admin-web control; the admin form re-posts the loaded document, so it keeps the value.
     - **Status change** compares only keys the request writes (`writes(key)`), because a partner
       write never carries `business_visible` and the rest. The explore cache is cleared and the
       closed/busy SMS sent only for a real change.

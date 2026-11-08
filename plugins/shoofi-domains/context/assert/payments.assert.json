@@ -89,6 +89,21 @@
       },
       "patterns": [
         {
+          "file": "services/payments/order-invoices.js",
+          "regex": "ISSUED: \"issued\",",
+          "desc": "CORE invariant 11: an invoices[] entry is a real document only at status \"issued\""
+        },
+        {
+          "file": "services/hq/money-audit/checks-money-in.js",
+          "regex": "const hasIssuedDocument = \\(o\\) =>",
+          "desc": "CORE invariant 11: the money audit's receipt-missing check reads invoices[], not invoiceStatus"
+        },
+        {
+          "file": "services/hq/money-audit/util.js",
+          "regex": "\\n  invoices: 1,",
+          "desc": "CORE invariant 11: the money audit's order projection keeps invoices[]"
+        },
+        {
           "file": "routes/admin.js",
           "regex": "const invoiceQueueAdmins = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];",
           "desc": "CORE invariant 11: GET invoices/pending takes any dashboard role"

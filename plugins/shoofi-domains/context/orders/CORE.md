@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -24,7 +24,8 @@ Server: `routes/order.js`, `routes/twin-order.js`, `routes/order-fraud-*.js`,
 `services/marketing/reconcile.js` (one marketing fact per checkout, kept true by a cron —
 invariant 16), who may call the coins admin routes (`routes/coins.js` `/api/admin/coins/*` and the
 Coins Settings block of `routes/shoofi-admin.js`, invariant 19), `services/orders/shipping-price-check.js`
-(the log-only delivery-fee check, invariant 20), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
+(the log-only delivery-fee check, invariant 20), `routes/order-history.js` +
+`services/orders/order-history.js` (the partner's one-day order history, invariant 21), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
 (shoofir), monitoring/twin-admin (delivery-web).
 
 **Not yours:** payment internals (`payments`), settlement/payouts (`accountant`), driver
@@ -465,9 +466,13 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `POST /api/order/admin/all-orders/:page?`, `POST /api/order/statistics/new-orders/:page?`,
       `POST /api/order/byDate` (no caller) and `GET /api/shoofiAdmin/external-order-providers`.
       Only the admin web calls them.
-    - **Every `/api/order/admin/*` route carries one of the two.** The one exception is
-      `GET admin/my-stores/new-orders-count` (`auth.required`): it takes the store set from the
-      token's phone (`storeUsers`), ignores `app-name` and returns counts only. The customer's
+    - **Every `/api/order/admin/*` route in `routes/order.js` carries one of the two.** The one
+      exception there is `GET admin/my-stores/new-orders-count` (`auth.required`): it takes the
+      store set from the token's phone (`storeUsers`), ignores `app-name` and returns counts only.
+      **`POST admin/history` lives in its own router (`routes/order-history.js`) and takes the
+      store-analytics gate instead** (`auth.required` + `requireStoreMembership()`): partner-only
+      by decision, an admin-web token is 403 (invariant 21). The static test in
+      `orders-admin-auth.js` reads `routes/order.js` only; `order-history.js` pins its own gate. The customer's
       own reads (`customer-orders`, `customer-active-orders`, `customer-orders-history`,
       `customer-last-completed-order`, `customer-invoices`) stay `auth.required`, because they
       select by `req.auth.id`. A static test fails for a new login-only admin route.
@@ -597,6 +602,50 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests: `test/integration/order-shipping-price-check.js`. It covers each exemption, active
       and paused areas, unresolved cases, a throwing lookup, a lookup that never answers (the
       create response is not held), and a failed flag write.
+
+21. **PARTNER ORDER HISTORY IS THE PAYMENTS SCREEN'S DAY, AND ITS SALES TOTAL TIES OUT TO
+    `partner/summary`** (`POST /api/order/admin/history`, `routes/order-history.js` +
+    `services/orders/order-history.js`, built 2026-11-08 for the partner tablet's v3 history tab;
+    definitions decided by the accountant domain and Sari). Read-only.
+    - **Gate:** `auth.required` + `requireStoreMembership()` (`utils/store-membership.js`, the
+      store-analytics gate). The store is `req.storeMembership.appName`, never the raw header.
+      The LIST is for every member of the store. The TOTALS only for the partner `reports` role,
+      decided by `storeUserHasRole(me, ["reports"])`, the function `requireStoreRole` itself
+      calls (so `isAdmin` first, and a doc with a missing/empty `roles` array passes, as legacy).
+      Without the role the answer is `totals: null`, **never a 403** (a 403 is silent in the
+      partner app and would blank the screen).
+    - **Body** `{ date: "YYYY-MM-DD" }`: one business day. 400 when missing/malformed/not a real
+      day, in the future, or more than 31 days back (`MAX_DAYS_BACK`), "today" being the Israel
+      calendar day.
+    - **The day:** `getBusinessDayBoundariesForDateRange(date, date, openHours)`
+      (`utils/store-service.js`) on the store's `store {id:1}.openHours`, matched on `created`
+      with the same string-range query as `partner/summary` (`routes/payments/summaries.js`). So
+      the window is the SNAPPED one (closed gaps split at their midpoint), and a twin leg's
+      `+00:00` `created` compares as a string exactly as it does there. Not fixed here on
+      purpose: the two screens must agree. **Never** `routes/order.js`
+      `getBusinessDayBoundaries` (reference C3: its overnight branch reads wall-clock now).
+    - **The list:** statuses `HISTORY_STATUSES` = `1,2,3,4,5,7,8,9,10,11,12`. `0`, `6`, `13`,
+      `14`, `15` are out. No `isViewd` filter (a cancel before acceptance shows), school orders
+      in, a superseded Apple Pay placeholder (`supersededBySessionId`) out. Newest first by the
+      INSTANT of `created` (a string sort would misplace a `+00:00` twin leg by hours). Capped at
+      `MAX_HISTORY_ROWS` = 500 with `truncated: true`; the totals are always over the whole day.
+    - **A row:** `{ _id, orderId, status, created, orderDate, receiptMethod, paymentMethod,
+      customerName, amount, isSchoolProject, cancelReason, twinGroupId }`, from a projection,
+      never the full document. `amount = (orderPrice || 0) + (driveInPrice ||
+      driveInPricing?.price || 0)`, the payments screen's drive-in chain. Never `total` (it
+      carries the courier's `shippingPrice`).
+    - **Totals** `{ sales: {count, amount}, cancelled: {count, amount}, inProgress: {count} }`:
+      sales = `COMPLETED_STATUSES`, cancelled = `CANCELLED_STATUSES` (both imported from
+      `utils/customer-orders.js`), inProgress = status `1` (no amount). Summed raw, no rounding.
+    - **Tie-out (the contract):** for any day, `totals.sales.amount` / `.count` =
+      `partner/summary`'s `totalRevenue` / `totalRevenueCount` for `startDate = endDate = date`.
+      It holds because both read the same window, the same completed statuses and the same
+      amount; the superseded exclusion cannot break it (a superseded row is always status `4`).
+      `test/integration/order-history.js` runs both real routers on one fixture day and fails
+      if they drift. **Change the window, the completed set or the amount in either route, and
+      change the other.**
+    - Response `{ date, window: { start, end }, orders, truncated, totals }`, top level (no
+      `{message, data}` envelope; the partner reads `res?.data || res`).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
