@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -646,6 +646,18 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       change the other.**
     - Response `{ date, window: { start, end }, orders, truncated, totals }`, top level (no
       `{message, data}` envelope; the partner reads `res?.data || res`).
+
+22. **`bookDelivery.bookId` IS STORE-LOCAL. ALWAYS PAIR IT WITH `appName`.** `bookId` is the
+    order's `orderId` ("1096-8335"), a per-store number that two stores can share. On 2026-11-08,
+    88 numbers in prod `book-delivery` were shared by 2+ stores out of 106,071 rows. Every booking
+    writes the store's DB name as `appName` beside it, and no delivered row lacks it. A lookup by
+    `bookId` alone can read or write another store's delivery. Incident 2026-11-08: the
+    customer's active-orders list (`filterOutDeliveredOrders`, `utils/active-orders.js`) hid
+    GCP's live 1096-8335 behind burger-house's delivered 1096-8335. The customer ordered again,
+    and the store cancelled the duplicate. The filter now drops an order only on an exact
+    `appName|bookId` match. An order whose store is unknown is kept, because over-inclusive is
+    the safe side. Paths that still key on `bookId` alone are listed in reference §5
+    (`delivery-company.bookDelivery`).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
