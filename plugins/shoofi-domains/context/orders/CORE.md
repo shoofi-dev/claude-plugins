@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/HIGH-RISK-coins-server-total-and-cancel-refund / 2026-11-08 (invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -114,7 +114,7 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     `soldByWeight === true` (`calculateItemUnitPrice` reads the flag off the product loaded by
     `loadPricedProducts`, which must keep returning it) or when the weight is the only
     non-header extra; otherwise as an add-on with the first step bundled. Creation charges
-    the client total and only **shadow-compares** (`utils/order-pricing-shadow.js` →
+    the client total (except the coin discount, which is settled server-side — invariant 24) and only **shadow-compares** (`utils/order-pricing-shadow.js` →
     `order.serverPricing.driftDetected`); **amend** (`routes/order-amend.js` `repriceOrder`)
     is server-authoritative through `calculateOrderPricing`. **Combo lines add a fourth
     function to the same lockstep:** `calculateComboExtrasPrice(comboProduct, item, components)`
@@ -721,6 +721,28 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       a cross-store and a same-store decoy inserted first; legacy fallback; twin cascade,
       degrade and undo; a source pin that the order-side files never regrow a
       `bookDelivery.x({ bookId … })` key) and the amend case in `test/integration/order-amend.js`.
+24. **COINS LAND ON THE TOTAL EXACTLY ONCE, AND A CANCEL GIVES BACK WHAT THE LEDGER SAYS WAS
+    SPENT — never `order.usedCoins`.** `services/coins/order-coins.js`.
+    - **The app already subtracts the coins from `total`** (`shoofi-app components/total-price`
+      `getTotalPrice`). Prod to 2026-11-08: 17,738 of 17,817 coin orders arrived net, 70 gross
+      (paid full price, coins debited anyway), 9 neither. So "subtract coins server-side"
+      double-discounts. `settleCoinsAtCreation` classifies the posted total
+      (`net`|`gross`|`unknown`, `classifyPostedTotal`) and applies the server-validated
+      discount once; the outcome is `order.coinsPricing`. `unknown` leaves the total alone.
+      **Prepaid providers (`PREPAID_PROVIDERS` = `APPLEPAY`, `HYP`) are never re-priced** — the
+      charge is final, the coins follow the money.
+    - **`usedCoins` is INTENT.** Coins move only in `redeemOrderCoins` after the payment is
+      confirmed; its outcome is `order.coinsRedemption.status` (`redeemed`|`failed`), and the
+      claim makes a second call a no-op. A failed redeem never fails the order.
+    - **Every cancel path calls `reverseOrderCoins`**, which claims `order.coinsReversal`
+      atomically and refunds `redeem − refund` / removes `earn − expire` for that `orderId` from
+      `shoofi.customerCoins.transactions`. Callers: `/api/order/update` (all five cancelled
+      statuses incl. `9`), the superseded Apple Pay placeholder cancel, twin `cascadeCancel` and
+      `degradeToSingle`; `undoDegrade` calls `reinstateOrderCoins`. The old `usedCoins`-based
+      refund minted coins on never-debited orders and repeated on every re-cancel.
+    - `coinsService.redeemCoins`/`refundCoins` read the mongodb 3.7 `findOneAndUpdate` result
+      as `{ value }` — `{ value: null }` is a failure, not a truthy success.
+    - Tests: `test/integration/order-coins.js`.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
@@ -835,7 +857,7 @@ Worked example: `services/exec-dashboard/engagement-metrics.js`.
 - **BY DESIGN:** fraud **rejection** is intentionally off — risky orders route to
   FRAUD_REVIEW(`13`) for manual handling. Do not enable hard-blocking.
 - **Awareness (not bugs):** coins-redeem-after-charge failure logs CRITICAL for manual
-  reconciliation; HYP "verified=false but paid" is logged paid-but-stuck; background work in
+  reconciliation and marks `order.coinsRedemption.status: "failed"` (invariant 24); HYP "verified=false but paid" is logged paid-but-stuck; background work in
   store-accept runs after the 200 response so failures never reach the client.
 - **DEFERRED (Sari, 2026-10-16) — do NOT build without a new decision:** the in-chat
   **checkout** card in the For-you chat. Adding to the cart from the chat IS built (Sari,
