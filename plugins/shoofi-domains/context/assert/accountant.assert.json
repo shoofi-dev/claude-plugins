@@ -1058,9 +1058,12 @@
           "desc": "CORE invariant 19: a store report is marked sent only after at least one WhatsApp really went out"
         },
         {
-          "file": "routes/hyp.js",
-          "regex": "\\.\\.\\.\\(ok \\? \\{ \\$set: \\{ 'hyp\\.taxUrlSentAt': at \\} \\} : \\{\\}\\)",
-          "desc": "CORE invariant 19: taxUrlSentAt is stamped only when the approval link was actually sent"
+          "file": [
+            "services/invoicing/tax-consent.js",
+            "routes/hyp.js"
+          ],
+          "regex": "\\.\\.\\.\\(ok \\? \\{ \\$set: \\{ 'hyp\\.taxUrlSentAt': at \\} \\} : \\{\\}\\)|\\.\\.\\.\\(stampSent \\? \\{ \\$set: \\{ 'hyp\\.taxUrlSentAt': at \\} \\} : \\{\\}\\)",
+          "desc": "CORE invariant 19: taxUrlSentAt is stamped only when the approval link was actually sent (moving to services/invoicing/tax-consent.js with feat/tax-consent-renewal; both forms accepted until it merges)"
         },
         {
           "file": "routes/hyp.js",
