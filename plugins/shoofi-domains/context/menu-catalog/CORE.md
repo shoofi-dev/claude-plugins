@@ -862,6 +862,14 @@ boundary and say so in the PR.
       cleared before. Six still clear only the regular key, not `_schoolProject`, which breaks
       invariant 2 and predates the gate: `update/activeTastes`, `update/order`,
       `update/order-per-category`, `bulk-reorder`, `reset-order/:categoryId`, `migrate-orders`.
+    - **`POST /api/store/out-of-stock-extras`** (`routes/store.js`, the sold-out options list)
+      takes `PRODUCT_ADMIN_OR_OWN_STORE` too. It had no auth until 2026-11-08. Its only caller is
+      shoofi-partner `stores/menu` `updateOutOfStockExtras` (`Token`). Two bodies
+      (`services/catalog/out-of-stock-extras.js`): the whole list
+      `{ outOfStockExtras: [...] }`, which installed partner builds send and is `$set` as sent
+      (last writer wins between tablets), or one option `{ name: "<nameAR>", outOfStock: bool }`,
+      which does `$addToSet` / `$pull` so concurrent toggles all land. Both clear both cache keys.
+      Tests: `test/integration/out-of-stock-extras-auth.js`. Detail: reference §7.
 
 27. **CATEGORY AND EXPLORE ADMIN ROUTES ARE DASHBOARD-ONLY. THE HOME'S READS STAY PUBLIC, AND NO
     PUBLIC STORE LIST SENDS A STORE'S SECRETS** (`services/catalog/category-access.js`, `services/catalog/public-store.js`,
