@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -620,7 +620,13 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       calendar day.
     - **The day:** `getBusinessDayBoundariesForDateRange(date, date, openHours)`
       (`utils/store-service.js`) on the store's `store {id:1}.openHours`, matched on `created`
-      with the same string-range query as `partner/summary` (`routes/payments/summaries.js`). So
+      with the same string-range query as `partner/summary` (without `figures` in the body — what
+      installed partner builds send — that is the legacy handler,
+      shoofi-server `services/payments/partner-summary-legacy.js`, unchanged; with
+      `figures: "report"` it is the store report engine's orders query,
+      `services/payments/store-sales.js` `settlementOrdersQuery`, over
+      `storeReportBounds(date, date)` — the same snapped bounds except in the store's
+      `openHoursEnabledMonth`, where the report starts at 00:00). So
       the window is the SNAPPED one (closed gaps split at their midpoint), and a twin leg's
       `+00:00` `created` compares as a string exactly as it does there. Not fixed here on
       purpose: the two screens must agree. **Never** `routes/order.js`
@@ -642,8 +648,16 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `partner/summary`'s `totalRevenue` / `totalRevenueCount` for `startDate = endDate = date`.
       It holds because both read the same window, the same completed statuses and the same
       amount; the superseded exclusion cannot break it (a superseded row is always status `4`).
-      `test/integration/order-history.js` runs both real routers on one fixture day and fails
-      if they drift. **Change the window, the completed set or the amount in either route, and
+      `partner/summary` answers two ways (shoofi-server `fix/partner-summary-figures`, accountant
+      invariant 17). Without `figures` (installed builds) it is the legacy answer, unchanged:
+      `totalRevenue` = Σ(`orderPrice` + drive-in), the same sum as here by construction. With
+      `figures: "report"` it IS the store report: `totalRevenue` = the report's `totalIncomes`
+      (סך הכל הכנסות ממכירות), which equals Σ(`orderPrice` + drive-in) whenever every completed
+      order is CARD or CASH (prod 10/2026: 13,535 completed, 0 with another method). An order with
+      no or another payment method counts in the report only through its coins + Shoofi coupon
+      credit, so on such a day the two would differ — the report wins.
+      `test/integration/order-history.js` runs both real routers on one fixture day, against BOTH
+      answers, and fails if either drifts. **Change the window, the completed set or the amount in either route, and
       change the other.**
     - Response `{ date, window: { start, end }, orders, truncated, totals }`, top level (no
       `{message, data}` envelope; the partner reads `res?.data || res`).
