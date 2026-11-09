@@ -155,6 +155,19 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.
+12. **A whole order document carries the terminal Password and the customer's CVV.**
+   `processCreditCardPayment` stores the ZCredit CommitFullTransaction request it sent on the
+   order: at `ccPaymentRefData.payload` on success, and at
+   `ccPaymentRefData.paymentData.payload` on a failed charge (status "0" orders, which
+   `admin/orders` returns when asked for that status). A projection on `ccPaymentRefData.payload`
+   alone misses the second shape. Every admin / store-member read that returns whole orders
+   passes them through `stripSensitivePaymentFields[FromOrders]`
+   (`services/payments/strip-payment-secrets.js`) right before `res.json`, which also strips
+   `recharges[]` copies. The customer reads do the same (`routes/order.js` `customer-invoices`,
+   `customer-orders`, `customer-active-orders`, `customer-orders-history`,
+   `customer-last-completed-order`; `routes/customer.js` `orders`, `orders-old`). No screen
+   reads `payload`. Pinned by `test/integration/admin-order-reads-strip-payment-secrets.js`
+   and `customer-target-id.js` (HQ #6a956d).
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds

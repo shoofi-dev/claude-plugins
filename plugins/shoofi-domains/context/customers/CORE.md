@@ -853,6 +853,17 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       Prod dry-run 2026-11-07: cleanup 185 customers / 185 rows; backfill 11,718 customers to set;
       dedupe 1,393 customers / 2,531 rows to merge, 550 customers skipped for a name conflict.
     Pinned by shoofi-server `test/integration/confirmed-delivery-address.js`.
+20. **A body `customerId` is honoured only for a dashboard role.** `auth.required` lets every
+    app's token in (one shared secret), so a route that reads `req.body.customerId ||
+    req.auth.id` lets any logged-in user act on any customer. `POST /api/customer/{orders,
+    update-name,update,lead/update,lead/update/status,update-plan,update-plan-branch,
+    update-notification-token,pay}` run `targetCustomer` (`services/customer/target-customer.js`)
+    after `auth.required` and read `req.targetCustomerId`. No id or the caller's own id means
+    the caller. Another id is allowed only for a `DASHBOARD_ROLES` token, and anyone else gets
+    403, never silently their own id (most of these routes write). The mobile apps send no id;
+    the admin web's customer orders tab is the only caller that names another customer. Never
+    reintroduce `req.body.customerId ||`; `test/integration/customer-target-id.js` greps for it
+    (HQ #6a956d).
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:

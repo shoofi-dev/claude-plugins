@@ -183,6 +183,11 @@
       },
       "patterns": [
         {
+          "file": ["services/customer/target-customer.js", "routes/customer.js"],
+          "regex": "function targetCustomer\\(|const customerId = req\\.body\\.customerId \\|\\| req\\.auth\\.id",
+          "desc": "CORE invariant 20: a body customerId is honoured only for a dashboard role (targetCustomer). Once shoofi-server HQ #6a956d merges, drop routes/customer.js and the `|const customerId = req.body.customerId || req.auth.id` leg (it only lets the pin pass on main before the fix)"
+        },
+        {
           "file": "app.js",
           "regex": "if \\(shouldRunCrons\\) \\{[\\s\\S]*scheduledCampaignsCron\\.startScheduledCampaignsCron\\(app\\.db\\)",
           "desc": "CORE invariant 12: the scheduled-campaigns cron is started inside the shouldRunCrons block - before 2026-10-28 it was never started, so no scheduled campaign sent"
