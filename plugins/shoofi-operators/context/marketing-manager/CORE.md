@@ -248,14 +248,21 @@ explain them, do not recount them.
 **What you read: `shoofi.hq-marketing-days`** (read-only), `_id` = the Israel day, built at 07:35 by
 shoofi-server `services/hq/marketing-day.js` (the same reads as the marketing hub):
 - `published { last24h[], count24h, live, liveByChannel }` — went live in the last 24 h, live now;
-- `next { scheduled[] (7 days), scheduledCount, drafts { count, oldestAt, items[] } }`;
+- `next { scheduled[] (7 days), scheduledCount, drafts { count, oldestAt, items[] }, socialPostsAwaiting { picked, ready, oldestPickedAt } }` —
+  `drafts` is marketing drafts only (the approval record, `socialPublications`); `socialPostsAwaiting` is the
+  פוסטים לרשתות rows (`shoofi.socialPosts`, archived excluded, status + dates only — never the content):
+  `picked` = a caption was chosen and waits for approval, `ready` = options wait for someone to pick one.
+  Its clock is the later of `pickedAt` and `updatedAt` (a cancelled publication returns the post to
+  `picked` with its old `pickedAt`). `null` = the read failed (an `errors[]` entry), never zero;
+  absent on days built before 2026-11-09;
 - `results` (7 days) `{ checkouts, revenue, newCustomers, attributedOrders, top[], weak[], pushes[] }` —
   `top` brought orders, `weak` was seen 1000+ times and brought none, a push carries `sent`,
   `openRate` and its before/after `verdict` (up / down / no_change / too_small);
 - `social { accounts, posts7d, stories7d, best }`; `warnings[]` (each channel's own, in words);
 - `gaps[]` `{ kind, title, detail }` — `unpromoted_coupon` / `unpromoted_deal` /
   `unpromoted_new_store` (an offer that exists and nothing live or scheduled promotes),
-  `rhythm` (no push or no post in 7 days), `approval` (drafts waiting over a day), `ending_soon`;
+  `rhythm` (no push or no post in 7 days), `approval` (drafts AND `picked` social posts waiting over a
+  day — one gap, its detail names the social posts), `ending_soon`;
 - `errors[]` — a source that could not be read: its part is unknown, not zero. Say so.
 A piece is `{ channel, title, status, startsAt, endsAt, audience, results { views, taps, orders } }`.
 No customer is in it, and none goes in your summary.
@@ -263,7 +270,9 @@ No customer is in it, and none goes in your summary.
 **How you write it** — Hebrew, the owner reads it in the brief:
 1. First line, one sentence: "שיווק: N עלו אתמול, M מתוכננים, K הזמנות מהשיווק השבוע (X% מההזמנות)".
 2. **פורסם** — what went live, by channel, one line.
-3. **מה הבא** — what is scheduled; drafts waiting and for how long (the owner approves them).
+3. **מה הבא** — what is scheduled; drafts waiting and for how long (the owner approves them); social
+   posts with a chosen caption waiting for approval, and `ready` ones waiting for a caption pick — two
+   different jobs, never one number.
 4. **מה עבד ומה לא** — the top pieces by orders; a `weak` piece by name; pushes with their verdict.
    A before/after verdict is an estimate, a holdout lift is the number to trust (§4d) — never call
    `no_change` a failure or `up` proof.
