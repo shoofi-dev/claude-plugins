@@ -99,7 +99,8 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
   referral (`referralCode`, `referral{clickId,inviterCustomerId,…}`), flags
   (`isBlocked`, `isDeleted`+`deletedAt`, `cashRestricted`), location (`cityId`, `cityAreaId`),
   `schoolProject{…}`, marketing (`marketingPushOptOut` + `marketingPushOptOutUpdatedAt`; unset
-  = opted in, §5b). **No `tokenExpiry` field** — expiry lives only inside the JWT.
+  = opted in, §5b), `confirmedAddressId` (string `addresses[]._id` of the last delivery order's
+  saved address; unset = none — CORE invariant 19). **No `tokenExpiry` field** — expiry lives only inside the JWT.
 - **`schoolProject{schoolId, classId, isActive, studentIds[]}`** (school-project / "مدارس"
   customers; all ids are strings). `isActive` alone puts the customer app into school mode
   (schools category, pickup-only cart, student card at checkout); the card / student picker
@@ -266,7 +267,12 @@ Profile: `GET /api/customer/details` (joins store orders for a valid-order count
 `update`, `update-name`, `update-language`, `update-city-area` (resolves city from lat/lng
 via `delivery-company.cities`). Addresses: `controllers/customerAddressController.js` —
 add/get/update/delete/setDefault on the `addresses[]` subdoc (default toggling clears all
-then sets one). Push tokens: `update-notification-token` — writes `notificationToken` on the
+then sets one). `delete` also unsets `confirmedAddressId` when it named the deleted row; `update`
+keeps the row's `_id` and so the confirmed address. `GET /details` returns `confirmedAddressId`
+(string | null) to the customer app only. Order creation sets it (CORE invariant 19,
+shoofi-server `docs/confirmed-delivery-address.md`). Order creation also seeds `addresses[]` for a
+customer who has none — only with a real address (street + location, not GPS-only), always with
+an ObjectId `_id` (`addressToSaveFromOrder`); a town-only order seeds nothing. Push tokens: `update-notification-token` — writes `notificationToken` on the
 identity doc `req.auth.id` names, and **for a partner then mirrors it onto every sibling
 `storeUsers` doc sharing that phone** (`updateMany`, self excluded). The mirror exists
 because a new-order push is addressed to the token on the doc of *the store that got the

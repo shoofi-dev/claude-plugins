@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -43,7 +43,11 @@
         "utils/email-validation.js",
         "docs/invoice-step-tracking.md",
         "services/invoicing/company-invoice-precheck.js",
-        "services/invoicing/company-precheck-runner.js"
+        "services/invoicing/company-precheck-runner.js",
+        "services/invoicing/tax-consent.js",
+        "services/invoicing/tax-consent-reminders.js",
+        "routes/tax-consent.js",
+        "utils/crons/tax-consent-reminder-cron.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -193,7 +197,8 @@
           "fetchTaxAuthorityState",
           "deriveApprovalState",
           "getDistributorUsersCached",
-          "parseEzcountDate"
+          "parseEzcountDate",
+          "refreshDistributorUsers"
         ],
         "services/invoicing/store-invoice-precheck.js": [
           "evaluateStoreInvoicePrecheck",
@@ -224,6 +229,20 @@
         "services/invoicing/company-invoice-precheck.js": [
           "evaluateCompanyInvoicePrecheck",
           "companyDocumentAmounts"
+        ],
+        "services/invoicing/tax-consent.js": [
+          "sendConsentMessage",
+          "recordConsentEvent",
+          "liveCheckConsent",
+          "buildConsentView",
+          "whoMustLogInAr",
+          "maskFileNumber",
+          "resolveTemplate"
+        ],
+        "services/invoicing/tax-consent-reminders.js": [
+          "selectReminders",
+          "reminderStageFor",
+          "runTaxConsentReminders"
         ]
       },
       "patterns": [
@@ -1058,9 +1077,49 @@
           "desc": "CORE invariant 19: a store report is marked sent only after at least one WhatsApp really went out"
         },
         {
+          "file": "utils/store-report-invoice-status.js",
+          "regex": "if \\(typeof data\\.creditCardRevenue !== 'number' \\|\\| Number\\.isNaN\\(data\\.creditCardRevenue\\)\\) return true;",
+          "desc": "CORE invariant 19: storeInvoiceRequiredForSend fails closed — a report that cannot prove 'no card sales' still requires the store document"
+        },
+        {
           "file": "routes/hyp.js",
-          "regex": "\\.\\.\\.\\(ok \\? \\{ \\$set: \\{ 'hyp\\.taxUrlSentAt': at \\} \\} : \\{\\}\\)",
-          "desc": "CORE invariant 19: taxUrlSentAt is stamped only when the approval link was actually sent"
+          "regex": "if \\(!hasStoreDoc && storeInvoiceRequiredForSend\\(report\\)\\) \\{",
+          "desc": "CORE invariant 19: send-invoice refuses STORE_INVOICE_MISSING only when a store document is required; an all-cash store sends Shoofi's invoice alone"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "hasStoreDoc \\? report\\.hypStoreInvoicePdfLink : NO_STORE_INVOICE_TEMPLATE_TEXT,",
+          "desc": "CORE invariant 19: monthly_invoice {{2}} is the store link, or the Arabic 'none this month' text — never empty, never Shoofi's link twice"
+        },
+        {
+          "file": "services/invoicing/report-facts.js",
+          "regex": "s\\.send\\.code === 'STORE_INVOICE_MISSING' && \\(hasStore \\|\\| !st\\.creditCardExpected\\)",
+          "desc": "CORE invariant 19: a recorded STORE_INVOICE_MISSING send refusal is stale once the store document exists or is not needed"
+        },
+        {
+          "file": "utils/store-report-invoice-status.js",
+          "regex": "if \\(typeof data\\.totalOutcomes !== 'number' \\|\\| Number\\.isNaN\\(data\\.totalOutcomes\\)\\) return true;",
+          "desc": "CORE invariant 19: shoofiInvoiceRequiredForSend fails closed — a report that cannot prove 'Shoofi owes the store' still requires Shoofi's document"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "if \\(!hasShoofiDoc && shoofiInvoiceRequiredForSend\\(report\\)\\) \\{",
+          "desc": "CORE invariant 19: send-invoice refuses SHOOFI_INVOICE_MISSING only when Shoofi's document is required; when Shoofi owes the store the store's invoice goes alone"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "hasShoofiDoc \\? report\\.hypInvoicePdfLink : NO_SHOOFI_INVOICE_TEMPLATE_TEXT,",
+          "desc": "CORE invariant 19: monthly_invoice {{3}} is Shoofi's link, or the Arabic 'none this month (Shoofi coupons exceed the commission)' text"
+        },
+        {
+          "file": "services/invoicing/report-facts.js",
+          "regex": "const sendable = hasShoofi \\|\\| \\(hasStore && shoofiNotRequired\\);",
+          "desc": "CORE invariant 19: a store-only report (Shoofi owes the store) is sendable — next action sendInvoices, ready chip"
+        },
+        {
+          "file": "services/invoicing/tax-consent.js",
+          "regex": "\\.\\.\\.\\(stampSent \\? \\{ \\$set: \\{ 'hyp\\.taxUrlSentAt': at \\} \\} : \\{\\}\\)",
+          "desc": "CORE invariant 19: taxUrlSentAt is stamped only when the approval link was actually sent, never on a copy (recordConsentEvent; every send path goes through sendConsentMessage)"
         },
         {
           "file": "routes/hyp.js",
@@ -1159,6 +1218,36 @@
           "file": "services/database/DatabaseInitializationService.js",
           "regex": "db\\.storeReports\\.createIndex\\(\\{ 'dateRange\\.endDate': 1, 'dateRange\\.startDate': 1 \\}|db\\.storeReports = db\\.collection\\('store-reports'\\);",
           "desc": "reference §8: the store-report period index (shoofi DB only, fire-and-forget)"
+        },
+        {
+          "file": "services/invoicing/tax-consent.js",
+          "regex": "remindersEnabled: false,",
+          "desc": "CORE invariant 19: the renewal reminder is OFF by default (it messages real owners)"
+        },
+        {
+          "file": "services/invoicing/tax-consent-reminders.js",
+          "regex": "if \\(!dryRun && !settings\\.remindersEnabled\\) \\{",
+          "desc": "CORE invariant 19: a real reminder run returns before calling EZcount unless remindersEnabled"
+        },
+        {
+          "file": "services/invoicing/tax-consent-reminders.js",
+          "regex": "if \\(mine\\.some\\(\\(e\\) => e\\.ok\\)\\) \\{ skip\\('already_sent'\\); continue; \\}",
+          "desc": "CORE invariant 19: one successful reminder per consent period per stage"
+        },
+        {
+          "file": "routes/tax-consent.js",
+          "regex": "router\\.put\\('/api/hyp/admin/tax-consent/settings', \\.\\.\\.ownersOnly,",
+          "desc": "CORE invariant 19: only master turns the reminder on or changes the template"
+        },
+        {
+          "file": "services/invoicing/tax-consent.js",
+          "regex": "const TEMPLATE_NAME_MUST_CONTAIN = 'tax_authority_approval';",
+          "desc": "CORE invariant 19: a configured template name must keep the partner channel + Arabic routing of utils/whatsapp.js"
+        },
+        {
+          "file": "services/invoicing/tax-consent.js",
+          "regex": "return `\\$\\{'\\*'\\.repeat\\(d\\.length - 3\\)\\}\\$\\{d\\.slice\\(-3\\)\\}`;",
+          "desc": "CORE invariant 19: an individual's file number (a personal ID) is shown by its last 3 digits only"
         }
       ]
     },
@@ -1173,7 +1262,9 @@
         "src/views/admin/reports/invoice-steps/RowDetail.tsx",
         "src/views/admin/reports/invoice-steps/storeRowModel.ts",
         "src/views/admin/reports/invoice-steps/companyRowModel.ts",
-        "src/views/admin/reports/invoice-steps/rowShared.ts"
+        "src/views/admin/reports/invoice-steps/rowShared.ts",
+        "src/components/tax-consent/TaxConsentBox.tsx",
+        "src/components/tax-consent/taxConsentView.ts"
       ],
       "symbols": {},
       "patterns": [
@@ -1209,6 +1300,31 @@
           ],
           "regex": "export function initialPeriod\\(|startDate: searchParams\\.get\\('startDate'\\) \\|\\| '',",
           "desc": "reference §9: the report lists open on last month (Israel calendar) when the URL has no period"
+        },
+        {
+          "file": "src/components/tax-consent/taxConsentView.ts",
+          "regex": "export const CONSENT_TITLE = 'אישור EZcount ברשות המסים — מתחדש כל 3 חודשים';",
+          "desc": "CORE invariant 19: the admin names EZcount's 3-month consent, not the שופי שופינג permission"
+        },
+        {
+          "file": "src/views/admin/reports/invoice-steps/RowDetail.tsx",
+          "regex": "<TaxConsentBox kind=\\{taxConsent\\.kind\\} id=\\{taxConsent\\.id\\}",
+          "desc": "reference §9: the רשות המסים ומסמכים panel opens with the consent box (check + logged copy)"
+        },
+        {
+          "file": "src/views/admin/reports/invoice-steps/sendInvoiceGate.ts",
+          "regex": "if \\(storeInvoiceExpected\\(r\\)\\) return \\{ ok: false, message: STORE_INVOICE_FIRST \\};",
+          "desc": "CORE invariant 19: the report page sends Shoofi's invoice alone for an all-cash store, and says 'צור קודם חשבונית חנות' when the store had card sales"
+        },
+        {
+          "file": "src/views/admin/reports/invoice-steps/invoiceRouting.ts",
+          "regex": "\\|\\| \\(!!r\\.hypStoreInvoicePdfLink && !r\\.greenInvoiceId\\);",
+          "desc": "CORE invariant 19: a report whose only document is HYP's store one routes to HYP; a GreenInvoice report with a HYP store document stays on GreenInvoice"
+        },
+        {
+          "file": "src/views/admin/reports/ReportsList.tsx",
+          "regex": "reportDetails\\.filter\\(r => r && hasSendableInvoice\\(r\\)\\)",
+          "desc": "CORE invariant 19: the bulk invoice send includes a store-only report (Shoofi owes the store)"
         }
       ]
     }
