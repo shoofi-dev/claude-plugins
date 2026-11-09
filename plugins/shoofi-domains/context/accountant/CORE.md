@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@feat/code-coupons-filter + shoofi-delivery-web@feat/code-coupons-filter / 2026-11-07 (invariant 14 code coupons out of funder buckets, kind=code, ref); shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08 (invariant 17 partner/details deleted with admin/partners + admin/analytics, the flat-15% routes; ref §3/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@feat/code-coupons-filter + shoofi-delivery-web@feat/code-coupons-filter / 2026-11-07 (invariant 14 code coupons out of funder buckets, kind=code, ref); shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -618,8 +618,8 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       `services/exec-dashboard/billing-metrics.js` still describes that path). Do not widen the
       throw without a decision; do not drop the header forwarding, or every report fails.
     - **Earnings reads — identity from the token** (`services/payments/earnings-access.js`,
-      no auth at all until 2026-10-30). `partner/{summary,daily-orders,details}`
-      (`partnerEarningsAccess`): a dashboard role, or a `shoofi-partner` token whose own
+      no auth at all until 2026-10-30). `partner/{summary,daily-orders}` (`partner/details`,
+      flat 15% and never called, was deleted 2026-11-08) (`partnerEarningsAccess`): a dashboard role, or a `shoofi-partner` token whose own
       `storeUsers` doc's `appName` IS the `app-name` header — the handlers pick the store DB from
       that header, so the gate is what stops a partner reading another store. Caller:
       shoofi-partner `screens/admin/payments` (summary, daily-orders); nothing calls `details`.
@@ -753,6 +753,30 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       guard (2026-05-05) blocked every all-cash store: 52 HYP reports May–Oct 2026, none sent (verified
       against respond.io). The derivation treats an old `STORE_INVOICE_MISSING` record as stale once the
       document exists or is not needed.
+    - **The mirror: when Shoofi owes the store, the store's invoice goes out alone** (2026-11-08).
+      `totalOutcomes` nets `couponsFromShoofi` and `compensationsFromShoofi` against commission + VAT +
+      fees (`generateStoreReportData`). When the credits are larger it is ≤ 0: Shoofi owes the store,
+      `create-invoice` refuses, and Shoofi has no document, ever. The store still issued its card-sales
+      document. `send-invoice` asks `shoofiInvoiceRequiredForSend` (`utils/store-report-invoice-status.js`):
+      a numeric `totalOutcomes ≤ 0` → skip Shoofi's link probe, keep the store document's allocation and
+      link checks, and send `monthly_invoice` with {{3}} = `NO_SHOOFI_INVOICE_TEMPLATE_TEXT`. It marks
+      **both** `hypStoreInvoiceSent` and `hypInvoiceSent`: `hypInvoiceSent` means "this report's
+      monthly_invoice went out", and it is the one flag every unsent reader checks (derivation, bulk
+      "send only unsent", row, page). **Fail closed:** a missing/non-numeric `totalOutcomes` or any amount
+      > 0 keeps `SHOOFI_INVOICE_MISSING`. With neither document the route answers 400
+      `NO_INVOICES_TO_SEND` and records nothing, so the 84 no-orders months (outcomes 0, card 0) stay
+      quiet. The derivation's `sendable` (Shoofi's document, or the store's when Shoofi's is not needed)
+      drives the next action `sendInvoices` and the `ready` chip. Before this such a row sat under
+      "מוכן לשליחה" with next action "הושלם". Prod 2026-11-08: 19 reports since 12/2025 had outcomes < 0,
+      all from `couponsFromShoofi` (compensations ₪0 on every one); 15 had a store document and no Shoofi
+      document, none sent (Falafel Alasil 10/2026: card 143, commission 142.2 + VAT 25.6, coupons 247,
+      outcomes −79.20, transfer 222.20, store #10006). **The admin web routes by
+      `invoice-steps/invoiceRouting.ts`, never by `invoiceProvider` alone**: only Shoofi's HYP
+      `create-invoice` writes that field, so a store-only report has none. A report is HYP when
+      `invoiceProvider === 'hyp'`, or it has `hypInvoicePdfLink`, or a `hypStoreInvoicePdfLink` and no
+      `greenInvoiceId`. That last clause matters: 219 GreenInvoice-era reports carry a GreenInvoice
+      Shoofi document AND a HYP store document with no provider, and they must stay on the GreenInvoice
+      route.
     - **Recovering a stuck document = `recheck-allocation`**, read-only at EZcount
       (`getTaxMinistryAllocationNumber`). Never reset + re-create: `reset-invoice` does not cancel at
       the provider (Known status), so that issues a duplicate tax invoice. EZcount's ignoreApproval /
