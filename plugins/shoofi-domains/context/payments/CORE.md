@@ -145,6 +145,13 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
      2026-08-10..09-22). Their documents are in `invoices[]`, not Gmail. A fetch for `"EZ"`
      would search `subject:EZ`, publish an arbitrary customer's mail at the public key
      `invoices/doc-EZ.pdf` and mark one arbitrary order completed.
+   - **"Does this order have a receipt?" is answered by `invoices[]`, never by
+     `ccPaymentRefData.invoiceStatus`.** A real document is an entry with
+     `status: "issued"` (`INVOICE_STATUS.ISSUED` in `services/payments/order-invoices.js`)
+     and a `docNumber`/`docUuid`/`pdfLink`; a `failed` entry is a pending retry. Any reader
+     that projects orders must include `invoices`. The HQ money audit's `receipt-missing`
+     check (`hasIssuedDocument`, `services/hq/money-audit/checks-money-in.js`) false-flagged
+     all 2,894 of those orders until it did.
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.

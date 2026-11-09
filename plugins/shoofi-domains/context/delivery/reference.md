@@ -36,7 +36,11 @@ if it supports **BOTH** `store.supportedCities` (ObjectId[] — permission) **AN
 
 ## 2. bookDelivery lifecycle & DELIVERY_STATUS
 `delivery-company.bookDelivery`, one per delivery. `bookId = order.orderId`,
-`originalBookId = order.originalOrderId` (set at partner-accept, `order.js`).
+`originalBookId = order.originalOrderId` (set at partner-accept, `order.js`). **`bookId` is not
+unique** (first4+last4 of `originalOrderId`; 88 bookIds shared across stores in prod,
+2026-11-08) — an order's row is located by `originalBookId` through
+`deliveryRowFilterForOrder` (`utils/delivery-row.js`), never by `bookId` alone (CORE
+invariant 20; orders CORE invariant 23).
 **Status constants are authoritative in `consts/consts.js`** (`DELIVERY_STATUS`):
 `1` WAITING_FOR_APPROVE → `2` APPROVED → `3` COLLECTED_FROM_RESTAURANT (pickup) →
 `4` DELIVERED; `5` WAITING_IN_STORE; cancels `-1` by-driver, `-2` by-store, `-3` by-admin.
@@ -91,7 +95,7 @@ open and focus, and every call is a refusal while the platform flag is off.
 pre-flight for stores/regions that would book at ₪0.
 
 ## 2c. Courier state for the store (partner order card)
-`services/delivery/courier-status.js`; rules and emit points in CORE invariant 20. Each DELIVERY
+`services/delivery/courier-status.js`; rules and emit points in CORE invariant 21. Each DELIVERY
 row of `POST /api/order/admin/orders` carries:
 
 ```ts
@@ -349,7 +353,7 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   assignedAt, approvedAt, waitingInStoreAt(Date), startedAt, completedAt(Date), cancelledAt,
   isReadyForPickup, readyForPickupAt}`.
   ⚠️ `order._id` is an ObjectId on partner-accept bookings and a 24-hex **string** on bookings
-  made over `POST /api/delivery/book` — query both forms (CORE invariant 20).
+  made over `POST /api/delivery/book` — query both forms (CORE invariant 21).
   ⚠️ Fields that are not what they look like (CORE invariant 11): `readyForPickupAt` exists
   only if a driver was already assigned when the store pressed ready — the full store-ready
   source is `shoofi.orderFlowEvents` `status_change` status `"3"`. `company.storeName` and
@@ -389,12 +393,13 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
 - **ORDERS (you're the callee)**: at partner-accept `routes/order.js` builds `deliveryData`
   and fire-and-forgets `deliveryService.bookDelivery(...)` — **only if the GLOBAL switch
   `shoofi.store {id:1}.isSendNotificationToDeliveryCompany` is on** (else NO bookDelivery is
-  created platform-wide, §10). Order cancellation mirrors into `bookDelivery` (→ `-3`). You don't edit `order.js`.
+  created platform-wide, §10). Order cancellation mirrors into `bookDelivery` (→ `-3`) on the row located by
+  `deliveryRowFilterForOrder` and written by its `_id`. You don't edit `order.js`.
 - **PAYOUTS = accountant**: driver/company pay (`routes/driver-reports.js`, `driverDailyHours`,
   `shoofi.compensations`) and MASAV are the accountant's. You provide the delivery data; they compute pay.
 - **NOTIFICATIONS**: driver/store/customer push + WS (`driver_location_update`,
   `driver_status_updated`, `pickup_delayed`, `delivery_delayed`) via the notification domain.
-  `courier_updated` (store tablet, CORE invariant 20) is sent by delivery code itself through
+  `courier_updated` (store tablet, CORE invariant 21) is sent by delivery code itself through
   `websocketService.sendToAppAdmins`; that transport's single-process reach is the notification
   domain's to fix.
 

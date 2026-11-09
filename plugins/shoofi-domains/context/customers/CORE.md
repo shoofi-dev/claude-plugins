@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/marketing-suggestions + shoofi-delivery-web@feat/marketing-suggestions / 2026-11-07 (invariant 11: «הצעות» GET /api/admin/marketing/suggestions); shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/confirmed-delivery-address / 2026-11-07 (invariant 19: the confirmed delivery address, the requireSavedDeliveryAddress guard, the first-address push saves only real addresses, the address cleanup / backfill / dedupe scripts); shoofi-delivery-web@feat/one-editor-for-places + shoofi-server@feat/coupon-by-id / 2026-11-07 (invariant 16: add/edit a place through the wizard step, ?stepContent= on edit); shoofi-server@feat/marketing-suggestions + shoofi-delivery-web@feat/marketing-suggestions / 2026-11-07 (invariant 11: «הצעות» GET /api/admin/marketing/suggestions); shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -18,6 +18,11 @@ Accounts, phone+OTP login, tokens & sessions, profiles, addresses, referrals.
 Server: `routes/{auth,customer,customer-referrals,customer-campaigns,customer-feedback,
 shoofi-admin-users}.js`, `utils/{auth-service,admin-auth-service,app-name-helper}.js`,
 `controllers/customerAddressController.js`. Clients: login/OTP/profile in all four apps.
+Also yours: the **confirmed delivery address** and the saved-address guard
+(`services/customer/confirmed-address.js`) and the near-duplicate address rules
+(`services/customer/address-dedupe.js`, used by `scripts/dedupe-customer-addresses.js`) —
+invariant 19. The hook sits inside order creation, which is `orders`' file: keep it one
+fire-and-forget call.
 Also yours: **who a push campaign may reach**: the customer's marketing-push opt-out
 (`routes/customer-marketing-preferences.js`), the frequency cap
 (`services/customer-campaigns/marketing-push-policy.js`), and the campaign send and schedule
@@ -595,6 +600,19 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       is the form's own "מה נפתח בלחיצה" link (`subjectFromLink`); a form with no link yet has
       the button disabled, and a sent push or the saved-draft prompt shows none. "מלא בטופס"
       REPLACES the form's text fields and picture; nothing is saved until the form is.
+    - **Adding or editing a place of a קידום goes through the wizard's step too** (owner
+      2026-11-07: "new and edit should look the same"). The item page's «+ <place>» opens
+      `/admin/marketing/new?…&item=&channel=&add=1` (step bar: תמונה / טקסט → שמירה) and «ערוך»
+      opens the same step with `&edit=<docId>`, started from what is SAVED (banner pictures, the
+      story's picture or video and captions, a push/note's texts as «הטקסט השמור», the social
+      post). A coupon subject without a code loads by id (`GET /api/admin/coupon/by-id/:id`,
+      couponReaders). Popups and subject-less items keep their direct form links.
+    - **`?prefill=` stays create-only** (`useCreatePrefill`); an edit form takes the step's result
+      only through **`?stepContent=`** (`useEditStepContent`, web utils/marketing-prefill.ts):
+      edit routes only, copy / image / video only — never the link, store, areas, dates or a
+      push's campaign name — applied once after the saved record loads, only the fields present,
+      and never to a push or post already sent. «בלי שינוי — לטופס העריכה» opens the form with
+      nothing.
     - ⚠️ **The Hebrew voice is pending the owner's sign-off** (`voice.js HEBREW_VOICE`, a
       written spec; nothing was measured for Hebrew). The Arabic is the social `VOICE`.
     Pinned by shoofi-server `test/integration/marketing-generate.js`.
@@ -788,6 +806,53 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       approved styles, rotated.
     Pinned by shoofi-server `test/integration/marketing-templates.js` and
     `marketing-routes-auth.js`.
+
+19. **The confirmed delivery address is the saved address the LAST delivery order went to,
+    stored on the ACCOUNT** (2026-11-07, shoofi-server `services/customer/confirmed-address.js`,
+    `docs/confirmed-delivery-address.md`). `customers.confirmedAddressId` is the `String()` of an
+    `addresses[]._id` (ObjectId on disk, string in an order body — always compared as strings).
+    The customer app stops auto-opening the address picker while it is selected. That picker,
+    opened on every delivery tap, is where the duplicate addresses came from.
+    - **Set** by `rememberConfirmedAddress` from `/api/order/create` (right AFTER the customer
+      `findOneAndUpdate` — that one `$set`s the whole doc from a snapshot read before the
+      order, so an earlier write is clobbered) and from twin `/place` + `/digital-place-pending`.
+      Only for a DELIVERY order whose `order.address._id` is one of the customer's saved
+      addresses; the "is it saved" test is IN the update filter (`"addresses._id": {$in:
+      [ObjectId, string]}`). **Fire-and-forget: never awaited, never throws** — it must never
+      fail or slow an order. Pickup, a town-only fallback (no `_id`), `current-location`, or a
+      foreign id leave the previous value alone.
+    - **Unset** only by `deleteAddress` when the deleted id equals it (`forgetConfirmedAddress`).
+      An edit keeps the `_id`, so it keeps the value.
+    - **Read** by `GET /api/customer/details` as `data.confirmedAddressId` (string or `null`;
+      `null` too when the id no longer names a saved address) — **customer app only**; partner
+      and driver replies never carry the key.
+    - **Guard, OFF by default:** `shoofi.store{id:1}.requireSavedDeliveryAddress === true` (a
+      literal `true`; not in `SHOOFI_CONFIG_PUBLIC_FIELDS`, no admin UI) makes `/api/order/create`
+      and twin `/place` answer **400 `code: "DELIVERY_ADDRESS_REQUIRED"`** for a DELIVERY order
+      whose address is not saved — before the lock, the group and any charge. **APPLEPAY and HYP
+      (hosted page) on `/create`, and twin `/digital-place-pending`, are exempt**: their money has
+      moved (or is moving) before the route runs, so a 400 there is a charge with no order. Never
+      extend the guard to them. A lookup error fails open. Old bundles still send town-only
+      addresses — the owner turns it on after the app update spreads.
+    - **Only a real address is ever saved by order creation.** The "first address" push in
+      `/api/order/create` (a customer with an empty `addresses[]`) goes through
+      `addressToSaveFromOrder` (`services/customer/address-validity.js`): street + usable
+      location + not GPS-only, else nothing is pushed; the row always gets an ObjectId `_id`
+      (the order's own when valid). It used to push `order.address` as-is, leaving 185 prod
+      customers with an `_id`-less town-only "saved address" (117 with nothing else). The
+      non-address signature is an **empty street** — never a "منطقة"/"אזור" prefix on the
+      street: "אזור תעשיה …" is a real street on 71 named, saved addresses.
+    - **Scripts** (dry-run default, `--apply`, JSON backup + compare-and-set), run in this order:
+      `clean-invalid-customer-addresses.js` (removes no-street rows without an `_id` or with an
+      area city, gives an `_id` to any remaining row without one; keeps `_id`-bearing saved GPS
+      pins — prod has 10, one on 28 orders — for the owner to decide), then
+      `backfill-confirmed-address.js` (latest DELIVERY order per customer whose address is still
+      saved, across every store DB) and `dedupe-customer-addresses.js` (same place = ≤ 30 m
+      complete-linkage AND same normalized street + number; keeper confirmed > default > named >
+      most-used > newest; a group with two different non-empty names skips the WHOLE customer).
+      Prod dry-run 2026-11-07: cleanup 185 customers / 185 rows; backfill 11,718 customers to set;
+      dedupe 1,393 customers / 2,531 rows to merge, 550 customers skipped for a name conflict.
+    Pinned by shoofi-server `test/integration/confirmed-delivery-address.js`.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
