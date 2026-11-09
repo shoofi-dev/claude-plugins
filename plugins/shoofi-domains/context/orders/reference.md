@@ -168,6 +168,11 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   `find({ shippingPriceCheck: { $exists: true } })` lists the flagged ones. Diagnostic only:
   no reader, no index, money unchanged. A `book-delivery.order` snapshot taken before the `$set`
   lands does not carry it. CORE invariant 20.
+- **`orders.isFirstOrderAtStore`** (top level, boolean or ABSENT) = "the customer's first
+  order at this store", written once at insert by `/api/order/create` and both twin place
+  routes (`applyFirstOrderFlag`, `services/orders/first-order-at-store.js`), never rewritten.
+  Absent = unknown (failed lookup, or an order from before 2026-11-08), so a reader badges only
+  `=== true`. Index `customerId_idx` `{ customerId: 1 }`. Rules: CORE invariant 24.
 - **`shoofi.customers.orders[]`** = a **write-once snapshot with NO status field.**
   `{ orderId(ObjectId→orders._id), appName, created, total, orderIdNumber(=orders.orderId),
   originalOrderId, ... }`. **NEVER infer status/completion/revenue from it** — join
@@ -583,6 +588,10 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   **Any 401 signs the store out** (`utils/http-interceptor` → `OPEN_GENERAL_SERVER_ERROR_DIALOG`
   `isSignOut: true` → `resetAppState` + restart), so a partner-polled route must never 401 a
   logged-in terminal.
+- **"New customer" badge source** (CORE invariant 24): `order.isFirstOrderAtStore` arrives
+  on the whole documents of `admin/orders`, `admin/all/not-viewd` and `admin/not-viewd`. Badge
+  only on `=== true`; absent (old orders, a failed lookup) = no badge. The v3 history endpoint
+  (`admin/history`, shoofi-server#497, CORE invariant 21) projects its rows without it.
 - **Realtime**: WS `?appType=shoofi-partner`; handles `order_status_updated`,
   `unviewed_orders_updated`, `future_order_*` (NOT `menu_refresh`). The `print_order` /
   `print_not_printed` frames still arrive (the server sends `print_not_printed` when
