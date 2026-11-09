@@ -89,6 +89,11 @@
       },
       "patterns": [
         {
+          "file": ["services/payments/strip-payment-secrets.js", "routes/order.js"],
+          "regex": "stripSensitivePaymentFieldsFromOrders|const redactPaymentSecrets = ",
+          "desc": "CORE invariant 12: admin order reads strip the stored ZCredit request (Password + CVV) via stripSensitivePaymentFields[FromOrders]. Once shoofi-server HQ #6a956d merges, drop the `|const redactPaymentSecrets = ` leg (it only lets this pin pass before the helper exists on main)"
+        },
+        {
           "file": "services/payments/order-invoices.js",
           "regex": "ISSUED: \"issued\",",
           "desc": "CORE invariant 11: an invoices[] entry is a real document only at status \"issued\""
