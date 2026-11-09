@@ -163,10 +163,11 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    alone misses the second shape. Every admin / store-member read that returns whole orders
    passes them through `stripSensitivePaymentFields[FromOrders]`
    (`services/payments/strip-payment-secrets.js`) right before `res.json`, which also strips
-   `recharges[]` copies. No screen reads `payload`. ⚠️ The customer reads in `routes/order.js`
-   (`customer-invoices`, `customer-orders`, `customer-active-orders`,
-   `customer-orders-history`, `customer-last-completed-order`) do not strip it yet. Pinned by
-   `test/integration/admin-order-reads-strip-payment-secrets.js` (HQ #6a956d).
+   `recharges[]` copies. The customer reads do the same (`routes/order.js` `customer-invoices`,
+   `customer-orders`, `customer-active-orders`, `customer-orders-history`,
+   `customer-last-completed-order`; `routes/customer.js` `orders`, `orders-old`). No screen
+   reads `payload`. Pinned by `test/integration/admin-order-reads-strip-payment-secrets.js`
+   and `customer-target-id.js` (HQ #6a956d).
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
