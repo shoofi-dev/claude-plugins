@@ -20,7 +20,9 @@ Primary files: `routes/order.js` (~7k lines), `routes/twin-order.js`,
 `routes/order-origin-validator.js`, `routes/admin/order-monitoring.js`,
 `routes/admin/twin-order-config.js`, `services/twin-order/*`,
 `utils/order-stock.js` (stock semantics), `utils/crons/*order*`,
-`services/monitoring/centralized-flow-monitor.js`. Status constants: `consts/consts.js`.
+`services/monitoring/centralized-flow-monitor.js`, `routes/order-history.js` +
+`services/orders/order-history.js` (the partner's one-day history, CORE invariant 21).
+Status constants: `consts/consts.js`.
 
 **⚠️ HIGH-RISK code (change via draft PR flagged HIGH-RISK; never merge):**
 - `POST /api/order/create` — the creation pipeline (`order.js`)
@@ -183,8 +185,66 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   - **`order_viewed` `metadata.previousStatus` is always wrong** — `/update/viewd` reads it
     from the order re-fetched *after* its `$set`, so it equals the new status. Pre-accept
     status (normally `6`) is not recorded there; take it from the prior event.
-- **`delivery-company.bookDelivery`** keyed by `bookId` = order `orderId`; mirrors
-  `DELIVERY_STATUS` (`1` waiting_approve … `3` collected/pickup … `4` delivered).
+- **`delivery-company.bookDelivery`** (Mongo collection `book-delivery`) carries three order keys:
+  `bookId` = the order's short `orderId`, `originalBookId` = its full `originalOrderId`, and
+  `appName` = the store's DB name. It mirrors `DELIVERY_STATUS` (`1` waiting_approve … `3`
+  collected/pickup … `4` delivered). CORE invariants 22 (matching a delivery) and 23 (locating an
+  order's row: `deliveryRowFilterForOrder(order, appName)`, `utils/delivery-row.js`).
+  - **The short number is not unique, across stores or within one.** `orderId` is the first 4 +
+    last 4 digits of the 14-digit `originalOrderId` (`generatedOrderId`, `routes/order.js`; the
+    twin routes cut it the same way), roughly 5×10^7 values. Prod on 2026-11-08: 88 `bookId`s were
+    shared by 2+ stores out of 106,071 rows, the newest collision from 2026-11-07; and 12
+    (appName, orderId) pairs in `customers.orders[]` belonged to two different orders (GCP
+    "0880-8715", GCP "4587-1395", cacao "7660-8910", …). The full id had 0 collisions across
+    173,659 orders.
+  - **Who writes what.** Every booking writes `bookId: order.orderId`,
+    `originalBookId: order.originalOrderId` and `appName: storeData.appName || order.appName`
+    together: store accept `POST /api/order/update/viewd`, twin sides included, and
+    `POST /api/order/start-preparing`. `originalBookId` is on all 85,304
+    rows created since 2025-12-12. The 20,771 rows without it are all older; the newest is from
+    2025-12-12. The one duplicate `originalBookId` is a single vapego order booked twice (one row
+    `-3`), not a collision. `services/delivery/book-delivery.js` **invents a random
+    `originalBookId`** when the booking passed none, so a row having one does not prove it came
+    from an order. Delivery-only bookings use `String(idempotencyKey)`. 96 rows carry the
+    `appName` fallback `"shoofi-app"`. Every `created` is an offset string (106,076 of 106,076),
+    and a booking is always made after its order. Across the past 14 days' delivered rows, the
+    gap from order to booking ran from +5 s upward, and none was negative.
+  - **No index on `originalBookId`** (indexes: `bookId`, `{bookId, status, completedAt}`,
+    `created`, `order._id`, …). On 2026-11-08 an `$or` with an `originalBookId` branch scanned
+    104,734 docs (339 ms). Query on `bookId` and compare the full id in code. The order's own row
+    always shares its `bookId`, so it is always in that result.
+  - **Matched correctly:** `filterOutDeliveredOrders` (`utils/active-orders.js`, behind
+    `GET /api/order/customer-active-orders`).
+    - It reads delivered rows by `bookId ∈ …, appName ∈ …` (indexed) and projects `bookId`,
+      `appName`, `originalBookId` and `created`. It groups the rows by exact `appName|bookId`,
+      because the two `$in`s are a cross product.
+    - A row is the order's delivery (`isDeliveryOfOrder`) when `originalBookId ===
+      order.originalOrderId`.
+    - **Only if either side lacks the full id**, it accepts a row booked no more than
+      `BOOKING_BEFORE_ORDER_MARGIN_MINUTES` (10) before the order (`isBookedAfterOrder`). A row
+      whose `created` is missing or unreadable is not accepted. That rules out every older
+      same-store row, including all legacy rows without `originalBookId`.
+    - The endpoint passes the store DB it read each order from (`appNameOf`), falling back to
+      `order.appName`.
+    - Kept, never dropped: an order with no known store, and every order when the delivery DB
+      read throws.
+    - History: before the fix it matched on `bookId` alone. On 2026-11-08 GCP's live CASH order
+      1096-8335 never reached the customer's ActiveOrders screen or tab-bar bubble, because
+      burger-house had a delivered 1096-8335 from 2026-09-21. The customer ordered again. Fixed in
+      shoofi-dev/shoofi-server#513. Tests: `test/integration/customer-active-orders-per-store.js`.
+  - **Located with `deliveryRowFilterForOrder`** (CORE invariant 23, shoofi-server#514, merged
+    2026-11-08): `/api/order/update` cancel and ready-for-pickup (find, then write by `_id`),
+    `update-delay`, order-amend `syncDeliverySnapshot`, twin `cascadeCancel` / `degradeToSingle` /
+    `undoDegrade` (via `legDeliveryFilter`), twin `group/:groupId/full` and `assign-driver`,
+    support `update-address-to-current-location`, admin order-monitoring `computeOrderDelays`,
+    support-agent `find_order`. `routes/order-comment-to-courier.js` pairs `bookId` + `leg.appName`.
+  - **Still keyed on `bookId` alone:** delivery-side, need a delivery-web change (delivery CORE
+    invariant 20): the writes `POST /api/delivery/admin/cancel` (delivery-web sends only `bookId`)
+    and `POST /api/delivery/update` → `updateDelivery`; the reads `GET /api/delivery/book/:bookId`
+    (owner-scoped for a mobile token), `GET /api/delivery/order/:id`, `POST /api/delivery/orders/batch`
+    (no caller), the impersonation driver lookup in `routes/shoofi-admin-users.js`, and the
+    analytics `bookId: {$in}` joins (live-ops, churn-360, support-analytics). A bare `updateOne`
+    on a shared number hits whichever row Mongo returns first.
 - **`shoofi.twinOrderGroups`** links `orders.twinGroup` ↔ group `primary`/`secondary`.
 - **`orders.marketingTouch`** (optional, top level) =
   `{ kind, placement, itemId, campaignId?, linkType?, at: Date }`: the last marketing
@@ -493,7 +553,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   store user without `all`, and before user details load), **`update/viewd` = ACCEPT** (→ `6→1`, future `14→1`,
   sends `readyMinutes` — not persisted, §2), `update` (forward/back status + note), `update-item-collected`,
   `start-preparing` / `update-start-preparing`, `update-delay`, `printed`,
-  `book-delivery`, `*-custom-delivery`, `addRefund`, `future-orders-ready`, `drive-in-arrival-confirm`.
+  `book-delivery`, `*-custom-delivery`, `addRefund`, `future-orders-ready`, `drive-in-arrival-confirm`,
+  and `admin/history` (`getOrderHistory(date)`, the v3 history tab; on shoofi-partner
+  `feat/orders-board-v3`, not on `main` as of 2026-11-08).
 - **Transition rule**: ACCEPT goes through **`order/update/viewd`** (NOT `order/update`);
   all other forward/back transitions use `order/update` with an explicit `status` the
   client computes (`1→3` delivery / `1→2` takeaway; `3→11`; `2→11|10`; `15→1`).
@@ -514,6 +576,10 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   one of its phone's memberships. Even mid-`switchStore` (store first, token second) it passes.
   `admin/my-stores/new-orders-count` (`utils/cross-store-alerts`) stays `auth.required`: it is
   token-scoped and ignores the header.
+  `admin/history` is the other way round: `auth.required` + `requireStoreMembership()` (the
+  store-analytics gate, `routes/order-history.js`), partner-only, and the `reports` role only
+  decides whether `totals` is filled. A store user without it gets the list and `totals: null`,
+  never a 403 (CORE invariant 21).
   **Any 401 signs the store out** (`utils/http-interceptor` → `OPEN_GENERAL_SERVER_ERROR_DIALOG`
   `isSignOut: true` → `resetAppState` + restart), so a partner-polled route must never 401 a
   logged-in terminal.
@@ -544,7 +610,15 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     order came back on every sweep on every day.
   - **Business day**: the server picks the window with `getBusinessDayBoundaries` from
     wall-clock now. For "today" that is the current business day, including the overnight
-    tail. One known gap: on a store with normal (non-overnight) hours, an order whose
+    tail. ⚠️ **Known bug (not fixed, noted 2026-11-08 in shoofi-server `feat/partner-order-history`):**
+    the overnight branch tests the CURRENT clock time, not the date asked. When the weekday
+    before `ordersDate` has overnight hours and the request is made before that close + 90 min
+    (any date, e.g. 01:30 for a 01:00 close), it returns the business day BEFORE `ordersDate`
+    (start = its opening the evening before, end = its close on `ordersDate`). Right for "today"
+    just after midnight, which is what it was written for; wrong for any other date asked in
+    that window. A new day-scoped reader must use
+    `utils/store-service.js` `getBusinessDayBoundariesForDateRange` instead (as `admin/history`
+    and the payments screen do). One known gap: on a store with normal (non-overnight) hours, an order whose
     `orderDate` falls after midnight but before the next opening is outside the sweep. Its
     accept-time explicit print is unaffected.
   - **Driver result** (`helpers/printer/index.ts` `printImagesWithOutcome`): `"printed" |

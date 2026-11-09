@@ -211,6 +211,13 @@ hangs the request (CORE invariant 11), so none of them answered.
   `components/credit-card/HypTokenizeWebView.tsx`) — card entered in the hosted page, never
   in RN; result URL carrying `CCode` is intercepted (navigation blocked) and forwarded to
   `payments/hyp-process-token`. Saved cards via `stores/creditCards` (`/credit-cards` CRUD).
+  - **Managing saved cards** (shoofi-app PR #99): `screens/credit-cards` (route `credit-cards`) opens
+    from the profile row «بطاقات الدفع» (logged-in only) and is also rendered inside checkout's
+    card sheet (`components/CreditCardModal`, with `onClose`). Expiry is shown from `tokef`
+    (YYMM) via `helpers/credit-card-display.ts`; expired cards cannot be made default (UI-only:
+    an expired default that is already set is still preselected at checkout). Delete confirms
+    in an in-app sheet (`components/credit-card/DeleteCardSheet.tsx`). Adding a card from the
+    profile uses the same HYP hosted page (platform `hyp_enabled`, no store needed).
 - **Apple/Google Pay**: ZCredit WebCheckout session created **client-side** (`screens/checkout/
   index.tsx`, `data/zcredit-config.ts`) with `zcredit_api_key`; heavy dedup/retry guards;
   server verifies & captures. Google Pay routed through the ZCredit web-view (native button disabled).
