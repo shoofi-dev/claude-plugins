@@ -155,6 +155,20 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.
+12. **A refused J5 release is NOT a refund case unless the order shows a capture.**
+   `releaseOrderAuthorization` (`services/payments/order-authorization.js`) re-reads the order
+   via `readCapturedAuth` when HYP CancelTrans is refused or throws. Only if
+   `paymentAuth.status === "captured"` with a `captureTransId` does it refund, and only when
+   support chose refund. It refunds the CAPTURE for the captured amount and records
+   `paymentAuth.releaseFallback`. Otherwise the order is flagged `release_failed` with no credit,
+   and the hold lapses at `expiresAt`.
+   ⚠️ In prod (2026-08..11) **every CCode 920 was a saved-card J5 hold that was never
+   captured**: 20 of 20 card holds were refused and 51 of 51 wallet holds released, with the
+   same hold-to-cancel time. So the `cancelAuthorization` JSDoc's "already transmitted to Shva →
+   refund" does not explain them. zikoyAPI on the hold's id would credit money that was never
+   taken. A `refundRequired` with reason `release_refused_ccode_920` is a hold to confirm in the
+   HYP portal, not a refund to issue. Why HYP refuses saved-card holds is still unknown
+   (`scripts/hyp-j5-spike.js` only tested a raw card).
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
