@@ -331,7 +331,7 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       branches and twin `/pay` all `$set` named fields and never rebuild the document. A
       status-`"0"` row carries a touch too, so attribution reports filter on status like
       every revenue reader. The former whole-body writer, `POST /api/order/update/all`, now
-      writes only `order.items` (+ `isPrinted`, `itemsEditedAt/By`) through a whitelist
+      writes only per-item notes (+ `isPrinted`, `editedAt/By/Fields`) through a whitelist
       (`services/orders/order-edit.js` `buildOrderUpdate`, HQ #06c6c7), so it cannot touch it.
     - **Not** in the `customers.orders[]` snapshot (recipe step 2). **No index on it, on
       purpose:** nothing reports off `order.marketingTouch` directly. It is the FALLBACK input
@@ -498,15 +498,32 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `update-item-collected`, `book-delivery`, `book-custom-delivery`, `update-custom-delivery`,
       `drive-in-arrival(-confirm)`). These are status transitions, so any change
       is high-risk. Ungated money paths `addRefund` and `updateCCPayment` belong to payments.
-    - **`POST /api/order/update/all` (the partner's "edit this order" checkout) is
-      `ORDERS_DASHBOARD_OR_STORE_MEMBER`, BEFORE multer** (HQ #06c6c7), so a refused caller
-      uploads nothing. It loads the order from the `app-name` store DB (404 otherwise) and
-      `$set`s `order.items` only (+ `isPrinted: false`, `itemsEditedAt`, `itemsEditedBy`);
-      total, shippingPrice, payment fields, `ccPaymentRefData`, `customerId`, `status` and
-      `created` in the body are ignored. **No repricing**: after an edit the items may not add
-      up to `total`; `itemsEditedAt` says why. Until then it was `auth.required` and spread the
-      whole body into `$set`, but threw `offsetHours is not defined` before the write, so the
-      edit had never worked and the live hole was public-read uploads by any token. Pinned by
+    - **`POST /api/order/update/all` (the partner's "edit this order" checkout,
+      `services/orders/order-edit.js`, HQ #06c6c7) is `ORDERS_DASHBOARD_OR_STORE_MEMBER`,
+      BEFORE multer**, and nothing is uploaded. Phase one (CTO decision): **price-neutral
+      fields, on an ACTIVE order only.**
+      - The order is loaded by `_id` from the `app-name` store DB (404 otherwise).
+      - Active = amend's `AMENDABLE_STATUSES` (`routes/order-amend.js`: `1 6 14 15`), reused.
+        Anything else is 409 `ORDER_NOT_EDITABLE` with `data.status`. The write is conditional
+        on the status and amendment count it read.
+      - Writable: `order.items.<i>.note` only (the one note the partner sends), plus
+        `isPrinted: false` (kitchen reprint) and `editedAt/editedBy/editedFields`. No change →
+        200 no-op.
+      - Items are never written. A basket differing in count, `item_id` order, a stated `qty` or
+        stated `selectedExtras` → 409 `ITEMS_EDIT_USE_AMEND` with `/api/order/<_id>/amend`,
+        which reprices. Client `price` and an absent `qty` are not compared: the partner's
+        round trip drops `qty` and re-reads the menu price.
+      - Address: a moved pin, an added pin or a different `locationText` → 409
+        `ADDRESS_EDIT_NOT_SUPPORTED` (area/fee could move; a booked delivery keeps the old
+        dropoff). `order.address` (the picker object) is ignored.
+      - Time: `orderDate`/`orderType` are ignored: the partner checkout sends `orderDate: now`
+        unless a time is picked.
+      - `status`, `created`, totals, payment fields, `ccPaymentRefData`, `customerId` and
+        `appliedCoupon` are never written. An exception is 500, never 401.
+
+      Until then the route was `auth.required` and spread the whole body into `$set`. It threw
+      `offsetHours is not defined` before writing, so the edit had never worked, and the live
+      hole was public-read uploads by any token. Pinned by
       `test/integration/order-update-all-auth.js`.
 
 19. **THE COINS ADMIN ROUTES ARE DASHBOARD-ONLY, GATED ON THE ROUTE ITSELF.** Coins have no

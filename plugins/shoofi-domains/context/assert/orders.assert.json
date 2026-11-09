@@ -162,8 +162,13 @@
         },
         {
           "file": "services/orders/order-edit.js",
-          "regex": "\\$set: \\{\\s*\"order\\.items\": mapItemImages\\(items, images\\),\\s*isPrinted: false,\\s*itemsEditedAt: now,\\s*itemsEditedBy: editor \\|\\| null,\\s*\\}",
-          "desc": "CORE invariants 15 + 18: an order edit writes order.items only (+ isPrinted, itemsEditedAt/By) - never totals, payment fields, customerId, status or created"
+          "regex": "if \\(next !== was\\) \\$set\\[`order\\.items\\.\\$\\{i\\}\\.note`\\] = next;",
+          "desc": "CORE invariants 15 + 18: an order edit writes only per-item notes (+ isPrinted, editedAt/By/Fields) - never items, totals, payment fields, customerId, status or created"
+        },
+        {
+          "file": "services/orders/order-edit.js",
+          "regex": "const EDITABLE_STATUSES = AMENDABLE_STATUSES;",
+          "desc": "CORE invariant 18: update/all edits only an ACTIVE order, and 'active' is amend's AMENDABLE_STATUSES, reused not redefined"
         },
         {
           "file": "routes/order.js",
