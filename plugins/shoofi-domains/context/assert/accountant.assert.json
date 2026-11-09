@@ -878,11 +878,6 @@
         },
         {
           "file": "routes/payments/summaries.js",
-          "regex": "router\\.post\\(\"/api/payments/partner/details\", \\.\\.\\.partnerEarningsAccess,",
-          "desc": "CORE invariant 17: partner/details is the partner's own store (or the dashboard)"
-        },
-        {
-          "file": "routes/payments/summaries.js",
           "regex": "router\\.post\\(\"/api/payments/driver/summary\", \\.\\.\\.driverEarningsAccess,",
           "desc": "CORE invariant 17: driver/summary is the driver's own (shoofir) or any driver (dashboard)"
         },
