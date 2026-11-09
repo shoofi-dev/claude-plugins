@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@fix/partner-summary-figures / 2026-11-08 (invariant 17 partner/summary = the store report's figures from generateStoreReportData in-process; stores-export-new's per-store body in services/payments/store-sales.js; ref §1/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData in-process, OPT-IN via body figures: \"report\"; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's per-store body in services/payments/store-sales.js; ref §1/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -1300,7 +1300,7 @@
             "routes/payments/summaries.js"
           ],
           "regex": "(?:const reportData = await generateStoreReportData\\(store, period\\.startDate, period\\.endDate, appDb\\.shoofi, req, sources\\);|const totalCommission = calculateCommission\\(totalRevenue\\);|const totalRevenueCreditCard = cardOrders\\.reduce)",
-          "desc": "CORE invariant 17: partner/summary IS generateStoreReportData over the requested calendar days - never a parallel derivation - valid-before legs are routes/payments/summaries.js on main (flat 15%) and on the first #512 commit (gross); drop them once shoofi-server fix/partner-summary-figures has merged"
+          "desc": "CORE invariant 17: partner/summary with figures: \"report\" IS generateStoreReportData over the requested calendar days - never a parallel derivation (without the flag: the legacy answer, pinned separately) - valid-before legs are routes/payments/summaries.js on main (flat 15%) and on the first #512 commit (gross); drop them once shoofi-server fix/partner-summary-figures has merged"
         },
         {
           "file": [
@@ -1316,7 +1316,7 @@
             "routes/payments/summaries.js"
           ],
           "regex": "(?:totalRevenue: f\\.totalIncomes \\|\\| 0,[\\s\\S]*?totalRevenueCreditCard: f\\.creditCardRevenue \\|\\| 0,[\\s\\S]*?totalRevenueCash: f\\.cashRevenue \\|\\| 0,|const totalCommission = calculateCommission\\(totalRevenue\\);|const totalRevenueCreditCard = cardOrders\\.reduce)",
-          "desc": "CORE invariant 17: the v1 partner screen's fields carry the report's lines (totalRevenue = totalIncomes, card/cash = creditCardRevenue/cashRevenue) - valid-before legs as above"
+          "desc": "CORE invariant 17: with figures: \"report\" the v1 partner screen's field names carry the report's lines (totalRevenue = totalIncomes, card/cash = creditCardRevenue/cashRevenue) - valid-before legs as above"
         },
         {
           "file": [
@@ -1324,7 +1324,7 @@
             "routes/payments/summaries.js"
           ],
           "regex": "(?:return storeUserHasRole\\(req\\.partnerStoreUser, \\[ROLE_REPORTS\\]\\);|router\\.post\\(\"/api/payments/partner/summary\", \\.\\.\\.partnerEarningsAccess,)",
-          "desc": "CORE invariant 17: partner figures only for a dashboard role or the store's reports role (else 200 restricted, never 403) - valid-before leg is routes/payments/summaries.js on main before shoofi-server fix/partner-summary-figures; drop it once that PR has merged"
+          "desc": "CORE invariant 17: partner figures (both answers) only for a dashboard role or the store's reports role (else 200 restricted, never 403) - valid-before leg is routes/payments/summaries.js on main before shoofi-server fix/partner-summary-figures; drop it once that PR has merged"
         },
         {
           "file": [
@@ -1341,6 +1341,37 @@
           ],
           "regex": "(?:month: every figure partner/summary returns is the store report's figure for that month|router\\.post\\(\"/api/payments/partner/summary\", \\.\\.\\.partnerEarningsAccess,)",
           "desc": "CORE invariant 17: the tie-out test - the report through its real HTTP self-calls vs the partner routes, on a real Mongo - valid-before leg is main before shoofi-server fix/partner-summary-figures; drop it once that PR has merged"
+        },
+        {
+          "file": [
+            "services/payments/partner-summary.js",
+            "routes/payments/summaries.js"
+          ],
+          "regex": "(?:const REPORT_FIGURES = \"report\";\\nconst wantsReportFigures = \\(body\\) => !!body && body\\.figures === REPORT_FIGURES;|router\\.post\\(\"/api/payments/partner/summary\", \\.\\.\\.partnerEarningsAccess,)",
+          "desc": "CORE invariant 17: the store-report figures are OPT-IN - only a body with figures: \"report\" (exactly that string) gets them - valid-before leg is routes/payments/summaries.js on main before shoofi-server fix/partner-summary-figures; drop it once that PR has merged"
+        },
+        {
+          "file": [
+            "routes/payments/summaries.js"
+          ],
+          "regex": "(?:if \\(!wantsReportFigures\\(req\\.body\\)\\) \\{\\s*return await legacyPartnerSummary\\(req, res\\);[\\s\\S]*?if \\(!wantsReportFigures\\(req\\.body\\)\\) \\{\\s*return await legacyPartnerDailyOrders\\(req, res\\);|router\\.post\\(\"/api/payments/partner/summary\", \\.\\.\\.partnerEarningsAccess,)",
+          "desc": "CORE invariant 17: partner/summary AND partner/daily-orders without the flag answer the legacy handlers (installed partner builds; owner 2026-11-09: the deploy must not change what the live app shows) - valid-before leg is main before shoofi-server fix/partner-summary-figures; drop it once that PR has merged"
+        },
+        {
+          "file": [
+            "services/payments/partner-summary-legacy.js",
+            "routes/payments/summaries.js"
+          ],
+          "regex": "const driveInOf = \\(o\\) => o\\.driveInPrice \\|\\| o\\.driveInPricing\\?\\.price \\|\\| 0;\\n\\s*const totalRevenue = orders\\.reduce\\(\\(sum, order\\) => sum \\+ \\(order\\.orderPrice \\|\\| 0\\) \\+ driveInOf\\(order\\), 0\\);\\n\\s*const totalCommission = calculateCommission\\(totalRevenue\\);",
+          "desc": "CORE invariant 17: the LEGACY partner/summary is main's handler verbatim - gross totalRevenue (orderPrice + drive-in) and the flat-15% totalCommission, kept ON PURPOSE for installed builds; never 'fix' it, delete the module once no build calls without figures: \"report\" - valid-before leg is routes/payments/summaries.js on main (the same lines) before shoofi-server fix/partner-summary-figures"
+        },
+        {
+          "file": [
+            "test/integration/partner-summary-legacy.js",
+            "routes/payments/summaries.js"
+          ],
+          "regex": "(?:no `figures`: partner/summary answers what main's handler answered, field for field|router\\.post\\(\"/api/payments/partner/summary\", \\.\\.\\.partnerEarningsAccess,)",
+          "desc": "CORE invariant 17: the test pinning the no-flag answers (and stores-export-new + generateStoreReportData without sources) byte-for-byte to a golden file captured from main's own handlers - valid-before leg is main before shoofi-server fix/partner-summary-figures; drop it once that PR has merged"
         }
       ]
     },
