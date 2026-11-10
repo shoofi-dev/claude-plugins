@@ -179,7 +179,12 @@ hangs the request (CORE invariant 11), so none of them answered.
    it only ever raises `total`, never rejects.
 5. **Coins/coupons settle only AFTER payment success**; failures are logged CRITICAL for
    manual reconciliation, never rolled back against an irreversible capture.
-6. **Order dedup lock** (Redis `SET NX` + fallback + 30s window) prevents double charges.
+6. **Order dedup lock** (Redis `SET NX` 10s + in-memory fallback) → 429 `ORDER_IN_PROGRESS` for a
+   concurrent send. The 30s recent-order query only logs (and drops the lock); it blocks nothing.
+7. **Idempotency key** (`idempotencyKey` on `/api/order/create`): see CORE invariant 7a. Replays
+   the earlier order with the same key + customer that took money (`idempotentReplay: true`);
+   an uncharged earlier order (declined card) lets the retry through. The lookup prefers the
+   charged order (`findReplayableOrder`). Wallet flows send it; card + cash per HQ #7ef468.
 
 ## App — shoofi-app (customer) payment client
 - **Method resolution**: `helpers/get-supported-payment-methods.ts` → GET `payment-methods`;

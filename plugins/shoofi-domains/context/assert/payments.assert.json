@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-idempotency-replay-prefers-charged-order + shoofi-app@fix/HIGH-RISK-idempotency-key-card-and-cash / 2026-11-10 (CORE invariants 7 + 7a: the 30s window only logs; idempotency key for card + cash, replay prefers the charged order; reference §8.6-7); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -36,7 +36,9 @@
         ],
         "routes/order.js": [
           "ccPaymentRefData",
-          "applePayIntentId"
+          "applePayIntentId",
+          "idempotencyKey",
+          "idempotentReplay"
         ],
         "services/twin-order/twin-payment-service.js": [
           "captureCombined",
