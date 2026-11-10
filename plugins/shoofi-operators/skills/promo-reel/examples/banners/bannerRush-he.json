@@ -1,0 +1,60 @@
+{
+ "style": "bannerRush",
+ "theme": {
+  "ink": "#121212",
+  "lime": "#8AEA5F",
+  "paper": "#F4F1EA",
+  "endBg": "#121212",
+  "endInk": "#ffffff",
+  "glow": "#DFF5D0"
+ },
+ "subject": {
+  "kind": "deal",
+  "store": {
+   "name": "Burger Cave",
+   "logo": "../img/burger-cave-logo.png"
+  },
+  "offer": {
+   "big": "10%",
+   "label": "הנחה",
+   "line": "על כל ארוחה ב-Burger Cave",
+   "terms": "בהזמנה מעל ₪30 · עד 30/11",
+   "headline": "הנחה\nעל כל ארוחה"
+  },
+  "dishes": [
+   {
+    "img": "../img/bc/6959240b8158a9000df22989.jpg"
+   },
+   {
+    "img": "../img/bc/6959240bff01e3000dab9737.png"
+   },
+   {
+    "img": "../img/bc/695924058158a9000df2297a.jpg"
+   },
+   {
+    "img": "../img/bc/69592407ff01e3000dab9724.png"
+   },
+   {
+    "img": "../img/bc/6959240aff01e3000dab9732.png"
+   },
+   {
+    "img": "../img/bc/69fb3d058e72cf000d93b964.jpg"
+   }
+  ]
+ },
+ "text": {
+  "pill": "שופי",
+  "cta": "הזמינו בשופי",
+  "ctaButton": "הזמינו בשופי"
+ },
+ "assets": {
+  "icon": "../assets/shoofi-icon.png",
+  "shadiStand": "../assets/shadi-stand.png",
+  "shadiPoint": "../assets/shadi-point.png",
+  "font": "../assets/me.ttf"
+ },
+ "size": [
+  1920,
+  1080
+ ]
+}

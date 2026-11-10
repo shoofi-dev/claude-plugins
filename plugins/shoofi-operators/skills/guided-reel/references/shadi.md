@@ -55,7 +55,13 @@ speed and he stops sounding like one person. Cut it into segments afterwards
 - **Numbers as words, ه not ة on عشره**: «عشره شيكل», «عشرين شيكل», «سبعين شيكل», «تسعين يوم».
   A ة makes the model read the construct state «عشرت».
 - Words that came out right and can be reused: طوّالي، لحالها، بتوخذ، بتلاقيها، هسّا، لَهَسّا،
-  عالواتساب، عالطلب.
+  عالواتساب، عالطلب، جْديد (jdīd)، أُطلُبو.
+- Never «هلأ» (Lebanese/Syrian) or «الآن» — «هسّا».
+- **ق keeps its q.** Bare «مقلي» and «مَقْلي» came out *magli* (a Bedouin g); «مَأْلي» dropped it.
+  The kasra under the lam fixed it: **«مَقْلِي»** (2026-11-07, checked against the owner's own
+  recording). Mark the vowel after a ق-syllable when the model hardens it.
+- Foreign dish names: tashkeel, not Latin letters — «سْوِيت دِيَابْلو» (Sweet Diablo) was the owner's
+  pick of three (Latin «Sweet Diablo», tashkeel, a stretched «سْوِييت»).
 
 ### Hebrew wording
 Plural imperative (היכנסו, לחצו, שלחו), plain spoken Hebrew, השליח (Hebrew keeps it). Numbers
@@ -74,7 +80,10 @@ recording is only for how words are pronounced"). A recording guides the spellin
 the source audio.
 
 ## Lip-sync (Wan 2.7 image-to-video)
-- **720p, 9:16**, image = pose asset, audio = segment asset (the audio drives the mouth).
+- **720p, `aspect_ratio: "auto"`**, image = pose asset, audio = segment asset (the audio drives
+  the mouth). `auto` follows the 1152x2048 pose, so the clip comes back 720x1280. Since 2026-11
+  Wan refuses `"9:16"` ("Available options: auto") before generating — nothing is charged, but
+  the batch fails as a whole.
 - **Upload the pose and each segment mp3 as assets** (upload → PUT → confirm) and pass the asset
   ids. A previous generation's id as an input is refused. Seedance's reference-to-video does not
   accept image + audio together — Wan is the one that does.
@@ -99,8 +108,12 @@ His other hand makes small natural gestures on key words; friendly expressions a
 nods. Keep the exact character, outfit, full-body framing and the perfectly flat pure blue
 #0000FF background unchanged. Static camera." Extra negative: "lowering the pointing arm".
 
-**Outro (stand.png)** — "…talks excitedly to the camera … making an inviting open-hand gesture
-toward the camera and then a friendly wave goodbye. …"
+**Outro (stand.png, 4 s)** — "The full-body 3D cartoon courier talks excitedly to the camera with
+lips precisely synced to the voice audio, mouth clearly moving, making an inviting open-hand
+gesture toward the camera, then gives a friendly wave goodbye while smiling. Keep the exact
+character, outfit, full-body framing and the perfectly flat pure blue #0000FF background
+unchanged. Static camera." (Used for the invite reel's endings, 2026-11-06: arms open toward the
+camera, in sync, 800 credits each.)
 
 Negative prompt for all: "text, subtitles, extra people, camera movement, background change,
 shadows on background, warped hands, extra fingers, changing outfit, closed mouth while

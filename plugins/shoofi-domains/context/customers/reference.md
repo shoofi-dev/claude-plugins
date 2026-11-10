@@ -95,11 +95,15 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
 ## 4. Data model
 - **`shoofi.customers`** — identity (`fullName`, `phone`, `email`, `language`), auth
   (`authCode`, `token`, `notificationToken`), `addresses[]`
-  (`{name,street,city,cityId,location{Point},isDefault,…}`), **`orders[]` snapshot**,
+  (`{_id,name,street,streetNumber,city,cityId,selectedCity,location{Point},floorNumber,
+  apartmentNumber,entrance,notes,isDefault,isCurrentLocation,createdAt,updatedAt}` — `notes` is
+  the courier landmark ≤ 200, the floor / apartment / entrance / street number ≤ 20, cleaned on
+  add and update: CORE invariant 20), **`orders[]` snapshot**,
   referral (`referralCode`, `referral{clickId,inviterCustomerId,…}`), flags
   (`isBlocked`, `isDeleted`+`deletedAt`, `cashRestricted`), location (`cityId`, `cityAreaId`),
   `schoolProject{…}`, marketing (`marketingPushOptOut` + `marketingPushOptOutUpdatedAt`; unset
-  = opted in, §5b). **No `tokenExpiry` field** — expiry lives only inside the JWT.
+  = opted in, §5b), `confirmedAddressId` (string `addresses[]._id` of the last delivery order's
+  saved address; unset = none — CORE invariant 19). **No `tokenExpiry` field** — expiry lives only inside the JWT.
 - **`schoolProject{schoolId, classId, isActive, studentIds[]}`** (school-project / "مدارس"
   customers; all ids are strings). `isActive` alone puts the customer app into school mode
   (schools category, pickup-only cart, student card at checkout); the card / student picker
@@ -265,8 +269,25 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
 Profile: `GET /api/customer/details` (joins store orders for a valid-order count),
 `update`, `update-name`, `update-language`, `update-city-area` (resolves city from lat/lng
 via `delivery-company.cities`). Addresses: `controllers/customerAddressController.js` —
-add/get/update/delete/setDefault on the `addresses[]` subdoc (default toggling clears all
-then sets one). Push tokens: `update-notification-token` — writes `notificationToken` on the
+add/get/update/delete/setDefault on the `addresses[]` subdoc. setDefault validates first — a
+malformed id (`"current-location"`, junk) is 400, an unknown customer or address 404, a
+current-location row 400 — and only then clears every default and sets the one (by the row's
+stored `_id`, ObjectId or string). `PUT` also answers 400 to a malformed id before it clears
+any default, and add / update answer 400 to `isCurrentLocation: true`: a current-location pin
+is never a saved address (CORE invariant 19, 2026-11-10). Add and update both pass the body through `cleanAddressFields`
+(`services/customer/address-fields.js`): `notes` trimmed + whitespace collapsed + ≤ 200;
+`floorNumber` / `apartmentNumber` / `entrance` / `streetNumber` trimmed + ≤ 20; numbers
+stringified; an unsent key stays unsent. Add builds an explicit field list (`buildAddress`) and
+keeps `apartmentNumber` / `entrance` only when sent; update `$set`s every sent key on
+`addresses.$` (minus `_id`). The customer app's add-address sheet sends the whole form, so all of
+these arrive together. At checkout the app sends the selected address object, so the note lands
+on the order as `order.order.address.notes` — a snapshot; a later edit doesn't touch past orders
+(CORE invariant 20). `delete` also unsets `confirmedAddressId` when it named the deleted row; `update`
+keeps the row's `_id` and so the confirmed address. `GET /details` returns `confirmedAddressId`
+(string | null) to the customer app only. Order creation sets it (CORE invariant 19,
+shoofi-server `docs/confirmed-delivery-address.md`). Order creation also seeds `addresses[]` for a
+customer who has none — only with a real address (street + location, not GPS-only), always with
+an ObjectId `_id` (`addressToSaveFromOrder`); a town-only order seeds nothing. Push tokens: `update-notification-token` — writes `notificationToken` on the
 identity doc `req.auth.id` names, and **for a partner then mirrors it onto every sibling
 `storeUsers` doc sharing that phone** (`updateMany`, self excluded). The mirror exists
 because a new-order push is addressed to the token on the doc of *the store that got the
@@ -286,7 +307,7 @@ failure there is logged, never fails the registration.
 | `GET /:customerId` | `getCustomerDetailsApi`, `CouponForm` | name, phone, flags, `deletedAt`, addresses |
 | `GET /:customerId/status` | `getCustomerStatusApi` | `badges` |
 | `GET /:customerId/whatsapp-summary` | `getCustomerWhatsappSummaryApi` | the respond.io mirror's summary |
-| `POST /:customerId/update-address-to-current-location` | support's location fix | writes the order, the customer and the booking |
+| `POST /:customerId/update-address-to-current-location` | support's location fix | writes the order and the booking (never `isCurrentLocation`); moves a saved row only when the order went to a real one, never adds one (`customerAddressSkipped`) — CORE invariant 19 |
 
 - `status.authCode` is the customer's pending OTP. Support shows it on purpose ("מנסה להתחבר
   (code)"), so the reply includes it only for a dashboard role (`mayReadPendingCode`). Prod
@@ -533,10 +554,13 @@ story's 9:16 render when the post is a story.
 | `GET /api/admin/marketing/templates?channel=&status=` | master / admin / manager | `{data: [{id, channel, status, name, summary, style, examples[{id, placement, imageUrl, words, rate}], uses, decidedBy, decidedAt}], limits}`; `status` is a comma list; 400 for an unknown channel |
 | `POST /api/admin/marketing/templates/:id/approve` \| `reject` \| `retire` | same | suggested → approved / rejected, approved → retired; 409 `state` or `full` (4 approved) |
 | `POST /api/admin/marketing/templates/run` | same | runs the daily job now; per-channel `{suggested, refreshed, dropped}` or `{skipped: too_few_sources \| too_few_images \| budget}`; 409 `locked` |
+| `POST /api/admin/marketing/templates/from-picture` | same | multipart `image` (≤ 10 MB, type by its bytes) + `channel` banner\|story + `note`? → 201 a `suggested` template with `source.kind: "upload"`; 400 `channel` / `no_image` / `not_image`, 409 `full` (6 suggested), 422 `not_a_design` / `no_style` / `has_facts`, 429 `budget` |
+| `POST /api/admin/marketing/templates/video` | same | multipart `video` (MP4 by its bytes, ≤ 60 MB) + `banner`? (its 16:9 version) + `reelStyle` + `name`? `summary`? `fits`? → 201 a `suggested` reel template `{reelStyle, fits, videoUrl, bannerUrl}`; 400 `style` / `no_video` / `not_video`, 409 `full` (8), 413. The list answers `reelStyles` and `limits.approvedReel` (8) |
 
 Data: `shoofi.marketingTemplates {channel banner|story|note|push, status
 suggested|approved|rejected|retired, name, summary (Hebrew), style (English), examples, uses,
-createdAt, lastSeenAt, lastUsedAt, decidedBy, decidedAt}`, no TTL, no index. Admin client:
+createdAt, lastSeenAt, lastUsedAt, decidedBy, decidedAt, source? {kind: "upload", by, note}}`
+(no `source` = learned); reel rows add `reelStyle, fits, video {url, bytes}, banner {url}?`, no TTL, no index. Uploaded pictures: `marketing-templates/<id>.jpg`. Admin client:
 `src/apis/admin/marketing-templates.ts`, `views/admin/marketing/components/TemplatePicker.tsx`
 ("תבניות" in the "תוכן" step, which fetches nothing until clicked), and
 `views/admin/marketing-templates/MarketingTemplates.tsx` — מרכז שיווק's "תבניות" tab
