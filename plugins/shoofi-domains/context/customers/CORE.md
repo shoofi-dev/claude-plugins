@@ -1045,8 +1045,12 @@ All of these are **known and accepted for now**. They are scheduled work, not di
   planned migration. An SMS credential is likewise baked into `utils/sms.js`. Leave both alone.
 - **KNOWN — hardening planned:** the OTP is a plaintext 4-digit code with no expiry, no attempt
   counter and no lockout; a rate limiter exists but is not wired up. **Planned direction (design
-  toward it, don't implement unasked):** (a) a **max-retry limit on requesting a code**, and
-  (b) letting the user **choose WhatsApp vs SMS** for delivery.
+  toward it, don't implement unasked):** (a) a **max-retry limit on requesting a code**.
+  (b) **choose WhatsApp vs SMS** is BUILT (owner's courier-redesign decision, 2026-11-10):
+  `POST /api/customer/create` takes `channel: "sms" | "whatsapp"` and sends on that one only
+  (`services/customer/otp-channel.js` `otpChannels`); absent or unknown = both, the old
+  behaviour, so every installed build is unchanged. Each request mints a new code and
+  overwrites `authCode`, so resending on the other channel invalidates the first code.
 - **KNOWN:** `search-customer` projects `token` + `authCode` and has no auth.
   Verified still true on 2026-10-30. The reply carries the pending OTP itself as
   `status.authCode`, and `isLoggedIn` is derived from the token. The token itself is not in
