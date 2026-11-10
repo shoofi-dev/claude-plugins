@@ -40,7 +40,8 @@
         "lib/delivery/helpers.js",
         "services/delivery/admin-access.js",
         "services/delivery/response-redaction.js",
-        "services/delivery/availability.js"
+        "services/delivery/availability.js",
+        "services/delivery/driver-decline.js"
       ],
       "symbols": {
         "services/delivery/availability.js": [
@@ -85,7 +86,8 @@
           "currentPickupInstantOf",
           "scoreBreakdown",
           "createPendingDelivery",
-          "appliedCoupon"
+          "appliedCoupon",
+          "excludeDriverIds"
         ],
         "services/delivery/driver-load.js": [
           "ACTIVE_ORDER_STATUSES",
@@ -127,6 +129,11 @@
           "/api/delivery/delivery-only/book",
           "/api/delivery/delivery-only/list",
           "isDeliveryOnly"
+        ],
+        "services/delivery/driver-decline.js": [
+          "declineDelivery",
+          "DECLINABLE_STATUSES",
+          "declinedDriverIds"
         ]
       },
       "patterns": [
@@ -741,6 +748,11 @@
           ],
           "regex": "(?:admin/cancel legacy \\{bookId\\} shared by 3 rows cancels the single live one|bookId: deliveryData\\.bookId  // Match by bookId)",
           "desc": "CORE invariant 20: the decoy-first tests (another store + same store older row inserted ahead of the real one) - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "/api/delivery/driver/order/decline\", \\.\\.\\.driverSelfAction",
+          "desc": "the driver's decline re-queues the booking (CORE invariant 21) and is gated like the rest of the driver loop"
         }
       ]
     },
