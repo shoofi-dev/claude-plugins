@@ -40,9 +40,15 @@
         "lib/delivery/helpers.js",
         "services/delivery/admin-access.js",
         "services/delivery/response-redaction.js",
-        "services/delivery/availability.js"
+        "services/delivery/availability.js",
+        "routes/courier-applications.js",
+        "services/courier-applications/applications.js",
+        "services/courier-applications/applicant-auth.js",
+        "services/courier-applications/banks.js"
       ],
       "symbols": {
+        "services/courier-applications/applications.js": ["approvalBlockers", "approve", "fromApplicationId", "isControlledByAdmin: false"],
+        "services/courier-applications/applicant-auth.js": ["applicantAuth", "x-applicant-key"],
         "services/delivery/availability.js": [
           "checkStoreDeliveryAvailability",
           "isDeliveryPaused"

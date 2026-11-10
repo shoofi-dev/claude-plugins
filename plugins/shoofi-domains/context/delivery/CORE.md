@@ -543,6 +543,25 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     custom-delivery cancel (`/api/order/update-custom-delivery` → `updateDelivery`) is safe: its
     `bookId` is the row's own `_id` string.
 
+22. **A courier joins through a REQUEST, and approval writes the two records an admin writes by
+    hand.** `routes/courier-applications.js` + `services/courier-applications/` (README there).
+    Collections in `delivery-company`: `courier-applications`, `courier-application-files` (document
+    BYTES, served only through an admin token — never the public-read CDN: ID cards and bank
+    letters), `applicant-otps`. The applicant has no account: a hashed 4-digit code (10 min, 5
+    tries, 5 sends/hour; a phone that is already a driver gets `ALREADY_DRIVER`) buys a request
+    KEY (`x-applicant-phone` + `x-applicant-key`) that opens only that phone's request — it is
+    NOT `POST /api/customer/create`, which refuses non-driver shoofir phones (−7) and mints
+    account tokens. Statuses `draft → new → review → info | interview → approved | rejected`;
+    reject sets `rejection.reapplyAt` = +30 days, the back office can reopen any time. Approve
+    (`master`/`admin` only; every document `verified`, contract signed, no driver with that phone,
+    `maxOrdersByAdmin` 1–10 required because an empty limit is a switched-off courier) writes
+    `delivery-company.store` (new company, `isControlledByAdmin: false`, `supportedCities` = the
+    work towns + `computeSupportedAreasForCities`, `accounting.bankAccount.bank` = the bank NAME,
+    the same names as delivery-web `israeli-banks.ts`) or attaches to an existing one, and
+    `delivery-company.customers` (`role: "driver"`, `isDriver: true`, `isActive: false`,
+    `storeAssignmentMode: "all"`, `vehicleInfo.type`), both with `fromApplicationId`. Claimed
+    via status `approving` so a double click makes one driver; a half approval is undone.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
   `isDeliveryOnlySupport` field, so the gate returns `platform_disabled`/`store_disabled` for
