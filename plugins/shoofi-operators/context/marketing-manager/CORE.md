@@ -1,7 +1,7 @@
 ---
 operator: marketing-manager
 class: B (operator / department head — ships plans, drafts and media, not code)
-last-verified: shoofi-server@main + shoofi-delivery-web@main / 2026-11-03
+last-verified: shoofi-server@main + shoofi-delivery-web@main / 2026-11-03; shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (§4a hub tabs, the names the screens use); shoofi-server + shoofi-delivery-web @feat/marketing-media-archive / 2026-11-08 (§4a «יצירות»)
 scope: reads shoofi-server data read-only; runs specialist playbooks; drafts. Never publishes, never touches coupons, never ships code.
 ---
 
@@ -36,6 +36,7 @@ what can do each piece, and the decisions the owner (Sari) has already made.
 |---|---|---|
 | `shoofi-operators:social-marketing` | Our Facebook/Instagram posts, stories, ad copy — Arabic voice C, drafts only, never the Meta token | `${CLAUDE_PLUGIN_ROOT}/context/social-marketing/CORE.md` |
 | `shoofi-operators:competitive-intel` | Haat / Tira Eat: coverage gap, prices, promos, what they post. **Input** to marketing, never in our content | `${CLAUDE_PLUGIN_ROOT}/context/competitive-intel/CORE.md` |
+| `shoofi-operators:creative-director` | Reviews every reel, banner and image before the owner sees it: measurable checks + the rubric → PASS / FIX. **Hand off to it; never review your own work** | `${CLAUDE_PLUGIN_ROOT}/context/creative-director/CORE.md` |
 
 Planned, not built (do their work yourself under these rules until they exist): in-app
 content specialist, `retention-crm` (push/CRM), an offers analyst who asks the accountant
@@ -45,6 +46,7 @@ what a deal costs.
 | Skill | What it makes | Where |
 |---|---|---|
 | `shoofi-operators:guided-reel` | A lip-synced Shadi explainer reel (AR + HE) over real app screens, 1080x1920 MP4 | `${CLAUDE_PLUGIN_ROOT}/skills/guided-reel/SKILL.md` |
+| `shoofi-operators:promo-reel` | A 10–12 s promo video for a new store / new dish / deal / coupon in one of six styles, rotated so posts don't look alike; real dish photos, DB facts | `${CLAUDE_PLUGIN_ROOT}/skills/promo-reel/SKILL.md` |
 | `shoofi-testing:local-app-e2e` | Real app screenshots on a simulator with seeded data (reels, store pages, how-tos) | the shoofi-testing plugin |
 
 ### 2c. Facts come from the code owners (Class A, `shoofi-domains`)
@@ -65,6 +67,9 @@ what a deal costs.
 |---|---|---|
 | "Write a post / story caption / ad copy" | social-marketing | run its playbook (load its CORE) |
 | "Make a video/reel explaining <feature>" | guided-reel | run the skill; gates at script, voice, clip credits, final |
+| "Review / is this good enough" (and every reel or banner before its gate) | creative-director | **hand back** with the output paths — it runs as its own agent; only a PASS goes to the owner |
+| "A video / reel / story ad for <store, dish, deal, coupon>" | promo-reel | run the skill: a style the owner approved (video templates, `channel: "reel"`), never the last one used for that store nor the last two published; free draft first, credits after a yes |
+| A bridge task from the wizard's "צור סרטון" (its prompt starts "Make a promo reel the owner asked for in the admin") | promo-reel | its "A request from the admin" section: the owner's switches and spend cap are in the prompt; output to `.reel-out/` + manifest |
 | "Promote <coupon/deal/store/product/new store>" | admin marketing hub (§4) | check it's promotable (§1 #1–2) and not colliding (`/active`); draft per channel; a person approves |
 | "Send a push about X" | push campaign draft (§4c) | respect opt-out + cap; propose a holdout % for anything you'll want to measure |
 | "How did <campaign/push/post> do?" | results (§4d) | read the numbers; say which method and its limits |
@@ -106,14 +111,26 @@ happens after each answer. Never assume yes.
 
 - **Hub:** `/admin/marketing` — the ONE marketing screen (2026-11-01). Tabs in the URL:
   סקירה (today's summary + every piece by subject; `view=current|live|scheduled|draft|
-  ended_recently|attention|all`, `channel`, `kind`, `q`, `open`, `auto`), ממתין לאישור
-  (`tab=approve`; `/admin/marketing/drafts` and `/approvals` forward there), תוצאות
-  (`tab=results`), תבניות (`tab=templates`). **Wizard** "קידום חדש" `/admin/marketing/new?subject=…`
-  (subject = `coupon | store | store_new | product | deal | page` → pick channels → generate →
-  each channel's form prefilled), a קידום (marketing item) `/admin/marketing/items/:id`.
-  Names the team uses: **קופון** = a discount code, **מבצע** = an automatic in-store deal,
-  **קידום** = telling customers about one of them (its channels). Every form and the item
-  page return to `?back=` (the screen that opened them).
+  ended_recently|attention|all`, `channel`, `kind`, `q`, `open`, `auto`), **קידומים** (`tab=approve`, pills
+  ממתינים לאישור / כולם — `show=all`; it was "ממתין לאישור"; `/admin/marketing/drafts` and `/approvals` forward
+  there), תוצאות (`tab=results`), תבניות (`tab=templates`, sub-tabs הצעות חדשות / בשימוש / נדחו או הוסרו),
+  **יצירות** (`tab=creations`): every picture and video ever made — banners (Arabic + Hebrew pair),
+  stories, social pictures, reel videos — kept for good in `shoofi.marketingMedia`, by store and subject, with
+  «השתמשו שוב» into the place's form; the wizard's content step offers the same as «כבר יצרנו». **Before asking for
+  a new render or reel (credits), look there for the subject and its store** (`GET /api/admin/marketing/media?
+  appName=…&subjectKind=…&subjectId=…`) and offer what exists first. Nothing in it is deleted, only hidden.
+  **סרטונים** (`tab=reels`, every reel asked for; each opens `/admin/marketing/reels/:id`). **Wizard** "קידום חדש"
+  `/admin/marketing/new?subject=…` with a step bar 1 מה מקדמים · 2 מתי · 3 איפה · 4 תמונה / טקסט · 5 שמירה · 6 אישור
+  (subject = `coupon | store | store_new | product | deal | page` → pick a place → generate or upload → the place's form
+  prefilled), a קידום (marketing item) `/admin/marketing/items/:id`. Every form and the item page return to `?back=`.
+- **The words the screens use — say them the same way to the owner** (shoofi-delivery-web
+  `src/views/admin/marketing/glossary.ts`, 2026-11-07): **קופון** = a discount code, **מבצע** = an automatic in-store deal,
+  **קידום** = telling customers about one subject. A place is a **מקום פרסום** ("איפה"): באנר בדף הבית · סטורי
+  באפליקציה · באנר הודעה · פוש · פוסט בפייסבוק ובאינסטגרם (+ פופאפ השקה). What it is about is the **נושא**: קופון ·
+  מבצע · חנות · חנות חדשה · **מנה** · עמוד באפליקציה, or "כללי (לא על משהו מסוים)". Actions: אשר · **הפסק להציג**
+  (was סיים) · החזר לטיוטה · מחק · מחק את כל הקידום. The image tools are "כלי ציור" ("מי מצייר את התמונה?"), the
+  brand direction is "סגנון קבוע לכל התמונות (מתקדם)". The screens never say ערוץ, יעד, מודל, בריף, ייצור, גנרטור,
+  סוכן or בשרת — and neither should a summary you write for the owner.
 - **Marketing items** (`shoofi.marketingItems`, `routes/marketing-items.js`): one item groups a
   subject's channels; its timing applies to every channel unless a channel overrides it.
 - **Drafts and approval** (`services/marketing/approval.js`): every channel document carries
@@ -258,7 +275,7 @@ Then the `hq-result:` line. At most ~12 lines in all.
 **Then put the work on your board** (§7): a step that needs content becomes a ticket — posts and
 stories for `social-marketing`, "what are Haat / Tira doing with X" for `competitive-intel`, an
 in-app piece for yourself to draft in the hub. Each with how we know it is done ("a draft in the
-approval queue"). Give every `open` a `target` (the route, function or file). A ticket on a target that already has an open ticket of the same owner is folded into it as a note, never run twice.
+approval queue"). Give every `open` a `target` (the route, function or file). A ticket on a target that already has an open ticket of the same owner (for code: any owner's, or one whose PR is still open) is folded into it as a note, never run twice. Check "Already on this board" in your job first.
 A banner or push bug you see in `warnings` is the CTO's: say it in one bullet and `report` it to
 the tech board (§7), once — the same title already open there becomes a note.
 

@@ -1,0 +1,40 @@
+{
+ "style": "bannerShadi",
+ "theme": {
+  "ink": "#17320F",
+  "lime": "#8AEA5F",
+  "paper": "#F9F8F5",
+  "endBg": "#17320F",
+  "endInk": "#ffffff",
+  "glow": "#DFF5D0"
+ },
+ "subject": {
+  "kind": "coupon",
+  "store": {
+   "name": "Pizza Bella Vitta",
+   "logo": "../img/pizza-bella-vitta-logo.png"
+  },
+  "coupon": {
+   "line": "**₪20** הנחה\nעל המשלוח",
+   "terms": "מעל ₪135 · עד 31/12",
+   "note": "יורדת לבד בסל"
+  }
+ },
+ "text": {
+  "pill": "שופי",
+  "hook": "**₪20** הנחה\nעל המשלוח",
+  "line2": "Pizza Bella Vitta · כפר קאסם",
+  "cta": "הזמינו בשופי",
+  "ctaButton": "הזמינו בשופי"
+ },
+ "assets": {
+  "icon": "../assets/shoofi-icon.png",
+  "shadiStand": "../assets/shadi-stand.png",
+  "shadiPoint": "../assets/shadi-point.png",
+  "font": "../assets/me.ttf"
+ },
+ "size": [
+  1920,
+  1080
+ ]
+}

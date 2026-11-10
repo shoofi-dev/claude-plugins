@@ -1,0 +1,46 @@
+{
+ "style": "bannerCloseup",
+ "theme": {
+  "ink": "#17320F",
+  "lime": "#8AEA5F",
+  "paper": "#F9F8F5",
+  "endBg": "#17320F",
+  "endInk": "#ffffff",
+  "glow": "#DFF5D0"
+ },
+ "subject": {
+  "kind": "dish",
+  "store": {
+   "name": "מאסטר בורגרס",
+   "logo": "../img/master-burger-logo.png"
+  },
+  "dishes": [
+   {
+    "name": "סוויט דילו",
+    "img": "../img/6adf253722cb9f000d7cd7ab.jpg"
+   }
+  ],
+  "chips": [
+   "אננס מטוגן",
+   "טאקיס",
+   "רוטב דיאבלו"
+  ],
+  "price": "₪75"
+ },
+ "text": {
+  "pill": "שופי",
+  "hook": "חדש",
+  "cta": "הזמינו בשופי",
+  "ctaButton": "הזמינו בשופי"
+ },
+ "assets": {
+  "icon": "../assets/shoofi-icon.png",
+  "shadiStand": "../assets/shadi-stand.png",
+  "shadiPoint": "../assets/shadi-point.png",
+  "font": "../assets/me.ttf"
+ },
+ "size": [
+  1920,
+  1080
+ ]
+}

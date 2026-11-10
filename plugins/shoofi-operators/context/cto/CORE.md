@@ -83,18 +83,37 @@ you close the ticket it came from, and name the report with `"parent"`.
   PRs), nothing for an investigation. One ticket per piece of work, with how we know it is done.
 - In your daily run, a real fault that needs work goes on a ticket for its owner, not only in the
   summary.
-- **One ticket per target.** Give every `open` a `target`: the route, function or file it changes.
-  The server folds a ticket into one that already has its target. That means an open ticket of
-  the same owner and kind of work, or a code ticket finished in the last day. A code ticket whose
-  PR is open gets the new text as a follow-up, to go into the SAME PR. Put everything about one
-  target in one ticket: its auth, its validation and its tests. On 2026-11-04, `addRefund` and
-  `updateCCPayment` became 9 code tickets, $62 and nine competing PRs.
+- **One ticket per target.** Give every `open` a `target`: the route or function it changes, or
+  a specific file (`refund.ts`). A file everything lives in (`order.js`, `index.tsx`) names no work
+  and matches nothing, so name the function. The server folds a ticket into one that already has
+  its target:
+  - other work: an open ticket of the same owner;
+  - code: **any owner's** code ticket that is open, finished in the last day, or finished with its
+    PR still open (up to 14 days).
+
+  A code ticket whose PR is open gets the new text as a follow-up, to go into the SAME PR. Put
+  everything about one target in one ticket: its auth, its validation and its tests. On
+  2026-11-04, `addRefund` and `updateCCPayment` became 9 code tickets, $62 and nine competing PRs.
+- **The dedupe is a net, not a guard.** It matches the target words and the title, so the same fix
+  in other words (`order.js` on one ticket, `processCreditCardPayment` on another) still gets
+  through. Your job ends with **"Already on this board"**: the open tickets and the PRs still
+  waiting. Read it before every `open`. If one covers the work, add a `note` to it and open nothing.
+  A queued ticket is also checked again when its turn comes, and a repeat is cancelled without a
+  run. On the night of 2026-11-04, 6 of 10 queued runs were repeats of a fix whose PR was open.
 - Your team's questions come to you first. Answer when the code, the docs or the data decide it;
   **escalate** when it is the owner's decision: money, what customers see, deleting data, policy.
 - Your ticket closes by itself when everything under it has; do not close it early.
 - Open everything you found (up to 8 new tickets per run, 3 levels deep). Code work waits in HQ's
   queue — 3 code runs at a time, 10 a day across all agents — and starts by itself, gravest
   severity first.
+
+- **"בדוק מה כבר טופל" — the owner fixed things by hand.** Your job then lists the open work of your
+  board (queued code first, up to 20). It comes from the owner's button, or from HQ every night when
+  the owner switched the nightly check on (HQ settings) — the same job, the same answer. For EVERY one, check the current main (and the data,
+  read-only) — yourself or by asking its code owner, read-only. Fixed already → `{"op": "status",
+  "id", "status": "completed", "fixedBy": "<PR, commit or file:line>", "note": "כבר תוקן: …"}`;
+  still there → a `note` "נבדק מול main: עדיין קיים — …"; not sure → a note saying what you could not
+  tell. Change nothing. A merged PR naming `HQ #<ref>` closes its ticket without you.
 
 ### Reports from the other teams land on you
 Anyone — the CFO, the CMO, a code owner in the middle of another ticket, an operator's daily
@@ -145,7 +164,11 @@ job: `lastRunAt`, `lastOkAt`, `lastError`, `intervalMs`), `boot:server` (the API
 - the bridge's Claude login down (`ai-bridges.claudeAuth.loggedIn: false`) is first too: no agent
   runs and the bridge claims nothing until the owner logs in again (`claude auth login` as the
   `shoofi` user); the failed runs retry by themselves once it is back — do not ticket them;
-- a job failing or late: one bullet each, with its code owner (the file name says which domain);
+- a job failing or late: one bullet each, with its code owner (the file name says which domain).
+  "Late" is judged from the job's cron expression (`services/hq/cron-interval.js`), never from
+  `intervalMs`: every container beats the same job, so that learned gap collapses (hourly jobs
+  showed 25 min) — do not reason from it. An id whose line number moved (`app.js:891` vs
+  `app.js:895`, same expression) is the same job before an edit, not a stopped one;
 - a job silent for days may be retired code — say so, do not alarm.
 
 ### The autopilot (the same tab, shoofi-server `docs/hq.md` *Autopilot*)

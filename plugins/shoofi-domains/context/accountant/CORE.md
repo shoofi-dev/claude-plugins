@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 6 — cancelled excluded from settlement, keep → Shoofi COMP credited at redemption, customer documents fixed at capture); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 6 — cancelled excluded from settlement, keep → Shoofi COMP credited at redemption, customer documents fixed at capture); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData run in-process, OPT-IN via body `figures: "report"`; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's body moved to services/payments/store-sales.js — invariant 7/13/14/15 line refs repointed; ref §4); shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08 (invariant 17 partner/details deleted with admin/partners + admin/analytics, the flat-15% routes; ref §3/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@feat/code-coupons-filter + shoofi-delivery-web@feat/code-coupons-filter / 2026-11-07 (invariant 14 code coupons out of funder buckets, kind=code, ref); shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -18,7 +18,12 @@ invoices, and bank payouts. Distinct from `payments` (money IN).
 ## Scope
 Server: `routes/payments/{admin-reports,admin,summaries}.js`, `routes/driver-reports.js`,
 `routes/admin/masav.js`, `routes/hyp.js` (EZcount invoicing), `lib/payments/calc.js`,
-`utils/{vat,greeninvoice,invoice-provider}.js`, `services/compensations/report-window.js` (which
+`utils/{vat,greeninvoice,invoice-provider}.js`, `services/payments/store-sales.js` (`stores-export-new`'s
+per-store body — every settlement sales figure), `services/payments/store-report-reads.js` +
+`services/payments/partner-summary.js` (the partner screen = the report engine when the body opts in
+with `figures: "report"`, invariant 17), `services/payments/partner-summary-legacy.js` (the
+partner screen's answer WITHOUT the flag — main's handlers verbatim, never "fixed"),
+`services/compensations/report-window.js` (which
 report a compensation belongs to + the post-report lock, invariant 10), `services/compensations/access.js`
 (who may call the compensation API, invariant 16), `services/financial-overview/` (the live overview —
 it RUNS the two report engines over any range; never re-derive money there), and the accountant's
@@ -158,7 +163,7 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      exists once, on the primary; an unprovable twin retry is held (`order.invoicesHeld`).
 7. **A store's coupon cost (`reportData.campaigns`) is the coupon's NOMINAL
    `storeDiscount`, never the waiver the customer actually got**, and the gate that
-   decides it is **blind to `discountType`** (`routes/payments/admin.js:1188-1194`,
+   decides it is **blind to `discountType`** (`services/payments/store-sales.js:196-202`,
    feeding `totalAppliedCouponsSum` → `campaignsTotal` → `campaigns`):
    `if (storeDiscount && !isSpecificToCustomers && discountType !== 'full_discount')`.
    Three consequences that keep getting rediscovered:
@@ -177,10 +182,10 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      express. `couponDeliverySplit` (`lib/payments/calc.js`) therefore takes that
      percentage off **`order.shippingPrice`** — the same base `computeDiscountCap`
      strikes a delivery coupon's own `value` against (`utils/coupon-discount.js:34-42`),
-     which is the exact parallel of `:1191` using `orderPrice` for an items coupon. NOT
+     which is the exact parallel of `:199` using `orderPrice` for an items coupon. NOT
      off the waiver (that halves a partial discount's store share) and NOT off
      `effectiveDeliveryFee` (a coupon can never touch the twin combination fee). It
-     **deliberately diverges from `:1190-1191` for these coupons**;
+     **deliberately diverges from `:198-199` for these coupons**;
      `isPercentageStoreDeliveryCoupon` counts them so the divergence is measurable
      (`percentageShareCoupons` on the exec-dashboard month detail) rather than
      invisible. Fixing the report's base to match is a **live billing change** — it
@@ -196,7 +201,7 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      invariant 15), so `storeDiscount` on
      the applied snapshot is already an amount (prod check 2026-10-26: P147T5LK on a ₪118
      brixta order carries `shoofiDiscount: 71.5, storeDiscount: 0`). Any reader dividing by
-     100 must exclude them. **`stores-export-new` itself does not** (`:1190-1191` checks only
+     100 must exclude them. **`stores-export-new` itself does not** (`:198-199` checks only
      `type`; nothing under `routes/payments/` or `lib/payments/` reads `splitType`): a
      `type: 'percentage'` + `splitType: 'percentage'` coupon with a store share bills
      `storeDiscount × orderPrice / 100`: a ₪30 share on a ₪200 order bills ₪60, and the bill is
@@ -208,8 +213,8 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      configuring delivery campaigns. **`type: 'fixed_amount'` + `splitType: 'percentage'` is
      the safe way to give a store a share of a coupon** (verified 2026-10-26). Every reader
      treats `storeDiscount` as percent points only when `type === 'percentage'`:
-     `stores-export-new` `:1190-1194`, the legacy export `:979-984`, `couponDeliverySplit`
-     (`lib/payments/calc.js:156-161`), `routes/payments/summaries.js:131-135` and
+     `stores-export-new` (`services/payments/store-sales.js:198-202`), the legacy export `routes/payments/admin.js:979-984`, `couponDeliverySplit`
+     (`lib/payments/calc.js:156-161`), `services/payments/partner-summary-legacy.js:132-135` (the legacy partner/summary, no `figures`) and
      `services/exec-dashboard/coupon-funding.js:207`. Prod has 12 such coupons, all auto-applied
      delivery coupons (ICF86DOX joker 20/80, YNM83RFF 50/50, the vapego coupons 0/100). All
      333 orders checked carry `storeDiscount = discountAmount × storePercent`, and the sent
@@ -219,8 +224,8 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
      never combine it with `type: 'percentage'` (the OPEN item above), and never use it on a
      `full_discount` partial-use coupon, whose breakdown treats the snapshot split as a running
      budget (`services/coupons/coupon-usage.js:424-425`).
-   - **The row pushed at `:1206` carries no items/delivery split** (unlike the
-     `full_discount` rows at `:1296`), so `campaignsList` is not splittable for
+   - **The row pushed at `:214` carries no items/delivery split** (unlike the
+     `full_discount` rows at `:302`), so `campaignsList` is not splittable for
      `delivery`/`order_items` coupons. `full_discount` is the **only** coupon type with a
      stored 2×2 split (`getFullDiscountMatrix`); everything else must be re-derived from
      the order at read time — see `couponDeliverySplit` in `lib/payments/calc.js`.
@@ -379,7 +384,7 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       (`resolveCouponSplit` in `utils/coupon-discount.js`; `routes/coupon.js:411` typed, `:1314`
       auto-apply), so the store pays its share
       of the real fee under the ceiling. A shekel split is billed NOMINALLY
-      (`routes/payments/admin.js:1192-1194`), which over-bills whenever the fee is below the
+      (`services/payments/store-sales.js:200-202`), which over-bills whenever the fee is below the
       ceiling, and that is the usual case (fees seen: 17, 18, 20, 28, 32, 35). It is safe end
       to end; see the prod evidence at invariant 7. 100/0 is settled the same as the old
       `shoofiDiscount = value` shape (the store is billed 0 and Shoofi's delivery cost is
@@ -391,14 +396,14 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       they derive from their own amount.
     - **`SHOOFI_FUNDED_TEMPLATES` = `compensation_items_only`, `gift_voucher`**: always
       `shoofiDiscount = amount, storeDiscount = 0`, no question. Why: a customer-specific coupon's
-      store share is never billed (`routes/payments/admin.js:1188` `!isSpecificToCustomers`), and
+      store share is never billed (`services/payments/store-sales.js:196` `!isSpecificToCustomers`), and
       an empty/0 `shoofiDiscount` there is credited to the store at `coupon.value`
-      (`:1180-1181`). A "store-funded" customer coupon is therefore fiction that Shoofi pays —
+      (`:188-189`). A "store-funded" customer coupon is therefore fiction that Shoofi pays —
       **a store-paid compensation is a compensations row** (`payingParty: business` →
       `compensationsToCustomers`, invariant 8), never a coupon split.
     - **`DRAFT_EXCLUDED_TEMPLATES.store_percentage_off`** — invariant 7's OPEN
       percentage-split question. Lift it only with the owner's ruling AND a matching change at
-      `routes/payments/admin.js:1190-1191`, never by deleting the entry alone. The ordinary
+      `services/payments/store-sales.js:198-199`, never by deleting the entry alone. The ordinary
       coupon form still creates such coupons.
     - **Approval never writes a coupon.** `approve` writes the label translations, reserves a
       code, and returns `buildCreateFields(...)` — the exact multipart fields CouponForm posts
@@ -427,26 +432,47 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       `coupon-templates.js`, as its own change.
 
 14. **Who funds a GLOBAL coupon is decided by the store's share alone** — the admin coupons
-    list's `funder=shoofi|store|split` filter (`GET /api/admin/coupons`, plus `isActive=now` =
-    on AND within its dates) and each row's `funder`. Rule: `services/coupons/coupon-funder.js`
-    (`funderOf` for one coupon, `funderFilter` for the same rule as Mongo buckets,
-    `activeNowFilter`). **It is a display/filter rule, NOT a billing path.** Settlement never
+    list's `funder=shoofi|store|split` filter (`GET /api/admin/coupons`, plus the date-aware
+    statuses: `isActive=now` = on AND within its dates; `isActive=live` = on AND not over yet,
+    the list's default «פעילים» — a coupon that starts later stays, an expired one does not;
+    `isActive=expired` = on but past its end, «פג תוקף»; `true`/`false` stay the bare flag) and
+    each row's `funder`. Rule: `services/coupons/coupon-funder.js` (`funderOf` for one coupon,
+    `funderFilter` for the same rule as Mongo buckets, `activeNowFilter`, `liveFilter`,
+    `expiredFilter`). Prod 2026-11-07: 14,230 coupons switched on, 13,620 of them expired —
+    the bare flag listed them all under «פעילים».
+    - **Gift cards (`isPurchasedCoupon`) are outside every funder bucket** (`funderOf` → null,
+      `funderFilter` excludes `isPurchasedCoupon ∈ [true,'true']`): a customer paid for them, so
+      they are nobody's giveaway (owner 2026-11-07: «שופי» = coupons Shoofi made for all
+      customers; prod: 26 of the 42 «שופי» rows were gift cards → 16). They have their own filter,
+      **`kind=general|code|personal|gift`** (`kindFilter`, any other value → 400), which partitions
+      every coupon. A gift card carries `isCustomerSpecific: false`, so the other kinds exclude
+      it explicitly.
+    - **Code coupons (`isAutoApply` off) are outside every funder bucket too** (`funderOf` → null;
+      `funderFilter` requires `isAutoApply ∈ [true,'true']`): a code someone is handed and types
+      (retention codes, influencer gifts such as IMG100), not a coupon for all customers (owner
+      2026-11-07). Their own kind is **`code`**; `general` = auto-apply for everyone, the only kind
+      with a funder. Prod 2026-11-07: every code coupon sat in «שופי» (none in store/split);
+      «שופי» 16 → 9. Kinds `general|code|personal|gift` = 90 / 9 / 14,290 / 26 of 14,415. Each gift row also
+      carries `giftCard` = `giftCardBalance`: value − SUM(`couponUsages.discountAmount`) of the
+      code, and the holder (`buyer` until someone else redeems it, then `recipient`). Display
+      only; the wallet's own per-user balance (`routes/coupon.js` wallet) is unchanged.
+    **It is a display/filter rule, NOT a billing path.** Settlement never
     calls it. It restates what `stores-export-new` already does, so if settlement changes,
     this file follows; never the other way round.
     - **Share:** `storePercent` out of 100 for `splitType: 'percentage'` (resolved per order by
       `resolveCouponSplit`, `utils/coupon-discount.js`); otherwise `storeDiscount` out of `value`. The bucket is
       `shoofi` when the share is null or 0, `store` when it covers the whole value (or 100%),
       and `split` for anything between. That is because the store is billed its share
-      (`routes/payments/admin.js:1140`, `:1146-1160` fallback, truthy gate `:1188`), and
+      (`services/payments/store-sales.js:150`, `:157-176` fallback, truthy gate `:196`), and
       whatever it isn't billed is Shoofi's (`lib/payments/calc.js:161`).
     - **`shoofiDiscount` is never read for a public coupon** (only for customer-specific
-      `order_items`, `admin.js:1209`). So both shares null/0 means Shoofi pays, and
+      `order_items`, `store-sales.js:217`). So both shares null/0 means Shoofi pays, and
       shoofi + store < value with store > 0 is a split.
     - **The bucket doesn't say how much the store is billed.** A fixed store share is billed
-      at its nominal amount (`admin.js:1192-1194`): a ₪20 share on a ₪17 fee bills ₪20 and
+      at its nominal amount (`store-sales.js:200-202`): a ₪20 share on a ₪17 fee bills ₪20 and
       still counts as `store`. A `type: 'percentage'` fixed share is percent points of the
-      items subtotal (`:1190-1191`), compared against `value` in the same units.
-    - **Out of scope (`null`):** customer-specific coupons (never billed to a store, `:1188`)
+      items subtotal (`:198-199`), compared against `value` in the same units.
+    - **Out of scope (`null`):** customer-specific coupons (never billed to a store, `:196`)
       and value-0 tag coupons. An **`onlyForOneCustomer`** voucher is global only until its
       first use, which claims it and sets `isCustomerSpecific: true`
       (`services/coupons/coupon-usage.js:171`). From then on its store share is not billed,
@@ -457,8 +483,8 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       a value-0 tag coupon. A storePercent of 20 lands in `split`, 0 in `shoofi`, 100 in `store`
       — whatever the area fee turns out to be on each order.
     - **Dates:** `start`/`end` are strings with mixed +02:00/+03:00 offsets, so
-      `activeNowFilter` converts them with `$convert … onError: null` and never compares them
-      as text. Prod 2026-10-26, active now and global: 29 Shoofi, 5 store, 0 split.
+      `activeNowFilter`, `liveFilter` and `expiredFilter` convert them with `$convert … onError:
+      null` and never compare them as text (an unreadable `end` counts as not over). Prod 2026-10-26, active now and global: 29 Shoofi, 5 store, 0 split.
 
 15. **A FIXED DELIVERY PRICE coupon needs no settlement change, and must stay a percent split**
     (`type: 'delivery_price'`, `discountType: 'delivery'`, "משלוח ב-₪10"; shoofi-server
@@ -469,10 +495,10 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     - **Why settlement is untouched.** Every money-out reader branches only on
       `type === 'percentage'` and on `discountType`, never on `fixed_amount`. It reads the
       ORDER's `appliedCoupon.discountAmount` plus the shekel shares already resolved on the order:
-      - store `campaigns`: `routes/payments/admin.js:1188-1195`
+      - store `campaigns`: `services/payments/store-sales.js:196-203`
       - `couponDeliveryPortion` / `couponDeliverySplit`: `lib/payments/calc.js:92-164`
       - the CASH courier repayment `actualDriverPayment` and `earningsByCoupons`:
-        `routes/driver-reports.js:171-284`, `admin.js:566-600`, `summaries.js:950-965`
+        `routes/driver-reports.js:171-284`, `admin.js:566-600`, `summaries.js:661-676`
       - the exec `orderCouponFunding`, delivery-metrics, financial overview and unit economics
 
       `isPercentageStoreDeliveryCoupon` is false for this type. The delivery tax invoice and
@@ -506,7 +532,7 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       "₪cap off".
     - **Always `splitType: 'percentage'`** (`deliveryPriceCouponError`, `routes/coupon.js:51`,
       on create `:1528` and update `:1778`; same rule in `assertTemplateInvariants`). Why: a
-      fixed store share is billed NOMINALLY (`admin.js:1192-1194`), while D swings from ₪0 to
+      fixed store share is billed NOMINALLY (`store-sales.js:200-202`), while D swings from ₪0 to
       the cap with the area fee. Example: a ₪5 fixed share on a ₪8 fee bills the store ₪5
       for an order that got ₪0 off. A percent share is resolved against the D actually given.
       This happens three times: at the quote, at creation by `resolveCouponSplit`
@@ -539,7 +565,7 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       it would have been D 28 + deal 15 = 43 on a 38 fee: the courier over-repaid by 5 and the
       items eaten by 5.
     - **Fallback caveat — under-bills, not over-bills.** If an order's copy of the coupon
-      lacks the split, `stores-export-new` reads the coupon DOCUMENT (`admin.js:1147-1160`).
+      lacks the split, `stores-export-new` reads the coupon DOCUMENT (`store-sales.js:157-176`).
       For a percent split that document has `storeDiscount: null`, so the store is billed
       **₪0** and its share silently becomes Shoofi's cost. The same happens in
       `couponDeliverySplit`, which has no document lookup. Since the creation guard and
@@ -614,12 +640,108 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       is still swallowed** (the `suspectZeroOrderReports` counter in
       `services/exec-dashboard/billing-metrics.js` still describes that path). Do not widen the
       throw without a decision; do not drop the header forwarding, or every report fails.
+      **In-process readers (2026-11):** `generateStoreReportData(..., sources)` takes optional
+      readers for its five reads (`storeDoc`, `storeSales`, `compensations`,
+      `carryoverCompensations`, `deliveryOnlyBookings`, `quiet`). `reports/generate` and the
+      financial overview pass NONE — HTTP and error handling exactly as above. With a reader given,
+      a failure THROWS (never a silent ₪0). Only the partner screen passes them, and only for a
+      request with `figures: "report"`
+      (`inProcessReportSources`). `stores-export-new`'s per-store body is
+      `services/payments/store-sales.js` (`computeStoreSalesRow` / `buildStoreSalesRow`), run by
+      the route AND by the partner screen — one implementation; the carry-over and delivery-only
+      queries are `store-report-reads.js`, shared by both paths. Its compensation reader is the
+      list route's query for the engine's params (`storeReportCompensationsQuery`).
     - **Earnings reads — identity from the token** (`services/payments/earnings-access.js`,
-      no auth at all until 2026-10-30). `partner/{summary,daily-orders,details}`
-      (`partnerEarningsAccess`): a dashboard role, or a `shoofi-partner` token whose own
+      no auth at all until 2026-10-30). `partner/{summary,daily-orders}` (`partner/details`,
+      flat 15% and never called, was deleted 2026-11-08) (`partnerEarningsAccess`): a dashboard role, or a `shoofi-partner` token whose own
       `storeUsers` doc's `appName` IS the `app-name` header — the handlers pick the store DB from
       that header, so the gate is what stops a partner reading another store. Caller:
       shoofi-partner `screens/admin/payments` (summary, daily-orders); nothing calls `details`.
+      **What `partner/summary` means (shoofi-server `fix/partner-summary-figures`, 2026-11-08/09)
+      — TWO ANSWERS, chosen by the request body. The store-report figures are OPT-IN.**
+      - **No `figures` field (or any value other than `"report"`) → the LEGACY answer,
+        unchanged.** Every installed partner build sends no flag, and the owner ruled
+        (2026-11-09, "i don't want it to effect the existing production version") that a server
+        deploy must not change what it shows. `services/payments/partner-summary-legacy.js` is the
+        two handlers exactly as on main before the PR (copied verbatim): card / cash = Σ
+        (`orderPrice` + drive-in) per method (coins, Shoofi coupons and drive-in INSIDE — matches
+        no line of the PDF), the flat-15% `totalCommission` / `partnerEarnings` / per-day
+        `commission` / `earnings`, compensations by `items.approvedAt` (daily-orders keyed by the
+        body `storeId`). **Never "fix" this module** — its whole job is to keep answering what it
+        answered; delete it once no installed build calls without the flag. Pinned byte-for-byte
+        by shoofi-server `test/integration/partner-summary-legacy.js` against a golden file
+        captured by running main's own handlers on the same fixture.
+      - **`figures: "report"` → THE STORE REPORT'S FIGURES, from the report's own engine** (owner:
+        "show the same values as we show in the report"); a new client build opts in by sending the
+        field (`REPORT_FIGURES` / `wantsReportFigures` in `partner-summary.js`). Everything below
+        describes this answer. `services/payments/partner-summary.js` runs
+      `generateStoreReportData` in-process with `inProcessReportSources`
+      (`services/payments/store-report-reads.js`), because a partner token cannot pass the
+      engine's dashboard-only self-calls. It adds, subtracts and filters NO money: it picks the
+      report's lines out of the engine's result and rounds them to agorot (`reportFigures`).
+      **Never re-derive a figure here** — before this the screen had its own gross split (card =
+      `orderPrice` + drive-in) that matched no line of the PDF (tortilla 10/2026: card ₪27,443 on
+      the tablet vs ₪26,548.73 on the report).
+      - **The period** = calendar days, as the admin passes them to `reports/generate`
+        (`reportPeriod`): `month` → `YYYY-MM-01`..last day, so a month IS that month's report,
+        line for line (verified on prod against 8 sent reports, 09-10/2026: identical, and
+        `stored.matchesLive` true). `day`/`week`/custom = the same engine over that window.
+      - **Month-only lines** (`MONTH_ONLY`, `null` for any other period): commission (tiered,
+        progressive — `calculateCommissionTiered` on the period's total), coins commission, VAT on
+        it, contract monthly/one-time charges (billed in full for any period they overlap),
+        carry-over compensations (pending NOW, undated), `totalOutcomes`, `totalForTransfer`,
+        `balance`. `provisional: true` while the month has not ended or for any non-month window.
+      - **Days add up.** `dailyData` = the same engine over each business day's SLICE of the
+        period's data (in memory, nothing re-read). A day = `[storeReportBounds(day, day).start,
+        next day's start)`; orders and bookings placed by their `created` STRING (as the engine's
+        query compares it), compensations by `createdAt` (Date). Every additive line sums over the
+        days to the period exactly.
+      - **`partner/daily-orders`** = the engine for that one day, then the engine over each order
+        alone (+ the compensations filed on it): each row carries its report lines (`figures`),
+        `amount` = the order's `totalIncomes`, `compensation` = its `compensationsFromShoofi`.
+        Σ rows = the day (compensations tied to no order of the day are in the day only). The
+        store is the gated `app-name`; a body `storeId`/`partnerId` is ignored.
+      - **With the flag, the v1 field names carry the report's lines** (a build that opts in can
+        keep the v1 layout):
+        `totalRevenue` = `totalIncomes` (סך הכל הכנסות ממכירות), `totalRevenueCreditCard` =
+        `creditCardRevenue` (הכנסות באשראי: items − coins − Shoofi coupons on card orders),
+        `totalRevenueCash` = `cashRevenue`, counts = orders per method, `totalCoinsUsed`/
+        `totalShoofiCoupons`/`totalDriveIn` (+ splits) = `coins`/`couponsFromShoofi`/`driveIn`;
+        the five add up to `totalRevenue`. `compensation` = `{ totalApproved:
+        compensationsFromShoofi, totalPaidToCustomers/ToDrivers: + carry-over (the PDF's summary
+        line), totalPaidToShoofi }`. `dailyData[]` rows: `revenue` = the day's `totalIncomes`,
+        `dailyRevenueCreditCard/Cash` = the day's report lines. The full shape is
+        `summary.report = { period, monthOnly, provisional, figures, stored }`, every row also
+        `figures`. `stored` = the generated report for exactly that month (`store-reports`), with
+        `matchesLive` + `differences` — it shows when an order/compensation/contract changed after
+        the report was made.
+      - **Who sees figures (BOTH answers, checked before the flag):** a dashboard role, or a store
+        user with the partner `reports` role
+        (`canSeeStoreTotals` → `storeUserHasRole(me, ['reports'])`, the `requireStoreRole`
+        predicate; the gate leaves the token's storeUsers doc on `req.partnerStoreUser`). Anyone
+        else gets **200** `{ summary: null, dailyData: [], restricted: true }` /
+        daily-orders `{ date, orders: [], totalOrders: 0, restricted: true }` with nothing read —
+        never a 403. A full report answer carries `restricted: false` (the legacy answer carries
+        no `restricted` key, as before). The live app shows the payments tile only to
+        `isAdmin && roles ∋ "reports"` (shoofi-partner `userDetailsStore.isAdmin(ROLES.reports)`), a
+        subset of `storeUserHasRole` (which also passes an admin with no/empty `roles`), so nobody who
+        can open the screen is restricted.
+      - **No flat-15% figures in the report answer** (`totalCommission`, `partnerEarnings`, daily
+        `commission`/`earnings` are absent; `calculateCommission` contradicts the tiered
+        settlement). The report's commission and transfer are `figures.commission` / `.balance`,
+        month only. The LEGACY answer still returns the flat-15% fields, on purpose.
+        (`partner/details`, `admin/partners` and `admin/analytics` were deleted 2026-11-08.)
+      - **Tie-out with «السجل»** (orders invariant 21): legacy `totalRevenue` = Σ(`orderPrice` +
+        drive-in) by construction; with the flag, `totalRevenue` (`totalIncomes`) =
+        Σ(`orderPrice` + drive-in) of the completed orders when every one is CARD or CASH (prod
+        10/2026: 13,535 completed, 0 with another method). An order with no/another method enters
+        the report only through its coins and Shoofi coupon credit.
+      Tests: shoofi-server `test/integration/partner-summary-report-tieout.js` (mongodb-memory-server;
+      `figures: "report"`: the report through its REAL HTTP self-calls vs the partner routes, every
+      order/compensation mix, overnight store across midnight and the month edge) and
+      `test/integration/partner-summary-legacy.js` (no flag = main's own output byte-for-byte; the
+      same golden file pins `stores-export-new` and `generateStoreReportData` without `sources` as
+      unchanged by the move to `store-sales.js`).
       `driver/{summary,details}` (`driverEarningsAccess`): a dashboard role (the admin תשלומי נהגים
       screen reads any driver); a `shoofi-shoofir` token whose id IS the body `driverId`; or that
       driver's delivery-company admin — `role: "admin"`, company `isControlledByAdmin`, same
@@ -737,11 +859,76 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       not open (HTTP 429 "not ready" / 417 "awaiting allocation" / a probe that fails), and **marks sent
       only after a WhatsApp that actually went out** — `sendWhatsAppTemplate` RETURNS undefined when it
       did not send. (The company send, invariant 18, still marks sent unconditionally — not changed.)
+    - **An all-cash store sends Shoofi's invoice alone** (2026-11-08). No card sales means no store →
+      Shoofi document, ever (`create-store-invoice` refuses ₪0). The store still owes Shoofi's invoice
+      for the commission on its cash orders. `send-invoice` asks `storeInvoiceRequiredForSend`
+      (`utils/store-report-invoice-status.js`): a numeric `creditCardRevenue` with card + drive-in card
+      ≤ 0 → skip the allocation/store-link checks, still require Shoofi's link to open, and send
+      `monthly_invoice` with {{2}} = `NO_STORE_INVOICE_TEMPLATE_TEXT`. The template is Arabic with 3
+      plain-text body variables: month, "فاتورة المحل", "فاتورة شوفي". Only `hypInvoiceSent` is marked.
+      **Fail closed:** any card amount > 0, or no numeric `creditCardRevenue`, keeps `STORE_INVOICE_MISSING`
+      ("צור קודם חשבונית חנות"), and the derivation points it at `createStoreInvoice`. So every store at
+      or above the allocation ceiling still needs its document AND its number. Before this, the store-link
+      guard (2026-05-05) blocked every all-cash store: 52 HYP reports May–Oct 2026, none sent (verified
+      against respond.io). The derivation treats an old `STORE_INVOICE_MISSING` record as stale once the
+      document exists or is not needed.
+    - **The mirror: when Shoofi owes the store, the store's invoice goes out alone** (2026-11-08).
+      `totalOutcomes` nets `couponsFromShoofi` and `compensationsFromShoofi` against commission + VAT +
+      fees (`generateStoreReportData`). When the credits are larger it is ≤ 0: Shoofi owes the store,
+      `create-invoice` refuses, and Shoofi has no document, ever. The store still issued its card-sales
+      document. `send-invoice` asks `shoofiInvoiceRequiredForSend` (`utils/store-report-invoice-status.js`):
+      a numeric `totalOutcomes ≤ 0` → skip Shoofi's link probe, keep the store document's allocation and
+      link checks, and send `monthly_invoice` with {{3}} = `NO_SHOOFI_INVOICE_TEMPLATE_TEXT`. It marks
+      **both** `hypStoreInvoiceSent` and `hypInvoiceSent`: `hypInvoiceSent` means "this report's
+      monthly_invoice went out", and it is the one flag every unsent reader checks (derivation, bulk
+      "send only unsent", row, page). **Fail closed:** a missing/non-numeric `totalOutcomes` or any amount
+      > 0 keeps `SHOOFI_INVOICE_MISSING`. With neither document the route answers 400
+      `NO_INVOICES_TO_SEND` and records nothing, so the 84 no-orders months (outcomes 0, card 0) stay
+      quiet. The derivation's `sendable` (Shoofi's document, or the store's when Shoofi's is not needed)
+      drives the next action `sendInvoices` and the `ready` chip. Before this such a row sat under
+      "מוכן לשליחה" with next action "הושלם". Prod 2026-11-08: 19 reports since 12/2025 had outcomes < 0,
+      all from `couponsFromShoofi` (compensations ₪0 on every one); 15 had a store document and no Shoofi
+      document, none sent (Falafel Alasil 10/2026: card 143, commission 142.2 + VAT 25.6, coupons 247,
+      outcomes −79.20, transfer 222.20, store #10006). **The admin web routes by
+      `invoice-steps/invoiceRouting.ts`, never by `invoiceProvider` alone**: only Shoofi's HYP
+      `create-invoice` writes that field, so a store-only report has none. A report is HYP when
+      `invoiceProvider === 'hyp'`, or it has `hypInvoicePdfLink`, or a `hypStoreInvoicePdfLink` and no
+      `greenInvoiceId`. That last clause matters: 219 GreenInvoice-era reports carry a GreenInvoice
+      Shoofi document AND a HYP store document with no provider, and they must stay on the GreenInvoice
+      route.
     - **Recovering a stuck document = `recheck-allocation`**, read-only at EZcount
       (`getTaxMinistryAllocationNumber`). Never reset + re-create: `reset-invoice` does not cancel at
       the provider (Known status), so that issues a duplicate tax invoice. EZcount's ignoreApproval /
       addApprovalNumber / furtherObjection / cancel stay manual human decisions and are not exposed.
-    - `send-tax-url` stamps `taxUrlSentAt` only on a real send; every attempt is in `hyp.taxUrlSendLog`.
+    - **The owner's consent is EZcount's 3-month OAuth grant, not the שופי שופינג permission**
+      (2026-11-07, shoofi-server `services/invoicing/tax-consent.js`, `routes/tax-consent.js`, `docs/invoice-step-tracking.md`
+      "The consent: status, message and send log"). Owners and accountants see a separate, year-long
+      representative permission to שופי שופינג בע"מ in the Tax Authority portal and read it as "approved"
+      (shawerma-alarz: "פעיל" there, EZcount's `maxConsentDate` 2026-10-05). Only EZcount's consent allows
+      an allocation number. Every admin surface names it "אישור EZcount ברשות המסים — מתחדש כל 3 חודשים"
+      and says it is not the other one. Only the file's owner (ID = file number), someone authorised
+      for a company, or an authorised accountant can approve. The message names an individual's file
+      by its last 3 digits only (`******846`, between U+200E marks so an RTL line does not show it as
+      `846******`); a company number is shown in full.
+    - **One send path, one log.** `send-tax-url` (store + company), both bulk sends and the renewal
+      reminder go through `sendConsentMessage`; the admin's "העתק הודעה עם הוראות"
+      (`POST …/tax-consent/message`) logs a `copy`. Every attempt is one `hyp.taxUrlSendLog` entry
+      (last 100: who, when, channel, phone, ok from the provider's real answer, stage, template, messageId,
+      period); `taxUrlSentAt` only on a real send, never on a copy. Never add a send path that bypasses it.
+      The WhatsApp template is `tax-consent-settings.whatsappTemplate` (unset = the legacy two-parameter
+      `tax_authority_approval`; a configured name must contain `tax_authority_approval`, which is how
+      `utils/whatsapp.js` picks the partner channel and Arabic).
+    - **"בדוק עכשיו מול EZcount"** (`POST …/tax-consent/check`) drops the one-minute distributor cache,
+      re-reads, and stores the copy with `checkedAt`/`checkedBy`. A check that reaches no EZcount source
+      keeps the last good copy (`hyp.taxAuthorityLastCheckError` instead) — it never turns "valid" into
+      "unknown".
+    - **The renewal reminder messages real owners, so it is OFF by default**
+      (`tax-consent-settings{_id:"settings"}.remindersEnabled`, master-only PUT). Daily 10:00 Israel:
+      ≤ 14 days before `maxConsentDate`, then once on expiry (within 7 days). Dedupe: one successful send
+      per consent period (`maxConsentDate`) per stage. It sends nothing when the live distributor list is
+      unavailable, skips exempt issuers and hidden stores, and sends one message per shared account and phone.
+      Dry run: `GET /api/hyp/admin/tax-consent/reminders/preview`. Never turn it on in code or a migration —
+      an owner flips it. Tests: shoofi-server `test/integration/tax-consent.js`.
     - **Delivery companies get the same (2026-11-06).** A company issues invoice 1 (אשראי) and invoice 2
       (תוספות) to Shoofi from ITS OWN EZcount account (`createInvoiceOnBehalf`, company `api_key`), so the
       allocation rule applies per document: `create-company-invoice` runs `evaluateCompanyInvoicePrecheck`
@@ -822,7 +1009,7 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
   credit-noting at the provider stays a separate, manual step.
 - **OPEN — needs an owner ruling (2026-10-26):** `stores-export-new` reads a percentage-split
   (`splitType: 'percentage'`) `type: 'percentage'` coupon's already-in-shekels `storeDiscount`
-  as percentage points (`routes/payments/admin.js:1190-1191`) and bills
+  as percentage points (`services/payments/store-sales.js:198-199`) and bills
   `storeDiscount × orderPrice / 100`. Today it bills ₪0 in prod (the only 2 such coupons are
   100% Shoofi). Until there is a ruling, coupon drafts refuse `store_percentage_off`
   (invariant 13); the ordinary form does not. Any fix is a live billing change → HIGH-RISK PR.

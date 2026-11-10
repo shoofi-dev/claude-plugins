@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -106,6 +106,21 @@
           "file": "utils/crons/invoice-retry-cron.js",
           "regex": "\\[INVOICES_HELD_FIELD\\]: \\{ \\$exists: false \\}",
           "desc": "CORE invariant 10: the retry cron skips an order held for review (order.invoicesHeld) until a person clears it"
+        },
+        {
+          "file": "services/payments/order-invoices.js",
+          "regex": "ISSUED: \"issued\",",
+          "desc": "CORE invariant 11: an invoices[] entry is a real document only at status \"issued\""
+        },
+        {
+          "file": "services/hq/money-audit/checks-money-in.js",
+          "regex": "const hasIssuedDocument = \\(o\\) =>",
+          "desc": "CORE invariant 11: the money audit's receipt-missing check reads invoices[], not invoiceStatus"
+        },
+        {
+          "file": "services/hq/money-audit/util.js",
+          "regex": "\\n  invoices: 1,",
+          "desc": "CORE invariant 11: the money audit's order projection keeps invoices[]"
         },
         {
           "file": "routes/admin.js",
@@ -345,6 +360,16 @@
           "file": "components/total-price/index.tsx",
           "regex": "couponsStore\\.setAppliedCoupon\\(couponApp\\)",
           "desc": "TotalPrice is the one writer of the coupon submit sends, in the same step as the total it prices"
+        },
+        {
+          "file": "hooks/checkout/use-checkout-submit.ts",
+          "regex": "if \\(couponsStore\\.appliedCoupon && !promotionSelection\\?\\.couponSuppressed\\)",
+          "desc": "reference Coupons: a coupon the total did not use (couponSuppressed) is not sent with the order"
+        },
+        {
+          "file": "components/total-price/index.tsx",
+          "regex": "couponSuppressed: couponNotUsed,|^      couponSuppressed,$",
+          "desc": "reference Coupons: couponSuppressed also covers a delivery coupon on a pickup / drive-in order (couponNotUsed = lost to the delivery deal OR isDeliveryCouponOffForMethod). The second alternative is main before shoofi-app#87; drop it once #87 has merged."
         },
         {
           "file": "services/public-coupon.ts",

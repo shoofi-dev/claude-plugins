@@ -1,0 +1,50 @@
+{
+ "style": "table",
+ "theme": {
+  "ink": "#17320F",
+  "lime": "#8AEA5F",
+  "paper": "#EDE3D6",
+  "endBg": "#17320F",
+  "endInk": "#ffffff",
+  "glow": "#DFF5D0"
+ },
+ "subject": {
+  "kind": "deal",
+  "store": {
+   "name": "باستيتو",
+   "logo": "../img/pastito-logo.jpg"
+  },
+  "offer": {
+   "big": "7%",
+   "label": "خصم",
+   "line": "على كل الوجبات",
+   "terms": "لغاية 27/3"
+  },
+  "dishes": [
+   {
+    "img": "../img/6ae74c381810b1000d5d672c.jpg"
+   },
+   {
+    "img": "../img/6ae748b2663d01000d7092a4.jpg"
+   },
+   {
+    "img": "../img/6ae72f1a663d01000d701a55.jpg"
+   },
+   {
+    "img": "../img/6ae742a71810b1000d5d5adb.jpg"
+   }
+  ]
+ },
+ "text": {
+  "pill": "شوفي",
+  "hook": "**باستيتو** على شوفي",
+  "cta": "اطلب من **شوفي**"
+ },
+ "assets": {
+  "icon": "../assets/shoofi-icon.png",
+  "shadiStand": "../assets/shadi-stand.png",
+  "shadiPoint": "../assets/shadi-point.png",
+  "font": "../assets/me.ttf"
+ },
+ "audio": "../out/mix-table.m4a"
+}
