@@ -95,7 +95,7 @@ the server's). Anything reading `order.readyMinutes` (e.g. `computeOrderDelays` 
 **saved-address guard** (only when `shoofi.store{id:1}.requireSavedDeliveryAddress === true`,
 default off: a DELIVERY order to an address that is not one of the customer's saved ones →
 400 `DELIVERY_ADDRESS_REQUIRED`; APPLEPAY / HYP exempt — customers CORE invariant 19) →
-lock (Redis `SET NX` + in-mem fallback + 30s dup check) → fraud checks → generate
+lock (owner-token Redis `SET NX PX` + in-mem fallback, 120s; see §6.4) → fraud checks → generate
 `originalOrderId`/`orderId` → image upload → decide initial status → validate coins
 (no debit) → price corrections, in this order: coupon entitlement (`enforceCouponEntitlement`:
 ownership + partial-use balance only) → store promotions + the delivery deal-vs-coupon
@@ -352,7 +352,13 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
    (self-heal `order.js`). Twin = single combined capture.
 3. **Amount-mismatch backstop**: charged vs `order.total` drift ≥0.01 → force
    FRAUD_REVIEW (`finalizeApplePayOrder:2254`); twin excluded.
-4. **Creation lock** must always release in `finally`.
+4. **Creation lock** (`order_lock:<appName>:<customerId>`, `ORDER_CREATE_LOCK_TTL_MS` = 120s,
+   `utils/owned-lock.js`) holds a random owner token. Only the request that took it releases it,
+   by compare-and-delete: `releaseOrderCreationLock()` in the create route's `finally`, or on a
+   throw before the main `try`. Never `del` it anywhere else. A plain `del` let a request that
+   outlived the old 10s TTL delete a resubmit's lock, and the old 30s "recent orders" check and
+   `performFraudChecks` released it early, so the order went on unlocked. The in-memory fallback
+   is keyed by the same lock key, so it is per store too.
 5. **Secondary features must NEVER fail the primary order** — coins, world-cup,
    attribution, coupon minting, invoices, notifications, external-provider, flow
    events are all try/caught and swallowed. Coins-redeem-after-charge failure is
