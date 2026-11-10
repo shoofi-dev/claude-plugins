@@ -279,7 +279,12 @@ is never a saved address (CORE invariant 19, 2026-11-10). Add and update both pa
 `floorNumber` / `apartmentNumber` / `entrance` / `streetNumber` trimmed + ≤ 20; numbers
 stringified; an unsent key stays unsent. Add builds an explicit field list (`buildAddress`) and
 keeps `apartmentNumber` / `entrance` only when sent; update `$set`s every sent key on
-`addresses.$` (minus `_id`). The customer app's add-address sheet sends the whole form, so all of
+`addresses.$` (minus `_id`), and when `selectedCity._id` is sent it becomes `cityId` (ObjectId)
+like `buildAddress` — over any stale `cityId` posted back; a malformed one is 400 before any
+write. Prod 2026-11-10: no saved row has a `selectedCity` (the app sends `null`), so `cityId` is
+null everywhere. Every address 500 answers `{ error }` only — `err.message` goes to
+`utils/logger`. PATCH `…/:addressId/default` is in `admin-audit-routes.js`
+(`set_default_customer_address`) beside add / update / delete. The customer app's add-address sheet sends the whole form, so all of
 these arrive together. At checkout the app sends the selected address object, so the note lands
 on the order as `order.order.address.notes` — a snapshot; a later edit doesn't touch past orders
 (CORE invariant 20). `delete` also unsets `confirmedAddressId` when it named the deleted row; `update`
