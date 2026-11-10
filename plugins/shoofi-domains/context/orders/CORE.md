@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@feat/HIGH-RISK-duplicate-order-review-rule / 2026-11-10 (invariant 27); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -859,6 +859,21 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests (shoofi-app): `__tests__/stores/active-orders-placed-and-stale.test.ts`,
       `__tests__/components/active-orders-error-and-placed.test.tsx`,
       `__tests__/components/order-history-error.test.tsx`.
+27. **`order.duplicateSuspect` IS DECIDED ONCE, AT CREATE, AND NEVER REJECTS, DELAYS OR TOUCHES
+    THE CHARGE.** (HQ #7ef46a, `services/orders/duplicate-order-rule.js`.) Same store db, same
+    `customerId`, same cart fingerprint, earlier order created ≤ 120s before. The earlier order
+    counts by invariant 24's rule — an uncharged `"0"` retry (a declined card, an abandoned sheet,
+    an Apple Pay placeholder) is never a duplicate; that is what keeps the ~750 retries a month out.
+    - **Fingerprint:** per line `item_id` + `selectedExtras` + `comboSelections`, keys and arrays
+      sorted, empties dropped, qty summed per identical line, lines sorted, sha1 → 16 hex. Price,
+      notes, coupon, address and payment method are ignored.
+    - **Mode:** `shoofi.store {id:1}.orderDuplicateRule.mode` — `measure` (default, also when
+      missing or unknown) only stamps the field and logs `[duplicateOrderRule]`; `route` joins
+      `requiresFraudReview`, so the order lands in FRAUD_REVIEW(`13`) exactly where a fraud flag
+      would; `off`. Field absent = not flagged. A client-sent value is removed (applied after the
+      `...parsedBodey` build). School orders are skipped. Twin `/place` is NOT covered.
+    - Do not switch to `route` until a held card order is non-capturable and the review screen's
+      reject refunds — today neither is true.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
