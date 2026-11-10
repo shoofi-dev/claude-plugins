@@ -40,9 +40,12 @@
         "lib/delivery/helpers.js",
         "services/delivery/admin-access.js",
         "services/delivery/response-redaction.js",
-        "services/delivery/availability.js"
+        "services/delivery/availability.js",
+        "services/driver-shift/waiting-list-offers.js",
+        "utils/crons/shift-waiting-list-cron.js"
       ],
       "symbols": {
+        "services/driver-shift/waiting-list-offers.js": ["runWaitingListPass", "bookableSeatsFor", "OFFER_MINUTES"],
         "services/delivery/availability.js": [
           "checkStoreDeliveryAvailability",
           "isDeliveryPaused"
