@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 24, reference C1 Tracking); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -203,7 +203,11 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **The one conflict with a coupon**: a delivery deal and a delivery coupon
       (`discountType: 'delivery'` or `type: 'free_delivery'`) never both apply — the larger
       wins, a tie goes to the deal, and the dropped coupon is not sent so it is not spent
-      (`resolveDeliveryConflict`; the app picks first, creation re-checks).
+      (`resolveDeliveryConflict`; the app picks first, creation re-checks). The app's flag for a
+      coupon it shows but does not send is `couponSuppressed` (`components/total-price/index.tsx`
+      → `promotionsStore.checkoutSelection` → `use-checkout-submit.ts`). Since shoofi-app#87 it also
+      covers a delivery coupon on a pickup or drive-in order (payments reference "Coupons"). The
+      server has no matching check for that case.
     - **Uses** are one row per (order, promotion) in `shoofi.promotionRedemptions` (unique,
       idempotent), written at the four `couponUsages` write points with the same status gates
       and released on cancel. NOT `couponUsages` — settlement and every coupon cap read that.
@@ -620,7 +624,13 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       calendar day.
     - **The day:** `getBusinessDayBoundariesForDateRange(date, date, openHours)`
       (`utils/store-service.js`) on the store's `store {id:1}.openHours`, matched on `created`
-      with the same string-range query as `partner/summary` (`routes/payments/summaries.js`). So
+      with the same string-range query as `partner/summary` (without `figures` in the body — what
+      installed partner builds send — that is the legacy handler,
+      shoofi-server `services/payments/partner-summary-legacy.js`, unchanged; with
+      `figures: "report"` it is the store report engine's orders query,
+      `services/payments/store-sales.js` `settlementOrdersQuery`, over
+      `storeReportBounds(date, date)` — the same snapped bounds except in the store's
+      `openHoursEnabledMonth`, where the report starts at 00:00). So
       the window is the SNAPPED one (closed gaps split at their midpoint), and a twin leg's
       `+00:00` `created` compares as a string exactly as it does there. Not fixed here on
       purpose: the two screens must agree. **Never** `routes/order.js`
@@ -642,8 +652,16 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `partner/summary`'s `totalRevenue` / `totalRevenueCount` for `startDate = endDate = date`.
       It holds because both read the same window, the same completed statuses and the same
       amount; the superseded exclusion cannot break it (a superseded row is always status `4`).
-      `test/integration/order-history.js` runs both real routers on one fixture day and fails
-      if they drift. **Change the window, the completed set or the amount in either route, and
+      `partner/summary` answers two ways (shoofi-server `fix/partner-summary-figures`, accountant
+      invariant 17). Without `figures` (installed builds) it is the legacy answer, unchanged:
+      `totalRevenue` = Σ(`orderPrice` + drive-in), the same sum as here by construction. With
+      `figures: "report"` it IS the store report: `totalRevenue` = the report's `totalIncomes`
+      (סך הכל הכנסות ממכירות), which equals Σ(`orderPrice` + drive-in) whenever every completed
+      order is CARD or CASH (prod 10/2026: 13,535 completed, 0 with another method). An order with
+      no or another payment method counts in the report only through its coins + Shoofi coupon
+      credit, so on such a day the two would differ — the report wins.
+      `test/integration/order-history.js` runs both real routers on one fixture day, against BOTH
+      answers, and fails if either drifts. **Change the window, the completed set or the amount in either route, and
       change the other.**
     - Response `{ date, window: { start, end }, orders, truncated, totals }`, top level (no
       `{message, data}` envelope; the partner reads `res?.data || res`).
@@ -709,19 +727,115 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **One row per order is still assumed.** A re-booked order can hold two rows with the same
       `originalBookId` (prod: one, vapego, statuses `-3` and `4`). These paths touch the first
       one found, exactly as before; they do not choose between them.
-    - **Still keyed on `bookId` alone — delivery-side, need a client change, not fixed here:**
-      `POST /api/delivery/admin/cancel` (delivery-web sends only `bookId`) and
-      `POST /api/delivery/update` → `updateDelivery` (`services/delivery/book-delivery.js`)
-      are WRITES; `GET /api/delivery/book/:bookId` (customer-scoped for mobile callers, sorted
-      newest), `GET /api/delivery/order/:id`, `POST /api/delivery/orders/batch` (dashboard-only,
-      no client calls it), the impersonation driver lookup in `routes/shoofi-admin-users.js`,
-      and the analytics `bookId: {$in}` joins (live-ops, churn-360, support-analytics,
-      `utils/active-orders.js`) are reads. Delivery CORE invariant 20.
+    - **The delivery-side WRITES no longer key on `bookId` alone (2026-11-08).** These are
+      `POST /api/delivery/admin/cancel` and `POST /api/delivery/update` → `updateDelivery`. They
+      go through `locateDeliveryRow` (`services/delivery/delivery-row-locator.js`), which tries,
+      in order: the row's `deliveryId`, then `originalBookId` + `bookId`, then legacy `bookId`
+      (+ `appName`). A shared legacy number writes its single live row or is refused with a 409.
+      delivery-web's cancel sends `deliveryId`. Delivery CORE invariant 20.
+    - **Still keyed on `bookId` alone, all READS:** `GET /api/delivery/book/:bookId`
+      (customer-scoped for mobile callers, sorted newest), `GET /api/delivery/order/:id`,
+      `POST /api/delivery/orders/batch` (dashboard-only, no client calls it), the impersonation
+      driver lookup in `routes/shoofi-admin-users.js`, and the analytics `bookId: {$in}` joins
+      (live-ops, churn-360, support-analytics, `utils/active-orders.js`).
     - Tests: `test/integration/delivery-row-by-original-order-id.js` (helper; cancel/ready with
       a cross-store and a same-store decoy inserted first; legacy fallback; twin cascade,
       degrade and undo; a source pin that the order-side files never regrow a
       `bookDelivery.x({ bookId … })` key) and the amend case in `test/integration/order-amend.js`.
-24. **THE CUSTOMER APP NEVER SAYS "NO ORDERS" WHILE IT HOLDS ONE, OR WHEN THE LOAD FAILED.**
+24. **`order.isFirstOrderAtStore` IS DECIDED ONCE, AT INSERT, AND ABSENT MEANS "UNKNOWN", NEVER
+    "FIRST"** (`services/orders/first-order-at-store.js`, shoofi-server#508, the partner tablet's "new customer"
+    badge, partner redesign item 15, approved by Sari 2026-11-08).
+    - **Meaning:** `true` = no earlier order of this `customerId` in THIS store's db counts;
+      `false` = one does; **absent** = unknown (the lookup threw or hit `maxTimeMS` 2000, no
+      customer id, or the order predates the field: no backfill). A reader shows the badge only
+      on `=== true`.
+    - **What counts:** every status except cancelled/rejected (`4 5 7 8 9`) and the uncharged
+      `"0"` attempt, plus the charged-never-finalised orphan (`"0"` with
+      `ccPaymentRefData.status === "success"`, the create route's idempotency `chargeLanded` rule).
+      A superseded Apple Pay placeholder (`supersededBySessionId`) never counts. So pending,
+      fraud review (`13`), future/ramadan (`14`/`15`) and school orders all count.
+    - **Identity = `customerId`, not the phone.** Customers are found by phone at login, deleting
+      an account is a soft `isDeleted` that the next login reverses on the SAME document, and
+      there is no phone-change or merge flow, so one phone keeps one `_id`. `orders.customerId`
+      is a string in prod (checked 2026-11-08), and the ObjectId form is matched as well.
+      `customerDetails.phone` is an unindexed snapshot.
+    - **Every inserter sets it, right before its `insertOne`:** `/api/order/create` (decided
+      before the `orderDoc` build, `applyFirstOrderFlag` after it, because the build spreads
+      `...parsedBodey` and a client-sent value must be overwritten or removed), and twin `/place`
+      + `/digital-place-pending` (both legs decided before either insert, each **in its own
+      store's db**, so the legs never count each other). Card, cash, Apple Pay, HYP, school,
+      the For-you chat (which goes through the normal create) and idempotent retries all use those
+      three routes. Nothing writes the field later: amend, accept, `update-delay`, the Apple Pay
+      finalize and session repoint all `$set` named fields, and `/api/order/update` is
+      whitelisted. So a reprint or a history view shows what was decided at insert, even after a
+      later cancel. `test/integration/first-order-at-store.js` fails when a new
+      `orders.insertOne` in production code has no `applyFirstOrderFlag` before it.
+    - **Cost:** one `findOne`, `_id` projection, stopping at the first match, on
+      `{ customerId: 1 }` (`customerId_idx`). `DatabaseInitializationService` creates it on every
+      store db at boot, fire-and-forget and never awaited before an insert. Before this change
+      only the one-off `utils/create-orders-indexes.js` made it, and prod had it on 1 of 262 store
+      dbs (2026-11-08). The largest `orders` collection is ~9.6k docs, so the index build is small
+      (Mongo 8.0, non-blocking builds).
+    - **Who reads it:** the partner's `admin/orders`, `admin/not-viewd` and `admin/all/not-viewd`
+      return whole documents, so the field is there with no projection change. The websocket
+      frames (`unviewed_orders_updated`, `order_status_updated`, `new_order_alert`) carry no
+      order body: they only trigger a refetch. `POST /api/order/admin/history` (invariant 21,
+      shoofi-server#497) projects its rows and does NOT carry it. Add it to `HISTORY_PROJECTION`
+      and `toHistoryRow` if the history tab wants the badge. It is not in `customers.orders[]`.
+    - **Secondary feature (invariant 6):** the lookup never throws into the create path. A
+      failure is a `logger.warn` (`[first-order-at-store] lookup failed`) and the order is
+      inserted without the field.
+
+25. **`order.commentToStore` IS THE CUSTOMER'S NOTE TO THE STORE: CLEANED AT THE DOOR, ANY
+    RECEIPT METHOD, ABSENT WHEN EMPTY, AND ONE PER STORE ON A TWIN** (`utils/comment-to-store.js`,
+    shoofi-server branch `fix/HIGH-RISK-comment-to-store`, 2026-11-10). shoofi-app sends it from the
+    cart page's note box. On app `main` that is ONE string (`cartStore.storeNote` → `getCartData`)
+    and twin checkout sends none. App branch `feat/store-note-per-twin-store` (built, not merged
+    as of 2026-11-10) keeps one note per store, details in reference C1.
+    - **Three different notes, never mixed up:**
+      `orders.order.commentToStore` = the CUSTOMER → the store (this invariant, any receipt method,
+      not editable after insert); `orders.order.commentToCourier` = the CUSTOMER → the courier
+      (`utils/comment-to-courier.js`, DELIVERY only, editable by support through
+      `POST /api/order/comment-to-courier`, mirrored onto `bookDelivery`); top-level `orders.note` =
+      the STORE STAFF's own note, written through `/api/order/update` (`ALLOWED_ORDER_UPDATE_FIELDS`),
+      never by the customer.
+    - **The cleaner, `sanitizeCommentToStore`:** plain strings only (an object, array, number or
+      null is dropped, never stringified); `\r\n`/`\r` → `\n`; a run of spaces/tabs → one
+      space; a run of line breaks (blank lines included) → ONE `\n`, so a single line break is
+      kept; trimmed, clamped to `COMMENT_TO_STORE_MAX_LENGTH` = 200 (the app's
+      `COMMENT_TO_STORE_MAX_LENGTH`), trimmed again. Empty → **no key at all**, never `""`, so
+      `$exists` means the customer wrote something. Unlike the courier cleaner (clamp + trim only,
+      nothing collapsed) it collapses whitespace, because the note prints on a kitchen ticket.
+    - **Single store:** `/api/order/create` cleans it, **`delete`s the raw
+      `parsedBodey.order.commentToStore`** before `const orderDoc = {`, and re-adds only the
+      cleaned value (`...(commentToStore ? { commentToStore } : {})`) inside `order`. This is the
+      `commentToCourier` pattern. Drop that delete and the `...parsedBodey.order` spread puts any
+      client JSON on the order verbatim. No receipt-method gate: pickup, drive-in and table keep it.
+    - **Twin, one note PER STORE:** the request carries `primary.commentToStore` and
+      `secondary.commentToStore`, each the note for THAT store. `buildSkeletonOrder` takes
+      `commentToStore`, cleans it itself and writes it on that leg's `order`. All four call sites
+      (primary + secondary × `/place` + `/digital-place-pending`) pass their OWN side's value. A
+      leg never carries the peer's note, and a side with no note has no key.
+    - **Written only at insert; nothing rewrites it.** Amend, accept, `update-delay`, the Apple
+      Pay finalize/repoint and twin `/pay` all `$set` named fields, and `/api/order/update` is
+      whitelisted. The one whole-`order` writer, the legacy `POST /api/order/update/all`, still
+      throws `ReferenceError: offsetHours is not defined` before it writes (re-verified
+      2026-11-10 against the real router). Whoever revives it must keep the stored note (it would
+      also lose `commentToCourier`). It is not in the `customers.orders[]` snapshot (recipe step 2).
+      The `bookDelivery.order` snapshot taken at store accept copies the whole order, so the note
+      is there too, but the driver's `POST /api/delivery/list` projection is a whitelist without
+      it: drivers never receive it, and nothing mirrors it there.
+    - **Readers (being built in parallel, not on `main` as of 2026-11-10):** shoofi-partner branch
+      `feat/customer-note-to-store` shows it as «ملاحظة الزبون» on the order screens and on both
+      printed tickets (the regular printer and the Urovo native printer). shoofi-delivery-web
+      branch `feat/admin-customer-note-to-store` shows it read-only in `CardOrder` (reference C4).
+      There is no edit path anywhere.
+    - Server tests: `test/integration/comment-to-store.js` (the cleaner; create on DELIVERY and
+      TAKEAWAY through the real router; junk, empty and over-long input; twin `/place` and
+      `/digital-place-pending` each leg with its own note; a pin that every `buildSkeletonOrder`
+      call site passes its own side's value).
+
+26. **THE CUSTOMER APP NEVER SAYS "NO ORDERS" WHILE IT HOLDS ONE, OR WHEN THE LOAD FAILED.**
     (shoofi-app, after GCP 1096-8335 on 2026-11-08, when "no orders" right after checkout cost a
     duplicate order. The details are in reference C1 "Tracking".)
     - **One list.** `ordersStore.activeOrders` (`stores/orders/index.tsx`) feeds the ActiveOrders
