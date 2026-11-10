@@ -269,8 +269,12 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
 Profile: `GET /api/customer/details` (joins store orders for a valid-order count),
 `update`, `update-name`, `update-language`, `update-city-area` (resolves city from lat/lng
 via `delivery-company.cities`). Addresses: `controllers/customerAddressController.js` —
-add/get/update/delete/setDefault on the `addresses[]` subdoc (default toggling clears all
-then sets one). Add and update both pass the body through `cleanAddressFields`
+add/get/update/delete/setDefault on the `addresses[]` subdoc. setDefault validates first — a
+malformed id (`"current-location"`, junk) is 400, an unknown customer or address 404, a
+current-location row 400 — and only then clears every default and sets the one (by the row's
+stored `_id`, ObjectId or string). `PUT` also answers 400 to a malformed id before it clears
+any default, and add / update answer 400 to `isCurrentLocation: true`: a current-location pin
+is never a saved address (CORE invariant 19, 2026-11-10). Add and update both pass the body through `cleanAddressFields`
 (`services/customer/address-fields.js`): `notes` trimmed + whitespace collapsed + ≤ 200;
 `floorNumber` / `apartmentNumber` / `entrance` / `streetNumber` trimmed + ≤ 20; numbers
 stringified; an unsent key stays unsent. Add builds an explicit field list (`buildAddress`) and
@@ -303,7 +307,7 @@ failure there is logged, never fails the registration.
 | `GET /:customerId` | `getCustomerDetailsApi`, `CouponForm` | name, phone, flags, `deletedAt`, addresses |
 | `GET /:customerId/status` | `getCustomerStatusApi` | `badges` |
 | `GET /:customerId/whatsapp-summary` | `getCustomerWhatsappSummaryApi` | the respond.io mirror's summary |
-| `POST /:customerId/update-address-to-current-location` | support's location fix | writes the order, the customer and the booking |
+| `POST /:customerId/update-address-to-current-location` | support's location fix | writes the order and the booking (never `isCurrentLocation`); moves a saved row only when the order went to a real one, never adds one (`customerAddressSkipped`) — CORE invariant 19 |
 
 - `status.authCode` is the customer's pending OTP. Support shows it on purpose ("מנסה להתחבר
   (code)"), so the reply includes it only for a dashboard role (`mayReadPendingCode`). Prod
