@@ -92,6 +92,9 @@ the server's). Anything reading `order.readyMinutes` (e.g. `computeOrderDelays` 
 
 ## 3. Order creation pipeline (understand; do not edit without sign-off)
 `POST /api/order/create` (`order.js`) — ordered side effects:
+**saved-address guard** (only when `shoofi.store{id:1}.requireSavedDeliveryAddress === true`,
+default off: a DELIVERY order to an address that is not one of the customer's saved ones →
+400 `DELIVERY_ADDRESS_REQUIRED`; APPLEPAY / HYP exempt — customers CORE invariant 19) →
 lock (Redis `SET NX` + in-mem fallback + 30s dup check) → fraud checks → generate
 `originalOrderId`/`orderId` → image upload → decide initial status → validate coins
 (no debit) → price corrections, in this order: coupon entitlement (`enforceCouponEntitlement`:
@@ -102,7 +105,11 @@ and never rejects → build `orderDoc` → **insert into store `orders`** (autho
 `[shippingPriceCheck]` fired and **never awaited** (log-only; a DELIVERY fee below the area
 tariff → one warn line + `order.shippingPriceCheck`, CORE invariant 20) →
 **stock decrement if status≠"0"** → first-order attribution → Apple Pay session
-self-heal → fraud persistence → **push `customers.orders[]` snapshot (central)** →
+self-heal → fraud persistence → **push `customers.orders[]` snapshot (central)** (+ seed
+`addresses[]` for a customer with none — a real address only, with an `_id`:
+`addressToSaveFromOrder`, customers CORE invariant 19) →
+remember the confirmed delivery address (`rememberConfirmedAddress`, **fire-and-forget**,
+after the snapshot write that would clobber it — customers CORE invariant 19) →
 notify store owner (**a repeating alert, not one push**, **fired in the background and
 never awaited** — `fireStoreOwnerNotifications`, see §7) → flow event →
 (CC/HYP branch: charge → set `6`/`1`/`13`, stock,
@@ -138,6 +145,10 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   Not handled: `degradeToSingle` with `keepSide:'secondary'` moves the FULL primary fee onto the
   kept order (`$inc total`) while the primary's coupon usage stays. This was already true for
   every delivery coupon before this change.
+- **Customer notes**: `commentToCourier` is ONE note for the shared courier and is written on
+  both legs. `commentToStore` is ONE NOTE PER STORE: `primary.commentToStore` goes on the primary
+  leg and `secondary.commentToStore` on the secondary. `buildSkeletonOrder` cleans each value,
+  and a leg never carries the peer's note (CORE invariant 25).
 - **Dispatch**: longer-prep side dispatched first; second side revealed on first accept.
 - **Cancel/degrade**: `cascadeCancel` (both), `degradeToSingle` (keep one, record
   `degrade.refundOwed`), `undoDegrade` (bails if refund cleared).
@@ -161,6 +172,40 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   `find({ shippingPriceCheck: { $exists: true } })` lists the flagged ones. Diagnostic only:
   no reader, no index, money unchanged. A `book-delivery.order` snapshot taken before the `$set`
   lands does not carry it. CORE invariant 20.
+- **`orders.isFirstOrderAtStore`** (top level, boolean or ABSENT) = "the customer's first
+  order at this store", written once at insert by `/api/order/create` and both twin place
+  routes (`applyFirstOrderFlag`, `services/orders/first-order-at-store.js`), never rewritten.
+  Absent = unknown (failed lookup, or an order from before 2026-11-08), so a reader badges only
+  `=== true`. Index `customerId_idx` `{ customerId: 1 }`. Rules: CORE invariant 24.
+- **`orders.order.address`** (the INNER `order`, beside `items` / `commentToCourier`; there is no
+  top-level `orders.address`) = a snapshot of the **saved address** the customer delivered to. The
+  customer app sends the address object whole (`screens/checkout/index.tsx` `addressLocationRef` →
+  `getCartData` `address: order.address`, `stores/cart/index.ts`) and `/api/order/create` keeps it
+  through `order: { ...parsedBodey.order, … }`. Beside `street` / `streetNumber` / `city` /
+  `location` it carries the customer's own label `name` ("בית", "عمل"), the building details
+  `floorNumber` / `apartmentNumber` / `entrance`, and **`notes` = the courier landmark** (the
+  app's «סימן דרך לשליח», "white house next to the mosque"). All optional free text, often `""`.
+  - **`notes` is not `commentToCourier`.** `notes` is saved WITH the address and repeats on every
+    order sent there; `commentToCourier` is typed per order at checkout (support can edit it,
+    `routes/order-comment-to-courier.js`). Show them as two labelled things.
+  - **Only as complete as the saved address.** Before shoofi-server #534 (merged 2026-11-10)
+    adding an address (`controllers/customerAddressController.js` `buildAddress`) stored
+    `floorNumber` and `notes` but dropped `apartmentNumber` / `entrance`; editing it
+    (`updateAddress`) kept them. Since #534 add keeps both when sent, so only addresses added
+    earlier and never edited lack them. Customers domain (customers CORE).
+  - **Never rewritten for content.** Support's `update-address-to-current-location`
+    (`routes/customer.js`) moves `order.address.location` (+ `isCurrentLocation`, `updatedAt`,
+    `updatedBySupport`) and `order.geo_positioning`; `notes` and the building details stay.
+  - Copied whole into the `bookDelivery.order` snapshot at store accept (the booking's `order` is the
+    order document), and into `customers.orders[].address` at create.
+- **`orders.order.commentToStore`** (string or ABSENT) = the customer's note to the store, from
+  the cart page. Cleaned by `sanitizeCommentToStore` (`utils/comment-to-store.js`): strings only,
+  whitespace runs collapsed but a single line break kept, ≤ 200 chars, absent when empty. Kept on
+  every receipt method. On a twin, each leg has its own store's note. Written only at insert,
+  with no edit path, and not in `customers.orders[]`. Do not confuse it with
+  `orders.order.commentToCourier` (customer → courier, DELIVERY only, support-editable) or with
+  top-level `orders.note` (the store staff's own note, `/api/order/update` whitelist).
+  CORE invariant 25.
 - **`shoofi.customers.orders[]`** = a **write-once snapshot with NO status field.**
   `{ orderId(ObjectId→orders._id), appName, created, total, orderIdNumber(=orders.orderId),
   originalOrderId, ... }`. **NEVER infer status/completion/revenue from it** — join
@@ -511,6 +556,25 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
     check (the order landed in the dish's store with the chosen extras, shadow-pricing drift 0).
     The in-chat checkout card stays DEFERRED (CORE Known status, §10).
 
+- **Note to the store** (CORE invariant 25): the cart page's note box →
+  `order.commentToStore`, sent on every receipt method, trimmed, ≤ `COMMENT_TO_STORE_MAX_LENGTH`
+  (200), left out when blank. On `main` (2026-11-10) it is one string, `cartStore.storeNote`, and
+  `getCartData` sends it; twin checkout sends no store note. Branch
+  `feat/store-note-per-twin-store` (built, not merged) changes this:
+  - **Per store:** the note is kept in `cartStore.storeNotes: Record<appName, string>`. It lives
+    in memory only and is cleared by `resetCart` and `resetCartForNewStore`.
+  - **Single store:** `getCartData` sends the note for `order.storeData.appName`.
+  - **Twin:** both twin builders, `/twin-order/place` (`handleTwinCheckout`) and
+    `/twin-order/digital-place-pending`, take `primary.commentToStore` /
+    `secondary.commentToStore` from `cartStore.twinCommentToStoreFields(primaryAppName,
+    secondaryAppName)`. The notes are never put in `sidePayloadShared`; `commentToCourier`
+    stays shared.
+  - **Cart UI:** one box on a single-store cart (testID `cart-store-note-input`). A twin cart has
+    one box inside each store's section (`twin-cart-store-note-input-primary` / `-secondary`),
+    with a placeholder naming the store.
+  - **Tests:** `__tests__/stores/cart-store-notes.test.ts`,
+    `__tests__/screens/twin-checkout-store-notes.test.ts`, `__tests__/helpers/store-note.test.ts`.
+
 ## C2. shoofi-shoofir — the DRIVER app (React Native, MobX)
 Role: executes the **delivery leg**; drives `bookDelivery` status only — never the order's.
 - **API client**: axios in `utils/http-interceptor/index.ts` — token `@storage_userToken`
@@ -578,6 +642,10 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   **Any 401 signs the store out** (`utils/http-interceptor` → `OPEN_GENERAL_SERVER_ERROR_DIALOG`
   `isSignOut: true` → `resetAppState` + restart), so a partner-polled route must never 401 a
   logged-in terminal.
+- **"New customer" badge source** (CORE invariant 24): `order.isFirstOrderAtStore` arrives
+  on the whole documents of `admin/orders`, `admin/all/not-viewd` and `admin/not-viewd`. Badge
+  only on `=== true`; absent (old orders, a failed lookup) = no badge. The v3 history endpoint
+  (`admin/history`, shoofi-server#497, CORE invariant 21) projects its rows without it.
 - **Realtime**: WS `?appType=shoofi-partner`; handles `order_status_updated`,
   `unviewed_orders_updated`, `future_order_*` (NOT `menu_refresh`). The `print_order` /
   `print_not_printed` frames still arrive (the server sends `print_not_printed` when
@@ -683,6 +751,22 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
 - **Gotcha**: no explicit REJECT endpoint — the accept screen is accept-only; rejection/cancel
   is a generic `order/update` to status `4`/`5` from the main list.
 
+- **Customer note to the store** (CORE invariant 25): `order.order.commentToStore` arrives on
+  the whole order documents the partner already reads (`admin/orders`, `admin/not-viewd`,
+  `admin/all/not-viewd`), with no server projection change. Branch `feat/customer-note-to-store`
+  (built in parallel, not on `main` as of 2026-11-10) shows it as «ملاحظة الزبون» on the order
+  screens and on both printed tickets: the regular printer and the Urovo native printer. It is
+  read-only. The partner's own `orders.note` (sent with `order/update`) is a different field.
+  One reader: `helpers/order-customer-note.ts` `getCustomerNote` (strings only — a non-string
+  must never reach a `<Text>`; it re-applies the server's `sanitizeCommentToStore` rules so old raw
+  values look the same; a THIRD copy of the 200 cap next to server + app — keep them in step),
+  rendered by `components/order-customer-note`: list v1/v2 (outside the collapsible part),
+  new-orders v1/v2 (above the items), item details and the school list. Tickets print a stacked
+  label + text box after the items, directly above the staff «ملاحظة:» line, `textAlign: "left"`
+  (the printed RIGHT edge under forced RTL; never a label/value row — the partner#41 clipping).
+  **Not yet on the v3 redesign** (`components/orders-v3/*`, only on the unmerged stack #47–#58):
+  hook `OrderCardV3` / `NewOrderViewV3` to the same helper once that stack rebases.
+
 ## C4. shoofi-delivery-web — the ADMIN dashboard (React web)
 Role: oversight — list/monitor, manual intervention, fraud queue, **twin group admin**, config.
 - **API client**: axios (`src/utils/http-interceptor/index.ts`), **Bearer** token
@@ -749,6 +833,22 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   `db.orders.find({isSchoolProject:true}).sort({created:-1}).limit(20)`.
   `src/components/OrderMonitoring/OrderFlowDashboard.tsx`,
   `src/views/admin/settings/DeliverySettings.tsx`, `src/views/admin/fraud/FraudReview.tsx`.
+- **The delivery address on admin surfaces** (§5 `orders.order.address`): `CardOrder`'s location
+  modal ("⋯" → "הצג מיקום על המפה") renders `src/components/Cards/OrderAddressLines.tsx` — «שם
+  הכתובת» (`order.order.address.name`; until 2026-11-10 it read a top-level `order.address.name`
+  that never exists, so it never showed), «כתובת מלאה», then קומה / דירה / כניסה and «סימן דרך
+  לשליח» (`notes`). The card's "פרטי משלוח" block shows «סימן דרך לשליח» beside the editable
+  «הערות לשליח». The delivery board (`src/views/admin/analytics/DeliveryListAnalytics.tsx`) puts
+  it on its own labelled line («סימן דרך:») in the «הערות לשליח» cell. One reader for all of them:
+  `src/utils/order-address-details.ts` (trims, drops empty values, prefers the live order and
+  falls back to the `bookDelivery.order` snapshot). Nothing renders for an empty value.
+  ⚠️ The board reads it off `POST /api/analytics/deliveries`, whose `bookDelivery` projection
+  (`routes/analytics.js`) is a whitelist: the line stays empty unless it lists
+  `'order.order.address.notes'` — listed field by field with `floorNumber` / `apartmentNumber` /
+  `entrance` since shoofi-server `feat/address-note-apartment-entrance` (2026-11-10), pinned by
+  `test/integration/delivery-comment-to-courier-projection.js`; never the whole address. `CardOrder`
+  is unaffected: `order/admin/all-orders` and `analytics/order/:id` return the whole order, and
+  `delivery/order/:id` the whole booking (credentials redacted).
 - **⚠️ Cross-repo consistency flags (candidate bugs — human verdict):**
   1. **Status-enum divergence** — admin-web `src/consts/shared.ts` uses
      `FUTURE_ORDER_PENDING:"16"` and `PENDING_START_PREPARING:"14"`, but the server &
@@ -756,6 +856,19 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
      or mis-transitions future orders. **Verify before trusting admin-side future-order logic.**
   2. **`admin/order/delete/{id}`** is called with **plain axios (no auth interceptor)** —
      confirm this is intended.
+
+- **Customer note to the store** (CORE invariant 25), branch `feat/admin-customer-note-to-store`
+  (built, not on `main` as of 2026-11-10):
+  - **Reader:** `src/components/Cards/OrderStoreNote.tsx` reads `order.order.commentToStore`.
+    `getCommentToStore` shows it only when it is a non-blank string, trimmed.
+  - **Where it shows:** `CardOrder` renders it read-only right under the items, above
+    «פרטי בית העסק», labelled «הערת הלקוח למסעדה», for any receipt method. Through that card it
+    also reaches `/admin/orders`, `OrderDetailModal` (so the analytics screens), the live-ops
+    order-details overlay and the twin card's per-side items.
+  - **Where it does not show, on purpose:** the live-ops board rows/cards and
+    `DeliveryListAnalytics`. Those are courier-dispatch views.
+  - **No edit path and no `bookDelivery` mirror.** It is not «הערות לשליח» (`commentToCourier`),
+    which is delivery-only and editable through `POST /api/order/comment-to-courier`.
 
 ## Cross-repo invariants (the whole-domain view)
 - **Status source of truth = server** (store `orders.status`). Clients each keep their

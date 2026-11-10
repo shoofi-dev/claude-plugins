@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20 order side); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -120,6 +120,14 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
   `exec-dashboard/delivery-metrics.js`) and add the two fees as their own settlement lines.
 - The store's list is filtered **server-side**: default = active work queue (`1,2,3,5`),
   عرض الكل = no status filter at all (not a date toggle), newest 200, `appName`-scoped.
+
+## The dropoff note is TWO fields — the driver card shows both
+`order.order.address.notes` = the **landmark** the customer saved ON THE ADDRESS («علامة مميزة
+للسائق»); `order.order.commentToCourier` = free text typed **at checkout**. The shoofir cards show the
+first in a blue «علامة مميزة:» banner (plus a floor / apartment / entrance line) under the address, and
+the second in the amber «ملاحظات للمندوب» banner — never merge them. Both are **snapshots from
+booking time**: editing the saved address later changes nothing on a placed order. Detail:
+reference C1; the saved-address side is `customers` CORE invariant 20.
 
 ## Invariants — never weaken
 1. **`DELIVERY_STATUS` is authoritative in `consts/consts.js`**: `1` waiting-approve → `2`
