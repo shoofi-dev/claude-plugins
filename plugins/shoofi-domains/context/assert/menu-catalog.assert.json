@@ -479,6 +479,36 @@
           "desc": "doc CORE invariant 4 / reference §5: GET /api/menu projects outOfStoreUntil for partner/admin only, never the customer menu or its cache"
         },
         {
+          "file": "utils/menu-refresh.js",
+          "regex": "await menuCache\\.clearStore\\(appName\\);\\n\\s*await menuCache\\.clearStore\\(`\\$\\{appName\\}_schoolProject`\\);",
+          "desc": "doc CORE invariant 2 / reference §6: clearMenuCaches clears BOTH keys"
+        },
+        {
+          "file": "utils/menu-refresh.js",
+          "regex": "websocketService\\.sendToAppCustomers\\(\\\"shoofi-shopping\\\", \\{\\n\\s*type: \\\"menu_refresh\\\",\\n\\s*data: \\{ \\.\\.\\.data, appName \\},",
+          "desc": "doc CORE invariant 2 / reference §6: refreshCustomerMenus pushes menu_refresh to customers with data.appName (debounced per store)"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "await refreshCustomerMenus\\(appName, \\{ action: 'product_updated', productId: req\\.body\\.productId \\}\\);",
+          "desc": "doc CORE invariant 2 / reference §6: product update (rename/price/image) pushes menu_refresh, not only clears the cache"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "await refreshCustomerMenus\\(appName, \\{ action: 'product_deleted' \\}\\);",
+          "desc": "doc CORE invariant 2 / reference §6: product delete pushes menu_refresh"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "await refreshMenusAfterCategoryWrite\\(appName, 'store_category_update'\\);",
+          "desc": "doc CORE invariant 2 / reference §6: store-category update clears both keys + pushes (it cleared nothing before 2026-11-10)"
+        },
+        {
+          "file": "routes/category.js",
+          "regex": "await refreshMenusAfterGeneralCategoryWrite\\(appName, 'general_category_update'\\);",
+          "desc": "doc CORE invariant 2 / reference §6: general-category update clears both keys + pushes"
+        },
+        {
           "file": "utils/crons/products-in-store-update.js",
           "regex": "cron\\.schedule\\('0 7 \\* \\* \\*'",
           "desc": "doc CORE invariant 4 / reference §5: outOfStoreUntil is cleared only by the daily 07:00 restore"
@@ -2614,6 +2644,26 @@
           "file": "helpers/chat-cart-line.ts",
           "regex": "if \\(!extrasStore\\.validateWith\\(prepared\\?\\.extras, selections\\)\\) return false;",
           "desc": "doc reference §4 / §7f: the chat's add gate is the menu's validateWith (every non-header single answered)"
+        },
+        {
+          "file": "stores/menu/index.ts",
+          "regex": "export const MENU_MAX_AGE_MS = 2 \\* 60 \\* 1000;",
+          "desc": "doc reference §6: the in-memory menu is reloaded once older than 2 min (refreshIfStale)"
+        },
+        {
+          "file": "stores/menu/index.ts",
+          "regex": "AppState\\.addEventListener\\?\\.\\(\\\"change\\\", \\(state\\) => \\{\\n\\s*if \\(state === \\\"active\\\"\\) this\\.refreshIfStale\\(\\);",
+          "desc": "doc reference §6: app foreground reloads a stale menu"
+        },
+        {
+          "file": "screens/menu/components/BestSellers.tsx",
+          "regex": "const menuIsThisStore = !!appName && menuStore\\.loadedAppName === appName;",
+          "desc": "doc reference §6: best-sellers strips build cards only from THIS store's menu"
+        },
+        {
+          "file": "screens/menu/components/BestSellers.tsx",
+          "regex": "if \\(!isReachable\\(reachable, res\\.product\\._id\\)\\) continue;",
+          "desc": "doc reference §6: best-sellers drop products reachable only under a hidden general category"
         },
         {
           "file": "helpers/chat-cart-line.ts",

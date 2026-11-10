@@ -636,9 +636,40 @@ caching to admin paths).
 menuCache.clearStore(appName);
 menuCache.clearStore(`${appName}_schoolProject`);   // school-project menus are a separate filtered view
 ```
-Missing this serves a stale menu for up to 5 minutes. Most product write
-endpoints also emit a websocket `menu_refresh` (`shoofi-shopping`) /
-`product_updated` (`shoofi-partner`) and re-run indexing.
+Missing this serves a stale menu for up to 5 minutes. Helper: `clearMenuCaches(appName)` in
+`utils/menu-refresh.js`.
+
+**The customer app's menu is in memory, so the server cache is only half of it.** The app
+(`shoofi-app/stores/menu`) loads a store's menu on a store tap, on the menu screen mounting, on a
+`menu_refresh` push while the menu screen is mounted, and — since 2026-11-10 — whenever a screen
+that shows it finds it older than `MENU_MAX_AGE_MS` (2 min): the app returning to the foreground,
+the menu screen regaining focus, a best-sellers strip mounting (`refreshIfStale`, silent — no
+loading state). Before that, a product renamed/repriced/hidden while the customer sat in the store
+stayed as it was on screen until they left. Server side, `refreshCustomerMenus(appName, data)`
+clears both keys AND sends `menu_refresh` (`data.appName` set; the app ignores another store's),
+trailing-debounced 3 s per store so a burst of edits is one reload. Writes that use it: product
+insert / create-from-mock / update / delete, `update/activeTastes`, `store-category`
+add/update/delete (`routes/store.js`, previously no cache clear at all), `category/general`
+add/update/delete (`routes/category.js`, same). The availability routes (`isInStore`,
+`isInStore/byCategory`, `quantity`, `isHidden`), bulk price, out-of-stock extras, `order-stock`
+and both restore crons push directly. Product/category ORDER writes only clear the cache. Partner
+apps get `product_updated` separately. Pinned by `test/integration/menu-refresh.js`.
+
+**Best sellers / "most ordered" (`GET /api/menu/best-sellers`).** Returns product **ids only**,
+ranked from completed orders (`services/menu/best-sellers.js computeBestSellers`, drops deleted
+and `isHidden` products, deliberately keeps `isInStore:false` for the app to drop), cached by id
+list under its own `bestsellers:` key (ids cannot go stale in name/price). Every card's name,
+price, image and discount comes from the in-memory menu (`resolveReorderItem`). Surfaces: the menu
+strip (obeys the platform switch `shoofi.store.isBestSellersEnabled`), the order summary's and
+the choice-free product sheet's «قد يعجبك أيضاً» (`ignoreAdminSwitch` — live even with the switch
+off), and the tile order in `GeneralCategoriesList`. The strip (`BestSellers.tsx`) builds cards
+only when `menuStore.loadedAppName === storeData.appName` (the order summary shows the CART's
+store while the loaded menu may be another — it used to top up with that other store's
+products), asks for the school ranking when the loaded menu is a school menu, and drops
+`isInStore:false`, `isHidden` and products reachable only under a hidden general category
+(`helpers/menu-reachable.ts`; the server omits a hidden tile from `generalCategories` but still
+sends its store categories in `menu`). "Order again" (`LastOrderQuickAdd`) applies the same
+hidden-tile filter.
 
 **Combo snapshots and the capability header sit on opposite sides of the cache.**
 `resolveComboSnapshots` (`services/menu/combo-snapshots.js`) runs BEFORE `menuCache.set` in
@@ -1253,9 +1284,8 @@ Full detail: shoofi-server `docs/extras-icons.md`.
 ## 9. Known status (human-confirmed) — what's a bug vs. by-design
 Each item below was reviewed with the product owner. Respect these verdicts.
 
-- **CONFIRMED BUG — `update/isInStore/byCategory` cache-clear is commented out**
-  (`product.js`) → stale menus after a bulk category toggle. Fix: restore
-  both `clearStore(appName)` and `clearStore(\`${appName}_schoolProject\`)`. (Backlog #1.)
+- **FIXED — `update/isInStore/byCategory` cache-clear was commented out** (`product.js`).
+  It now clears both keys and pushes `menu_refresh` (re-verified 2026-11-10). (Backlog #1 done.)
 - **CONFIRMED BUG — `GET /api/menu` vs `POST /api/menu/refresh` diverge.**
   `refresh` is a *real, admin-triggered* action ("Refresh Menu Cache", audited)
   that re-caches under the same key `GET /api/menu` reads — but builds a
@@ -1284,7 +1314,7 @@ Each item below was reviewed with the product owner. Respect these verdicts.
 In priority order. #1–#2 are pure menu-domain. #3 touches product-write paths, so
 run `npm run lint` + relevant tests after. Confirm the cross-repo/order-flow
 risk item stays untouched.
-1. Restore the commented-out cache-clear in `update/isInStore/byCategory`.
+1. ~~Restore the commented-out cache-clear in `update/isInStore/byCategory`.~~ Done (verified 2026-11-10).
 2. Extract a single shared menu-builder used by both `GET /api/menu` and
    `POST /api/menu/refresh`; delete the divergent `refresh` logic.
 3. Remove the dead `lib/indexing.js` and its call sites.
