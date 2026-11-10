@@ -407,6 +407,24 @@ it silently does not exist for twins.
 own row and **replaces the order table with a two-line money block** (تدفع للمتجر / تحصّل من الزبون,
 both `order.price`) — the order panel would otherwise render an all-zero table, since there is
 no order.
+**Dropoff details under the address (2026-11-10, shoofir `feat/driver-sees-address-note`):** both
+`OrderCard` and `TwinOrderCard` render, under the street line, (a) a building line from
+`floorNumber` / `apartmentNumber` / `entrance` («طابق 2 · شقة 4 · مدخل ب», only the parts that are
+non-blank) and (b) the customer's **landmark note** `order.order.address.notes` («علامة مميزة للسائق»
+in the customer app) in a **blue** banner, labelled «علامة مميزة:». It is deliberately a sibling of,
+and NOT the same as, the amber «ملاحظات للمندوب» banner, which is `order.order.commentToCourier`
+(typed at checkout). Landmark sits with the address, the checkout comment stays where it was below
+it; either renders only when non-blank. The share-to-WhatsApp text in `OrderCard` adds the same two
+lines under the address line. Logic is the pure `utils/address-details.ts` (Arabic/Hebrew labels
+inline, because translations are DB-served), pinned by `utils/__tests__/address-details.test.ts`.
+All four fields ride the existing `'order.order.address': 1` whitelist in `POST /api/delivery/list`
+(`routes/delivery/orders.js`) — no server change. **They are a snapshot from booking time:** the
+address object is copied onto the order at checkout and onto `bookDelivery` at booking, so a
+customer who edits the saved address afterwards does NOT change what the courier sees. Writing and
+cleaning those fields on the saved address (≤ 200 note / ≤ 20 others, add keeping
+apartment + entrance) is `customers` CORE invariant 20. For a twin pair the values come from
+whichever leg carries them (one customer, one dropoff), rendered once in the shared header.
+A delivery-only booking has no `order`, so neither line ever renders there.
 **Dead/inherited (leave alone):** `services/deliveryDriverService.ts` (legacy fetch dup,
 `app-name: shoofi-app`), `getNearbyOrders`/`getSchedule` (no UI callers), customer-app city/address remnants.
 
