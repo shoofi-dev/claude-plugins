@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/HIGH-RISK-strip-zcredit-secrets-from-payload / 2026-11-10 (invariant 13 stored ZCredit request is sanitized, HQ #b52f1b); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -155,6 +155,16 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.
+13. **A ZCredit request is stored without its secrets.** `processCreditCardPayment`
+   (`routes/order.js`) and the twin `applyCaptureSuccess`/`applyCaptureFailure`
+   (`services/twin-order/twin-payment-service.js`) keep the request they posted as
+   `ccPaymentRefData.payload` (or `.paymentData.payload` on a failed charge) only through
+   `sanitizePaymentPayload` (`services/payments/sanitize-payment-payload.js`). That helper drops
+   `Password`, `CVV` and `CardNumber` (the saved-card token). ZCredit still receives all three.
+   Orders written before 2026-11-10 were **not** migrated and still carry them, so a read still
+   projects `ccPaymentRefData` leaf by leaf. Never log a provider axios error object: its
+   `config.data` is the posted body. Pinned by `test/integration/zcredit-payload-no-secrets.js`
+   (HQ #b52f1b).
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
