@@ -40,7 +40,11 @@ if it supports **BOTH** `store.supportedCities` (ObjectId[] — permission) **AN
 unique** (first4+last4 of `originalOrderId`; 88 bookIds shared across stores in prod,
 2026-11-08) — an order's row is located by `originalBookId` through
 `deliveryRowFilterForOrder` (`utils/delivery-row.js`), never by `bookId` alone (CORE
-invariant 20; orders CORE invariant 23).
+invariant 20; orders CORE invariant 23). A delivery-side request (`delivery/admin/cancel`,
+`delivery/update`) is located by `locateDeliveryRow` (`services/delivery/delivery-row-locator.js`).
+It takes `deliveryId` (the row `_id`), else `originalBookId` + `bookId`, else legacy `bookId`
+(+ `appName`). Several matches resolve to the single live row (status `1/2/3/5` or pending), or the
+request is refused with a 409 and no write.
 **Status constants are authoritative in `consts/consts.js`** (`DELIVERY_STATUS`):
 `1` WAITING_FOR_APPROVE → `2` APPROVED → `3` COLLECTED_FROM_RESTAURANT (pickup) →
 `4` DELIVERED; `5` WAITING_IN_STORE; cancels `-1` by-driver, `-2` by-store, `-3` by-admin.
@@ -442,7 +446,7 @@ routes in `src/index.tsx`) are the only callers of `delivery/{update, book, crea
 employe-list, employe-payments}`, now dashboard-token only. `views/admin/driver-routes` posts
 `delivery/list` for any driver, and the order card reads `delivery/order/:id`.
 `POST delivery/admin/order/cancel` has **no client at all** on main (only the root script
-`test-delivery-status-notifications.js`); the web cancels through `delivery/admin/cancel`; boards `DeliveryMonitor`, `DeliveryListAnalytics`,
+`test-delivery-status-notifications.js`); the web cancels through `delivery/admin/cancel` (`CancelDeliveryModal` → `buildCancelDeliveryData`: `{deliveryId: deliveryOrder._id, bookId}`, never `bookId` alone); boards `DeliveryMonitor`, `DeliveryListAnalytics`,
 `OpsDashboard`. **Live driver map**: `GET delivery/drivers/locations` + WS
 (`views/admin/driver-locations/DriverLocationsMap.tsx`); its pins and the restaurant↔customer
 colour pairing (`getOrderColor(bookId)`, a hash into a fixed 15-slot palette) live in
@@ -484,7 +488,10 @@ the second most common status in `delivery-company.book-delivery` after `"4"`. E
 delivery-status renderer in the repo falls back to the raw value
 (`shared/opsDashboardUtils.ts`, `live-ops/logic/stepper.ts`), and so must any new one, because
 `"0"` is reachable and is in no enum: `POST /api/delivery/update` → `updateDelivery`
-(`services/delivery/book-delivery.js`) `$set`s the request body unvalidated and branches on it.
+(`services/delivery/book-delivery.js`) `$set`s the request body unvalidated (minus its identifier
+keys) and branches on it. No client has ever done that successfully, though. The legacy
+`/delivery-list` page echoes the whole row including `_id`, which `updateDelivery` refuses, as
+Mongo's immutable-`_id` error did before (CORE invariant 20).
 **Delivery-only:** `DeliveryListAnalytics.tsx` marks these rows with a `ידנית` badge and shows a
 `ביטול משלוח` button — `isDeliveryOnly && !CLOSED_DELIVERY_STATUSES.includes(status)` — which
 POSTs `delivery/order/status/update` with `status: -3`. That route clears `isPendingAssignment`

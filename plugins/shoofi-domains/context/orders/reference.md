@@ -276,9 +276,11 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
     `undoDegrade` (via `legDeliveryFilter`), twin `group/:groupId/full` and `assign-driver`,
     support `update-address-to-current-location`, admin order-monitoring `computeOrderDelays`,
     support-agent `find_order`. `routes/order-comment-to-courier.js` pairs `bookId` + `leg.appName`.
-  - **Still keyed on `bookId` alone:** delivery-side, need a delivery-web change (delivery CORE
-    invariant 20): the writes `POST /api/delivery/admin/cancel` (delivery-web sends only `bookId`)
-    and `POST /api/delivery/update` → `updateDelivery`; the reads `GET /api/delivery/book/:bookId`
+  - **Delivery-side writes, located by `locateDeliveryRow`** (delivery CORE invariant 20,
+    2026-11-08): `POST /api/delivery/admin/cancel` (delivery-web sends `{deliveryId, bookId}`) and
+    `POST /api/delivery/update` → `updateDelivery`. A legacy shared `bookId` writes its single live
+    row or gets a 409.
+  - **Still keyed on `bookId` alone:** the reads `GET /api/delivery/book/:bookId`
     (owner-scoped for a mobile token), `GET /api/delivery/order/:id`, `POST /api/delivery/orders/batch`
     (no caller), the impersonation driver lookup in `routes/shoofi-admin-users.js`, and the
     analytics `bookId: {$in}` joins (live-ops, churn-360, support-analytics). A bare `updateOne`
