@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-strip-zcredit-secrets-from-payload / 2026-11-10 (CORE invariant 13 stored ZCredit request is sanitized, HQ #b52f1b); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -88,6 +88,21 @@
         ]
       },
       "patterns": [
+        {
+          "file": "routes/order.js",
+          "regex": "(?:const storedPayload = sanitizePaymentPayload\\(paymentPayload\\);[\\s\\S]*?payload: storedPayload,[\\s\\S]*?payload: storedPayload,[\\s\\S]*?payload: storedPayload,|payload: paymentPayload,)",
+          "desc": "CORE invariant 13: processCreditCardPayment returns only the sanitized payload on declined, success and error. Once shoofi-server fix/HIGH-RISK-strip-zcredit-secrets-from-payload (HQ #b52f1b) merges, drop the `|payload: paymentPayload,` leg (it only lets the pin pass on main before the fix)"
+        },
+        {
+          "file": "services/twin-order/twin-payment-service.js",
+          "regex": "(?:payload: sanitizePaymentPayload\\(paymentResult\\?\\.payload\\) \\|\\| null,[\\s\\S]*payload: sanitizePaymentPayload\\(paymentResult\\?\\.payload\\) \\|\\| null,|payload: paymentResult\\?\\.payload \\|\\| null,)",
+          "desc": "CORE invariant 13: twin applyCaptureSuccess + applyCaptureFailure sanitize the payload where it is written. Drop the `|payload: paymentResult?.payload || null,` leg once HQ #b52f1b merges"
+        },
+        {
+          "file": ["services/payments/sanitize-payment-payload.js", "routes/order.js"],
+          "regex": "(?:const PAYMENT_PAYLOAD_SECRET_KEYS = Object\\.freeze\\(\\[\"Password\", \"CVV\", \"CardNumber\"\\]\\);|payload: paymentPayload,)",
+          "desc": "CORE invariant 13: the stripped keys are Password, CVV, CardNumber. Once HQ #b52f1b merges, drop routes/order.js from the file list and the `|payload: paymentPayload,` leg"
+        },
         {
           "file": "services/payments/order-invoices.js",
           "regex": "ISSUED: \"issued\",",
