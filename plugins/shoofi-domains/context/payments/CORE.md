@@ -53,7 +53,21 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    grows with the client-posted fee. See "Coupons between quote and charge" below.
 6. **Coins/coupons settle only AFTER payment success**; failures log CRITICAL for manual
    reconciliation — never roll back an irreversible capture.
-7. **Order dedup lock** (Redis `SET NX` + fallback + recent-order window) prevents double charges.
+7. **Order dedup lock** (Redis `SET NX` 10s + in-memory fallback) answers a concurrent second
+   send with 429 `ORDER_IN_PROGRESS`. The 30s "recent order" check after it only LOGS (and
+   releases the lock) — it rejects nothing, so it is not a double-charge guard.
+7a. **Idempotency key = the guard against a resend after a lost reply.** `/api/order/create`
+   takes an optional `idempotencyKey` (one per checkout ATTEMPT, `routes/order.js` IDEMPOTENCY
+   block). An earlier order with that key + `customerId` that took money (status ≠ `"0"`, or
+   `ccPaymentRefData.status === "success"`; cash is status `"6"`, so it counts) is returned as
+   200 `{orderId, idempotentReplay: true}` instead of a new order; an uncharged one (a declined
+   card) lets the retry through. The app sends it from the wallet flows
+   (`walletIdempotencyKeyRef`) and — once HQ #7ef468 merges — card + cash (`handleCheckout`,
+   `helpers/checkout-attempt-key.ts`): kept across any failure, released on success, re-minted
+   when the order itself changes (NOT on a payment-method change). A declined attempt and its
+   charged retry share a key, so the lookup must prefer the CHARGED order
+   (`services/orders/idempotency-replay.js` `findReplayableOrder`, HQ #7ef468); a bare
+   `findOne` on the key returns the declined one and lets a third send charge again.
 8. **There are TWO charge implementations, and a fix to one does not reach the other.**
    `routes/order.js` charges single orders; `services/twin-order/twin-payment-service.js`
    (`captureCombined`) charges twin orders. `POST /api/twin-order/pay` never enters
