@@ -44,11 +44,15 @@
         "routes/courier-applications.js",
         "services/courier-applications/applications.js",
         "services/courier-applications/applicant-auth.js",
-        "services/courier-applications/banks.js"
+        "services/courier-applications/banks.js",
+        "routes/courier-documents.js",
+        "services/courier-documents/documents.js"
       ],
       "symbols": {
         "services/courier-applications/applications.js": ["approvalBlockers", "approve", "fromApplicationId", "isControlledByAdmin: false"],
         "services/courier-applications/applicant-auth.js": ["applicantAuth", "x-applicant-key"],
+        "services/courier-documents/documents.js": ["listForDriver", "courierDocumentFiles", "fromApplicationId"],
+        "routes/courier-documents.js": ["/api/courier-documents/mine", "/api/admin/drivers/:driverId/documents"],
         "services/delivery/availability.js": [
           "checkStoreDeliveryAvailability",
           "isDeliveryPaused"
