@@ -2616,6 +2616,16 @@
           "desc": "doc reference §4 / §7f: the chat's add gate is the menu's validateWith (every non-header single answered)"
         },
         {
+          "file": "hooks/reorderHelpers.ts",
+          "regex": "if \\(Object\\.prototype\\.hasOwnProperty\\.call\\(stored, extra\\.id\\)\\) continue;",
+          "desc": "doc reference §4: order again seeds a single's default ONLY when the old line has no key for it (a choice added since) — a made-but-gone pick is not swapped"
+        },
+        {
+          "file": "hooks/reorderHelpers.ts",
+          "regex": "if \\(!extrasStore\\.validateWith\\(currentProduct\\.extras, filteredExtras\\)\\) \\{\\n\\s*return \\{\\n\\s*status: \"blocked-required-extras\",",
+          "desc": "doc reference §4: order again is gated by the menu's validateWith — an unanswered single sends the item to the product sheet, never into the cart"
+        },
+        {
           "file": "helpers/chat-cart-line.ts",
           "regex": "const cap = Number\\(e\\.maxCount \\?\\? e\\.max\\);",
           "desc": "doc reference §7f: selectionsValid adds the maxCount ?? max cap the menu's checkbox enforces (validateWith reads max only)"

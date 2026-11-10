@@ -535,7 +535,17 @@ each set in header `order`; keep it in lockstep with `validateWith` — and with
 `SINGLE_WITHOUT_OPTIONS` / `REQUIRED_GROUP_ALL_OUT_OF_STOCK` are `critical` precisely because
 this predicate leaves the add-to-cart button disabled forever. `validateWith` has a second
 caller, the For-you chat's `selectionsValid` (`helpers/chat-cart-line.ts`, which adds the
-`maxCount ?? max` cap the menu's checkbox enforces — §7f). The partner app enforces
+`maxCount ?? max` cap the menu's checkbox enforces — §7f) — and a third, **"order again"**:
+`resolveReorderItem` (`shoofi-app/hooks/reorderHelpers.ts`, behind the full reorder, the menu's
+last-order quick add and the best-sellers row) replays the old line's `selectedExtras`, then
+`seedNewSingleDefaults` writes the `defaultOptionId` of every non-header `single` the OLD line has
+no key for at all (a choice the store added since — cacao 2026-11-09 added a size to הפוך and
+"order again" lines went out with no size, so the ticket showed none), skipping an out-of-stock
+default; a pick that WAS made but is now deleted or out of stock is never swapped for the default.
+If `validateWith` still fails, the item comes back `blocked-required-extras` (the carousels open
+the product sheet, the full reorder lists it in the missing-items dialog) instead of reaching the
+cart without the choice. `multi` defaults are not seeded there (they can cost money and an old
+line may have left one empty on purpose). The partner app enforces
 nothing (`isValidForm={true}`), and order creation does not re-validate extras (see the recorded
 risk below). Making `required` real is a full-stack change: both editors → server passthrough →
 both validators → this doc — and the For-you quick-add flag `hasRequiredOptions`
