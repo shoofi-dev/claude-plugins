@@ -1016,6 +1016,11 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       in the same atomic update; legacy rows recognised by their notes) — the twin path refunded
       the trigger leg twice (order route + cascade).
     - **Backfill**: `scripts/money-backfill.js`, DRY-RUN by default; `--apply` only with Sari's OK.
+      Coupons already issued against a twin group count as ONE `compensate` entry each
+      (`collectTwinCompensations`): compensation rows naming a leg / the group, and a manual twin
+      coupon stamped on the legs as `cancelCompensation { couponCode, amount, compensationId,
+      twinGroupId }` (support's shape for dmfnny ₪177 and tg_1794337558463_qo9a4q ₪174, stamped on
+      BOTH legs) — deduped by coupon code / compensation id, so a group so covered owes 0.
     - Tests (shoofi-server): `money-cancel.js` (ledger, every endpoint, roles, concurrency,
       re-cancel, cash twin, keep→refund on a partly used coupon, HYP success/refused/timeout/cap,
       singles through the order pipeline, coins once), plus the invariant-27 tests.
