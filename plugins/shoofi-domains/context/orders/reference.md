@@ -150,7 +150,26 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   both legs. `commentToStore` is ONE NOTE PER STORE: `primary.commentToStore` goes on the primary
   leg and `secondary.commentToStore` on the secondary. `buildSkeletonOrder` cleans each value,
   and a leg never carries the peer's note (CORE invariant 25).
-- **Dispatch**: longer-prep side dispatched first; second side revealed on first accept.
+- **Dispatch**: longer-prep side dispatched first (`pickupSequence` 1); the second side
+  (`pickupSequence` 2) is held back from its store's new-orders lists while the first-dispatch
+  order is LIVE and NOT YET ACCEPTED — one rule, `resolveTwinSecondaryVisibility`
+  (`utils/twin-order-visibility.js`), used by `GET order/admin/not-viewd`,
+  `GET order/admin/all/not-viewd` and `GET order/admin/my-stores/new-orders-count` (they
+  disagreed until 2026-11-10; a first store cancelled before accepting hid the second order
+  forever in the multi-store view and badge). Visible when this order is `twinGroup.degraded`
+  or already opened (`viewdAt`), the first-dispatch order is missing or cancelled/rejected
+  (4/5/7/8/9, string or number), the group is `degraded_to_single`/`cancelled`, or the first
+  order was accepted (`viewdAt`, any status after). Fail open. `twinPeerInfo` (the readyMinutes
+  cap) only for a live, accepted peer. The peer is looked up by `peerOrderId` pinned to
+  `twinGroup.groupId` (the short number repeats), falling back to the group id.
+  **The second store's persistent alert** (push + reminder cron) fires on the first store's accept
+  (`order/update/viewd`) — and, since 2026-11-10, also when the first store is DROPPED
+  (`degradeToSingle` → `releaseSecondStore`: kept order is pickupSequence 2, status 6/14, not
+  opened, no alert on record) with a `twin_second_store_released` flow event. An undo that puts
+  the first store back to "not accepted" re-hides an unopened kept order and records
+  `twin_second_store_rehidden`. The admin bundle (`twin-order/admin/group/:id/full`) and the
+  monitoring `twin.group` carry `secondStoreWaiting` + `secondStoreWaitingDetail {waitingStore,
+  blockingStore}` while the second order is hidden.
 - **Cancel/degrade** (CORE invariant 27): `cascadeCancel` cancels both legs, stamps
   `cancelMoneyDecision: "undecided"` on each card leg it cancels and records NO refund amount
   (no group money decision exists yet). `degradeToSingle` keeps one leg and records

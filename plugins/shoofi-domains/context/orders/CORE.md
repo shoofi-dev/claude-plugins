@@ -940,6 +940,12 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `GET /admin/group/:groupId/full` and `GET /api/admin/twin-order-config` take
       `DASHBOARD_ROLES`; `POST /api/admin/twin-order-config` takes `["admin"]` (+ master). Until
       2026-11-06 the twin routes were `auth.required` only and the config had no auth.
+    - **The second-dispatch store sees its order** by ONE rule (`utils/twin-order-visibility.js`,
+      reference §4 Dispatch) on both new-orders lists and the badge count: hidden only while the
+      first-dispatch order is live and not accepted. A dropped first store releases it WITH the
+      persistent alert (`twin_second_store_released`); `secondStoreWaiting` tells the admin while
+      it is still hidden. Prod before: 17 groups' kept store opened 8-45 min after the degrade;
+      the 3 failed-undo groups' kept orders were never seen.
     - Tests (shoofi-server): `twin-cancel-safety.js`, `twin-admin-auth.js`,
       `order-cancel-undecided.js`, `order-cancel-settle-money.js`,
       `order-cancel-money-before-status.js`, `hq-money-audit.js`, `money-cancel.js`.
