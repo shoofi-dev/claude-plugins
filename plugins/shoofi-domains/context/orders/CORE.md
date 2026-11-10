@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -779,6 +779,55 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **Secondary feature (invariant 6):** the lookup never throws into the create path. A
       failure is a `logger.warn` (`[first-order-at-store] lookup failed`) and the order is
       inserted without the field.
+
+25. **`order.commentToStore` IS THE CUSTOMER'S NOTE TO THE STORE: CLEANED AT THE DOOR, ANY
+    RECEIPT METHOD, ABSENT WHEN EMPTY, AND ONE PER STORE ON A TWIN** (`utils/comment-to-store.js`,
+    shoofi-server branch `fix/HIGH-RISK-comment-to-store`, 2026-11-10). shoofi-app sends it from the
+    cart page's note box. On app `main` that is ONE string (`cartStore.storeNote` → `getCartData`)
+    and twin checkout sends none. App branch `feat/store-note-per-twin-store` (built, not merged
+    as of 2026-11-10) keeps one note per store, details in reference C1.
+    - **Three different notes, never mixed up:**
+      `orders.order.commentToStore` = the CUSTOMER → the store (this invariant, any receipt method,
+      not editable after insert); `orders.order.commentToCourier` = the CUSTOMER → the courier
+      (`utils/comment-to-courier.js`, DELIVERY only, editable by support through
+      `POST /api/order/comment-to-courier`, mirrored onto `bookDelivery`); top-level `orders.note` =
+      the STORE STAFF's own note, written through `/api/order/update` (`ALLOWED_ORDER_UPDATE_FIELDS`),
+      never by the customer.
+    - **The cleaner, `sanitizeCommentToStore`:** plain strings only (an object, array, number or
+      null is dropped, never stringified); `\r\n`/`\r` → `\n`; a run of spaces/tabs → one
+      space; a run of line breaks (blank lines included) → ONE `\n`, so a single line break is
+      kept; trimmed, clamped to `COMMENT_TO_STORE_MAX_LENGTH` = 200 (the app's
+      `COMMENT_TO_STORE_MAX_LENGTH`), trimmed again. Empty → **no key at all**, never `""`, so
+      `$exists` means the customer wrote something. Unlike the courier cleaner (clamp + trim only,
+      nothing collapsed) it collapses whitespace, because the note prints on a kitchen ticket.
+    - **Single store:** `/api/order/create` cleans it, **`delete`s the raw
+      `parsedBodey.order.commentToStore`** before `const orderDoc = {`, and re-adds only the
+      cleaned value (`...(commentToStore ? { commentToStore } : {})`) inside `order`. This is the
+      `commentToCourier` pattern. Drop that delete and the `...parsedBodey.order` spread puts any
+      client JSON on the order verbatim. No receipt-method gate: pickup, drive-in and table keep it.
+    - **Twin, one note PER STORE:** the request carries `primary.commentToStore` and
+      `secondary.commentToStore`, each the note for THAT store. `buildSkeletonOrder` takes
+      `commentToStore`, cleans it itself and writes it on that leg's `order`. All four call sites
+      (primary + secondary × `/place` + `/digital-place-pending`) pass their OWN side's value. A
+      leg never carries the peer's note, and a side with no note has no key.
+    - **Written only at insert; nothing rewrites it.** Amend, accept, `update-delay`, the Apple
+      Pay finalize/repoint and twin `/pay` all `$set` named fields, and `/api/order/update` is
+      whitelisted. The one whole-`order` writer, the legacy `POST /api/order/update/all`, still
+      throws `ReferenceError: offsetHours is not defined` before it writes (re-verified
+      2026-11-10 against the real router). Whoever revives it must keep the stored note (it would
+      also lose `commentToCourier`). It is not in the `customers.orders[]` snapshot (recipe step 2).
+      The `bookDelivery.order` snapshot taken at store accept copies the whole order, so the note
+      is there too, but the driver's `POST /api/delivery/list` projection is a whitelist without
+      it: drivers never receive it, and nothing mirrors it there.
+    - **Readers (being built in parallel, not on `main` as of 2026-11-10):** shoofi-partner branch
+      `feat/customer-note-to-store` shows it as «ملاحظة الزبون» on the order screens and on both
+      printed tickets (the regular printer and the Urovo native printer). shoofi-delivery-web
+      branch `feat/admin-customer-note-to-store` shows it read-only in `CardOrder` (reference C4).
+      There is no edit path anywhere.
+    - Server tests: `test/integration/comment-to-store.js` (the cleaner; create on DELIVERY and
+      TAKEAWAY through the real router; junk, empty and over-long input; twin `/place` and
+      `/digital-place-pending` each leg with its own note; a pin that every `buildSkeletonOrder`
+      call site passes its own side's value).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
