@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -422,6 +422,11 @@
         },
         {
           "file": "routes/delivery/orders.js",
+          "regex": "'order\\.order\\.address': 1,",
+          "desc": "POST /api/delivery/list is a whitelist; the driver card's street, floor / apartment / entrance and landmark note (address.notes) all ride this one key"
+        },
+        {
+          "file": "routes/delivery/orders.js",
           "regex": "isApproximateLocation: true,",
           "desc": "isApproximateLocation is written in exactly one literal, beside isDeliveryOnly: true — it implies delivery-only and never the converse; the point is a town centroid, not an address anybody typed"
         },
@@ -719,7 +724,8 @@
         "components/delivery-driver/DriverReassignModal.tsx",
         "components/delivery-driver/TwinOrderCard.tsx",
         "screens/delivery-driver/index.tsx",
-        "components/delivery-driver/OrderCard.tsx"
+        "components/delivery-driver/OrderCard.tsx",
+        "utils/address-details.ts"
       ],
       "patterns": [
         {
@@ -741,6 +747,21 @@
           "file": "components/delivery-driver/OrderCard.tsx",
           "regex": "isDeliveryOnly\\s*\\?",
           "desc": "the driver card swaps the order table for the pay/collect money block on a manual booking"
+        },
+        {
+          "file": "utils/address-details.ts",
+          "regex": "clean\\(address\\?\\.notes\\)",
+          "desc": "the landmark note the driver sees is order.order.address.notes (saved on the address), not commentToCourier (typed at checkout) - reference C1"
+        },
+        {
+          "file": "components/delivery-driver/OrderCard.tsx",
+          "regex": "getLandmarkNote\\(order\\?\\.order\\?\\.order\\?\\.address\\)",
+          "desc": "the single-order card renders the landmark banner + building line under the address"
+        },
+        {
+          "file": "components/delivery-driver/TwinOrderCard.tsx",
+          "regex": "getLandmarkNote\\(primary\\.order\\?\\.order\\?\\.address\\)",
+          "desc": "twins collapse into TwinOrderCard, so the landmark banner must be wired there too or it silently does not exist for twins"
         }
       ]
     },

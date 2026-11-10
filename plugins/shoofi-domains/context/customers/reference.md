@@ -95,7 +95,10 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
 ## 4. Data model
 - **`shoofi.customers`** — identity (`fullName`, `phone`, `email`, `language`), auth
   (`authCode`, `token`, `notificationToken`), `addresses[]`
-  (`{name,street,city,cityId,location{Point},isDefault,…}`), **`orders[]` snapshot**,
+  (`{_id,name,street,streetNumber,city,cityId,selectedCity,location{Point},floorNumber,
+  apartmentNumber,entrance,notes,isDefault,isCurrentLocation,createdAt,updatedAt}` — `notes` is
+  the courier landmark ≤ 200, the floor / apartment / entrance / street number ≤ 20, cleaned on
+  add and update: CORE invariant 20), **`orders[]` snapshot**,
   referral (`referralCode`, `referral{clickId,inviterCustomerId,…}`), flags
   (`isBlocked`, `isDeleted`+`deletedAt`, `cashRestricted`), location (`cityId`, `cityAreaId`),
   `schoolProject{…}`, marketing (`marketingPushOptOut` + `marketingPushOptOutUpdatedAt`; unset
@@ -267,7 +270,15 @@ Profile: `GET /api/customer/details` (joins store orders for a valid-order count
 `update`, `update-name`, `update-language`, `update-city-area` (resolves city from lat/lng
 via `delivery-company.cities`). Addresses: `controllers/customerAddressController.js` —
 add/get/update/delete/setDefault on the `addresses[]` subdoc (default toggling clears all
-then sets one). `delete` also unsets `confirmedAddressId` when it named the deleted row; `update`
+then sets one). Add and update both pass the body through `cleanAddressFields`
+(`services/customer/address-fields.js`): `notes` trimmed + whitespace collapsed + ≤ 200;
+`floorNumber` / `apartmentNumber` / `entrance` / `streetNumber` trimmed + ≤ 20; numbers
+stringified; an unsent key stays unsent. Add builds an explicit field list (`buildAddress`) and
+keeps `apartmentNumber` / `entrance` only when sent; update `$set`s every sent key on
+`addresses.$` (minus `_id`). The customer app's add-address sheet sends the whole form, so all of
+these arrive together. At checkout the app sends the selected address object, so the note lands
+on the order as `order.order.address.notes` — a snapshot; a later edit doesn't touch past orders
+(CORE invariant 20). `delete` also unsets `confirmedAddressId` when it named the deleted row; `update`
 keeps the row's `_id` and so the confirmed address. `GET /details` returns `confirmedAddressId`
 (string | null) to the customer app only. Order creation sets it (CORE invariant 19,
 shoofi-server `docs/confirmed-delivery-address.md`). Order creation also seeds `addresses[]` for a

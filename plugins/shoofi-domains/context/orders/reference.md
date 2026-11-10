@@ -173,6 +173,26 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   routes (`applyFirstOrderFlag`, `services/orders/first-order-at-store.js`), never rewritten.
   Absent = unknown (failed lookup, or an order from before 2026-11-08), so a reader badges only
   `=== true`. Index `customerId_idx` `{ customerId: 1 }`. Rules: CORE invariant 24.
+- **`orders.order.address`** (the INNER `order`, beside `items` / `commentToCourier`; there is no
+  top-level `orders.address`) = a snapshot of the **saved address** the customer delivered to. The
+  customer app sends the address object whole (`screens/checkout/index.tsx` `addressLocationRef` →
+  `getCartData` `address: order.address`, `stores/cart/index.ts`) and `/api/order/create` keeps it
+  through `order: { ...parsedBodey.order, … }`. Beside `street` / `streetNumber` / `city` /
+  `location` it carries the customer's own label `name` ("בית", "عمل"), the building details
+  `floorNumber` / `apartmentNumber` / `entrance`, and **`notes` = the courier landmark** (the
+  app's «סימן דרך לשליח», "white house next to the mosque"). All optional free text, often `""`.
+  - **`notes` is not `commentToCourier`.** `notes` is saved WITH the address and repeats on every
+    order sent there; `commentToCourier` is typed per order at checkout (support can edit it,
+    `routes/order-comment-to-courier.js`). Show them as two labelled things.
+  - **Only as complete as the saved address.** On shoofi-server `59cd5fdd` (2026-11-10) adding an
+    address (`controllers/customerAddressController.js` `buildAddress`) stores `floorNumber` and
+    `notes` but NOT `apartmentNumber` / `entrance`; editing it (`updateAddress`, spreads the body)
+    does. So an order from a never-edited address has no apartment/entrance. Customers domain.
+  - **Never rewritten for content.** Support's `update-address-to-current-location`
+    (`routes/customer.js`) moves `order.address.location` (+ `isCurrentLocation`, `updatedAt`,
+    `updatedBySupport`) and `order.geo_positioning`; `notes` and the building details stay.
+  - Copied whole into the `bookDelivery.order` snapshot at store accept (the booking's `order` is the
+    order document), and into `customers.orders[].address` at create.
 - **`shoofi.customers.orders[]`** = a **write-once snapshot with NO status field.**
   `{ orderId(ObjectId→orders._id), appName, created, total, orderIdNumber(=orders.orderId),
   originalOrderId, ... }`. **NEVER infer status/completion/revenue from it** — join
@@ -763,6 +783,22 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   `db.orders.find({isSchoolProject:true}).sort({created:-1}).limit(20)`.
   `src/components/OrderMonitoring/OrderFlowDashboard.tsx`,
   `src/views/admin/settings/DeliverySettings.tsx`, `src/views/admin/fraud/FraudReview.tsx`.
+- **The delivery address on admin surfaces** (§5 `orders.order.address`): `CardOrder`'s location
+  modal ("⋯" → "הצג מיקום על המפה") renders `src/components/Cards/OrderAddressLines.tsx` — «שם
+  הכתובת» (`order.order.address.name`; until 2026-11-10 it read a top-level `order.address.name`
+  that never exists, so it never showed), «כתובת מלאה», then קומה / דירה / כניסה and «סימן דרך
+  לשליח» (`notes`). The card's "פרטי משלוח" block shows «סימן דרך לשליח» beside the editable
+  «הערות לשליח». The delivery board (`src/views/admin/analytics/DeliveryListAnalytics.tsx`) puts
+  it on its own labelled line («סימן דרך:») in the «הערות לשליח» cell. One reader for all of them:
+  `src/utils/order-address-details.ts` (trims, drops empty values, prefers the live order and
+  falls back to the `bookDelivery.order` snapshot). Nothing renders for an empty value.
+  ⚠️ The board reads it off `POST /api/analytics/deliveries`, whose `bookDelivery` projection
+  (`routes/analytics.js`) is a whitelist: the line stays empty unless it lists
+  `'order.order.address.notes'` — listed field by field with `floorNumber` / `apartmentNumber` /
+  `entrance` since shoofi-server `feat/address-note-apartment-entrance` (2026-11-10), pinned by
+  `test/integration/delivery-comment-to-courier-projection.js`; never the whole address. `CardOrder`
+  is unaffected: `order/admin/all-orders` and `analytics/order/:id` return the whole order, and
+  `delivery/order/:id` the whole booking (credentials redacted).
 - **⚠️ Cross-repo consistency flags (candidate bugs — human verdict):**
   1. **Status-enum divergence** — admin-web `src/consts/shared.ts` uses
      `FUTURE_ORDER_PENDING:"16"` and `PENDING_START_PREPARING:"14"`, but the server &
