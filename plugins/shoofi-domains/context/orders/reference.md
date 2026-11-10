@@ -270,6 +270,8 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
       1096-8335 never reached the customer's ActiveOrders screen or tab-bar bubble, because
       burger-house had a delivered 1096-8335 from 2026-09-21. The customer ordered again. Fixed in
       shoofi-dev/shoofi-server#513. Tests: `test/integration/customer-active-orders-per-store.js`.
+      The app half (the just-placed order shown before the poll, and an error state instead of
+      "no orders") is in C1 "Tracking".
   - **Located with `deliveryRowFilterForOrder`** (CORE invariant 23, shoofi-server#514, merged
     2026-11-08): `/api/order/update` cancel and ready-for-pickup (find, then write by `_id`),
     `update-delay`, order-amend `syncDeliverySnapshot`, twin `cascadeCancel` / `degradeToSingle` /
@@ -516,11 +518,47 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
 - **Twin (customer side)**: `stores/twin-order` + `stores/twin-cart` (second-store cart);
   combined checkout calls `twin-order/{eligible-stores, quote, place, pay,
   digital-place-pending, digital-finalize}`. Secondary side `shippingPrice:0` (combination fee covers it).
-- **Tracking = POLLING every 30s** (`screens/order/active/index.tsx`) — **no websocket
-  for customer order status** (WS is only used for store/menu refresh elsewhere). Detail:
-  `screens/order/item`, timer `order-timer.tsx` keyed on status, ETA via `delivery/book/{bookId}`.
+- **Tracking = POLLING every 30s** — **no websocket for customer order status** (WS is only
+  used for store/menu refresh elsewhere). Detail: `screens/order/item`, timer `order-timer.tsx`
+  keyed on status, ETA via `delivery/book/{bookId}`.
+  - **One list, one poll** (`stores/orders/index.tsx`): `ordersStore.activeOrders` is what the
+    ActiveOrders tab (`screens/order/active/index.tsx`), the tab-bar order bubble
+    (`components/layout/footer-tabs/BottomTabBar.tsx`) and the For-you chips all render.
+    `subscribeActiveOrders` runs ONE `GET order/customer-active-orders` timer for every
+    subscriber. Extra refreshes: the tab bar on `ORDER_SUBMITTED` and on app-foreground, the
+    ActiveOrders tab on focus.
+  - **Stale-response guard:** each `refreshActiveOrders` takes a sequence number. A success is
+    applied only if it is newer than the last applied one (`activeOrdersAppliedSeq`); a failure
+    counts only when it is the latest request. Logout bumps the sequence, so a response in
+    flight from the old session is dropped.
+  - **A failed load is not "no orders":** the list already shown is kept and
+    `activeOrdersError` is set. With nothing to show, the tab renders an error and a retry button
+    (`components/order/orders-load-error`, `retryActiveOrders`). "No orders" appears only
+    after the server returned `[]`. A 200 that is not an array counts as a failure. Order history
+    (`screens/order/history/index.tsx`) works the same way, with its own sequence guard.
+  - **The just-placed order shows before the poll returns it** (`helpers/placed-order.ts`,
+    built after GCP 1096-8335 on 2026-11-08: three minutes of "no orders", then a duplicate
+    order). `use-checkout-submit` **stages** a local copy from the create response
+    (`{ message, orderId }`, where `orderId` is the Mongo `_id`; the response carries no
+    `originalOrderId` and no short number) and from the body it sent. It never stages a recorded
+    payment failure (`errorMessage`). `postChargeOrderActions` (`screens/checkout/index.tsx`)
+    **shows** it, right before `ORDER_SUBMITTED`. Staging and showing are separate because Apple
+    Pay creates the order at `"0"` before the sheet is paid. A twin checkout or an admin edit
+    discards the staged copy: a twin pair is drawn from both server docs. The copy is marked
+    `isPlacedLocally` and drawn by `placed-order-card.tsx`: store, "sent", payment method,
+    total and time. It shows no status, number or timer, and it does not open details.
+    - **Matched** to the server's copy on `_id`, or on `originalOrderId` when both carry it.
+      **Never on the short `orderId`** (CORE invariant 22).
+    - **Drop rule:** the copy is dropped for good the first time the server lists it. From then
+      on the server list alone decides, so a delivered or cancelled order that leaves the list
+      is not brought back. A copy the server never lists is dropped after
+      `PLACED_ORDER_TTL_MS` = 10 min (20 poll cycles), checked on every refresh, failed ones
+      included. A copy is never shown more than `STAGED_ORDER_MAX_AGE_MS` = 30 min after
+      staging. Logout or a different token clears it. It lives in memory only, so an app restart
+      drops it.
 - **Key files**: `stores/cart/index.ts` (payload builder + `order/create`),
-  `stores/orders/index.tsx`, `stores/twin-order/index.ts`,
+  `stores/orders/index.tsx` (the shared active-orders list), `helpers/placed-order.ts`,
+  `stores/twin-order/index.ts`,
   `hooks/checkout/use-checkout-submit.ts`, `screens/checkout/index.tsx`,
   `screens/order/{active,item,history}/*`, `consts/{api.js,shared.ts}`.
 - **Gotchas**: `order/create` is **multipart** (twin / Apple-Pay / HYP calls are JSON);

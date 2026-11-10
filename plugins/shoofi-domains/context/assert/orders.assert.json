@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -594,7 +594,14 @@
         "hooks/checkout/use-checkout-validate.ts",
         "screens/cart/cart.tsx",
         "helpers/for-you-attribution.ts",
-        "services/marketing-events.ts"
+        "services/marketing-events.ts",
+        "stores/orders/index.tsx",
+        "helpers/placed-order.ts",
+        "helpers/active-orders-labels.ts",
+        "components/order/orders-load-error/index.tsx",
+        "screens/order/active/components/placed-order-card.tsx",
+        "screens/order/history/index.tsx",
+        "hooks/checkout/use-checkout-submit.ts"
       ],
       "patterns": [
         {"file": "stores/cart/index.ts", "regex": "const marketingTouch = await prepareMarketingForOrder\\(\\);", "desc": "CORE invariant 15/16: submitOrder sends the queued taps (<=1.5s, never throws) before reading the touch for the body"},
@@ -693,6 +700,41 @@
           "file": "screens/checkout/index.tsx",
           "regex": "shippingPrice: shippingMethod === SHIPPING_METHODS\\.shipping \\? availableDrivers\\?\\.area\\?\\.price \\|\\| 0 : 0,",
           "desc": "reference C1 / CORE invariant 20: the app posts shippingPrice = the quoted area's tariff, ₪0 when the quote has no area (the paused-area ₪0 bug the server's [shippingPriceCheck] watches for)"
+        },
+        {
+          "file": "helpers/placed-order.ts",
+          "regex": "export const PLACED_ORDER_TTL_MS = 10 \\* 60 \\* 1000;",
+          "desc": "CORE invariant 26: a just-placed copy the server never lists is dropped after 10 min"
+        },
+        {
+          "file": "helpers/placed-order.ts",
+          "regex": "idOf\\(o\\?\\._id\\) === placed\\._id",
+          "desc": "CORE invariants 24 + 22: the local copy is matched to the server's on _id (or originalOrderId), never on the short orderId"
+        },
+        {
+          "file": "stores/orders/index.tsx",
+          "regex": "if \\(seq <= this\\.activeOrdersAppliedSeq\\) return;",
+          "desc": "CORE invariant 26: stale-response guard, an older poll answer never overwrites a newer one"
+        },
+        {
+          "file": "stores/orders/index.tsx",
+          "regex": "this\\.activeOrdersError = true;",
+          "desc": "CORE invariant 26: a failed load is an error state, not an empty list"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "ordersStore\\.showStagedPlacedOrder\\(\\);",
+          "desc": "CORE invariant 26: the staged copy is shown at confirmation (postChargeOrderActions), never at create"
+        },
+        {
+          "file": "hooks/checkout/use-checkout-submit.ts",
+          "regex": "if \\(errorMessage\\) return;",
+          "desc": "CORE invariant 26: a recorded payment failure is never staged as a placed order"
+        },
+        {
+          "file": "helpers/active-orders-labels.ts",
+          "regex": "\"orders-load-retry\"",
+          "desc": "CORE invariant 26: own retry key, because prod's retry translation reads OK"
         }
       ]
     },

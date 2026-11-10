@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -742,7 +742,6 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       a cross-store and a same-store decoy inserted first; legacy fallback; twin cascade,
       degrade and undo; a source pin that the order-side files never regrow a
       `bookDelivery.x({ bookId … })` key) and the amend case in `test/integration/order-amend.js`.
-
 24. **`order.isFirstOrderAtStore` IS DECIDED ONCE, AT INSERT, AND ABSENT MEANS "UNKNOWN", NEVER
     "FIRST"** (`services/orders/first-order-at-store.js`, shoofi-server#508, the partner tablet's "new customer"
     badge, partner redesign item 15, approved by Sari 2026-11-08).
@@ -835,6 +834,31 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       TAKEAWAY through the real router; junk, empty and over-long input; twin `/place` and
       `/digital-place-pending` each leg with its own note; a pin that every `buildSkeletonOrder`
       call site passes its own side's value).
+
+26. **THE CUSTOMER APP NEVER SAYS "NO ORDERS" WHILE IT HOLDS ONE, OR WHEN THE LOAD FAILED.**
+    (shoofi-app, after GCP 1096-8335 on 2026-11-08, when "no orders" right after checkout cost a
+    duplicate order. The details are in reference C1 "Tracking".)
+    - **One list.** `ordersStore.activeOrders` (`stores/orders/index.tsx`) feeds the ActiveOrders
+      tab, the tab-bar bubble and the For-you chips. Never give a screen a private copy.
+    - **"No orders" only after the server returned `[]`.** A failed refresh keeps the list on
+      screen and sets `activeOrdersError`. With nothing to show, the tab draws an error with a
+      retry button. Order history does the same. A slower, older response never overwrites a newer
+      one: `refreshActiveOrders` applies only a sequence number newer than
+      `activeOrdersAppliedSeq`.
+    - **The just-placed order is shown at once.** `helpers/placed-order.ts`: checkout stages it at
+      create and shows it at confirmation (`showStagedPlacedOrder` in `postChargeOrderActions`).
+      It is never shown at create, because Apple Pay creates at `"0"` before payment, and never
+      for a recorded payment failure. It is matched to the server copy on `_id` / `originalOrderId`,
+      **never on the short number** (invariant 22). It is dropped for good once the server lists
+      it, so a delivered or cancelled order is not brought back. If the server never lists it, it
+      is dropped after `PLACED_ORDER_TTL_MS` (10 min). A twin checkout gets no local copy.
+    - The create response is only `{ message, orderId: <_id> }`. Returning `originalOrderId` too
+      would be a server change. The app already reads it when present.
+    - The translations come from the DB, and prod's `retry` key reads "حسنا" / "אישור" (OK).
+      The retry button uses its own key, `orders-load-retry`.
+    - Tests (shoofi-app): `__tests__/stores/active-orders-placed-and-stale.test.ts`,
+      `__tests__/components/active-orders-error-and-placed.test.tsx`,
+      `__tests__/components/order-history-error.test.tsx`.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
