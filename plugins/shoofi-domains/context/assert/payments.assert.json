@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-validate-card-require-auth + shoofi-app@fix/HIGH-RISK-validate-card-send-token / 2026-11-08 (CORE invariant 12 validate-card auth + rate limit); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -88,6 +88,16 @@
         ]
       },
       "patterns": [
+        {
+          "file": "routes/payments/validate-card.js",
+          "regex": "router\\.post\\(\"/api/payments/validate-card\", auth\\.required, validateCardLimiter,",
+          "desc": "CORE invariant 12: validate-card needs a logged-in caller and the per-customer rate limit (card-testing guard)"
+        },
+        {
+          "file": "routes/payments/validate-card.js",
+          "regex": "const VALIDATE_CARD_RATE_LIMIT = \\{ windowMs: 15 \\* 60 \\* 1000, max: 10 \\};",
+          "desc": "CORE invariant 12: 10 validate-card calls per 15 minutes per customer"
+        },
         {
           "file": "services/payments/order-invoices.js",
           "regex": "ISSUED: \"issued\",",
