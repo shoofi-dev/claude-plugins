@@ -233,6 +233,21 @@ hangs the request (CORE invariant 11), so none of them answered.
   response its effect has not superseded. Before this, a late, superseded auto-apply answer
   wrote the store directly, so an order went out at the discounted total with
   `appliedCoupon: null` (no couponUsages row; 8265-1164, GCP 5194-1334 on 2026-10-27).
+  **A coupon the total did not use is not sent either.** TotalPrice puts one flag on
+  `promotionsStore.setCheckoutSelection({ couponSuppressed })`; `use-checkout-submit.ts` sends
+  `appliedCoupon` only when it is false, and the twin split (`splitCouponForTwin`) gets `null`.
+  It is true in two cases: (1) a delivery coupon that lost to the store's delivery deal (orders
+  CORE invariant 13); (2) since shoofi-app#87, a delivery coupon (`helpers/delivery-price-coupon.ts`
+  `isDeliveryCoupon`: `type` `free_delivery` / `delivery_price` or `discountType: 'delivery'`) on a
+  pickup or drive-in order (`isDeliveryCouponOffForMethod`). Either way the card shows it as "not
+  used on this order" (`notUsedReason`; case 2 says «التوصيل غير مشمول في الاستلام»), the total takes
+  nothing off, and a one-time coupon is not spent on ₪0. In case 2 the app does not ask
+  `/api/coupons/apply` (a fixed-price coupon would come back `COUPON_NO_DISCOUNT` and be dropped);
+  it keeps the coupon with `discountAmount: 0`, and switching back to delivery re-quotes it with
+  the real fee. **Server gap, not closed:** creation does not drop a ₪0 `free_delivery` /
+  `discountType: 'delivery'` coupon on a non-delivery order (only the `delivery_price` type is
+  re-priced and dropped, orders CORE invariant 14), so an older bundle that still sends one gets a
+  ₪0 `couponUsages` row from `buildCouponUsageDocs` (`services/coupons/coupon-usage.js`).
   Checkout also clears a store coupon left from an earlier visit on mount. It declares what
   its bundle can render in `x-client-features` (`consts/shared.ts` `CLIENT_FEATURES`, sent by
   `utils/http-interceptor`); `delivery-price-coupon` unlocks fixed-delivery-price coupons.
