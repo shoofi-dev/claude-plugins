@@ -253,8 +253,6 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
   does not store CVV (HYP cards already save `cvv:''`); plaintext CVV goes away as ZCredit
   is retired. **Do NOT independently rip out CVV handling** — it's tied to the migration.
   When touching card code, prefer HYP and never add new CVV storage.
-- **CONFIRMED — REMOVE (backlog #1):** `hyp-test-soft` debug endpoint (`hyp-pay.js`)
-  that charges 1 NIS with a token. It should not be in prod.
 - **CONFIRMED — REMOVE (backlog #2):** the legacy client-side ZCredit charge/refund in the
   customer app — `components/credit-card/api/payment.ts` + `refund.ts` (terminal number +
   password in client state). Deprecated; remove after confirming no live references.
@@ -266,8 +264,7 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
 - **By design (prior review):** `verifiedAppName` pass-through (`order.js`).
 
 ## 10b. Payments agent — starter backlog (human-confirmed, remove-only)
-1. **Remove `hyp-test-soft`** (`routes/hyp-pay.js`) — money-guardrail file, so a **draft
-   HIGH-RISK PR**: minimal diff, confirm nothing calls it, note the rollback.
+1. ~~Remove `hyp-test-soft`~~ — **done** (HQ #d2093d, 2026-11-05).
 2. **Remove the legacy client-side charge/refund** in shoofi-app
    (`components/credit-card/api/payment.ts` + `refund.ts`; sweep the deprecated
    `use-checkout-charge-cc.ts` no-op and manual `validate-card` add-card UIs if unused) —
