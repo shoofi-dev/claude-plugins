@@ -545,6 +545,18 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     9149-1898 / 5277-5921 / 6732-6168, abuissa-grills 1251-2881). The quote fix belongs to
     delivery (`services/delivery/availability.js`). This check is the net that catches the next
     one.
+    - **The quote is stamped with its store and point** (shoofi-app, HQ #d20f83, owner decision
+      2026-11-10: fix the app, keep the server log-only). `shoofiAdminStore.availableDrivers` is
+      one global quote. The menu and address screens write it for the BROWSED store, and checkout
+      used to skip a re-fetch when the point was unchanged. So GCP 8706-1776 posted nshnosh's
+      ₪20 against a ₪38 tariff. Every write now stamps `availableDriversFor` with
+      `{appName, lat, lng}` (`stores/shoofi-admin/index.tsx`). Checkout and total-price read only
+      `matchedDeliveryQuote(...)` for the cart store and the effective address
+      (`helpers/delivery-quote-match.ts`). They re-quote on every focus. Before money moves,
+      `ensureDeliveryQuoteBeforeSubmit` re-quotes and stops that tap if the quote is not this
+      order's. A post-payment `handleCheckout` is never stopped, so it can still post ₪0, and
+      this log catches it. Of the 25 audit findings for 11-04..11-09 (₪577), only 2 (₪23) were
+      this. 22 were twin second legs, which the money audit picks by pickup sequence.
     - **Where and when:** in `/api/order/create` only, right after `db.orders.insertOne(orderDoc)`
       and `scheduleOrderFact`, as `runShippingPriceCheck({...}).catch(() => {})`, **never
       awaited**. It never rejects and never changes `shippingPrice` or `total`. A lookup that
