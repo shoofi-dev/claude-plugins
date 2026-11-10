@@ -561,6 +561,13 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `delivery-company.customers` (`role: "driver"`, `isDriver: true`, `isActive: false`,
     `storeAssignmentMode: "all"`, `vehicleInfo.type`), both with `fromApplicationId`. Claimed
     via status `approving` so a double click makes one driver; a half approval is undone.
+    **A courier's documents afterwards** (`routes/courier-documents.js`,
+    `services/courier-documents/`): the courier reads their own, read-only
+    (`GET /api/courier-documents/mine`, shoofir token): the request's documents and contract via
+    `fromApplicationId`, plus any the back office added. The back office adds a document to ANY
+    driver (`POST /api/admin/drivers/:driverId/documents/:kind`, any dashboard role); it is stored
+    `verified`, wins over the request's one of the same kind, and its bytes are in
+    `courier-document-files` — private like the request's, never the CDN.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
