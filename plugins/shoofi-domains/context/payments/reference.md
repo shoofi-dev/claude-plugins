@@ -128,6 +128,21 @@ drops it, and the order keeps `invoiceStatus: "pending"` with nothing left to re
 Prod on 2026-10-30, across 188 store DBs: 41,351 `completed`, 4,122 `none`,
 **2,916 `pending`** (newest 2026-09-22) and 12 `failed`. `docId` is a number on most orders.
 Flagged with no verdict: whether those pending orders should be re-queued.
+**2,894 of those `pending` are not the queue's** (checked 2026-11-07): HYP charges under manual
+invoicing with `docId: "EZ"`, created 2026-08 (915) and 2026-09 (1,979) in 130 store DBs, every
+one with all of its `invoices[]` issued. Nothing ever moved their status (CORE invariant 10),
+and `process-all` counts them but never queues them (`skippedNonNumericDocId`). Do NOT re-queue
+them: `data-changes/2026-11-07-complete-hyp-manual-invoice-receipts.js` sets them `completed`
+(processedAt = the last document's `issuedAt`). Since 2026-09-22 manual-invoice HYP
+orders read `none` instead, because HYP stopped echoing `Hesh` (5,165 with every document issued on
+2026-11-07); from shoofi-server@fix/HIGH-RISK-hyp-manual-invoice-status new ones turn
+`completed` when their documents issue, the old ones were left as they are.
+⚠️ Flagged, no verdict: the saved-HYP-card one-phase branch of `routes/order.js` (the
+"Invoice link is normally signed inline" `setImmediate`) signs a `PrintHesh` link whenever
+`ccPaymentRefData.url` is empty, which under manual invoicing is always — the gateway issued no
+document. 150 manual-invoice orders (created 2026-08..11, counted 2026-11-07) carry such a `url` and `completed`.
+Whether that link opens anything was not checked (no sandbox call). Clients ignore it when
+`invoices[]` is present; the partner/shoofir order invoice screens read only `url`.
 
 **Admin routes** (`routes/admin.js`, CORE invariant 11). Every one is `auth.required` plus a
 role check, and no client calls any of them.

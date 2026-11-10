@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-hyp-manual-invoice-status / 2026-11-07 (CORE invariants 10-11, receipt status); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -53,7 +53,8 @@
           "issueInvoicesForOrder",
           "issueInvoicesForTwin",
           "reconcileToCharge",
-          "customerDocType"
+          "customerDocType",
+          "markHypReceiptCompleted"
         ],
         "utils/school-payment-methods.js": [
           "filterSchoolPaymentMethods",
@@ -147,6 +148,11 @@
           "file": "routes/admin.js",
           "regex": "secret !== process\\.env\\.INVOICE_WEBHOOK_SECRET",
           "desc": "reference §5: the webhook still checks its body secret behind the admin guard"
+        },
+        {
+          "file": "services/payments/order-invoices.js",
+          "regex": "\"ccPaymentRefData\\.invoiceStatus\": \\{ \\$ne: RECEIPT_COMPLETED \\}",
+          "desc": "CORE invariant 10: once every document is issued the HYP receipt reads completed; the condition is in the filter, not the caller's copy of the order"
         },
         {
           "file": "routes/order.js",
