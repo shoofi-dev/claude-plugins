@@ -543,6 +543,23 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     custom-delivery cancel (`/api/order/update-custom-delivery` → `updateDelivery`) is safe: its
     `bookId` is the row's own `_id` string.
 
+21. **A courier's DECLINE is a re-queue, not a cancel.** `POST /api/delivery/driver/order/decline`
+    (`services/delivery/driver-decline.js`, `...driverSelfAction`) is allowed only before pickup
+    (status `1`, `2` or `5`) and only on the caller's own booking. It writes the queue's own
+    entry state — status `"1"`, `isPendingAssignment: true`, `driver: null`, `company: null`,
+    `assignDriverAt` = now (offset STRING, see invariant 12) — plus `declinedDriverIds`
+    (`$addToSet`) and a `declines[]` entry `{driverId, reason, at}`. The next
+    `processPendingAssignments` tick re-dispatches it, and `findScoredDrivers` drops every id in
+    `excludeDriverIds` (the booking's and, for a twin, its peer's `declinedDriverIds`) before
+    the capacity fallback, so it is never offered back to whoever declined it; when nobody else
+    is eligible it waits for the next tick like any unassignable booking. **No customer push**
+    (the cancel route's "a new driver will be assigned" push is a promise no code keeps; the
+    decline sends nothing), a `delivery_declined_by_driver` flow event, and a notice to the
+    company's admins for an `isControlledByAdmin` company. A single-mode twin is one job: declining
+    either leg re-queues both. The write is filtered on the courier AND a declinable status, so a
+    decline racing a pickup or a reassign changes nothing (409 `NOT_DECLINABLE`). Driver cancel
+    (`-1`, terminal) is unchanged and still exists.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
   `isDeliveryOnlySupport` field, so the gate returns `platform_disabled`/`store_disabled` for
