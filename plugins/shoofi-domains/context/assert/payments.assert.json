@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@93cc915f (fix/HIGH-RISK-invoice-orderid-before-insert) / 2026-11-06 (CORE invariant 12); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -157,6 +157,11 @@
           "file": "routes/order.js",
           "regex": "GetSessionStatus",
           "desc": "ZCredit Apple/Google Pay verification"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "awaitInsertedOrderId",
+          "desc": "invariant 12: pre-insert background invoice updates in /api/order/create wait for the inserted _id, never read orderId"
         },
         {
           "file": "routes/hyp-pay.js",
