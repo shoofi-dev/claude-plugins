@@ -107,7 +107,8 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    reuse `getSuccessfulOrdersByCustomerIds`. **Two "how many orders has this customer placed"
    definitions coexist and legitimately disagree.** Customer-facing surfaces — the app's own
    profile count (`GET /api/customer/details`) and the admin profile badge
-   (`POST /api/customer/orders`) — count everything **except** status `"0"` and `4/5/7/8/9`, so
+   (`GET /api/customer/:customerId/orders`, dashboard roles; the customer's own
+   `POST /api/customer/orders` shares its handler `sendCustomerOrders`) — count everything **except** status `"0"` and `4/5/7/8/9`, so
    **in-flight orders (1/6/13/14/15) count**. Every revenue/report path instead uses
    `COMPLETED_STATUSES = ["2","3","10","11","12"]` (`utils/customer-orders.js`). The same
    customer therefore shows a *higher* number on their profile than in the reports — that gap is
@@ -146,6 +147,14 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    serialises the ObjectId), so compare with `String(...)` or cast via `getId`
    (`lib/common.js`). Any new `createdBy`-style provenance must be read from `req.auth` and
    never from the request body; `routes/team-tasks.js` is the reference implementation.
+   **Self-service routes in `routes/customer.js` act on `req.auth.id` only** — the old
+   `req.body.customerId || req.auth.id` let any token read or write another account (HQ
+   #e5e429). An admin acting on someone else's record gets its own by-id route behind
+   `checkAdminRole(CUSTOMER_ADMIN_ROLES)`. `update-notification-token` stays type-correct only
+   because it picks its collection from `app-type` the same way `getTokenFromHeaders`
+   (`routes/auth.js`) picks the one the token was checked against — keep the two in sync. The
+   RN apps' `insert-customer-name` screen still sends an `adminCustomerStore` id; the server
+   ignores it.
 8. **`deletedAt` is the deletion marker, NOT `isDeleted`.** Account deletion is soft:
    `POST /api/customer/delete` writes `{isDeleted: true, deletedAt: new Date()}`
    (`routes/customer.js`) and nothing ever purges the document. But the **OTP-*request***
