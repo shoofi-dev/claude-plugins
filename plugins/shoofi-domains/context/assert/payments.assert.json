@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@main / 2026-11-11 (reference §6 refunds rewritten around refundOrderPayment, HQ #716972); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -26,7 +26,8 @@
         "services/twin-order/twin-delivery-price.js",
         "utils/client-features.js",
         "services/coupons/public-coupon.js",
-        "routes/coupon.js"
+        "routes/coupon.js",
+        "services/payments/order-authorization.js"
       ],
       "symbols": {
         "utils/hyp-pay.js": [
@@ -94,6 +95,14 @@
           "couponBenefit",
           "loadPublicCoupon",
           "business_visible"
+        ],
+        "services/payments/order-authorization.js": [
+          "refundOrderPayment",
+          "releaseOrderAuthorization"
+        ],
+        "services/money/money-cancel.js": [
+          "recordSingleCancel",
+          "clearSingleRefundFlagIfSettled"
         ]
       },
       "patterns": [
@@ -321,6 +330,21 @@
           "file": "services/coupons/public-coupon.js",
           "regex": "const UPCOMING_WINDOW_DAYS = 30;",
           "desc": "CORE: an upcoming coupon shows only within 30 days of its start"
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "\"paymentAuth\\.refundRequired\": true,\\s*\"paymentAuth\\.refundRequiredReason\": refundReason,\\s*\"paymentAuth\\.refundRequiredAmount\": amount,\\s*\"paymentAuth\\.refundRequiredAt\": new Date\\(\\),",
+          "desc": "reference §6: refundOrderPayment flag write — refundRequired / refundRequiredReason / refundRequiredAmount / refundRequiredAt"
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "\"paymentAuth\\.refundedAmount\": amount,\\s*\"paymentAuth\\.refundedAt\": new Date\\(\\),\\s*\"paymentAuth\\.refundTransId\": result\\.Id \\|\\| null,\\s*\"paymentAuth\\.refundReason\": reason,\\s*\"paymentAuth\\.refundError\": null,\\s*\"paymentAuth\\.refundRequired\": false,",
+          "desc": "reference §6: refundOrderPayment success write — refundedAmount / refundedAt / refundTransId / refundReason, refundError null, refundRequired false"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "\"paymentAuth\\.refundRequiredReason\": \"cancel_no_decision\",",
+          "desc": "reference §6 / CORE invariant 12: an undecided cancel of a settled single charge is flagged cancel_no_decision (flagUndecidedCancelRefund)"
         }
       ]
     },

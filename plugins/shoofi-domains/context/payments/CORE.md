@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@main / 2026-11-11 (reference §6 refunds rewritten around refundOrderPayment, HQ #716972); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
