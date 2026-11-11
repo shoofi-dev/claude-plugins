@@ -31,7 +31,14 @@
       "symbols": {
         "utils/hyp-pay.js": [
           "buildCcPaymentRefData",
-          "chargeToken"
+          "chargeToken",
+          "cancelAuthorization",
+          "refundTransaction"
+        ],
+        "services/payments/order-authorization.js": [
+          "releaseOrderAuthorization",
+          "refundOrderPayment",
+          "RELEASE_FAILED"
         ],
         "utils/invoice-mail.js": [
           "saveInvoice"
