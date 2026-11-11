@@ -785,3 +785,47 @@ countedCash, totals }`. `closeClaim*` exist only while closing and are never ret
 - `kopaTillOrders` has no index on `payments.at` / `refunds.at` / `closedAt`. They belong in
   `till-orders.js` `INDEXES`. `ensureIndexes` keys builds by collection, so another file must not
   register them.
+
+### Phase 7b: the partner sales figures and store analytics for a Kopa login — `routes/kopa/sales.js`
+> last-verified: shoofi-server@feat/kopa-phase7 / 2026-11-12. Service: `services/kopa/sales.js`;
+> tests: `test/integration/kopa/sales.js`.
+
+Kopa's own login (`Authorization: Kopa <token>`) cannot call `POST /api/payments/partner/summary` or
+`GET /api/store-analytics/overview`: both take a partner JWT only (`auth.required`), and their gates
+stay unchanged. These two KOPA_REPORTS routes return the same answer. They call the same exported
+functions with the same arguments and **compute nothing of their own**:
+
+| Route | Same as | Calls |
+|---|---|---|
+| `POST /api/kopa/sales/summary` `{ startDate, endDate }` | `partner/summary` with `figures: "report"` | `computePartnerReport` + `summaryResponse` (`services/payments/partner-summary.js`) |
+| `GET /api/kopa/analytics/overview?months=` | `GET /api/store-analytics/overview` | `computeStoreAnalytics(db, { months, shoofiDb, appName })`, with the route's own `monthsFrom` clamp (exported from `routes/store-analytics.js`) |
+
+So the sales figures ARE the store report's lines (invariant 17), month-only lines included when the
+range is exactly one calendar month. A difference from the partner screen is a bug in this route.
+**Fix it by calling the shared function again, never by adjusting a number here.**
+
+**Gate mapping (sales/summary):**
+- **Store:** `appName` = `req.storeMembership.appName`, proven by KOPA_REPORTS. The partner
+  route's `partnerEarningsAccess` proves the same store from `app-name`.
+- **Who sees figures:** the gate decides. `reports` OR `all` gets the figures, and anyone else is
+  a 403. The partner route uses `canSeeStoreTotals` (`reports` only) and answers
+  `RESTRICTED_SUMMARY` with a 200. So an owner holding `all` without `reports` sees figures in
+  Kopa and a restricted answer on the partner screen. That is the KOPA_REPORTS decision.
+- **`req.partnerStoreUser`** is not set. `computePartnerReport` never reads it: it reads only
+  `req.app.db`, and the report engine, run with in-process sources, also reads only `req.app.db`.
+- **Always `figures: "report"`.** Kopa never gets the legacy answer. `partnerId` is not asked for,
+  because it selects nothing.
+- **Body:** `startDate` and `endDate` are both required, strict `YYYY-MM-DD`, start ≤ end, at most
+  93 calendar days (400 `INVALID_QUERY`). The partner route validates nothing. An unparseable
+  date there (`"garbage"`, `"2026-02-31"`) reaches `reportPeriod`'s day loop as an invalid moment.
+  Measured on a laptop: about 15 s of CPU and 1.6 GB RSS before it throws "Invalid array length"
+  and answers 500. That is a partner-gated OOM risk on the existing route, not changed here.
+
+**Pinned by** `test/integration/kopa/sales.js`, on in-memory Mongo with the
+`partner-summary-world` store-month, a stored October report and reviews:
+- The Kopa body deepEquals the partner route's body for 5 ranges (one month, one week, one day,
+  a month with no data, and a range that runs to today) and 9 `months` values, called with both a
+  partner Token and a Kopa session. `generatedAt` is checked, then left out of the compare,
+  because it is "now" to the second.
+- The gate: no token 401, customer 403, another store 403, cashier-only 403, reports via Token
+  200, owner via a Kopa session 200, `all`-only 200.

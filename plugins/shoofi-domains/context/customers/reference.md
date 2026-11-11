@@ -20,7 +20,8 @@ Also **who a push campaign reaches** (§5b): `controllers/customerCampaignContro
 `services/customer-campaigns/marketing-push-policy.js`, `routes/customer-marketing-preferences.js`,
 `utils/crons/scheduled-campaigns-cron.js`.
 Also the **Kopa customers and staff reads** (§5f): `routes/kopa/customers.js`,
-`services/kopa/customers.js`.
+`services/kopa/customers.js`, and the till's waiter picker `routes/kopa/staff-till.js` +
+`services/kopa/staff-till.js`.
 **Not yours:** order history *content* (orders), coins/growth rewards (growth), driver
 coverage fields (delivery) — you own the identity record they hang off.
 
@@ -602,6 +603,7 @@ way the identity it proves is a `shoofi.storeUsers` doc. Logic is in
 | GET | `/api/kopa/customers?page&limit&q&sort=spend\|orders\|last&from&to` | `KOPA_REPORTS` | `{ customers: [{ customerId, name, phone, orderCount, totalSpend, firstOrderAt, lastOrderAt }], totalCount, page, hasMore }` |
 | GET | `/api/kopa/customers/:customerId/orders` | `KOPA_REPORTS` | `{ customerId, orders: [{ _id, orderId, status, created, orderPrice, order: { receipt_method, payment_method } }], truncated }`, or **404** |
 | GET | `/api/kopa/staff` | `KOPA_OWNER` | `{ staff: [{ _id, fullName, phone, isAdmin, roles, createdAt? }] }` |
+| GET | `/api/kopa/staff/till` (phase 7c, `routes/kopa/staff-till.js`) | `KOPA_TILL` | `{ staff: [{ _id, fullName }] }` |
 
 - **Gates.** `KOPA_REPORTS` = `auth.required` + `requireStoreMembership()` +
   `requireStoreRole("reports", "all")` (an owner holding `all` without `reports` passes);
@@ -635,6 +637,21 @@ way the identity it proves is a `shoofi.storeUsers` doc. Logic is in
   for a doc with no roles array, because such an `isAdmin` doc passes every role gate.
   `createdAt` is the doc's `created` (the admin insert writes `created`), omitted when absent.
   The test asserts no `token` key with a fake that ignores projections.
+- **The till's waiter picker (`GET /api/kopa/staff/till`, phase 7c).** A cashier assigns a waiter
+  to a till order but cannot call the owner-only `/api/kopa/staff`, so this is a separate,
+  narrower read; `/api/kopa/staff` keeps `KOPA_OWNER`. Gate `KOPA_TILL` = `requireStoreRole("cashier",
+  "all")`, by partner `Token` or a Kopa session. It lists the store's `storeUsers` docs that would
+  pass that gate themselves: `find({ appName, isAdmin: true })`, then
+  `storeUserHasRole(doc, TILL_ROLES)` (`utils/store-membership.js`, the function the gate runs),
+  so `isAdmin` + `cashier`/`all`, or the legacy no-roles / empty-roles admin. Reports-only,
+  print-only and non-admin docs are not listed. The reply is `{ staff }` only, each row exactly
+  `{ _id, fullName }`, sorted by name. `TILL_STAFF_PROJECTION` is `{ _id, fullName, isAdmin,
+  roles }`: `isAdmin` and `roles` are read for the filter and dropped by `toTillStaffRow`;
+  `phone`, `token`, `authCode` and `notificationToken` are never read. The test
+  (`test/integration/kopa/staff-till.js`) pins that shape with a fake that ignores projections,
+  and mounts the whole Kopa router to prove neither `/staff` path shadows the other (both are
+  exact paths with no params). The list is narrower than what a till order accepts as `waiterId`
+  (any `storeUsers` doc of the store, `services/kopa/till-orders.js`); it changes nothing there.
 
 ## 5g. Kopa phase 4a: staff sessions and PINs (`routes/kopa/auth.js`)
 
