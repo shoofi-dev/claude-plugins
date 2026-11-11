@@ -193,6 +193,8 @@
           "regex": "if \\(shouldRunCrons\\) \\{[\\s\\S]*scheduledCampaignsCron\\.startScheduledCampaignsCron\\(app\\.db\\)",
           "desc": "CORE invariant 12: the scheduled-campaigns cron is started inside the shouldRunCrons block - before 2026-10-28 it was never started, so no scheduled campaign sent"
         },
+        {"file": "utils/admin-auth-service.js", "regex": "jwt\\.verify\\(token, JWT_SECRET, \\{\\s*algorithms: ADMIN_TOKEN_ALGORITHMS,\\s*ignoreExpiration: true,", "desc": "reference 7 item 6: admin refresh-token verifies the signature (HS256 only) and ignores only expiry - it used to jwt.decode a forged unsigned token into an admin session (HQ #717841)"},
+        {"file": "routes/shoofi-admin-users.js", "regex": "adminAuthService\\.findAdminForRefresh\\(", "desc": "reference 7 item 6: POST /api/admin/users/refresh-token goes through findAdminForRefresh, never jwt.decode"},
         {"file": "routes/customer.js", "regex": "const identityListAdmin = \\[auth\\.required, checkAdminRole\\(DASHBOARD_ROLES\\)\\];", "desc": "CORE invariant 2: the partner-account and customer-list routes take a dashboard role; auth.required alone passes a customer or partner token"},
         {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/store-users/:appName', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: listing a store's users (each doc held the owner's live token) is dashboard-only"},
         {"file": "routes/customer.js", "regex": "router\\.get\\('/api/customer/store-users/:appName/:userId', \\.\\.\\.identityListAdmin,", "desc": "CORE invariant 2: reading one store user is dashboard-only"},
