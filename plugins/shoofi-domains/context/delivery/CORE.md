@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -120,6 +120,15 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
   `exec-dashboard/delivery-metrics.js`) and add the two fees as their own settlement lines.
 - The store's list is filtered **server-side**: default = active work queue (`1,2,3,5`),
   عرض الكل = no status filter at all (not a date toggle), newest 200, `appName`-scoped.
+- **On the store's card the STATUS decides the state, never `isPendingAssignment`:** rows from
+  before Sept 2026 and rows support marked delivered/cancelled can still carry
+  `isPendingAssignment: true` on status 4 or a cancel (v1 `screens/delivery-only/list` checks the
+  flag first and labels them «بانتظار تعيين سائق»). The partner v3 screen (shoofi-partner
+  `helpers/deliveries/bookings.ts`, behind `DELIVERIES_V3`) maps 1 → waiting (flag / no driver =
+  searching, driver set = offered, not accepted), 2 / 5 / 3 → on the way (to the store / at the
+  store / collected), 4 → delivered, -1/-2/-3 → cancelled. The list is **pull-only** — no status
+  change is pushed to the tablet — and `pickupTime` is a bare `"HH:mm"`, meaningless on a row from
+  another day.
 
 ## The dropoff note is TWO fields — the driver card shows both
 `order.order.address.notes` = the **landmark** the customer saved ON THE ADDRESS («علامة مميزة
