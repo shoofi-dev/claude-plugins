@@ -827,7 +827,7 @@
         },
         {
           "file": "App.tsx",
-          "regex": "const printerTarget = printerTargetForStore\\(storeDataStore\\.storeData\\);|storeDataStore\\.storeData\\?\\.printerTarget \\|\\| \"BT:00:01:90:42:95:AA\"",
+          "regex": "printerTarget\\s*=[^;]*printerTargetForStore\\(storeDataStore\\.storeData\\);|storeDataStore\\.storeData\\?\\.printerTarget \\|\\| \"BT:00:01:90:42:95:AA\"",
           "desc": "CORE invariant 17: a store with no printerTarget has no printer, with no fallback address (HQ #7121e1). The second alternative is the OLD fallback line. It exists only so this pin is green on partner main before fix/partner-no-printer-no-fallback merges. Drop it once that branch is on main"
         },
         {
