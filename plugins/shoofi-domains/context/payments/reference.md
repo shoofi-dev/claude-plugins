@@ -186,6 +186,11 @@ hangs the request (CORE invariant 11), so none of them answered.
 5. **Coins/coupons settle only AFTER payment success**; failures are logged CRITICAL for
    manual reconciliation, never rolled back against an irreversible capture.
 6. **Order dedup lock** (Redis `SET NX` + fallback + 30s window) prevents double charges.
+7. **Cancel money is settled once, and "nobody decided" is recorded as such** (CORE invariant
+   12, orders CORE invariant 27): `cancelMoneyDecision` ∈ keep/refund/undecided;
+   `paymentAuth.refundRequiredReason` reasons written on cancel are `captured_before_cancel`,
+   `release_refused_ccode_*`, `release_error` (release), `refund_*` (explicit refund) and
+   `cancel_no_decision` (an undecided settled single charge, written by `routes/order.js`).
 
 ## App — shoofi-app (customer) payment client
 - **Method resolution**: `helpers/get-supported-payment-methods.ts` → GET `payment-methods`;

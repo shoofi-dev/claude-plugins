@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -15,7 +15,7 @@ per-repo client sections.
 **Yours:** order creation, status transitions, twin orders, order reads/admin/monitoring,
 customer order history, order crons, and the order-side wiring of secondary features
 (coins, world-cup, attribution, coupon usage).
-Server: `routes/order.js`, `routes/twin-order.js`, `routes/order-fraud-*.js`,
+Server: `routes/order.js`, `routes/twin-order.js`, `routes/money.js`, `services/money/*`, `services/orders/cancel-money.js`, `routes/order-fraud-*.js`,
 `routes/admin/order-monitoring.js`, `services/twin-order/*`, `utils/order-stock.js`,
 `utils/order-pricing.js` + `utils/order-pricing-shadow.js`, `routes/order-amend.js`,
 `utils/delivery-row.js` (how an order finds its delivery row, invariant 23),
@@ -502,7 +502,8 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `update/viewd`, `printed`, `update-delay`, `start-preparing`, `update-start-preparing`,
       `update-item-collected`, `book-delivery`, `book-custom-delivery`, `update-custom-delivery`,
       `drive-in-arrival(-confirm)`, `update/all`). These are status transitions, so any change
-      is high-risk. Ungated money paths `addRefund` and `updateCCPayment` belong to payments.
+      is high-risk. The ungated money path `updateCCPayment` belongs to payments
+      (`addRefund` was removed on 2026-11-03, shoofi-server 29ed5252).
 
 19. **THE COINS ADMIN ROUTES ARE DASHBOARD-ONLY, GATED ON THE ROUTE ITSELF.** Coins have no
     domain of their own; orders owns their order-side wiring and, since 2026-10-30, who may call
@@ -859,6 +860,176 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests (shoofi-app): `__tests__/stores/active-orders-placed-and-stale.test.ts`,
       `__tests__/components/active-orders-error-and-placed.test.tsx`,
       `__tests__/components/order-history-error.test.tsx`.
+
+27. **A CANCEL SETTLES MONEY ONCE AND SAYS WHAT WAS DECIDED; A TWIN UNDO IS REFUSED ONCE MONEY
+    MOVED** (shoofi-server `fix/twin-cancel-safety`, 2026-11-06). Prod cases: twin group
+    `tg_1793989742338_dmfnny` (pier-19 9765-0521 + asaiel 7643-8302, ZCredit ₪177: degraded, undo
+    clicked 3× as silent no-ops, then both legs cancelled with "keep" and no coupon) and snooshy
+    1802-2011 (cancel "keep" → COMP ₪140 → un-cancel → cancel again → also a ₪140 refund flag).
+    - **`cancelMoneyDecision` is `keep` | `refund` | `undecided`** (`CANCEL_MONEY_DECISION`,
+      `services/orders/cancel-money.js`, re-exported by `routes/order.js`). The admin web sends
+      `keep`/`refund` only when money is at stake. A cancel status (4,5,7,8,9) with NO decision
+      (partner reject, status dropdown, driver, crons) is stamped **`undecided`** when
+      `hasCancelMoneyAtStake(order)` (not cash — `payment_method` or `payment_provider` `CASH` —
+      `total > 0`, and `paymentAuth.status` or a non-`failed` `ccPaymentRefData`), and NOT
+      stamped at all otherwise (cash / zero / never paid). Until 2026-11-06 every one of these
+      was stamped `refund`. A value other than keep/refund in the request is dropped.
+      `settleCancelledOrderMoney` still RUNS an unattended cancel as REFUND: a live J5 hold is
+      released exactly as before (`autoRefund: false`), a captured J5 is flagged by the release
+      (`captured_before_cancel`), and — new — a settled charge with no `paymentAuth` on a SINGLE
+      order is flagged `paymentAuth.refundRequired` with **`refundRequiredReason:
+      "cancel_no_decision"`**, `refundRequiredAmount = order.total` (same fields
+      `refundOrderPayment` writes; nothing is sent back). A twin leg gets the stamp and no
+      per-order flag and no per-order settle: one charge covers two orders, so the GROUP decides
+      (invariant 28, `settleTwinAfterLegCancel`).
+    - **`cancelledAt`** is now written on every live → cancelled `/api/order/update`. It is the
+      only marker a cash cancel carries, and the HQ money audit's `uncancel-leftovers` check
+      finds un-cancelled orders by `cancelMoneyDecision || cancelledAt || cancelCompensation`.
+    - **Settle once, on live → cancelled only** (`cancelSettlementSkipReason`, computed on the
+      PRE-update order, before `settleCancelledOrderMoney`): `already_cancelled` (status already
+      4/5/7/8/9), or an un-cancelled order carrying `prior_cancel_compensation`
+      (`cancelCompensation`), `prior_refund_flag` (`paymentAuth.refundRequired`) or
+      `prior_refund_issued` (`paymentAuth.refundedAmount > 0`). Then no settle runs, the
+      client-sent decision is dropped (the first cancel's `cancelMoneyDecision*` stands), and
+      `cancelSettlementSkipped { reason, at, by, requestedDecision, previousStatus }` is written.
+      The other cancel side effects (coins, coupon usage, delivery) still run, but coins are now
+      refunded once per order (invariant 28).
+    - **Twin degrade** (`degradeToSingle`): `degrade.refundOwed` = `computeDegradeRefund` = the
+      dropped leg's `total − shippingPrice`, read BEFORE any shipping transfer, +
+      `combinationFee.customerPays`; **0 (and no auto-refund attempt) unless that leg was
+      card-captured** (`isCardCapturedLeg`: not cash, non-failed `ccPaymentRefData`). There is no
+      automatic ZCredit reversal any more — `degradeAutoRefund` is not read, so `refundAttempted`
+      stays false; the amount is owed on the group ledger (invariant 28). It used
+      `orderPrice` (pre-coupon) and was > 0 on every cash degrade. `refundBreakdown.basis` is
+      `card_captured` | `not_card_captured`. **The group's `paymentStatus` is no longer touched**
+      (it was overwritten to `pending`/`partial_refunded`); refund state lives only in
+      `degrade.refund*`.
+    - **Undo-degrade refusal** (`undoDegradeBlockReason(group, keptOrder, droppedOrder)`, pure,
+      mirrored by the admin web — shoofi-delivery-web#346): `money_already_handled` when
+      `degrade.refundAttempted || degrade.refundCompleted`, or either order has
+      `cancelCompensation`, or either order has a `cancelMoneyDecision` whose
+      `cancelMoneyDecisionAt` is after `degrade.triggeredAt` (a missing timestamp on either side
+      counts as after), or the group's `moneyLedger` has any entry at/after `degrade.triggeredAt`
+      other than `capture`/`release` and the degrade's own undecided `decide`/`owe`
+      (`ledgerMovedSince`); else `kept_side_cancelled` when the kept order's status is 4/5/7/8/9.
+      A successful undo closes the degrade's undecided owe (`cancel_owed`); the dropped leg's
+      coins / coupon / deal uses returned at the degrade are NOT taken back
+      (`undoDegrade.returnedOnDegradeNotReclaimed`).
+      The route answers **409 `{ message, reason }`** (Hebrew message) and nothing is written.
+    - **`db.twinOrderGroups` is the real `twinOrderGroups` collection**
+      (`DatabaseInitializationService`); it pointed at an empty `twin-order-groups`, so undo's
+      group restore (step 6) wrote nowhere and all 7 prod undos (3 groups) left a half-undone
+      group. Every twin writer uses `db.collection('twinOrderGroups')`.
+    - **`cascadeCancel`** stamps `moneyDecision` (keep/refund from `/api/money/cancel` or the
+      triggering order route) or else `undecided` on each leg it cancels when money is at stake and
+      no decision exists; no refund flag. **The dropped leg's status:** a SUPPORT degrade (source
+      `admin` — `POST /api/money/cancel` one side, `/api/twin-order/admin/degrade`) cancels it as
+      `7` CANCELLED_BY_ADMIN with support's reason in `cancelReason` and `twinDegradeSource`; `5`
+      REJECTED only for the store side (timeout sweeper / store reject) — partner reports, HQ and
+      store metrics read 5 as "the store rejected". The customer app's twin header checks
+      "degraded" before "cancelled" (shoofi-app#96). **`degradeToSingle`** returns the dropped leg's coins,
+      coupon uses and store-deal uses (`returnLegExtras`, recorded on `degrade.returnedOnDegrade`).
+    - **Flow events** (`shoofi.orderFlowEvents`, the `trackOrderFlowEvent` writer, swallowed on
+      failure): `twin_degrade`, `twin_undo_degrade`, `twin_cascade_cancel` on BOTH legs
+      (metadata `groupId`, `side`, `role`, actor = the admin), `cancel_money_undecided`
+      (`refundFlagged`, `liveHold`, `isTwinLeg`) and `cancel_settlement_skipped` (`reason`).
+    - **Who may call** (guardrails §3a; only the admin web calls these): every
+      `/api/twin-order/admin/*` action (`cancel`, `degrade`, `undo-degrade`, `assign-driver`) is
+      `auth.required` + `checkAdminRole(TWIN_ADMIN_ROLES)` = master, admin, manager, senior,
+      operator, viewer, editor (support works on `viewer`; `accountant` excluded);
+      `GET /admin/group/:groupId/full` and `GET /api/admin/twin-order-config` take
+      `DASHBOARD_ROLES`; `POST /api/admin/twin-order-config` takes `["admin"]` (+ master). Until
+      2026-11-06 the twin routes were `auth.required` only and the config had no auth.
+    - **The second-dispatch store sees its order** by ONE rule (`utils/twin-order-visibility.js`,
+      reference §4 Dispatch) on both new-orders lists and the badge count: hidden only while the
+      first-dispatch order is live and not accepted. A dropped first store releases it WITH the
+      persistent alert (`twin_second_store_released`); `secondStoreWaiting` tells the admin while
+      it is still hidden. Prod before: 17 groups' kept store opened 8-45 min after the degrade;
+      the 3 failed-undo groups' kept orders were never seen.
+    - Tests (shoofi-server): `twin-cancel-safety.js`, `twin-admin-auth.js`,
+      `order-cancel-undecided.js`, `order-cancel-settle-money.js`,
+      `order-cancel-money-before-status.js`, `hq-money-audit.js`, `money-cancel.js`.
+
+28. **THE CHARGE IS THE UNIT OF MONEY: ONE APPEND-ONLY LEDGER PER CHARGE, ONE SUMMARY, ONE
+    DECISION** (shoofi-server `fix/twin-cancel-safety`, 2026-11-07; contract
+    `worktrees/twin-cancel-money-contract.md`, approved by Sari 2026-11-06).
+    - **Charge keys:** `order:<appName>:<orderObjectId>` (single) and `twin:<groupId>` (one
+      combined capture for both legs + the combination fee). The ledger is `moneyLedger` on the
+      order / on the `twinOrderGroups` doc; `moneySummary` (`services/money/ledger.js`
+      `summarize`, the ONLY place these numbers are computed) is stored beside it and copied onto
+      both twin legs. Orders without one are legacy — the admin falls back to `charge-state.ts`.
+    - **Entry types:** capture, release, decide, compensate, owe, refund, record_refund,
+      refund_unknown, resolve_unknown, change_decision, cancel_owed. `captured = Σcapture`;
+      `compensated = Σcompensate − Σchange_decision`; `refunded = Σrefund + Σrecord_refund +
+      Σresolve_unknown(refunded)`; `owed = Σowe − refunded − Σcancel_owed`. **Invariant, checked
+      before every write: `refunded + compensated + owed ≤ captured`** (a would-be violation is
+      refused and logged CRITICAL — this is what makes snooshy's coupon-AND-refund impossible).
+    - **Writes** (`services/money/money-store.js` `appendEntries`): versioned `updateOne` on
+      `moneyLedgerVersion` (lost race → re-read, retry), entry `key` = idempotency key (a
+      duplicate key is skipped), then the summary, the central owed index
+      `shoofi.moneyOwed` (one row per charge: status open/closed, owedAmount, refundUnknown,
+      unknownEntryId, customer, orders, decision/decidedBy/At) and a `money_<type>` flow event per
+      entry on every order of the charge. **Charge claim:** `moneyClaim {token, at, by}` on the
+      same doc, stale after 2 min; a second money action while one runs → 409
+      `{reason: "charge_busy"}`. `/api/order/update` claims a single order's charge before it
+      settles (twins: the group, in `settleTwinAfterLegCancel`).
+    - **Capture:** twins record `group.capturedAmount` + a `capture` entry in
+      `applyCaptureSuccess` = `computeCombinedTotal` (legs' totals + fee). Singles (and older
+      twins) derive it at first ledger write (`ensureCaptureEntry`): `paymentAuth.capturedAmount`
+      else `order.total` (the server charges `orderDoc.total`); older twins via
+      `twinCapturedAtCapture` (a keep-secondary degrade's shipping transfer taken back off).
+      Creation paths were NOT touched.
+    - **Singles settle through the existing primitives**: `POST /api/money/cancel` runs the whole
+      `/api/order/update` pipeline in-process (`handleOrderUpdate`, exported) with status 7 + the
+      decision, and every single-order cancel (partner, cron, admin) records its outcome with
+      `recordSingleCancel`, read off what `settleCancelledOrderMoney` wrote (release, compensate,
+      refund, or owe from the `refundRequired` flag).
+    - **Twins settle once per decision** (`services/money/money-cancel.js`
+      `settleCancelledMoney`): keep → ONE coupon via `createCancelCompensation({ scope: "twin",
+      amount, decisionKey, groupId })` = `COMP-<primary originalOrderId>[-n]`, the existing
+      Shoofi-funded shape, NOT written on `order.cancelCompensation` (ledger +
+      `moneySummary.couponCodes`); refund → owe (+ HYP auto refund below); undecided → owe. Per-side
+      calls of `createCancelCompensation` / `refundOrderPayment` still refuse twins. Scopes: one
+      side (`this`/`other` → `degradeToSingle({settleMoney:false})`, amount = that leg's total −
+      shipping + fee), `both` (→ `cascadeCancel`), `remaining` (the live leg through the order
+      route). For `both`/`remaining` the amount is what is left (`captured − refunded −
+      compensated − owed`) **plus any open undecided owe, which the decision replaces**
+      (`cancel_owed {decision: undecided}`). Cash / never charged: 0, only a `decide` entry.
+      **`decision: "none"`** is accepted only when the preview has nothing to settle for that scope
+      (refundMode none or amount 0): no `cancelMoneyDecision` stamp, nothing owed, `cancelledAt` +
+      a `cancel_no_money` flow event; with money at stake it is 400 `bad_decision`. It exists so the
+      dialog never has to send "refund" for a cash order (the stamp invariant 27 removed).
+    - **A degrade with no decision** (old admin route, timeout sweeper) records `decide` + `owe`
+      `undecided` for `refundOwed` on the group; a twin leg cancelled through the order route with
+      no decision owes the remainder `undecided`. Both land in the owed queue.
+    - **HYP twin partial refund** (`attemptHypTwinRefund`), behind `twinOrderConfig.hypAutoRefund`
+      (default false): slot claimed first as a `refund_unknown` entry with a unique key, amount
+      capped by `min(owed, captured − refunded − in-doubt)`, one attempt per decision, never
+      retried while any refund is in doubt; a definite answer appends `resolve_unknown`
+      (refunded / not_refunded), a throw (timeout / HTTP error) leaves it unknown → owed queue →
+      `POST /api/money/resolve-unknown`. HYP's sandbox approved an over-refund and every duplicate,
+      so these guards are the only ones. **ZCredit is always manual** (record-refund).
+    - **Endpoints** (`routes/money.js`; only the admin web calls them, #346):
+      `POST /api/money/cancel-preview` and `POST /api/money/cancel` (`{appName, orderId: Mongo _id,
+      scope, decision, reason}`) take the twin-action roles (all but accountant);
+      `POST /api/money/change-decision` (keep→refund: unused coupon balance → owed, coupon
+      `isActive:false`; undecided→refund; undecided→keep), `POST /api/money/record-refund`
+      (capped by owed, idempotent on provider+providerRef; on a single it clears
+      `paymentAuth.refundRequired` once nothing is owed and adds `paymentAuth.refundedAmount`),
+      `POST /api/money/resolve-unknown`, `GET /api/money/owed?status=open|closed|all` take
+      `["accountant"]` (+ master). Errors: `{reason, message, code}`.
+    - **Coins are refunded once per order** (`refundCoins`: `customerCoins.cancelRefundedOrderIds`
+      in the same atomic update; legacy rows recognised by their notes) — the twin path refunded
+      the trigger leg twice (order route + cascade).
+    - **Backfill**: `scripts/money-backfill.js`, DRY-RUN by default; `--apply` only with Sari's OK.
+      Coupons already issued against a twin group count as ONE `compensate` entry each
+      (`collectTwinCompensations`): compensation rows naming a leg / the group, and a manual twin
+      coupon stamped on the legs as `cancelCompensation { couponCode, amount, compensationId,
+      twinGroupId }` (support's shape for dmfnny ₪177 and tg_1794337558463_qo9a4q ₪174, stamped on
+      BOTH legs) — deduped by coupon code / compensation id, so a group so covered owes 0.
+    - Tests (shoofi-server): `money-cancel.js` (ledger, every endpoint, roles, concurrency,
+      re-cancel, cash twin, keep→refund on a partly used coupon, HYP success/refused/timeout/cap,
+      singles through the order pipeline, coins once), plus the invariant-27 tests.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

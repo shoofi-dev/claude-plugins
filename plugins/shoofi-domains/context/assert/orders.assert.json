@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@fix/twin-cancel-safety / 2026-11-10 (CORE invariants 27-28); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -52,7 +52,18 @@
         "routes/coins.js",
         "test/integration/coins-admin-auth.js",
         "utils/active-orders.js",
-        "test/integration/customer-active-orders-per-store.js"
+        "test/integration/customer-active-orders-per-store.js",
+        "services/orders/cancel-money.js",
+        "services/database/DatabaseInitializationService.js",
+        "test/integration/twin-cancel-safety.js",
+        "test/integration/twin-admin-auth.js",
+        "test/integration/order-cancel-undecided.js",
+        "services/money/ledger.js",
+        "services/money/money-store.js",
+        "services/money/money-cancel.js",
+        "routes/money.js",
+        "scripts/money-backfill.js",
+        "test/integration/money-cancel.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -61,10 +72,11 @@
           "finalizeApplePayOrder",
           "verifiedAppName"
         ],
-        "services/twin-order/twin-group-service.js": [
-          "cascadeCancel",
-          "degradeToSingle"
-        ],
+        "services/twin-order/twin-group-service.js": ["cascadeCancel", "degradeToSingle", "undoDegrade", "undoDegradeBlockReason", "computeDegradeRefund"],
+        "services/money/ledger.js": ["summarize", "checkInvariant", "totals", "ledgerMovedSince"],
+        "services/money/money-store.js": ["appendEntries", "claimCharge", "ensureCaptureEntry", "twinCapturedAtCapture"],
+        "services/money/money-cancel.js": ["settleCancelledMoney", "attemptHypTwinRefund", "recordSingleCancel", "settleTwinAfterLegCancel"],
+        "services/orders/cancel-money.js": ["hasCancelMoneyAtStake", "cancelMoneyStamp", "cancelSettlementSkipReason"],
         "utils/order-stock.js": [
           "decrementOrderStock",
           "restoreOrderStock",
@@ -582,7 +594,29 @@
         {"file": "routes/twin-order.js", "regex": "(?:commentToStore, // string \\| undefined[\\s\\S]{0,2500}?const storeComment = sanitizeCommentToStore\\(commentToStore\\);[\\s\\S]{0,4000}?\\.\\.\\.\\(storeComment \\? \\{ commentToStore: storeComment \\} : \\{\\}\\),|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25 / reference §4: buildSkeletonOrder takes commentToStore, cleans it itself and writes it on that leg's order only when non-empty - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the alternation in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"},
         {"file": "routes/twin-order.js", "regex": "(?:commentToCourier: body\\.primary\\?\\.commentToCourier,\\n      commentToStore: body\\.primary\\?\\.commentToStore,[\\s\\S]*commentToCourier: body\\.primary\\?\\.commentToCourier,\\n      commentToStore: body\\.primary\\?\\.commentToStore,|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25: one note per store - both primary buildSkeletonOrder call sites (/place + /digital-place-pending) pass body.primary?.commentToStore beside that side's commentToCourier - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the alternation in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"},
         {"file": "routes/twin-order.js", "regex": "(?:commentToCourier: body\\.secondary\\?\\.commentToCourier,\\n      commentToStore: body\\.secondary\\?\\.commentToStore,[\\s\\S]*commentToCourier: body\\.secondary\\?\\.commentToCourier,\\n      commentToStore: body\\.secondary\\?\\.commentToStore,|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25: one note per store - both secondary buildSkeletonOrder call sites (/place + /digital-place-pending) pass body.secondary?.commentToStore beside that side's commentToCourier - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the alternation in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"},
-        {"file": ["test/integration/comment-to-store.js", "routes/order.js"], "regex": "(?:twin: every buildSkeletonOrder call site passes its own side's commentToStore|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25: the test that fails when a twin call site passes no note or the peer's note - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"}
+        {"file": ["test/integration/comment-to-store.js", "routes/order.js"], "regex": "(?:twin: every buildSkeletonOrder call site passes its own side's commentToStore|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25: the test that fails when a twin call site passes no note or the peer's note - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"},
+        {"file": "services/database/DatabaseInitializationService.js", "regex": "db\\.twinOrderGroups = db\\.collection\\('twinOrderGroups'\\);", "desc": "CORE invariant 27: the db.twinOrderGroups handle is the real collection (it was the empty twin-order-groups, so undo never restored a group)"},
+        {"file": "services/twin-order/twin-group-service.js", "regex": "if \\(degrade\\.refundAttempted \\|\\| degrade\\.refundCompleted\\) return 'money_already_handled';", "desc": "CORE invariant 27 / ref §4: undo refused once a degrade refund was attempted or completed"},
+        {"file": "services/twin-order/twin-group-service.js", "regex": "if \\(decidedAt === null \\|\\| degradedAt === null \\|\\| decidedAt > degradedAt\\) return 'money_already_handled';", "desc": "CORE invariant 27: a cancelMoneyDecision after the degrade (missing timestamp = after) blocks undo - mirrored by shoofi-delivery-web undoDegradeBlock"},
+        {"file": "services/twin-order/twin-group-service.js", "regex": "if \\(keptOrder && isCancelledStatus\\(keptOrder\\.status\\)\\) return 'kept_side_cancelled';", "desc": "CORE invariant 27: undo refused when the kept leg is cancelled/rejected"},
+        {"file": "services/twin-order/twin-group-service.js", "regex": "if \\(!isCardCapturedLeg\\(droppedOrderBefore\\)\\) \\{\\s*return \\{\\s*refundOwed: 0,", "desc": "CORE invariant 27: degrade refundOwed is 0 unless the dropped leg was card-captured"},
+        {"file": "services/twin-order/twin-group-service.js", "regex": "\\(Number\\(droppedOrderBefore\\.total\\) \\|\\| 0\\) - \\(Number\\(droppedOrderBefore\\.shippingPrice\\) \\|\\| 0\\)", "desc": "CORE invariant 27: refundOwed is the dropped leg's total minus shipping (what was paid), not orderPrice"},
+        {"file": "services/orders/cancel-money.js", "regex": "UNDECIDED: \\\"undecided\\\",", "desc": "CORE invariant 27 / payments CORE 12: the undecided cancel money decision"},
+        {"file": "services/orders/cancel-money.js", "regex": "if \\(isCancelledStatus\\(order\\.status\\)\\) return \\\"already_cancelled\\\";", "desc": "CORE invariant 27: money settles only on live -> cancelled"},
+        {"file": "routes/order.js", "regex": "\\\"paymentAuth\\.refundRequiredReason\\\": \\\"cancel_no_decision\\\",", "desc": "CORE invariant 27 / payments CORE 12: an undecided settled single charge is flagged cancel_no_decision"},
+        {"file": "routes/order.js", "regex": "const stamp = cancelMoney\\.cancelMoneyStamp\\(currentOrder, updateobj\\);", "desc": "CORE invariant 27: the stamp is what was decided (keep/refund/undecided/none), not the REFUND the settle step ran"},
+        {"file": "routes/twin-order.js", "regex": "const TWIN_ADMIN_ROLES = \\['master', 'admin', 'manager', 'senior', 'operator', 'viewer', 'editor'\\];", "desc": "CORE invariant 27: twin admin actions keep every operating seat (support = viewer), not accountant"},
+        {"file": "routes/twin-order.js", "regex": "router\\.post\\('/api/twin-order/admin/undo-degrade', \\.\\.\\.TWIN_ADMIN,", "desc": "CORE invariant 27: undo-degrade carries the admin role gate"},
+        {"file": "routes/admin/twin-order-config.js", "regex": "const CONFIG_WRITE = \\[auth\\.required, checkAdminRole\\(\\['admin'\\]\\)\\];", "desc": "CORE invariant 27: twin config write is admin (+ master)"},
+        {"file": "services/money/ledger.js", "regex": "if \\(t\\.refunded \\+ t\\.compensated \\+ t\\.owedOpen > t\\.captured \\+ EPS\\) \\{", "desc": "CORE invariant 28: refunded + compensated + owed <= captured, checked before every ledger write"},
+        {"file": "services/money/money-store.js", "regex": "\\{ \\.\\.\\.ctx\\.filter, moneyLedgerVersion: version === 0 \\? \\{ \\$in: \\[0, null\\] \\} : version \\}", "desc": "CORE invariant 28: ledger writes are versioned (a lost race re-reads and retries)"},
+        {"file": "services/money/money-store.js", "regex": "\\{ moneyClaim: \\{ \\$exists: false \\} \\}, \\{ moneyClaim: null \\}, \\{ \\\"moneyClaim\\.at\\\": \\{ \\$lt: stale \\} \\}", "desc": "CORE invariant 28: one money action per charge (409 charge_busy)"},
+        {"file": "services/money/money-cancel.js", "regex": "if \\(config\\.hypAutoRefund !== true\\) return \\{ attempted: false, reason: \\\"flag_off\\\" \\};", "desc": "CORE invariant 28 / payments CORE 12: HYP twin auto refund only behind hypAutoRefund"},
+        {"file": "services/money/money-cancel.js", "regex": "if \\(t\\.unknownOpen\\.length > 0\\) return \\{ attempted: false, reason: \\\"refund_in_doubt\\\" \\};", "desc": "CORE invariant 28: never retried while a refund is in doubt"},
+        {"file": "routes/money.js", "regex": "const MONEY_FINANCE_ROLES = \\[\\\"accountant\\\"\\];", "desc": "CORE invariant 28: finance routes = accountant (+ master)"},
+        {"file": "services/coins/coins-service.js", "regex": "cancelRefundedOrderIds: \\{ \\$ne: refundKey \\}", "desc": "CORE invariant 28: coins are refunded once per order"},
+        {"file": "routes/admin/twin-order-config.js", "regex": "hypAutoRefund: false,", "desc": "CORE invariant 28: hypAutoRefund defaults off"},
+        {"file": "routes/order.js", "regex": "module\\.exports\\.handleOrderUpdate = handleOrderUpdate;", "desc": "CORE invariant 28: /api/money/cancel runs the same order-update pipeline for singles"}
       ]
     },
     "shoofi-app": {
