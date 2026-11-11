@@ -157,6 +157,11 @@
       "patterns": [
         {
           "file": "routes/order.js",
+          "regex": "\"/api/order/update/all\",\\s*upload\\.array\\(\"img\"\\),\\s*(\\.\\.\\.ORDERS_DASHBOARD_OR_STORE_MEMBER|auth\\.required,\\s*async)",
+          "desc": "CORE invariant 18 / marketingTouch: update/all is store-member gated and writes only buildUpdateAllSet's whitelist (HQ #ba86d5). The auth.required leg is the pre-fix code and self-expires: narrow to the ORDERS_DASHBOARD_OR_STORE_MEMBER leg once shoofi-server PR #501 is on main"
+        },
+        {
+          "file": "routes/order.js",
           "regex": "if \\(req\\.body\\.isNotPrinted\\) \\{\\s*filterBy\\.isPrinted = false;",
           "desc": "doc reference C3 Auto-print: isNotPrinted only adds isPrinted:false. The date window is built only `if (ordersDate)`, so a sweep that sends no date has no window at all; the partner sweep must send ordersDate"
         },

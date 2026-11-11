@@ -334,10 +334,11 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       repoint (`update-apple-pay-order-session`), `finalizeApplePayOrder`, the CC/HYP
       branches and twin `/pay` all `$set` named fields and never rebuild the document. A
       status-`"0"` row carries a touch too, so attribution reports filter on status like
-      every revenue reader. The one whole-body writer, the legacy `POST /api/order/update/all`
-      (`$set: { ...parsedBodey }`), throws `ReferenceError: offsetHours is not defined` before
-      it writes (verified 2026-10-28), so today it cannot overwrite the touch. Whoever revives
-      it must `delete parsedBodey.marketingTouch` first.
+      every revenue reader. The legacy `POST /api/order/update/all` was once a whole-body
+      writer; since HQ #ba86d5 it `$set`s only `buildUpdateAllSet`'s whitelist
+      (`services/orders/update-all-fields.js`: basket, receipt details, prices,
+      `orderDate`/`orderType`, `notes`), so it can never touch `marketingTouch`, `paymentData`,
+      `status`, `created` or `customerId`. Never widen that list to a body spread.
     - **Not** in the `customers.orders[]` snapshot (recipe step 2). **No index on it, on
       purpose:** nothing reports off `order.marketingTouch` directly. It is the FALLBACK input
       of the order facts (invariant 16), read once per checkout by `_id`. A report reads
@@ -501,8 +502,13 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **Still `auth.required` only, outside this sweep:** the order MUTATIONS (`update`,
       `update/viewd`, `printed`, `update-delay`, `start-preparing`, `update-start-preparing`,
       `update-item-collected`, `book-delivery`, `book-custom-delivery`, `update-custom-delivery`,
-      `drive-in-arrival(-confirm)`, `update/all`). These are status transitions, so any change
-      is high-risk. Ungated money paths `addRefund` and `updateCCPayment` belong to payments.
+      `drive-in-arrival(-confirm)`). These are status transitions, so any change
+      is high-risk. `update/all` left this list (HQ #ba86d5): it carries
+      `ORDERS_DASHBOARD_OR_STORE_MEMBER`, finds the order in the `app-name` store's DB (404
+      otherwise) and takes `customerId` from the stored order. Its only callers are the
+      inherited store-owner edit screens in the RN apps (`cartStore.updateOrderAdmin`), none
+      reachable; customer and driver tokens get 403. Pinned by
+      `test/integration/order-update-all-access.js`. Ungated money paths `addRefund` and `updateCCPayment` belong to payments.
 
 19. **THE COINS ADMIN ROUTES ARE DASHBOARD-ONLY, GATED ON THE ROUTE ITSELF.** Coins have no
     domain of their own; orders owns their order-side wiring and, since 2026-10-30, who may call
