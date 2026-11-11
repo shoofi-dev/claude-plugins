@@ -826,6 +826,11 @@
           "desc": "client copy of order status enum (must track server)"
         },
         {
+          "file": "App.tsx",
+          "regex": "const printerTarget = printerTargetForStore\\(storeDataStore\\.storeData\\);|storeDataStore\\.storeData\\?\\.printerTarget \\|\\| \"BT:00:01:90:42:95:AA\"",
+          "desc": "CORE invariant 17: a store with no printerTarget has no printer, with no fallback address (HQ #7121e1). The second alternative is the OLD fallback line. It exists only so this pin is green on partner main before fix/partner-no-printer-no-fallback merges. Drop it once that branch is on main"
+        },
+        {
           "file": "hooks/use-notifications.ts",
           "regex": "newOrderAlertsStore\\.takeNewOrdersOnRefresh\\(appName, orders\\)",
           "desc": "the badge-refresh path (fetchUnviewedOrdersCount, which the notification-received listener runs within a second of the server's creation push) primes once then RINGS - if this ever goes back to seedSeen the loud store.wav new-order alarm is silenced entirely, because the order is already marked alerted 30s before the poll looks (ref C3). NOT triggered by unviewed_orders_updated, which the server only emits on accept"

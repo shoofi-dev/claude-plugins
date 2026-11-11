@@ -439,6 +439,19 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **Image i belongs to queue[i].** A failed capture keeps a `null` slot
       (`captureAlignedToQueue`) and is not printed. Skipping it used to shift later images
       onto the wrong order and mark an unprinted one printed.
+    - **No `printerTarget` means no printer. There is no fallback address.** Until
+      shoofi-partner `fix/partner-no-printer-no-fallback` (HQ #7121e1), `initPrinter`
+      used `printerTarget || "BT:00:01:90:42:95:AA"`, which is the shoofi store's own
+      Epson. Every print-role tablet in a store without an address (148 of 259 store
+      docs on 2026-11-11) tried that printer on each accept and sweep and failed. Those
+      stores made 74% of `printer-testPrint` rows and printed 9 of 2,628 orders in Oct
+      and Nov 2026. `printerTargetForStore` (`helpers/printer/printer-selection.ts`)
+      returns the trimmed address. For a built-in head or `isDisablePrinter` it returns
+      a placeholder that nothing connects to; otherwise it returns `null`.
+      `printNotPrinted` and the prewarm listener return early when `storeHasPrinter` is
+      false. So a `printer-testPrint` row now means a configured printer was unreachable.
+      The row carries `target`. To make a store stop printing, set `isDisablePrinter`
+      (orders are still marked printed) or leave `printerTarget` empty.
     So: never make a print path's success depend on Epson's completion callback alone, and
     never drop the sweep's date or cap. A stuck order is diagnosed from
     `<store>.client-error` `source: "printer-testPrint"` rows (they now carry `outcome`),
