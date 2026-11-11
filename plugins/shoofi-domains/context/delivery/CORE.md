@@ -126,9 +126,12 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
   flag first and labels them «بانتظار تعيين سائق»). The partner v3 screen (shoofi-partner
   `helpers/deliveries/bookings.ts`, behind `DELIVERIES_V3`) maps 1 → waiting (flag / no driver =
   searching, driver set = offered, not accepted), 2 / 5 / 3 → on the way (to the store / at the
-  store / collected), 4 → delivered, -1/-2/-3 → cancelled. The list is **pull-only** — no status
-  change is pushed to the tablet — and `pickupTime` is a bare `"HH:mm"`, meaningless on a row from
-  another day.
+  store / collected), 4 → delivered, -1/-2/-3 → cancelled. No status change is **pushed** to the
+  tablet; the v3 screen polls every 20 s while open — the **active** query only (status index,
+  ~15 docs on prod). **Never poll `isAll: true`:** no index covers `{appName, isDeliveryOnly}`, so
+  it reads the whole `book-delivery` collection (106,782 docs, ~234 ms, 2026-11-11) for a store's
+  dozen rows; the screen reloads it only when the active set changes. `pickupTime` is a bare
+  `"HH:mm"`, meaningless on a row from another day.
 
 ## The dropoff note is TWO fields — the driver card shows both
 `order.order.address.notes` = the **landmark** the customer saved ON THE ADDRESS («علامة مميزة
