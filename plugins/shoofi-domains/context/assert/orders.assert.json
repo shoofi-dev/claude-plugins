@@ -157,6 +157,21 @@
       "patterns": [
         {
           "file": "routes/order.js",
+          "regex": "\"/api/order/update/all\",\\s*\\.\\.\\.ORDERS_DASHBOARD_OR_STORE_MEMBER,\\s*upload\\.array\\(\"img\"\\)",
+          "desc": "CORE invariant 18: update/all is gated by the store-member gate BEFORE multer (HQ #06c6c7)"
+        },
+        {
+          "file": "services/orders/order-edit.js",
+          "regex": "if \\(next !== was\\) \\$set\\[`order\\.items\\.\\$\\{i\\}\\.note`\\] = next;",
+          "desc": "CORE invariants 15 + 18: an order edit writes only per-item notes (+ isPrinted, editedAt/By/Fields) - never items, totals, payment fields, customerId, status or created"
+        },
+        {
+          "file": "services/orders/order-edit.js",
+          "regex": "const EDITABLE_STATUSES = AMENDABLE_STATUSES;",
+          "desc": "CORE invariant 18: update/all edits only an ACTIVE order, and 'active' is amend's AMENDABLE_STATUSES, reused not redefined"
+        },
+        {
+          "file": "routes/order.js",
           "regex": "if \\(req\\.body\\.isNotPrinted\\) \\{\\s*filterBy\\.isPrinted = false;",
           "desc": "doc reference C3 Auto-print: isNotPrinted only adds isPrinted:false. The date window is built only `if (ordersDate)`, so a sweep that sends no date has no window at all; the partner sweep must send ordersDate"
         },
