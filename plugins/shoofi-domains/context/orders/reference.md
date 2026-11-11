@@ -21,7 +21,8 @@ Primary files: `routes/order.js` (~7k lines), `routes/twin-order.js`,
 `routes/admin/twin-order-config.js`, `services/twin-order/*`,
 `utils/order-stock.js` (stock semantics), `utils/crons/*order*`,
 `services/monitoring/centralized-flow-monitor.js`, `routes/order-history.js` +
-`services/orders/order-history.js` (the partner's one-day history, CORE invariant 21).
+`services/orders/order-history.js` (the partner's one-day history, CORE invariant 21),
+`routes/kopa/orders.js` + `services/kopa/orders.js` (Kopa's order reads, CORE invariant 29, C5).
 Status constants: `consts/consts.js`.
 
 **⚠️ HIGH-RISK code (change via draft PR flagged HIGH-RISK; never merge):**
@@ -995,6 +996,59 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
     `DeliveryListAnalytics`. Those are courier-dispatch views.
   - **No edit path and no `bookDelivery` mirror.** It is not «הערות לשליח» (`commentToCourier`),
     which is delivery-only and editable through `POST /api/order/comment-to-courier`.
+
+## C5. shoofi-kopa — the store till back-office (web)
+Kopa (repo `shoofi-kopa`) is the store's back-office web app. It calls the server like the
+partner app: a partner token, `app-type: shoofi-partner`, the store in `app-name`. Its order
+reads are three new read-only routes in shoofi-server `routes/kopa/orders.js` (logic in
+`services/kopa/orders.js`, tests `test/integration/kopa/orders.js`), built on
+`feat/kopa-phase1` (2026-11-11, not on `main` yet). Rules: CORE invariant 29.
+
+- **Gate (all three):** `KOPA_REPORTS` (`services/kopa/access.js`) = `auth.required` +
+  `requireStoreMembership()` + `requireStoreRole("reports", "all")` (an owner holding `all` without
+  `reports` passes; 38 of 406 prod docs, 2026-11-11). The store is
+  `req.storeMembership.appName`, never the raw header. No token → 401; a customer token → 403;
+  a member of another store → 403; a non-`isAdmin` doc or one whose `roles` has neither `reports` nor `all` →
+  403 `Insufficient role`. ⚠️ `storeUserHasRole` does not treat `all` as a superset: prod
+  2026-11-11 has 38 of 406 `store-users` docs with `isAdmin` + `roles` containing `all` but not
+  `reports`, and they get 403 here (as on the store-analytics routes).
+- **`POST /api/kopa/orders`** — body `{ from, to, page?, limit?, receiptMethod?, paymentMethod?,
+  status?, productId? }`. `from`/`to` are real `YYYY-MM-DD` days, `from ≤ to`, at most 93 days
+  (both ends counted), else 400. `limit` defaults to 50 and is clamped to 200. `status` is a
+  status string, a bucket (`completed` | `cancelled` | `inProgress`) or an array of them, and
+  must be in the listed set. The filters must be plain strings: an object is a 400.
+  `productId` matches `order.items.item_id` or a combo component
+  (`order.items.comboSelections.productId`).
+  Response `{ message, from, to, window: {start, end}, orders, totalCount, page, limit, hasMore,
+  summary }`. The summary is over the whole filtered range:
+  `{ byPayment: { CASH, CREDITCARD, OTHER }, total, cancelled, inProgress: {count} }`.
+  Each bucket is `{count, amount}`. Rows are an allowlist: `_id, orderId, status, created,
+  orderDate, viewdAt, completedAt, cancelledAt, amount, orderPrice, originalOrderPrice, total,
+  shippingPrice, customerDetails{name, phone}, order{items[{item_id, nameAR, nameHE, qty, price,
+  selectedExtras, note, comboSelections?}], receipt_method, payment_method, commentToStore},
+  appliedCoupon{discountAmount}, usedCoins{amount, shekelValue}, promotions{items, delivery},
+  cancelReason, updatedByName, amendments[{at, byName, reason, previousTotal, newTotal, diff}],
+  twinGroupId`. It makes two reads. The first is every match, with a 5-field projection
+  (summary, count and the sort by the instant of `created`). The second is the page's
+  `_id`s only, with `ORDER_PROJECTION`.
+- **`GET /api/kopa/cancel-log?from=&to=`** — same range rules. Response `{ message, from, to,
+  window, rows, totalCount, truncated }`, newest first, capped at 2000 rows. The rows are:
+  - **order** rows: one per order in `CANCELLED_STATUSES` (`4,5,7,8,9`) in the window,
+    `price = orderPrice`, `priceBasis: "order_price"`.
+  - **item** rows: one per `amendments[].diff` entry with `change: "removed"`, on any listed
+    order in the window, `qty = diff.from`.
+
+  Every row carries `{ kind, orderId, _id, name, price, by, at, reason }`, plus `status`,
+  `byRole` (`support|store|customer|driver|system`) and `orderCreated` (and `itemId`, `qty`,
+  `priceBasis` on items). Where "who" comes from is CORE invariant 29.
+- **`GET /api/kopa/stories`** — `shoofi.stories` that are not archived, with `storeAppName`
+  = the store OR `link.appName` = the store. Prod 2026-11-11 had 154 stories: 141 with no
+  `link` (legacy, `target` only) and 0 whose `link.appName` differs from `storeAppName`. So the
+  scope is reliable: it is the owning store. Rows: `_id, storeAppName, isOwnStory, mediaType,
+  media{uri}, thumbnail{uri}, durationMs, caption{ar, he}, link, publishedAt, expiresAt,
+  isActive, state (draft|inactive|scheduled|expired|live), viewsCount`. Never `approval` (it
+  names admins), `marketingItemId` or `cityAreas`. The `stories` TTL index deletes a story a
+  day after `expiresAt`, so `expired` rows only last that long.
 
 ## Cross-repo invariants (the whole-domain view)
 - **Status source of truth = server** (store `orders.status`). Clients each keep their

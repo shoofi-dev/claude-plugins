@@ -19,6 +19,8 @@ facts, avoid filtering, how a profile ranks suggestions — is menu-catalog's.
 Also **who a push campaign reaches** (§5b): `controllers/customerCampaignController.js`,
 `services/customer-campaigns/marketing-push-policy.js`, `routes/customer-marketing-preferences.js`,
 `utils/crons/scheduled-campaigns-cron.js`.
+Also the **Kopa customers and staff reads** (§5f): `routes/kopa/customers.js`,
+`services/kopa/customers.js`.
 **Not yours:** order history *content* (orders), coins/growth rewards (growth), driver
 coverage fields (delivery) — you own the identity record they hang off.
 
@@ -581,6 +583,53 @@ Approve / revert are the item's and the drafts routes' (`channel = social`). Aud
 Admin client: `shoofi-delivery-web` `src/apis/admin/marketing-social.ts`,
 `src/views/admin/marketing/social/SocialPostForm.tsx`, the item card's social preview
 (`MarketingItemCard.tsx`, `socialState` in `utils/marketing-approval.ts`).
+
+## 5f. Kopa: a store's customers and staff (`routes/kopa/customers.js`, read-only)
+
+Kopa is the store till back-office web app (repo `shoofi-kopa`). It calls the server **like the
+partner app**: a partner token (`Authorization: Token …`), `app-type: shoofi-partner`, the store
+in `app-name`. So the identity it proves is a `shoofi.storeUsers` doc. Logic is in
+`services/kopa/customers.js`, tests in `test/integration/kopa/customers.js`, gates in
+`services/kopa/access.js`. Nothing is written, and nothing is shared with an existing route.
+
+| Method | Path | Gate | Reply |
+|---|---|---|---|
+| GET | `/api/kopa/customers?page&limit&q&sort=spend\|orders\|last&from&to` | `KOPA_REPORTS` | `{ customers: [{ customerId, name, phone, orderCount, totalSpend, firstOrderAt, lastOrderAt }], totalCount, page, hasMore }` |
+| GET | `/api/kopa/customers/:customerId/orders` | `KOPA_REPORTS` | `{ customerId, orders: [{ _id, orderId, status, created, orderPrice, order: { receipt_method, payment_method } }], truncated }`, or **404** |
+| GET | `/api/kopa/staff` | `KOPA_OWNER` | `{ staff: [{ _id, fullName, phone, isAdmin, roles, createdAt? }] }` |
+
+- **Gates.** `KOPA_REPORTS` = `auth.required` + `requireStoreMembership()` +
+  `requireStoreRole("reports", "all")` (an owner holding `all` without `reports` passes);
+  `KOPA_OWNER` is the same with `"all"` only (`utils/store-membership.js`).
+  The store is `req.storeMembership.appName`, never the header again. A customer token with the
+  customer `app-type` passes `auth.required` and is 403 at membership; with `app-type:
+  shoofi-partner` it is a 401 (its id is not in `storeUsers`). `isAdmin` + a missing or empty
+  `roles` array passes both gates (the legacy rule), and `"all"` is not a superset: an owner
+  whose roles are `["all"]` only is 403 on the reports routes, as in the partner app.
+- **Who is the store's customer.** Built from THIS store's `orders`, `COMPLETED_STATUSES` only,
+  `isSchoolProject: {$ne: true}`, never from `customers.orders[]` (CORE invariant 5). Grouped on
+  `String(customerId)`, so string and ObjectId ids are one row. Orders without a `customerId` are
+  not counted. `from`/`to` (`YYYY-MM-DD`) are the store's business days
+  (`getBusinessDayBoundariesForDateRange` on `store{id:1}.openHours`, as the payments screen and
+  order history use); a bad date is a 400. First/last order are picked by instant, not by string.
+- **`totalSpend` = Σ `orderPrice`** (the charged items price) over the counted orders, rounded to
+  2 places. Not `total` (carries shipping, net of coupons and coins), not
+  `originalOrderPrice`, and **no drive-in fee**: so it is lower than the payments screen's revenue
+  for drive-in orders by design.
+- **Identity join.** Only `fullName` and `phone` are projected from `shoofi.customers`. A customer
+  with no central record still appears, named from the newest order's `customerDetails`
+  (`name`/`phone`). `q` matches the name (case-insensitive) or the phone digits; search, sort and
+  paging are on the server (limit max 200). Without `q`, only the page's rows are joined.
+- **One customer's orders**: completed + cancelled, school-project and superseded Apple Pay
+  placeholders excluded, newest first, capped at 500 (`truncated`). Both id forms are matched. No
+  orders in this store is a 404 with the same body as an unknown or malformed id; nothing outside
+  this store's `orders` is read, so the answer cannot say whether the person exists elsewhere.
+- **Staff never carries a secret.** `shoofi.storeUsers.find({ appName }, { projection:
+  STAFF_PROJECTION })` and then a field-by-field `toStaffRow`, so a `token`, `authCode`,
+  `notificationToken` (or any field added later) cannot ride along. `roles` is `null` (not `[]`)
+  for a doc with no roles array, because such an `isAdmin` doc passes every role gate.
+  `createdAt` is the doc's `created` (the admin insert writes `created`), omitted when absent.
+  The test asserts no `token` key with a fake that ignores projections.
 
 ## 6. Referrals (`routes/customer-referrals.js`)
 8-char code (ambiguity-free alphabet) + TinyURL short link with `/r/:code` fallback. Config on

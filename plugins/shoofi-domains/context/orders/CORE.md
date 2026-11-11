@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -26,7 +26,9 @@ Server: `routes/order.js`, `routes/twin-order.js`, `routes/money.js`, `services/
 invariant 16), who may call the coins admin routes (`routes/coins.js` `/api/admin/coins/*` and the
 Coins Settings block of `routes/shoofi-admin.js`, invariant 19), `services/orders/shipping-price-check.js`
 (the log-only delivery-fee check, invariant 20), `routes/order-history.js` +
-`services/orders/order-history.js` (the partner's one-day order history, invariant 21), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
+`services/orders/order-history.js` (the partner's one-day order history, invariant 21),
+`routes/kopa/orders.js` + `services/kopa/orders.js` (Kopa's orders, cancel log and stories,
+invariant 29), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
 (shoofir), monitoring/twin-admin (delivery-web).
 
 **Not yours:** payment internals (`payments`), settlement/payouts (`accountant`), driver
@@ -1030,6 +1032,57 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests (shoofi-server): `money-cancel.js` (ledger, every endpoint, roles, concurrency,
       re-cancel, cash twin, keep→refund on a partly used coupon, HYP success/refused/timeout/cap,
       singles through the order pipeline, coins once), plus the invariant-27 tests.
+
+29. **KOPA'S ORDER READS USE THE STORE REPORT'S DAY ON `created`, SUM `orderPrice`, AND COUNT
+    ONLY COMPLETED ORDERS AS SALES** (shoofi-server `routes/kopa/orders.js` +
+    `services/kopa/orders.js`, branch `feat/kopa-phase1`, 2026-11-11; endpoints and shapes in
+    reference C5). All three routes are read-only and gated by `KOPA_REPORTS`. The store is
+    `req.storeMembership.appName`.
+    - **Window:** `storeReportBounds(from, to, storeDoc)` (`services/compensations/report-window.js`).
+      This is the store report's snapped openHours business days, including its
+      `openHoursEnabledMonth` rule. It is matched on **`created`**, never `orderDate`: accept and
+      every delay rewrite `orderDate` (invariant 10). `created` is what the store report,
+      `partner/summary` and the partner history bucket on. It is compared as a string, with the
+      same `+00:00` twin-leg quirk as those readers. ≤ 93 days per request.
+    - **Set:** `HISTORY_STATUSES` (1-5, 7-12). Out: `0`, `6`, `13`, `14`, `15`, a superseded
+      Apple Pay placeholder, and **school-project orders** (`isSchoolProject: {$ne: true}`, as
+      the partner live list does). The school exclusion is the one difference from the partner
+      history (invariant 21), which includes them.
+    - **Amount = `orderPrice`** (`chargedOrderPrice` in `services/payments/store-sales.js`). It is
+      never `total`, has no drive-in added and no coins subtracted. **Sales** (`summary.byPayment`
+      / `summary.total`) are `COMPLETED_STATUSES` only. Cancelled orders go in
+      `summary.cancelled`, and accepted-unfinished ones are counted in `summary.inProgress`.
+      The summary is over the whole filtered range, never one page. So with no other filter,
+      `summary.total` equals the store report's `totalRevenue` minus any completed school
+      order's `orderPrice`.
+    - **Cancel log "who":** only the admin web sends `updatedByName` / `updatedBySource` /
+      `cancelReason` to `/api/order/update`. The partner app sends only a status, so a store
+      reject's `status_change` event says `actor: "System"`. And `order.updatedByName` is the
+      LAST admin-web updater, not necessarily the canceller. So the order is:
+      1. the latest `shoofi.orderFlowEvents` `status_change` INTO the order's current status
+         (looked up by `orderId: {$in: _ids}`, indexed, never by the short number);
+      2. for a twin-service cancel (`cancelReason` `twin_*` / `twinDegradeSource`), the latest
+         `twin_cascade_cancel` / `twin_degrade` event's named admin;
+      3. with no event, `order.updatedByName` + `order.cancelledAt`.
+
+      `by` is null for "System"/"Store Admin". `byRole` is derived from the source, else from
+      the status (5 store, 7 support, 8 customer, 9 driver). The flow-event read is enrichment:
+      if it fails, the rows fall back to step 3 and the log still answers.
+    - **Removed-item price is not recorded.** An amendment keeps `{previousTotal, newTotal}` and
+      a diff `{index, itemId, name, change, from, to?}`, and the removed line is gone from
+      `order.items`. So an item row is priced `previousTotal − newTotal` (`priceBasis:
+      "amendment_delta"`, net of coupon/deal re-pricing) only when that amendment's diff is that
+      single removal. Otherwise `price: null`. Recording the line price would be a change to
+      `routes/order-amend.js` `buildDiff` (amend is high-risk).
+    - **Never returned:** `ccPaymentRefData`, `paymentAuth`, card data, `customerId`, customer
+      tokens, fraud data, `moneyLedger`, the coupon snapshot, `order.address`, an amendment's
+      `byUserId`, a story's `approval` / `marketingItemId`. Every row is built by an allowlist
+      mapper over an inclusion projection.
+    - Tests: `test/integration/kopa/orders.js` (41: the gate matrix on all three routes,
+      overnight window on `created`, the 93-day limit, the status set + school + superseded
+      exclusion, summary across pages, instant sort with a `+00:00` leg, the filters, no leak
+      with the projection ignored, cancel-log rows from events/order fields/amendments,
+      flow-event failure, stories scope + states).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

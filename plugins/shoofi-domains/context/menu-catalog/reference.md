@@ -507,6 +507,9 @@ A topping with no price spends no slot; an extra with no `groupId`, or a group w
 has no allowance. The same function, same semantics, lives in three pricers that must stay in
 lockstep: `shoofi-server/utils/order-pricing.js` (shadow-prices order creation, prices the
 amend flow for real), `shoofi-app/stores/extras/index.ts` and `shoofi-partner/stores/extras/index.ts`.
+A fourth, read-only copy, `freeToppingKeys` in `shoofi-server/services/kopa/products.js`, decides
+which toppings the Kopa extras stats count as free (§7j). A parity test against
+`calculateExtrasPrice` pins it (CORE invariant 32).
 In a group with a header, the customer app also **re-stamps** every topping's `isFree` on each change
 (`components/extras-controls/ExtrasSection.tsx`, the `PizzaToppingGroup` `onChange`): the first
 `freeCount` picked toppings in menu order are flagged, the rest unflagged — the same rule the
@@ -727,6 +730,10 @@ the cache read.
   `POST /api/admin/extras-catalog/publish { dryRun? }` (`{ published, reason: unchanged|shrunk|dry_run }`).
 - Dish taxonomy / labels admin (`routes/admin/dish-taxonomy.js`; every route `auth.required` + `checkAdminRole(["master","admin","manager"])`):
   `GET /api/admin/dish-taxonomy` (seeds on first use), `POST /api/admin/dish-taxonomy/:key/approve` (→ active; its proposing labels get the type + `fromApprovedProposal`, `applied` at confidence ≥ 0.5 else `review`; admin labels untouched), `POST /api/admin/dish-taxonomy/:key/reject` (proposed only), `PATCH /api/admin/dish-taxonomy/:key`, `GET /api/admin/product-labels/review[?appName=]`, `POST /api/admin/product-labels/resolve { appName, productId, dishType }` (→ `status: "admin"`; `dishType` active or null), `GET /api/admin/product-labels/runs`, `POST /api/admin/product-labels/run [{ maxProducts, stores[] }]` — `startProductLabelsJob` (same `cron:product-labels` lock and locked index rebuild as the cron) answers as soon as it knows: `202 { started: true }` (running in the background), `409` a run already holds the lock, `503` no `ANTHROPIC_API_KEY`.
+- `GET /api/kopa/products/stats?from=&to=` and `GET /api/kopa/extras/stats?from=&to=`. These are
+  read-only product and extras sales by exact business day, for the Kopa back-office
+  (`routes/kopa/products.js`). The gate is `KOPA_REPORTS`: no token is `401`; a customer, another
+  store's staff or staff without `reports` is `403`. Bad dates are `400`. Shapes and rules: §7j.
 
 ## 7b. Nightly catalog lint — the cron and the app event contract
 `utils/crons/catalog-lint-cron.js` — `30 4 * * *` Asia/Jerusalem, registered in `app.js` inside
@@ -1205,6 +1212,91 @@ Full detail: shoofi-server `docs/extras-icons.md`.
   map, except `xl`. The size "XL" (90 options) now wins over the energy drink "xl" (5 options).
 - Tests: `test/integration/extras-icons.js` (app parity, rule, seed vote, map, publish guard, decide,
   sync/dry run, save hook never blocks, admin auth).
+
+## 7j. Kopa product and extras statistics (CORE invariant 32)
+These are for Kopa, the store's till back-office web app (repo `shoofi-kopa`). It calls like the
+partner app: a partner token, `app-type: shoofi-partner`, the store in `app-name`. Code:
+`routes/kopa/products.js` (thin) and `services/kopa/products.js`; tests:
+`test/integration/kopa/products.js`. **Read-only.** No writes and no menu cache.
+- **Gate:** `...KOPA_REPORTS` (`services/kopa/access.js`) = `auth.required` +
+  `requireStoreMembership()` + `requireStoreRole("reports", "all")`. No token → `401`. A customer token,
+  another store's staff, or staff with neither `reports` nor `all` → `403`. A legacy `isAdmin` doc with no `roles`
+  array passes (utils/store-membership.js). The store is `req.storeMembership.appName` →
+  `getOrInitializeDb`. Without it the handler answers `403` (fail closed).
+- **Dates:** `?from=YYYY-MM-DD&to=YYYY-MM-DD` are the store's business days, inclusive, both
+  required and strict. `from <= to`, at most 366 days; otherwise `400 { message }`. The order window
+  is `storeReportBounds(from, to, db.store.findOne({}))`
+  (`services/compensations/report-window.js`). That is the store report's and the partner sales
+  screen's window: openHours-snapped, with the transition-month rule. `created` is an offset string,
+  compared `$gte start, $lte end`. The response echoes `window: { start, end }`.
+- **A sale** is `aggregateSoldItems`' (CORE invariant 32): completed statuses, school-project
+  excluded, `qty`/`price` through the same `$convert` (bad qty → 1, bad price → 0). Revenue is
+  `price × qty`, where `price` is the final unit price with extras and the category discount in it.
+- **Splits:** `byPayment: { CASH, CREDITCARD, OTHER }` and `byReceiptMethod: { DELIVERY, TAKEAWAY,
+  DRIVEIN, TABLE, OTHER }`, every key always present. Apple Pay and Google Pay are stored as
+  `CREDITCARD`. A missing or unknown value goes to `OTHER`, so the splits always add up. Receipt
+  values pass through `receiptMethodOf` (trimmed, upper-cased). Sums run in integer agorot, so
+  every split adds up to its total to the agora. Per-item revenue can differ from
+  `aggregateSoldItems`' single `round2` by at most one agora per payment × receipt cell.
+- **`GET /api/kopa/products/stats`** → `data: { appName, from, to, window, products[], categories[],
+  totals }`.
+  - Each product is `{ itemId, nameAR, nameHE, inCatalog, categoryIds, categoryId, quantity,
+    revenue, byPayment, byReceiptMethod }`.
+  - The `$group` key is item × `payment_method` × `receipt_method`, folded by `String(item_id)`, so
+    an ObjectId and a string id join.
+  - Products load with `toObjectIds` and are keyed by `String(_id)` (the string-vs-ObjectId trap,
+    store-analytics product-performance header).
+  - The current names win. A sold id with no product (hard-deleted) is `inCatalog: false` and keeps
+    its revenue and its order-line name. Lines with no `item_id` are one `__unidentified__` row.
+  - **Category rollup:** one category per product, its first on the menu. Among its
+    `supportedCategoryIds` that exist (string vs `String(_id)`), visible ones beat hidden ones, then
+    `compareGeneralCategories` decides: lowest numeric `order`, missing `order` last, then the
+    string `_id`. All memberships stay in `categoryIds`; `categoryId` is the one chosen.
+  - `categories[]` is `{ categoryId, nameAR, nameHE, isHidden, productCount, quantity, revenue,
+    byPayment, byReceiptMethod }`. It lists every visible non-school category, zeros included, plus
+    any other category a product landed in. A `categoryId: null` bucket appears for deleted,
+    orphaned or unidentified products. The category totals equal `totals`.
+  - `totals` is `{ products, quantity, revenue, byPayment, byReceiptMethod }`.
+- **`GET /api/kopa/extras/stats`** → `data: { appName, from, to, window, options[], unresolved,
+  totals }`.
+  - The same order match, streamed with a narrow projection. Only lines with a non-empty selection
+    are kept.
+  - The products of those lines and of their `comboSelections[].productId` load in ONE
+    `find({_id:{$in: toObjectIds}})`, projected `{ extras: 1 }`. Selections resolve against the
+    product's **current** `extras` (no history is stored).
+  - Uses are multiplied by the line qty. Revenue is the option's catalogue `price` × uses: the list
+    price today, before any category discount, so it is an estimate of what the extras earned.
+  - Rules by type:
+    - `single`: an option id. The legacy `["id"]` shape is read too.
+    - `multi`: an array of ids. A lone scalar is read as one id.
+    - `counter`: a number. Uses are the value, and the revenue is `extra.price × value`.
+    - `weight`: a number. One use, plus `amount` (Σ value × qty) and `unit`. Revenue is 0, because
+      the weight is how much of the product was bought; its money is in the product stats.
+    - `pizza-topping` `{ [toppingId]: { areaId, isFree } }`: one use per topping, plus
+      `byArea: { full, half1, half2, other }`. It is priced like `pizzaToppingPrice` (an area priced
+      0 falls through to the topping price, §4).
+  - **Free toppings:** the group's `freeCount` allowance is decided by the current server rule (flagged
+    first, at most N per group, §4). A free topping counts in `uses` and in `freeUses` with no
+    revenue. Orders from before shoofi-server #479 may have given up to 2N free; those are counted
+    by today's rule, which overstates their topping revenue slightly (the 2026-11-07 estimate: ₪6 over 3 orders, a lower bound).
+  - **Combos:** each `comboSelections[]` entry resolves against the COMPONENT product's extras, and
+    combo-level extras against the combo itself.
+  - **Merge key** `type|group|option`, each part trimmed. The group is the extra's `nameAR`, else
+    `nameHE`, else its group header's name (most members of a headed group have an empty name),
+    else the id. The option is `nameAR`, else `nameHE`, else the id. This is the Kopa menu page's
+    `deriveExtras` key, plus the header fallback.
+  - Each option row is `{ key, type, groupAR, groupHE, nameAR, nameHE, uses, revenue, byPayment,
+    byReceiptMethod, freeUses, productCount, outOfStock, byArea?, amount?, unit? }`.
+  - `outOfStock` is the current state, not history: `"all" | "some" | "none"`, by the exact,
+    untrimmed `nameAR` against `store.outOfStockExtras`, as the app greys options. `"some"` means
+    variants merged by the trimmed key differ by a space and only some are sold out. It is `null` for
+    counter and weight.
+  - **Unresolved, never dropped:** `unresolved: { lines, uses, byReason: { productDeleted,
+    extraRemoved, optionRemoved, unreadable } }`. `unreadable` covers a value whose shape its type
+    cannot hold, an unknown type, or a header id. Each unresolved id counts once × qty; a bare value
+    counts once. An empty value (`null`, `""`, `[]`, `{}`, `0`) is no selection at all.
+  - `totals` is `{ lines, freeUses, uses, revenue, byPayment, byReceiptMethod }`, over resolved
+    options only.
 
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":
