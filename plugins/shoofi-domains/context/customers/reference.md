@@ -35,6 +35,10 @@ Everyone logs in with **phone + 4-digit OTP** (except admins, who use a password
 | `shoofi-shoofir` | driver app | **`delivery-company`** | `customers` |
 | `shoofi-admin` | admin web | `shoofi` | **`shoofiAdminUsers`** (password) |
 
+**Kopa (store till web) is a fifth way in, not a fifth audience:** `Authorization: Kopa <token>`
+on `/api/kopa/*` only resolves a `shoofi.kopaSessions` doc whose `staffId` is a `storeUsers` doc
+(§5g). It never reads or writes `storeUsers.token` and is not accepted by `auth.required`.
+
 ⚠️ **A missing/wrong `app-type` silently routes to `shoofi.customers`** — a common source of
 "user not found" bugs. Every customer endpoint branches on it (`customer.js` create/validate/
 details/update-notification-token/delete, `auth.js`).
@@ -588,7 +592,8 @@ Admin client: `shoofi-delivery-web` `src/apis/admin/marketing-social.ts`,
 
 Kopa is the store till back-office web app (repo `shoofi-kopa`). It calls the server **like the
 partner app**: a partner token (`Authorization: Token …`), `app-type: shoofi-partner`, the store
-in `app-name`. So the identity it proves is a `shoofi.storeUsers` doc. Logic is in
+in `app-name` — or, since phase 4a, its own session (`Authorization: Kopa <token>`, §5g). Either
+way the identity it proves is a `shoofi.storeUsers` doc. Logic is in
 `services/kopa/customers.js`, tests in `test/integration/kopa/customers.js`, gates in
 `services/kopa/access.js`. Nothing is written, and nothing is shared with an existing route.
 
@@ -630,6 +635,116 @@ in `app-name`. So the identity it proves is a `shoofi.storeUsers` doc. Logic is 
   for a doc with no roles array, because such an `isAdmin` doc passes every role gate.
   `createdAt` is the doc's `created` (the admin insert writes `created`), omitted when absent.
   The test asserts no `token` key with a fake that ignores projections.
+
+## 5g. Kopa phase 4a: staff sessions and PINs (`routes/kopa/auth.js`)
+
+Kopa logs staff in **beside** the partner tablet, never through the partner flow. That flow
+(`customer/create` → `validateAuthCode` → `switch-store`) rewrites `storeUsers.token`, and
+stored-token equality (CORE invariant 2) then signs the same phone out of the tablet. Kopa keeps
+its own sessions instead (CORE invariant 21). Logic: `services/kopa/auth.js` (code + sessions),
+`services/kopa/pins.js` (PINs); gate: `services/kopa/access.js`; tests:
+`test/integration/kopa/{auth,pins}.js`.
+
+| Method | Path | Gate | Body → reply |
+|---|---|---|---|
+| POST | `/api/kopa/auth/request-code` | public | `{ phone, appName }` → 200 `{ message, expiresInSec: 300 }` (same for non-staff), 400 bad phone/appName, 429 `{ message, retryAfterSec }` (per phone or per IP, same shape) |
+| POST | `/api/kopa/auth/verify` | public | `{ phone, appName, code: 6 digits }` → 200 `{ token, staff: { _id, fullName, phone, isAdmin, roles }, session: { _id, kind, expiresAt } }`, 401 for every miss |
+| POST | `/api/kopa/auth/logout` | `Kopa` header | deletes THIS session only (idempotent 200); any other header 401 |
+| PUT | `/api/kopa/auth/pin` | `KOPA_TILL` | `{ pin }` 4–6 digits → 200, 400, 409 (taken), 429 (too many 409s) |
+| POST | `/api/kopa/auth/switch` | Kopa session + `requireStoreMembership()` | `{ pin }` → 200 `{ token, staff, session }` (`kind: "pin"`, 12 h), 401 `{ attemptsLeft }`, 429 `{ retryAfterSec }` |
+| GET | `/api/kopa/auth/sessions` | `KOPA_OWNER` | `{ sessions: [{ _id, staffId, staffName, kind, createdAt, lastSeenAt, expiresAt, current }] }` |
+| DELETE | `/api/kopa/auth/sessions/:id` | `KOPA_OWNER` | 200, or 404 (also for another store's session) |
+
+- **Collections (central `shoofi`, `CENTRAL` in `services/kopa/store-data.js`).** `kopaSessions`
+  `{ tokenHash, staffId, appName, phone, kind: "device"|"pin", deviceSessionId?, createdAt,
+  lastSeenAt, expiresAt, pinFailures?, pinLockedUntil? }` (TTL on `expiresAt`, unique
+  `tokenHash`); `kopaOtps` `{ phone, appName, staffId|null, codeHash|null, salt, attempts,
+  createdAt, expiresAt, purgeAt, consumedAt, superseded? }` (TTL on `purgeAt`);
+  `kopaStaffPins` `{ appName, staffId, hash, updatedAt, setConflicts?, setLockedUntil? }`
+  (unique `appName + staffId`). Indexes are `ensureIndexes` background builds, never awaited.
+- **The token** is 32 random bytes, base64url, **opaque — not a JWT** (the platform JWT secret
+  is the shared literal; CORE Known status). Only `sha256(token)` is stored. A device session
+  lives 30 days (fixed, no sliding), a PIN session 12 hours. `lastSeenAt` is written at most once
+  a minute, fire-and-forget.
+- **The login code**: **6 digits** from `crypto.randomInt` (the partner login keeps its own 4;
+  a 4-digit code to Kopa is a 400), stored only as `sha256(salt:code)`, valid 5 minutes, 5 tries
+  (each try is spent atomically before the compare), single use, and a new request closes every
+  older open code for that phone + store. **For staff and non-staff alike** (a non-staff phone
+  gets an OTP doc with `codeHash: null`, the same reply, the same limits, and no SMS):
+  - request-code: 3 per phone per 10 minutes (counted on the OTP docs, across stores) and **20
+    per `req.ip` per hour**. Both answer the same 429 `{ message, retryAfterSec }`.
+  - verify: **at most 15 FAILED verifies per phone + store per 24 hours.** Each try takes a slot
+    first, a success gives it back; past the cap every verify is the same 401 as a wrong code
+    (the right code included, and the capped try never touches the OTP) until the window ends.
+  - The two counters are fixed-window docs in `kopaOtps`, `{ _id: "requestIp|<ip>" |
+    "verifyFail|<phone>|<appName>", kind: "limit", count, windowStart, purgeAt }`, chosen over an
+    in-memory LRU so every server instance shares them. They have no `phone` / `createdAt`, so the
+    OTP queries never match them, and the `purgeAt` TTL clears them. No index build is awaited.
+  - **`req.ip` is spoofable here**: app.js has `app.enable("trust proxy")`, so `req.ip` is the
+    left-most `X-Forwarded-For` entry, which a client can set unless the load balancer overwrites
+    it. The per-IP limit is a cost brake, not a security boundary; the per-phone and per-phone +
+    store limits are the ones a client cannot step around. The SMS is the
+  partner login's (`utils/sms.js` `sendSMS` + `getVerifyCodeContent`), sent after the reply is
+  decided and not awaited. No WhatsApp copy and **no test-phone bypass** (`config/test-phones.js`
+  is not honoured). `setCodeSender` swaps the sender under `NODE_ENV=test` only.
+- **The gate.** `KOPA_TILL` = `requireStoreRole("cashier", "all")`: **not `reports`**, so an
+  accountant-only account cannot set a PIN, look up or create a customer profile, take payments
+  or cancel at the till (same `isAdmin` + legacy no/empty-`roles` rule as every role gate).
+  `kopaSession()` runs first in `KOPA_REPORTS` / `KOPA_OWNER` / `KOPA_TILL`.
+  `Authorization: Kopa <token>` → the live session by hash (401 if none or expired), `app-name`
+  required (400) and equal to the session's `appName` (403 "Session is for another store", even
+  for a phone on both stores' staff), then `req.auth = { id: String(staffId), phone }` +
+  `req.kopaSession`, and `auth.required` is skipped. Any other scheme (`Token …`) falls through
+  to `auth.required` unchanged. `requireStoreMembership` / `requireStoreRole` then run as before,
+  so membership and roles are re-read from `storeUsers` on every request: a removed staff member
+  or a lost role takes effect at once. A Kopa token sent to a non-Kopa route is not a JWT:
+  `auth.required` answers 401, `auth.optional` treats the request as anonymous. A session-lookup error is a 503, not a 401, so a DB blip does not log the till out.
+- **PINs.** bcryptjs (10 rounds). Unique among the store's staff because the switch finds the
+  staff member by PIN alone, so a 409 reveals that a colleague has that PIN: after 3 collisions
+  in a row the caller's PIN setting is locked for an hour (429). The switch needs a Kopa session
+  (a partner token is 401). Wrong PINs count on the DEVICE session (a `pin` session points at it
+  via `deviceSessionId`): 5 wrong → 5 minutes locked, the right PIN included.
+- **`verifyManagerPin({ shoofiDb, appName, pin, session?, callerStaffId? })`** → `{ ok, staffId,
+  name }`. `ok` only for a live staff doc of `appName` that passes `storeUserHasRole(doc,
+  ["all"])` (so a legacy `isAdmin` doc with no/empty `roles` passes, `isAdmin: false` never
+  does). A non-manager's PIN answers exactly like nobody's. **Every call is limited:**
+  - with `session` (the caller's `req.kopaSession`): the device lockout shared with the switch;
+  - without one (a partner-token caller): `callerStaffId` (the caller's own `storeUsers._id`) is
+    required, and 5 wrong manager PINs lock that caller in that store for 5 minutes. The counter
+    is on the caller's `kopaStaffPins` doc (created with `hash: null` if the caller has no PIN; a
+    hash-less doc never matches a PIN);
+  - neither, or a `callerStaffId` that is not an id: `{ ok: false }` without reading any PIN.
+  A locked caller gets `{ ok: false, locked: true, retryAfterSec }`, the right PIN included.
+
+## 5h. Kopa phase 6: per-store customer profiles (`routes/kopa/customer-profiles.js`)
+
+A store's own card for a customer it knows at the till. Store DB, `kopaCustomerProfiles`
+(`STORE.CUSTOMER_PROFILES`), one doc per phone per store: `{ phone (0XXXXXXXXX, unique), name,
+centralCustomerId? (string), tags: [], idNumber, birthday ("YYYY-MM-DD"), email, notes,
+standingDiscount: { type: "percent"|"fixed", value } | null, createdAt, updatedAt, createdBy,
+updatedBy? }`. Logic `services/kopa/customer-profiles.js`, tests
+`test/integration/kopa/customer-profiles.js`.
+
+| Method | Path | Gate | Reply |
+|---|---|---|---|
+| GET | `/api/kopa/customer-profiles?q&tag&page` | `KOPA_REPORTS` | `{ profiles, totalCount, page, hasMore }` (50 a page, newest `updatedAt` first) |
+| GET | `/api/kopa/customer-profiles/by-phone/:phone` | `KOPA_TILL` | `{ profile, hint }`: the profile, else `hint: { name }` from `shoofi.customers`, else both null |
+| POST | `/api/kopa/customer-profiles` | `KOPA_TILL` | `{ phone, name }` only → 201 `{ profile }`, 409 `{ profileId }` |
+| PATCH | `/api/kopa/customer-profiles/:id` | `KOPA_OWNER` | any of name, phone, tags, idNumber, birthday, email, notes, standingDiscount → `{ profile }` |
+| POST | `/api/kopa/customer-profiles/bulk` | `KOPA_OWNER` | `{ ids (≤ 500), set: { tags?, standingDiscount? } }` → `{ matchedCount, modifiedCount }` |
+
+- **The central record is read, never written.** `shoofi.customers.findOne({ phone: { $in:
+  variants } }, { projection: { _id, fullName } })` links `centralCustomerId` on create and on a
+  phone change (unlinked if the new phone has no record). The by-phone hint carries `{ name }`
+  only. Note this lets any `cashier` / `all` staff member of any store look up a Shoofi customer's name
+  by phone.
+- **Validation.** Phone: Israeli, normalised (`+972`, dashes, spaces). Name 1–80. Tags ≤ 20 of ≤
+  30 chars, trimmed, de-duplicated, `set` replaces the array. `idNumber` ≤ 20 letters / digits /
+  dashes. `birthday` a real past date ≥ 1900. Email ≤ 120. Notes ≤ 1000. Discount: percent 0–100,
+  fixed 0–100000, rounded to 2 places. Unknown keys are a 400, so the till cannot send tags or a
+  discount. The unique phone is checked before the insert (the index may not exist yet), and a
+  duplicate-key race is the same 409.
+- **`standingDiscount` is stored only.** Nothing in this phase applies it to a sale.
 
 ## 6. Referrals (`routes/customer-referrals.js`)
 8-char code (ambiguity-free alphabet) + TinyURL short link with `/r/:code` fallback. Config on

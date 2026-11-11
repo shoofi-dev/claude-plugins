@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@feat/kopa-phase1 (invariant 32 — Kopa product and extras stats, /api/kopa/{products,extras}/stats; uncommitted worktree on origin/main cf25d5c2) / 2026-11-11; shoofi-app@design/round-2 67d4533 (invariant 29 — where the app draws option icons; the app files are committed) / 2026-11-08; shoofi-server@feat/store-closed-until (invariant 31 — special hours closedUntil / closedDays on isStoreClose, the same cron; invariant 28 partner fields; /api/store/holiday/* removed) / 2026-11-08; shoofi-server@feat/timed-busy-prep-extra (invariant 30 — timed busy busyUntil, extra prep time prepExtra, the expiry cron; invariant 28 partner fields) / 2026-11-07; shoofi-server@feat/prep-time-suggestion-field (invariant 28 — prepTimeSuggestion, a partner store field) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 — outOfStoreUntil, the 07:00 restore, store-wide outOfStockExtras) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@feat/kopa-phase1 (invariant 33 — Kopa phase 2 category writes + phase 3 till-only meta, /api/kopa/{categories,meta,kitchens}; uncommitted worktree) / 2026-11-11; shoofi-server@feat/kopa-phase1 (invariant 32 — Kopa product and extras stats, /api/kopa/{products,extras}/stats; uncommitted worktree on origin/main cf25d5c2) / 2026-11-11; shoofi-app@design/round-2 67d4533 (invariant 29 — where the app draws option icons; the app files are committed) / 2026-11-08; shoofi-server@feat/store-closed-until (invariant 31 — special hours closedUntil / closedDays on isStoreClose, the same cron; invariant 28 partner fields; /api/store/holiday/* removed) / 2026-11-08; shoofi-server@feat/timed-busy-prep-extra (invariant 30 — timed busy busyUntil, extra prep time prepExtra, the expiry cron; invariant 28 partner fields) / 2026-11-07; shoofi-server@feat/prep-time-suggestion-field (invariant 28 — prepTimeSuggestion, a partner store field) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 — outOfStoreUntil, the 07:00 restore, store-wide outOfStockExtras) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -10,6 +10,9 @@ reference: ./reference.md   # data model, endpoint tables, flows, options/extras
 Products, categories, menu assembly, options/extras, availability & stock, catalog i18n.
 
 ## Scope
+Kopa's menu slice: `routes/kopa/products.js` + `services/kopa/products.js` (invariant 32),
+`routes/kopa/menu-write.js` + `services/kopa/menu-write.js` and `routes/kopa/menu-meta.js` +
+`services/kopa/menu-meta.js` (invariant 33); the gates are `services/kopa/access.js`.
 Server: `routes/menu.js`, `routes/product.js` (and its gate `services/catalog/product-access.js`), `routes/category.js`, the catalog slice of
 `routes/store.js` (the category gate `services/catalog/category-access.js`, the public store card
 `services/catalog/public-store.js` — invariant 27, and who may save the store document,
@@ -1160,6 +1163,35 @@ boundary and say so in the PR.
     free-topping rule, and change the Kopa copy in the same PR**, or that test goes red. Both routes
     are read-only, gated by `KOPA_REPORTS` (`services/kopa/access.js`), and read the store from
     `req.storeMembership.appName`, never from the header.
+33. **KOPA WRITES THE MENU ONLY THE WAY THE ADMIN ALREADY DOES, AND KEEPS ITS OWN STATE OUT OF THE
+    MENU** (added 2026-11-11; reference §7k, §7l). The apps must see nothing new from a Kopa write.
+    All routes read the store from `req.storeMembership.appName` (the gate's proof), and check every
+    id against THAT store's DB (404 otherwise).
+    - **Kopa phase 2 — categories** (`routes/kopa/menu-write.js`, `services/kopa/menu-write.js`;
+      `KOPA_OWNER`). `POST /api/kopa/categories` writes the admin `store-category/add` document key for
+      key, flags at the admin defaults (`discountPercent: 0`, `isCampaign`/`isSchoolProject: false`,
+      `supportedGeneralCategoryIds: []`). `PATCH /api/kopa/categories/:id` `$set`s ONLY the sent fields
+      among `nameAR`/`nameHE`/`img`/`isHidden` (+ `updatedAt`); any other field is a 400. That is the
+      targeted write the Known status asks for; the admin update route stays as it is.
+      `POST /api/kopa/categories/reorder { ids }` writes `order` = position. Every write clears BOTH
+      cache keys (invariant 2); create/update also run `syncCampaignCategoryForStore` like the admin.
+      Kopa writes products through the existing `PRODUCT_ADMIN_OR_OWN_STORE` routes; there is no Kopa
+      product route (recipe: reference §7k). **Promotions from Kopa** (`/api/kopa/promotions`, `PATCH
+      /:id`, `POST /:id/active`) build every doc with the admin's own `sanitizePromotion` +
+      `validatePromotion`, exported by `routes/promotion.js` for this. Never copy them. Updates
+      re-sanitise the stored doc with the sent fields over it. The clears and campaign sync are the
+      admin's (invariant 18).
+    - **Kopa phase 3 — till-only details** (`routes/kopa/menu-meta.js`, `services/kopa/menu-meta.js`).
+      `kopaItemMeta` / `kopaCategoryMeta` / `kopaKitchens` (store DB) hold prep time, kitchen
+      instructions, English names, kitchen routing and till visibility. Nothing writes
+      `products`/`categories` and nothing in the customer menu reads these, so no cache clear. Meta is
+      keyed by the product/category id STRING as `_id` (unique by construction); `kitchenIds` must be
+      kitchens of the store; a kitchen in use cannot be deleted (409). `tillOnly`/`showInTill` do NOT
+      hide anything from customers. Indexes come from `ensureIndexes` and are never awaited before a
+      write (pinned with a failing-`createIndex` proxy).
+    - **Not built, because they change customer-app behaviour:** the extras `required` / `freeCount`
+      fixes, deal days/hours in the app, a shared ingredient library in the product schema, and
+      per-channel visibility in the customer menu.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
@@ -1201,6 +1233,8 @@ against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store D
 - **FACT:** `POST /api/store-category/update/:id` overwrites `order`, `discountPercent`,
   `isSchoolProject` and `isCampaign` from the body and clears **no** menu cache — a names-only
   call zeroes the discount. Write category names with a targeted `$set`.
+  (Verified still true 2026-11-11. Kopa's `PATCH /api/kopa/categories/:id` is that targeted
+  `$set`, invariant 33.)
 - **FACT:** `maxCount: 0` on a `multi` means "no limit" to the app (`max && …`), but both admin
   editors default it to 1 and refuse `<= 0`, so the lint reports `< 1` as `MAX_COUNT_INVALID`
   (warning, not repaired).

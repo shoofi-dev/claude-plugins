@@ -1,6 +1,6 @@
 # Accountant / Settlement / Payouts — Domain Context
 
-> last-verified §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
+> last-verified §12 (Kopa till sessions, Z/X, drawer, till reports, receipts built-but-off; till money separate from settlement): shoofi-server@feat/kopa-phase1 / 2026-11-12; §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
 
 > **Who you are:** the agent that owns **money OUT + the books** — computing what stores
 > and delivery companies/drivers are owed, issuing tax invoices, and generating bank
@@ -682,3 +682,106 @@ state it in the PR; preserve the `totalForTransfer`/`balance` formula, the `actu
 cash-vs-CC branch, the pre-discount commission base, and the invoice idempotency guards; never
 introduce a new rounding/VAT point without reconciling the existing ones; and never claim an
 invoice or MASAV change is correct without a dry-run / sandbox. When in doubt on real money, stop and ask.
+
+## 12. Kopa till sessions & reports (phase 5) — `services/kopa/{till-sessions,till-reports,receipts}.js`
+> last-verified: shoofi-server@feat/kopa-phase1 / 2026-11-12. Routers: `routes/kopa/{till-sessions,till-reports,receipts}.js`
+> (mounted by the Kopa index / `app.js`). The till order model is `services/kopa/till-orders.js` and
+> `till-money.js` (orders domain).
+
+**Till money is separate from settlement.** These files read `kopaTillOrders`, `kopaTillSessions`,
+`kopaDrawerMovements`, `kopaCounters` and `kopaStoreSettings`, plus `products` / `categories` (read
+only, for the staff-sales category). They never touch `orders`, store reports, commission, MASAV
+or Shoofi's own invoices. Tests prove the "no `orders`" rule with a spy on every route.
+
+### Routes
+| Route | Gate | Notes |
+|---|---|---|
+| `POST /api/kopa/till/sessions/open` `{ openingFloat }` | KOPA_TILL | 409 `SESSION_ALREADY_OPEN` (+ `sessionId`) |
+| `GET /api/kopa/till/sessions/current` | KOPA_TILL | `{ session, totals }`, or `session: null` |
+| `GET /api/kopa/till/sessions?from=&to=` | KOPA_REPORTS | sessions OPENED in range, newest first, ≤ 200, ≤ 93 days |
+| `GET /api/kopa/till/sessions/:id/x` | KOPA_TILL | X report: live totals for an open session; writes nothing |
+| `POST /api/kopa/till/sessions/:id/close` `{ countedCash? }` | KOPA_TILL | Z: `zNumber` + frozen `totals`; 409 `SESSION_CLOSED` / `CLOSE_IN_PROGRESS` |
+| `PATCH /api/kopa/till/sessions/:id/opening-float` `{ openingFloat }` | KOPA_OWNER | open only; appends `floatCorrections[]`, logged |
+| `POST /api/kopa/till/drawer` `{ type: in\|out, amount, note, managerPin }` | KOPA_TILL | needs an open session; `verifyManagerPin` (session or `callerStaffId`); 403 / 429 |
+| `GET /api/kopa/till/drawer?sessionId=` or `?from=&to=` | KOPA_REPORTS | only movements a session counts |
+| `GET /api/kopa/till/reports/{tips,discounts,staff-sales,refunds}?from=&to=` | KOPA_REPORTS | from/to required, ≤ 93 days |
+| `GET /api/kopa/till/orders/:id/receipt-preview` | KOPA_TILL | EZcount payload + `enabled` / `connected`; never the api_key |
+
+### Session document (`kopaTillSessions`)
+`{ status: open|closing|closed, openingFloat, floatCorrections[], openedAt, openedBy, drawerMovementIds[],
+closingAt, closeClaim?, closeClaimAt?, closedAt, closedBy: {staffId,name}|{system:true}, zNumber,
+countedCash, totals }`. `closeClaim*` exist only while closing and are never returned.
+
+### Frozen totals (`computeSessionTotals`, agorot arithmetic)
+- `byMethod` / `paymentCounts`: CASH, EXTERNAL_CARD, TRANSFER, CHEQUE, OTHER. An unknown method
+  counts as OTHER. `unpaid: { count, amount }` holds the UNPAID trail entries, which are not money.
+- `refunds: { byMethod, count, total }` by `refunds[].at`.
+- `tips`, `discounts` (`amount` sums), `staffMeals: { count, subtotal }`, `orderCount` (paid in
+  window), `ordersWithPayments`.
+- `drawer: { count, cashIn, cashOut }` from `drawerMovementIds`.
+- `cash: { openingFloat, cashSales, cashRefunds, cashIn, cashOut, expected, counted, difference }`.
+- `gross` = all payments (includes tips), `refundsTotal`, `net = gross − refundsTotal`.
+
+### Concurrency and crash cases
+- **Open:** `insertOne({ _id: "tillSession:open", sessionId, at })` in `kopaCounters`. A duplicate
+  `_id` means 409. A lock is stale, and replaced, when its session is closed, or when the session
+  is missing and the lock is older than `LOCK_ORPHAN_MS` (1 min). The lock is deleted on close.
+- **Close** (`closeSession`, shared with auto-close):
+  1. Claim `open → closing` with a token.
+  2. A claim older than `CLAIM_STALE_MS` (5 min) may be taken over. The takeover keeps `closingAt`
+     and any recorded `zNumber`.
+  3. Count the totals. On an error the session goes back to open, and no number is taken.
+  4. Take `nextSeq` and record it under the claim.
+  5. Freeze under the claim, then release the lock.
+- **Drawer:** insert the movement, then `$push` its id onto `{ _id, status: "open" }`. If that
+  push fails (the session closed meanwhile), the doc is deleted and the request is 409. A doc that
+  no session lists is never returned.
+- **Auto-close:**
+  - `autoCloseStaleSessions({ dbs, now, maxOpenHours = 20 })` closes old open sessions and
+    stale-claimed ones as `{ system: true }`. A 409 means someone else closed it, and is skipped.
+  - `startKopaTillAutoClose(app)` runs every 15 min over `shoofi.stores` appNames, via
+    `getOrInitializeDb`. It is a no-op unless `KOPA_TILL_AUTOCLOSE === "1"`, and returns `{ stop }`.
+
+### Reports (`till-reports.js`)
+- **tips:** per paid order closed in range: `type`, `value`, `amount`, waiter (else opener).
+  Totals by percent / fixed.
+- **discounts:** `type`, `value`, `amount`, `subtotal`, `final` (= `total`), `approvedBy`,
+  `reason`, `source` (manual / standing), `profileId`. Totals by type.
+- **staff-sales:** quantity per product (rows) × staff (columns).
+  - Each line is credited to the order's `waiterId`, else its `staffId` (opener). Never
+    `line.addedBy`.
+  - Excluded: cancelled lines, `refundedQty`, and staff meals (`staffMealsExcluded`).
+  - The category is `primaryCategoryOf` (`services/kopa/products.js`, the first menu category).
+  - `staffIds` and `categoryIds` filter the result.
+- **refunds:** refunds (by their own `at`, any order status) and counted drawer movements, in one
+  list sorted by time. Totals: refunds by method, drawer in / out.
+
+### Receipts (`receipts.js`): BUILT BUT OFF, HIGH-RISK, blocked for go-live
+- **`buildReceiptPayload(order, store)`** is pure.
+  - Doc type: `DOC_TYPE.TAX_INVOICE_RECEIPT` (320), or `RECEIPT` (400) when `isVatExempt(store)`.
+  - Lines: the live lines, VAT-inclusive (`vat_type` INC / NON). The discount is one negative line.
+  - VAT = total − `withoutVAT(total)` (agora), and 0 when exempt.
+  - Payment types: CASH 1, CHEQUE 2, EXTERNAL_CARD 3, TRANSFER 4, from `PAYMENT_TYPE`.
+  - Blockers: `OTHER` (no confirmed EZcount code), a tip (needs an accountant ruling), refunds
+    (a credit note is not built), not paid, a staff meal, a total mismatch, a payments mismatch.
+- **`issueReceipt`** refuses unless every guard passes, in this order:
+  1. `RECEIPTS_DISABLED`
+  2. `EZCOUNT_NOT_CONNECTED`
+  3. `PAYLOAD_BLOCKED`
+  4. `ADAPTER_UNFIT`: the default `createInvoiceOnBehalf` hard-codes Shoofi as the customer and
+     `payment_type: 4`.
+  5. The claim-lock: `insertOne` into `kopaTillReceipts` with `_id` = the order id.
+     `ALREADY_CLAIMED` on any repeat.
+
+  A provider failure is stored as `failed` and never retried automatically, because a timeout
+  may already have issued the document.
+- Nothing calls `issueReceipt`. `services/kopa/settings.js` refuses to change
+  `receipts.enabled`. No Open Format exporter is built: the owner said EZcount covers it.
+
+### Known limits
+- A payment made while no session is open falls in no Z.
+- A payment whose write is in flight at the claim instant can miss its Z. `till-orders.js` does
+  not gate payments on an open session.
+- `kopaTillOrders` has no index on `payments.at` / `refunds.at` / `closedAt`. They belong in
+  `till-orders.js` `INDEXES`. `ensureIndexes` keys builds by collection, so another file must not
+  register them.

@@ -103,6 +103,9 @@ Accessors are defined in `services/database/DatabaseInitializationService.js`.
 `nameAR`, `nameHE`, `order`, `img[]`, `supportedGeneralCategoryIds` (array of
 strings), `discountPercent` (**drives menu discounting**), `isSchoolProject`,
 `isCampaign`, `isHidden`, `descriptionAR/HE`.
+Writers: the admin store-category routes (`routes/store.js`) and, since Kopa phase 2, the Kopa
+category routes (§7k), which write the admin's create shape key for key and otherwise only a
+targeted `$set` of `nameAR`/`nameHE`/`img`/`isHidden` (+ `updatedAt`), or `order` on reorder.
 
 ### `general-categories` (`db.generalCategories`, top-level groups)
 `nameAR`, `nameHE`, `img`, `order`, `isSchoolProject`, `isHidden`. Enriched at
@@ -408,6 +411,21 @@ One list for every store, seeded once from the 2026-10-25 prod build (`scripts/s
 - `extras-catalog-runs`: `type: "sync"` (stats, `preview` on a dry run) and `type: "publish"`
   (`ok, hash, names, icons, url, trigger`). The last `ok` publish is the shrink guard's baseline.
 
+### Kopa collections — `kopaItemMeta`, `kopaCategoryMeta`, `kopaKitchens` (Kopa phase 3, §7l)
+Store DB, written and read ONLY by `/api/kopa/*` (`services/kopa/menu-meta.js`; names in
+`services/kopa/store-data.js` `STORE`). The customer menu, search, For you and the partner/admin
+apps never read them, and they never write `products`/`categories`.
+- `kopaItemMeta`: `{ _id: "<productId string>", productId, prepMinutes|null, instructions, isLabelPrint,
+  nameEN, descriptionEN, kitchenIds: [string], showInTill, createdAt, updatedAt, updatedBy }`.
+  The `_id` IS the product id string, so the upsert is unique with no index. Index `{ kitchenIds: 1 }`
+  (background, `ensureIndexes`).
+- `kopaCategoryMeta`: `{ _id: "<categoryId string>", categoryId, nameEN, showInTill, tillOnly,
+  createdAt, updatedAt, updatedBy }`.
+- `kopaKitchens`: `{ _id: ObjectId, nameAR, nameHE, nameEN, order, createdAt, updatedAt, updatedBy }`.
+  No printer fields (printing is out of scope).
+A deleted product or category leaves its meta row behind (product delete does not know about
+Kopa). Harmless: the till joins meta onto the menu, not the other way round.
+
 ## 3. Category → product hierarchy & ordering
 Two levels: `general-categories` → `categories` (linked by
 `category.supportedGeneralCategoryIds`) → `products` (linked by
@@ -421,6 +439,14 @@ reorder routes write `{order}` per item with one `bulkWrite` on the `app-name` D
 clear both menu cache keys (`clearMenuCachesAfterReorder`; a failed clear is logged, never
 fails the save). Admin callers: delivery-web `StoreCategoriesList.tsx` /
 `GeneralCategoriesList.tsx` drag-and-drop, which renumbers every item 0..n-1.
+Kopa's `POST /api/kopa/categories/reorder` writes the same `{order}` bulkWrite (order = position in
+`ids`) and clears both keys (§7k).
+**`POST /api/admin/product/update/order`** (the partner's products-order screen; Kopa's only
+product-reorder route, §7k) writes the LEGACY `order` = index for each `productsList[]._id`. It
+does not write `categoryOrders`, so it moves nothing in a category whose products carry
+`categoryOrders[categoryId]` (that wins, invariant 6). It clears only the `appName` cache key, not
+`_schoolProject` (invariant 2 drift, verified 2026-11-11; not fixed). `order-per-category`, which
+writes `categoryOrders`, is **[admin]** only.
 
 ## 4. Product options / extras / pricing
 Option icons are NOT stored on the product: the app looks each option's `nameAR`/`nameHE` up in
@@ -734,6 +760,12 @@ the cache read.
   read-only product and extras sales by exact business day, for the Kopa back-office
   (`routes/kopa/products.js`). The gate is `KOPA_REPORTS`: no token is `401`; a customer, another
   store's staff or staff without `reports` is `403`. Bad dates are `400`. Shapes and rules: §7j.
+- Kopa phase 2, `KOPA_OWNER`: `POST /api/kopa/categories`, `PATCH /api/kopa/categories/:id`,
+  `POST /api/kopa/categories/reorder`, `GET|POST /api/kopa/promotions`, `PATCH /api/kopa/promotions/:id`,
+  `POST /api/kopa/promotions/:id/active` (§7k).
+- Kopa phase 3: `GET /api/kopa/meta`, `GET /api/kopa/kitchens` (`KOPA_TILL`);
+  `PUT /api/kopa/meta/items/:productId`, `PUT /api/kopa/meta/categories/:categoryId`,
+  `POST /api/kopa/kitchens`, `PATCH|DELETE /api/kopa/kitchens/:id` (`KOPA_OWNER`) (§7l).
 
 ## 7b. Nightly catalog lint — the cron and the app event contract
 `utils/crons/catalog-lint-cron.js` — `30 4 * * *` Asia/Jerusalem, registered in `app.js` inside
@@ -1297,6 +1329,115 @@ partner app: a partner token, `app-type: shoofi-partner`, the store in `app-name
     counts once. An empty value (`null`, `""`, `[]`, `{}`, `0`) is no selection at all.
   - `totals` is `{ lines, freeUses, uses, revenue, byPayment, byReceiptMethod }`, over resolved
     options only.
+
+## 7k. Kopa phase 2 — category writes, and how Kopa writes products (CORE invariant 33)
+Code: `routes/kopa/menu-write.js` (thin), `services/kopa/menu-write.js`; tests
+`test/integration/kopa/menu-write.js`. Every route is `...KOPA_OWNER` (`services/kopa/access.js`:
+`auth.required` + `requireStoreMembership()` + `requireStoreRole("all")`); the store is
+`req.storeMembership.appName` → `getOrInitializeDb`. Responses `{ message: "ok", data }`.
+- **`POST /api/kopa/categories`** — JSON `{ nameAR, nameHE, order?, img? }` or multipart with ONE
+  image file in `img`. Writes the admin `POST /api/store-category/add` document, same keys in the
+  same order: `{ nameAR, nameHE, order, img, supportedGeneralCategoryIds: [], discountPercent: 0,
+  createdAt, isSchoolProject: false, isCampaign: false }` (the test runs the admin route on the same
+  fake DB and compares). Names trimmed, 1–200 chars. `order` omitted → last `order` + 1 (the admin
+  defaults to 0). Any other field (a flag, `isHidden`, `discountPercent`) → `400`. → `data` = the doc
+  with `_id`. Note: `supportedGeneralCategoryIds: []` means no general-category tile, so in a
+  `hasGeneralCategories` store the new category needs the admin to place it.
+- **`PATCH /api/kopa/categories/:id`** — any of `nameAR`, `nameHE`, `img`, `isHidden` (JSON booleans or
+  multipart `"true"`/`"false"`); `$set` of exactly the fields sent + `updatedAt`. Anything else
+  (`discountPercent`, `isCampaign`, `isSchoolProject`, `order`, `supportedGeneralCategoryIds`, …) →
+  `400`, nothing written. An id not in THIS store's `categories` → `404` (a 24-hex id is an ObjectId,
+  another short string is matched as is, a 24-char non-hex id is a 404, never the admin `getId`
+  throw). → `data` = the category after the write. This is the safe alternative to the admin update
+  route (Known status: it zeroes the discount and clears no cache), which is left as it is.
+- **`POST /api/kopa/categories/reorder`** — `{ ids: [categoryId, …] }` (1–500, no repeats). Every id
+  must be this store's (`404 { data: { missing } }`, nothing written); then `order` = position via
+  one `bulkWrite`, the admin update-order shape. Categories not listed keep their `order`, so send
+  the full list. → `data: { ids, updated }`.
+- **Images.** JSON `img` is `[]` or `[{ uri }]` with `uri` under `<appName>/` (no `..`, ≤ 5). A file in
+  multipart `img` (1 file, `image/*`, ≤ 10 MB) is uploaded with `routes/product.js` `uploadFile(files,
+  req, "<appName>/store-categories")`, the admin's exact call (key `<appName>/<appName>/store-categories/…`).
+  Text is validated before the upload, so a refused request uploads nothing. File + JSON `img` → `400`.
+- **Side effects:** every write clears BOTH menu cache keys; create and update also run
+  `syncCampaignCategoryForStore` as the admin add/update do (a no-op in practice: Kopa never sets a
+  campaign trigger). Both swallowed and logged. No websocket event (the admin category routes send none).
+- **Promotions** (the store's own deals, CORE invariant 18). `routes/promotion.js` exports its own
+  `sanitizePromotion` and `validatePromotion` (= its private `validate`) for this; Kopa requires them
+  and never builds a promotion itself. Never copy them: a field the admin form gains must reach Kopa
+  through the same function.
+  - `GET /api/kopa/promotions` → `data: { promotions, types }`: the admin list (`find({})`, newest
+    `createdAt` first) plus `ALL_PROMOTION_TYPES`.
+  - `POST /api/kopa/promotions` — the admin form body. Doc = `sanitizePromotion(body)` + `createdAt`,
+    `updatedAt`, `createdBy` (= `req.auth.id`, the partner token's storeUsers id), the admin create's
+    keys in the same order (the test runs `POST /api/admin/promotions` on the same fake DB and compares).
+    `validatePromotion` errors → `400 { message, errors }` with the admin's messages. → `data` = doc + `_id`.
+  - `PATCH /api/kopa/promotions/:id` — any form fields; the doc is `sanitizePromotion({ ...stored,
+    ...body })` + `updatedAt`, `updatedBy`, `$set` over the stored doc (top-level overlay: `config` and
+    `scope` replace as whole objects). With the full form it writes exactly what
+    `POST /api/admin/promotions/:id` writes (tested); with some fields, only those change, because
+    re-sanitising a stored doc is idempotent. Empty or non-object body → `400`.
+  - `POST /api/kopa/promotions/:id/active` — `{ isActive: <JSON boolean> }` (anything else `400`); the
+    same re-sanitise with only `isActive` changed, as the admin's "post the doc back" update does.
+  - Ids go through the admin's `getPromotionById` on the proven store's DB: another store's id or a
+    malformed one → `404`, nothing written.
+  - Side effects equal the admin's: both cache keys, then `syncCampaignCategoryForStore`, swallowed.
+    No promotion delete from Kopa (switch it off instead). Scope ids are not checked against the
+    store's products/categories, as in the admin.
+- **Products: no Kopa route.** Kopa calls the `PRODUCT_ADMIN_OR_OWN_STORE` routes with
+  `Authorization: Token <partner token>`, `app-type: shoofi-partner`, `app-name: <store>`. That gate
+  checks only that the token's storeUsers doc's `appName` equals `app-name`: **no role**, so a cashier
+  can write products there. Kopa's UI must gate product editing on `all` itself.
+  - `POST /api/admin/product/insert`, **multipart** (every value a string): `nameAR`, `nameHE`,
+    `supportedCategoryIds` (JSON array of category id strings, required non-empty), `price` (JSON
+    number string), `descriptionAR/HE`, `notInStoreDescriptionAR/HE`, `isInStore` (`"false"` → false,
+    anything else true), `quantity`, `extras` (JSON string), `others` (JSON string), `soldByWeight`,
+    `hasDiscount` + `discountQuantity`/`discountPrice`, `barcodeId` (3–100, else generated), `barcode`,
+    `productType`/`combo` (JSON) for a combo; image: ONE file in `img`, or `img` as a JSON string of
+    `[{ uri }]`, or `imageUrl` (downloaded server-side). → `200 { message, productId, lintIssues? }`;
+    `400` `CATALOG_INVALID` / `COMBO_INVALID` / "At least one category is required".
+  - `POST /api/admin/product/update`, **multipart**: `productId` + only the fields to change (omit =
+    keep, invariant 8; a blank price must be omitted, never sent as 0). Image: a file in `img` or
+    `imageUrl`; update does NOT read a JSON `img`. → `200 { message: "Successfully saved", product,
+    lintIssues? }`; `400 "Failed to update product"` when the id is unknown. JSON bodies break here:
+    `extras`/`supportedCategoryIds`/`price` go through `JSON.parse`, so they must be strings.
+  - `POST /api/admin/product/update/isInStore`, JSON `{ productId, isInStore: <boolean>,
+    outOfStoreUntil? }` (ISO; only with `false`; `true` clears it). The raw value is `$set`, so send a
+    real boolean.
+  - `POST /api/admin/product/update/isHidden`, JSON `{ productId, isHidden: <boolean> }` (raw `$set`; a
+    string `"true"` would not hide, the menu matches `$ne: true`).
+  - `POST /api/admin/product/update/order`, JSON `{ productsList: [{ _id }, …] }` (order = index; see §3
+    for what it does NOT do).
+  - `POST /api/admin/product/delete`, JSON `{ productsIdsList: [id, …] }` → `200`, or `409
+    PRODUCT_REFERENCED_BY_COMBO`. A thrown error answers `200 { message: <error> }`, so check `message`.
+  - **`POST /api/admin/images/upload` cannot set a product image.** It uploads into the `birthday`
+    folder, inserts `images` docs `{ data: { uri }, type: "birthday", subType }` and returns only
+    `{ message }`, no URI. Send product images through insert/update `img` instead.
+  - All of these clear both cache keys except `update/order` (main key only).
+
+## 7l. Kopa phase 3 — till-only menu details (CORE invariant 33)
+Code: `routes/kopa/menu-meta.js`, `services/kopa/menu-meta.js`; tests `test/integration/kopa/menu-meta.js`.
+JSON only. Writes only the three Kopa collections (§2), never `products`/`categories`, clears no
+menu cache key (the customer menu cannot change). Every id is checked against THIS store's DB.
+- **`GET /api/kopa/meta`** (`KOPA_TILL` = `cashier` | `all` | `reports`) → `data: { items: { [productId]:
+  meta }, categories: { [categoryId]: meta }, kitchens: [...] }` (meta without `_id`; kitchens by
+  `order`, then `_id`).
+- **`PUT /api/kopa/meta/items/:productId`** (`KOPA_OWNER`) — `{ prepMinutes, instructions, isLabelPrint,
+  nameEN, descriptionEN, kitchenIds, showInTill }`. PUT REPLACES: an omitted field returns to its
+  default (`null`, `""`, `false`, `[]`, `showInTill: true`). Strict types: `prepMinutes` integer 0–600
+  or null; booleans are JSON booleans; texts ≤ 200 (names) / 1000 (instructions) / 2000 (description);
+  `kitchenIds` ≤ 20 unique 24-hex ids, stored lower-case strings. Unknown key → `400`. Product not in
+  this store → `404`. A kitchen id not in this store's `kopaKitchens` → `400 { code:
+  "KITCHEN_NOT_FOUND", data: { kitchenIds } }`, nothing written. → `data` = the stored meta.
+- **`PUT /api/kopa/meta/categories/:categoryId`** (`KOPA_OWNER`) — `{ nameEN, showInTill, tillOnly }`,
+  same replace/strict rules; category not in this store → `404`. `tillOnly` / `showInTill` affect the
+  till only: they do NOT hide anything from the customer menu (per-channel visibility is out of scope).
+- **Kitchens:** `GET /api/kopa/kitchens` (`KOPA_TILL`) → `data: [...]`; `POST` (`KOPA_OWNER`) `{ nameAR,
+  nameHE, nameEN?, order? }` (both names required; `order` omitted → last + 1; ≤ 50 per store);
+  `PATCH /:id` any of those four (at least one); `DELETE /:id` → `409 { code: "KITCHEN_IN_USE", data:
+  { productIds } }` while any item meta lists it, else `200`. Another store's kitchen id → `404`.
+- **Indexes never gate a write:** `ensureIndexes` (background, one shared build per db handle,
+  retried on failure) is called but not awaited; a test with a rejecting `createIndex` proxy proves
+  every write still lands.
 
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":

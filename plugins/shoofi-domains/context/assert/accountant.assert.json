@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData in-process, OPT-IN via body figures: \"report\"; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's per-store body in services/payments/store-sales.js; ref §1/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@feat/kopa-phase1 / 2026-11-12 (CORE section + reference 12: Kopa till sessions & reports, phase 5 - till money separate from settlement, one open session via a fixed-_id lock, gapless Z on the shared close, the expected-cash formula, the drawer counted via drawerMovementIds, receipts built but off and refusing createInvoiceOnBehalf); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData in-process, OPT-IN via body figures: \"report\"; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's per-store body in services/payments/store-sales.js; ref §1/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -48,7 +48,16 @@
         "services/invoicing/tax-consent.js",
         "services/invoicing/tax-consent-reminders.js",
         "routes/tax-consent.js",
-        "utils/crons/tax-consent-reminder-cron.js"
+        "utils/crons/tax-consent-reminder-cron.js",
+        "services/kopa/till-sessions.js",
+        "services/kopa/till-reports.js",
+        "services/kopa/receipts.js",
+        "routes/kopa/till-sessions.js",
+        "routes/kopa/till-reports.js",
+        "routes/kopa/receipts.js",
+        "test/integration/kopa/till-sessions.js",
+        "test/integration/kopa/till-reports.js",
+        "test/integration/kopa/receipts.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -244,7 +253,10 @@
           "selectReminders",
           "reminderStageFor",
           "runTaxConsentReminders"
-        ]
+        ],
+        "services/kopa/till-sessions.js": ["OPEN_LOCK_ID", "Z_COUNTER = \"zReport\"", "closeSession", "computeSessionTotals", "autoCloseStaleSessions", "startKopaTillAutoClose", "KOPA_TILL_AUTOCLOSE", "addDrawerMovement", "verifyManagerPin", "correctOpeningFloat", "CLAIM_STALE_MS", "LOCK_ORPHAN_MS"],
+        "services/kopa/till-reports.js": ["tipsReport", "discountsReport", "staffSalesReport", "refundsReport", "primaryCategoryOf", "countedMovements"],
+        "services/kopa/receipts.js": ["buildReceiptPayload", "issueReceipt", "RECEIPTS_DISABLED", "EZCOUNT_NOT_CONNECTED", "ADAPTER_UNFIT", "ALREADY_CLAIMED", "isVatExempt", "withoutVAT"]
       },
       "patterns": [
         {
@@ -1378,6 +1390,31 @@
           ],
           "regex": "(?:no `figures`: partner/summary answers what main's handler answered, field for field|router\\.post\\(\"/api/payments/partner/summary\", \\.\\.\\.partnerEarningsAccess,)",
           "desc": "CORE invariant 17: the test pinning the no-flag answers (and stores-export-new + generateStoreReportData without sources) byte-for-byte to a golden file captured from main's own handlers - valid-before leg is main before shoofi-server fix/partner-summary-figures; drop it once that PR has merged"
+        },
+        {
+          "file": "services/kopa/till-sessions.js",
+          "regex": "const expectedC = floatC \\+ payC\\.CASH - refundC\\.CASH \\+ cashInC - cashOutC;",
+          "desc": "CORE (Kopa phase 5): expected cash = opening float + cash payments - cash refunds + drawer in - drawer out"
+        },
+        {
+          "file": "services/kopa/till-sessions.js",
+          "regex": "\\{ _id, status: \"open\" \\},\\s*\\{ \\$set: \\{ status: \"closing\"",
+          "desc": "CORE (Kopa phase 5): the close claim is conditional on status open, so one caller wins and one Z number is taken"
+        },
+        {
+          "file": "services/kopa/till-sessions.js",
+          "regex": "insertOne\\(\\{ _id: OPEN_LOCK_ID, sessionId: _id, at: now \\}\\)",
+          "desc": "CORE (Kopa phase 5): one open session per store via a fixed-_id lock doc"
+        },
+        {
+          "file": "services/kopa/receipts.js",
+          "regex": "if \\(invoiceFn === hyp\\.createInvoiceOnBehalf\\) \\{",
+          "desc": "CORE (Kopa phase 5): till receipts refuse the settlement adapter (Shoofi as customer, payment_type 4)"
+        },
+        {
+          "file": "services/kopa/receipts.js",
+          "regex": "s\\.receipts\\.enabled === true",
+          "desc": "CORE (Kopa phase 5): till receipts are off unless the store flag is exactly true"
         }
       ]
     },

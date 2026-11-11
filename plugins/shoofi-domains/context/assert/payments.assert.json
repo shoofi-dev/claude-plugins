@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -26,9 +26,15 @@
         "services/twin-order/twin-delivery-price.js",
         "utils/client-features.js",
         "services/coupons/public-coupon.js",
-        "routes/coupon.js"
+        "routes/coupon.js",
+        "services/kopa/till-money.js",
+        "routes/kopa/till-money.js",
+        "services/kopa/till-orders.js",
+        "test/integration/kopa/till-money.js"
       ],
       "symbols": {
+        "services/kopa/till-money.js": ["applyDiscount", "removeDiscount", "suggestDiscount", "setTip", "addRefund", "approveByManager", "standingDiscountOf", "verifyManagerPin", "clientRefundId", "discountLog"],
+        "services/kopa/till-orders.js": ["computeTotals", "discountCents", "tipCents", "percentOfCents", "amountDue", "clientPaymentId", "cleanClientId", "replaySignal"],
         "utils/hyp-pay.js": [
           "buildCcPaymentRefData",
           "chargeToken"
@@ -97,6 +103,31 @@
         ]
       },
       "patterns": [
+        {
+          "file": "services/kopa/till-orders.js",
+          "regex": "const dueC = totalC \\+ tipC;",
+          "desc": "CORE Kopa till money: the tip is NOT in total; amountDue = total + tip"
+        },
+        {
+          "file": "services/kopa/till-orders.js",
+          "regex": "if \\(toCents\\(next\\.paidAmount\\) >= toCents\\(next\\.amountDue\\)\\) \\{",
+          "desc": "CORE Kopa till money: a till order is paid when the payments cover amountDue (total + tip)"
+        },
+        {
+          "file": "services/kopa/till-orders.js",
+          "regex": "\\{ _id, status: current\\.status, rev: current\\.rev \\}",
+          "desc": "CORE Kopa till money: every till money write is CAS on { _id, status, rev }"
+        },
+        {
+          "file": "services/kopa/till-money.js",
+          "regex": "const isStanding = !!standing && standing\\.phoneMatches && sameAdjustment\\(standing, adj\\);",
+          "desc": "CORE Kopa till money: a discount skips the manager PIN only when it is the profile's standingDiscount exactly and the phone matches"
+        },
+        {
+          "file": "services/kopa/till-money.js",
+          "regex": "if \\(amountC > refundableC\\) \\{",
+          "desc": "CORE Kopa till money: total refunds never exceed paidAmount"
+        },
         {
           "file": "services/payments/order-invoices.js",
           "regex": "if \\(order\\?\\.twinGroup\\?\\.groupId\\) \\{\\s*return await retryTwinOrderInvoices\\(",

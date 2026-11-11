@@ -22,7 +22,9 @@ Primary files: `routes/order.js` (~7k lines), `routes/twin-order.js`,
 `utils/order-stock.js` (stock semantics), `utils/crons/*order*`,
 `services/monitoring/centralized-flow-monitor.js`, `routes/order-history.js` +
 `services/orders/order-history.js` (the partner's one-day history, CORE invariant 21),
-`routes/kopa/orders.js` + `services/kopa/orders.js` (Kopa's order reads, CORE invariant 29, C5).
+`routes/kopa/orders.js` + `services/kopa/orders.js` (Kopa's order reads, CORE invariant 29, C5),
+`routes/kopa/{reasons,tables,till-orders,kds,settings}.js` + `services/kopa/` same names (the
+Kopa till: in-store sales in `kopaTillOrders`, never `orders`; CORE invariant 30, C5).
 Status constants: `consts/consts.js`.
 
 **⚠️ HIGH-RISK code (change via draft PR flagged HIGH-RISK; never merge):**
@@ -1009,9 +1011,9 @@ reads are three new read-only routes in shoofi-server `routes/kopa/orders.js` (l
   `reports` passes; 38 of 406 prod docs, 2026-11-11). The store is
   `req.storeMembership.appName`, never the raw header. No token → 401; a customer token → 403;
   a member of another store → 403; a non-`isAdmin` doc or one whose `roles` has neither `reports` nor `all` →
-  403 `Insufficient role`. ⚠️ `storeUserHasRole` does not treat `all` as a superset: prod
-  2026-11-11 has 38 of 406 `store-users` docs with `isAdmin` + `roles` containing `all` but not
-  `reports`, and they get 403 here (as on the store-analytics routes).
+  403 `Insufficient role`. `storeUserHasRole` does not treat `all` as a superset, so
+  `KOPA_REPORTS` lists `all` explicitly. The store-analytics routes do not, and those 38 owners
+  still get 403 there. (Corrected 2026-11-11: this line used to say they get 403 here too.)
 - **`POST /api/kopa/orders`** — body `{ from, to, page?, limit?, receiptMethod?, paymentMethod?,
   status?, productId? }`. `from`/`to` are real `YYYY-MM-DD` days, `from ≤ to`, at most 93 days
   (both ends counted), else 400. `limit` defaults to 50 and is clamped to 200. `status` is a
@@ -1049,6 +1051,126 @@ reads are three new read-only routes in shoofi-server `routes/kopa/orders.js` (l
   isActive, state (draft|inactive|scheduled|expired|live), viewsCount`. Never `approval` (it
   names admins), `marketingItemId` or `cityAreas`. The `stories` TTL index deletes a story a
   day after `expiresAt`, so `expired` rows only last that long.
+
+### Kopa till: phases 3, 4 and 6 (CORE invariant 30)
+These routes write only Kopa collections (`services/kopa/store-data.js` `STORE`), never `orders`,
+`products` or `categories`. They are built on `feat/kopa-phase1` (2026-11-11, uncommitted) and
+are not yet mounted in `routes/kopa/index.js`. Gates are in `services/kopa/access.js`:
+- `KOPA_TILL` is `cashier | all | reports`.
+- `KOPA_OWNER` is `all`.
+- Both put the store and the acting staff member (`req.storeMembership.me`) on the request.
+
+Who acted is stored as `{ staffId, staffName }`. Errors are
+`{ message, code }` (plus `productIds` / `comboIssues` / `orderId` / `tableIds` where named). A
+`createIndex` is never awaited (`ensureIndexes`).
+
+#### Kopa phase 3: cancellation reasons (`routes/kopa/reasons.js`)
+- `GET /api/kopa/cancel-reasons?appliesTo=item|order&includeInactive=1` (`KOPA_TILL`): returns
+  `{ message, reasons }`, active only by default, sorted by `order`. `appliesTo=item` also lists
+  `both`.
+- `POST` (`KOPA_OWNER`): body `{ nameAR?, nameHE? (one required, ≤ 80), appliesTo = "both",
+  returnToStock = false, order = 0 (int 0-10000), active = true }`. Returns 201 `{ message,
+  reason }`. At most 200 per store.
+- `PATCH /:id` (`KOPA_OWNER`): partial. `DELETE /:id` (`KOPA_OWNER`): soft, `active: false`.
+  Both return `{ message, reason }` and 404 on an unknown id.
+
+#### Kopa phase 4: tables (`routes/kopa/tables.js`)
+- **Collections.** `kopaTables` holds `{ number (int 1-99999, unique per store), seats,
+  sectionId (string | null), visible, layout: { x, y, w, h, shape: square|circle|rect, rotation } }`.
+  `kopaTableSections` holds sections `{ nameAR, nameHE, order }` and ONE layout doc
+  `{ _id: "floorLayout", walls: [{ x1, y1, x2, y2 }], canvas: { orientation:
+  landscape|portrait } }`. Every section query excludes the layout doc.
+- `GET /api/kopa/tables` (`KOPA_TILL`): returns `{ message, tables, sections, layout: { walls,
+  canvas, updatedAt } }`. Every table is listed, hidden ones too. Each carries `status:
+  "free" | "occupied"` and `occupiedBy: { orderId, number, total, balance, createdAt } | null`
+  (an OPEN till order on it).
+- `POST /api/kopa/tables`, `PATCH` / `DELETE /api/kopa/tables/:id` (`KOPA_OWNER`).
+  - A duplicate number is 409 `TABLE_NUMBER_TAKEN`.
+  - PATCH merges a partial `layout` over the stored one.
+  - Hiding or deleting a table with an open order is 409 `TABLE_OCCUPIED`.
+  - Delete is a hard delete. A till order keeps its own `tableNumber`.
+- `PUT /api/kopa/tables/layout` (`KOPA_OWNER`): body `{ tables: [{ id, layout }], walls,
+  canvas: { orientation } }`.
+  - Validation is all-or-nothing: an unknown id is 400 with `tableIds`, and nothing is written.
+  - The positions are bulk-written, and the walls and canvas are upserted onto `floorLayout`.
+  - Returns the GET shape.
+- `GET` / `POST /api/kopa/table-sections`, `PATCH` / `DELETE /api/kopa/table-sections/:id`
+  (read `KOPA_TILL`, write `KOPA_OWNER`). Deleting a section a table uses is 409
+  `SECTION_IN_USE`.
+
+#### Kopa phase 4: till orders (`routes/kopa/till-orders.js`, all `KOPA_TILL`)
+- **Document (`kopaTillOrders`).**
+  - Header fields: `{ number (nextSeq "tillOrder", gapless), status: open|paid|cancelled,
+    receiptMethod: TABLE|TAKEAWAY|DELIVERY, tableId, tableNumber, customer: { name, phone,
+    profileId? } | null, staffId, staffName, waiterId, waiterName, isStaffMeal`.
+  - Lines and money: `items, subtotal, total, amountDue, payments, paidAmount, balance, unpaid,
+    unpaidAt, cancel, createdAt, updatedAt, closedAt, rev }`.
+  - Phase 4d adds `discount?`, `discountLog?`, `tip?`, `refunds?` and `refundedAmount?`, and
+    `refundedQty` / `refunded` on a line. They are written by `services/kopa/till-money.js`;
+    shapes and rules are in payments reference §6b.
+  - A line is `{ lineId, productId | null, nameAR, nameHE, qty (1-999), unitPrice, lineTotal,
+    selectedExtras, comboSelections?, note, kitchenIds, status: new|preparing|ready|served|cancelled,
+    statusTimes, addedAt, addedBy, cancel? }`.
+  - A payment is `{ paymentId, method, amount, tendered?, change?, clientPaymentId?, staffId,
+    staffName, at }`.
+- `POST /api/kopa/till/orders`: body `{ receiptMethod, tableId?, customer?, waiterId?,
+  isStaffMeal?, items? }`. Returns 201 `{ message, order }`.
+  - TAKEAWAY and DELIVERY need `customer.name` + `phone`.
+  - TABLE needs a visible table with no open order. Otherwise 409 `TABLE_OCCUPIED` with
+    `orderId`.
+  - `waiterId` must be a `storeUsers` doc of this store.
+  - An item is `{ productId, qty, selectedExtras, comboSelections?, note }` or
+    `{ productId: null, nameAR, nameHE?, price, qty, note }`.
+- `GET /api/kopa/till/orders?status=&from=&to=&tableId=&unpaid=1&limit=` returns `{ message,
+  orders, totalCount }`, newest first.
+  - `from` / `to` are a `YYYY-MM-DD` Israel day or an ISO time, on `createdAt`, ≤ 93 days.
+  - `limit` defaults to 100, max 500.
+- `GET /api/kopa/till/orders/:id` returns `{ message, order }`, or 404.
+- `POST /:id/items` takes `{ items }`. `PATCH /:id/items/:lineId` takes `{ qty?, note? }` and
+  works only while the line is `new`, else 409 `LINE_NOT_EDITABLE`.
+  `POST /:id/items/:lineId/cancel` takes `{ reasonId }` (an item reason). Each returns
+  `{ message, order }`.
+- `POST /:id/cancel` takes `{ reasonId }` (an order reason). It is 409 `PAYMENT_RECORDED` once
+  any payment exists.
+- `POST /:id/move` takes `{ tableId }`. It works on TABLE orders only, to a free visible
+  table.
+- `POST /:id/payments` takes `{ method, amount, tendered?, clientPaymentId? }`.
+  - It returns 201 `{ message, order, payment, replay: false }`.
+  - A repeated `clientPaymentId` returns 200 with the original payment and `replay: true`.
+    This holds after the order is paid too. The same id with another method or amount is
+    409 `CLIENT_PAYMENT_ID_REUSED`.
+  - The order is paid when the payments reach `amountDue` (total + tip).
+
+  Refusals:
+  - 409 `OVERPAY` (amount > balance, tip included);
+  - 400 `TENDERED_TOO_LOW`;
+  - 409 `ALREADY_UNPAID`;
+  - 409 `CONFLICT` (another device wrote first);
+  - 409 `ORDER_NOT_OPEN`.
+
+  `amount: 0` closes a zero-balance order that has live lines (a staff meal).
+
+#### Kopa phase 4: kitchen screen (`routes/kopa/kds.js`, `KOPA_TILL`)
+- `GET /api/kopa/kds?kitchenId=&receiptMethod=` returns `{ message, tickets: [{ orderId,
+  number, receiptMethod, tableId, tableNumber, customerName, isStaffMeal, createdAt,
+  waitingSince, lines: [{ lineId, productId, nameAR, nameHE, qty, selectedExtras,
+  comboSelections, note, kitchenIds, status, statusTimes, addedAt }] }], lineCount }`.
+  - Only lines of open orders that are not served or cancelled are shown.
+  - Tickets are sorted oldest waiting line first. No prices or payments are returned.
+  - `kitchenId` is matched lowercased. A line with no kitchen shows only with no `kitchenId`
+    (or `all`).
+- `PATCH /api/kopa/kds/:orderId/lines/:lineId` takes `{ status: preparing|ready|served }`. It
+  moves forward only, else 409 `NOT_FORWARD`. Returns `{ message, orderId, line }`.
+
+#### Kopa phase 6: store settings (`routes/kopa/settings.js`, `KOPA_OWNER`)
+- `GET /api/kopa/settings` returns `{ message, settings: { wifi: { ssid, password }, guestWifi,
+  gateway, externalIp, receipts: { enabled }, updatedAt, updatedBy } }`, with defaults when
+  nothing has been saved.
+- `PUT /api/kopa/settings` is a partial update of `{ wifi?, guestWifi?, gateway?, externalIp? }`.
+  - SSID ≤ 32 characters, password ≤ 63.
+  - `gateway` / `externalIp` take an IPv4 or IPv6 address, or `""`.
+  - Unknown keys are 400 `UNKNOWN_FIELD`.
+  - A `receipts` value other than the stored one is 400 `RECEIPTS_LOCKED`.
 
 ## Cross-repo invariants (the whole-domain view)
 - **Status source of truth = server** (store `orders.status`). Clients each keep their

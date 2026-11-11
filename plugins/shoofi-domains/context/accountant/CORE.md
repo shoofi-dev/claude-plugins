@@ -1000,6 +1000,40 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       steps, reasons and next actions (reference §9).
     Tests: shoofi-server `test/integration/hyp-invoice-steps.js`, `test/integration/hyp-store-invoice-guard.js`.
 
+## Kopa till sessions & reports (phase 5)
+*(shoofi-server@feat/kopa-phase1, 2026-11-12. Detail: reference §12.)*
+**Till money is the store's own in-store money and is SEPARATE from settlement.** The Kopa till
+(`services/kopa/till-sessions.js`, `till-reports.js`, `receipts.js`) reads `kopaTillOrders`,
+`kopaTillSessions` and `kopaDrawerMovements` only. It never reads or writes `orders`, and it
+feeds nothing on this page: no store report, commission, `totalForTransfer`, MASAV, or Shoofi
+invoice. A Z report is the store's cash-up, not a payout figure. Do not add till sales to any
+settlement sum. If that is ever wanted, it is a new owner decision, not a fix.
+- **One open session per store**, enforced by a fixed-`_id` lock doc (`OPEN_LOCK_ID`) in
+  `kopaCounters`. `_id` uniqueness holds without any built index.
+- **Z number = `nextSeq(db, "zReport")`, gapless, taken only on close**, through ONE
+  `closeSession`. The route and the auto-close cron both call it. The order is: claim
+  (`{ _id, status: "open" }` → `closing`), then count, then number (recorded at once), then
+  freeze. A lost race or a refused close burns no number. A counting failure re-opens the
+  session. The only gap is a crash between `nextSeq` and the write that records it.
+- **expected cash = openingFloat + CASH payments − CASH refunds + drawer in − drawer out**.
+  CASH counts `amount`, never `tendered`. difference = countedCash − expected, or null.
+  The window is `[openedAt, closingAt)` on `payments[].at` / `refunds[].at`. Tips, discounts
+  and staff meals come from orders paid (`closedAt`) in the window. `gross` (all payments)
+  INCLUDES tips, because `total` excludes the tip and the payments cover `amountDue`.
+- **Closed sessions are immutable.** The opening float is editable only while open (owner,
+  audited). Drawer movements need a manager PIN, have no edit route, and are counted only via
+  the session's `drawerMovementIds` (`$push` conditional on `status: "open"`).
+- **Receipts as the store (EZcount) are BUILT BUT OFF and HIGH-RISK / BLOCKED for go-live.**
+  `issueReceipt` refuses unless `kopaStoreSettings.receipts.enabled === true` (no route sets it)
+  AND `store.hyp.status === "connected"` AND the payload has no blockers. It also refuses
+  `createInvoiceOnBehalf` as its adapter (`ADAPTER_UNFIT`): that function always makes Shoofi the
+  customer and sends `payment_type: 4`. It is the store→Shoofi settlement document and cannot
+  carry a till receipt. Going live needs a dedicated adapter in `utils/hyp.js` (do-not-touch, so
+  it needs owner approval), an accountant ruling on tips and negative discount lines, and an
+  EZcount account per store. VAT comes from `utils/vat.js` only. Doc type 320, or 400 when
+  `isVatExempt`. Note the settlement path uses 305/300 for the same distinction.
+  Tests: shoofi-server `test/integration/kopa/{till-sessions,till-reports,receipts}.js`.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
   in `utils/vat.js`.
