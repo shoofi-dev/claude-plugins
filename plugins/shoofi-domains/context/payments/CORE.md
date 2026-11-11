@@ -173,6 +173,18 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.
+12. **A receipt PDF is published only when exactly one Gmail mail is provably this
+   docId's, and never over an existing key** (HQ #d210bf). Gmail `subject:` is a word
+   search, so a short DocumentID (976) also finds 9761, an amount or a date. And
+   DocumentIDs repeat across stores (5462/5465/5466 each sit on two orders) while the key
+   `invoices/doc-<docId>.pdf` has no store in it. `utils/invoice-mail-match.js` searches
+   `subject:"<docId>"` and keeps only mails whose Subject header holds the docId as a whole
+   number. 2+ matches (`multiple_emails`), a second result page (`too_many_candidates`) or
+   an existing key (`key_exists`, HeadObject in `utils/invoice-mail.js` and
+   `backfill-invoices.js` right before PutObject) → nothing uploaded, and the order gets
+   `ccPaymentRefData.invoiceStatus: "needs_review"` + `invoiceMatchError`. `needs_review`
+   is never re-queued and never counts as completed; the money audit's `receipt-missing`
+   lists it. There is **no amount check**: the receipt mail's format is not known from code.
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
