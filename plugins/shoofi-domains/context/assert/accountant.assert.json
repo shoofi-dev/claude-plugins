@@ -6,6 +6,7 @@
       "files": [
         "routes/payments/admin-reports.js",
         "routes/payments/admin.js",
+        "services/payments/cancel-compensation.js",
         "routes/payments/summaries.js",
         "routes/driver-reports.js",
         "routes/admin/masav.js",
@@ -270,6 +271,16 @@
           "file": "routes/payments/admin-reports.js",
           "regex": "revenueForCommission\\s*=\\s*totalRevenue\\s*\\+\\s*totalCustomerSpecificCoupons\\s*\\+\\s*totalShoofiCompensations\\s*\\+\\s*driveInTotal\\s*;",
           "desc": "commission is charged on the FINAL items price charged — productDiscounts must NOT be added back here (owner decision 2026-08-04), while reimbursed coupons, Shoofi compensations and drive-in stay in"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "status: \\{ \\$in: \\[\"2\",\"3\",\"10\",\"11\",\"12\"\\] \\}",
+          "desc": "CORE invariant 6: only completed statuses settle — a cancelled/rejected order (4,5,7,8,9) is excluded from settlement"
+        },
+        {
+          "file": "services/payments/cancel-compensation.js",
+          "regex": "payingParty: \"shoofi\"",
+          "desc": "CORE invariant 6: a keep-cancel's COMP coupon is Shoofi-paid — the cancelled order's store is not charged; the redeeming store is credited via couponsFromShoofi"
         },
         {
           "file": [

@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -114,6 +114,24 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    sale — and never fails the order: failures land on `order.invoices[]` and are retried by
    `utils/crons/invoice-retry-cron.js`, which is deliberately **not** gated on the flag so
    a rollback cannot strand a customer who paid while it was on.
+   ⚠️ **The documents are FIXED AT CAPTURE.** Capture plans them once and records every one
+   on `order.invoices[]` (failed ones too, with their `amount`). A retry re-issues only a
+   recorded, not-`issued` document at the amount capture planned — never re-plans from
+   post-capture totals, never re-issues an `issued` one, never originates an unrecorded one.
+   **A TWIN leg never reaches `planSingleOrderInvoices`:** `issueInvoicesForOrder` routes any
+   `order.twinGroup.groupId` to `retryTwinOrderInvoices`, which loads the group + both legs,
+   rebuilds the capture-time figures (`twinAtCapture`: a keep-secondary degrade's
+   `degrade.shippingTransferred` is taken back off the secondary, as `undoDegrade` does; the
+   charge is `computeCombinedTotal`, checked against a ZCredit `payload.TransactionSum` when
+   one exists), re-plans the GROUP with `planTwinInvoices`, and issues only this leg's
+   failed documents. The delivery document — shipping + combination fee — lives on the
+   primary only. If anything cannot be proven (group/peer missing, a recorded amount the
+   re-plan does not reproduce, a record the twin plan does not have — e.g. a delivery doc on
+   the secondary — or an unrecorded doc on this leg) it issues nothing and sets
+   `order.invoicesHeld {reason, detail, groupId, at}`; the cron's query skips held orders
+   until a person clears the field. Before 2026-11-06 the cron used the single planner on
+   twins: a primary retry dropped the fee from the delivery doc and a degraded secondary
+   retry issued a second delivery doc (prod had 0 such retries pending when fixed).
    ⚠️ The customer document carries **`ua_uuid`** — Shoofi's EZcount user holds several
    businesses and this says which one issues it. `CUSTOMER_DOC_UA_UUID` in `amazonconfigs
    {app:"hyp"}` overrides the constant in `utils/hyp.js`; an **empty string there stops the
