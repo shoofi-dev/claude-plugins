@@ -91,6 +91,13 @@ Unlike customers, admin verification **skips stored-token equality** (signature 
 **Impersonation** — `POST /api/admin/impersonation/order-token` : **`master`-only**,
 audited, mints a 15-min `imp:true` JWT to open the partner/driver/customer app as that user.
 It does **not** overwrite the subject's stored token. **Keep the master gate + audit intact.**
+Client side: the admin web mints it from `openAsStore` / `openAsDriver` / `openAsCustomer`
+(`shoofi-delivery-web` `src/components/Cards/order-actions/useOrderActions.tsx`) and hands it
+over as `?t=` (deep link `shoofi-partners://` / `shoofi-shoofir://`, or the app's web build in
+the device-frame iframe). Each receiver reads it in `stores/auth/impersonation.ts`
+`consumeMasterLink` (partner, shoofir, app) — it does not strip `?t=` from the URL afterwards.
+**Never `console.*` the reply or the URL built from it**; two `openAs*` did until HQ #718d9a,
+pinned by `order-actions/__tests__/no-impersonation-token-log.test.tsx`.
 
 ## 4. Data model
 - **`shoofi.customers`** — identity (`fullName`, `phone`, `email`, `language`), auth
