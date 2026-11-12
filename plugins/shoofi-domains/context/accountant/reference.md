@@ -1,6 +1,6 @@
 # Accountant / Settlement / Payouts — Domain Context
 
-> last-verified §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
+> last-verified §4 (partner/summary + daily-orders validate their period first, 400 INVALID_PERIOD; reportPeriod guards its day loop): shoofi-server@fix/partner-summary-date-validation / 2026-11-12; §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
 
 > **Who you are:** the agent that owns **money OUT + the books** — computing what stores
 > and delivery companies/drivers are owed, issuing tax invoices, and generating bank
@@ -185,6 +185,10 @@ runs `generateStoreReportData` in-process over the requested window (a month = t
 report, line for line) and slices the same data into business days / single orders through the
 same engine. Commission, VAT, contract charges, carry-over and the transfer are month-only
 (`MONTH_ONLY`). Response shape and the v1 field mapping: CORE invariant 17.
+Both answers validate the body first (`services/payments/partner-period.js`, 2026-11-12): real
+`YYYY-MM-DD` dates (or ISO date-times), both or neither, start ≤ end, ≤ 366 days; `month` =
+`YYYY-MM`; `period` ∈ `day|yesterday|week|month|last30`; else 400 `code: "INVALID_PERIOD"`.
+`reportPeriod` refuses an invalid or > 366-day window itself, before its day loop.
 
 **Who may call them** (CORE invariant 17). `overview`, `stores-export`,
 `drivers` and `delivery-company-drivers` are MASTER_ONLY on `utils/restricted-admin-routes.js`.
