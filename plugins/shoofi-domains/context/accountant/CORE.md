@@ -1076,6 +1076,18 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
   `:706` with `Cache-Control: private`) and `routes/team-tasks.js:752` both do this — and cap
   one file per document well under the 16MB BSON limit, the way
   `services/ai-tasks/constants.js:180` pins `MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024`.
+20. **A twin leg left without its customer document surfaces ONLY through the money audit**
+   (HQ #b3c58d). Every twin charge is manually invoiced (payments invariant 9), so the gateway
+   issues nothing, and the invoice-retry cron neither alerts nor records giving up. The
+   nightly check `twin-document-missing` (`services/hq/money-audit/checks-orders.js`, severity
+   `leak` → Needs you) judges `paymentStatus: "both_captured"` groups of the audited business
+   day and flags each live leg with `invoicesHeld`, or a `failed` document at
+   `attempts >= MAX_INVOICE_ATTEMPTS`, or — capture ≥ 1h old and on/after
+   `TWIN_ALWAYS_INVOICED_SINCE` — no `invoices[]` / a missing required store or
+   primary-delivery document. Twins captured earlier may legitimately carry only a gateway
+   receipt. A `failed` document under the cap is the cron's, not a finding. The money audit's
+   `receipt-missing` excludes twin legs (`real(o)`), so this is the only twin coverage; a
+   group is judged once, on its creation day's 07:10 run.
 
 ## Recipe — change a payout or invoice amount
 1. **Trace the money first**: who collected (cash/card) → who is owed → which formula line.
