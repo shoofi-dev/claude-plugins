@@ -145,6 +145,15 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    DocumentID`, web-checkout `InvoiceRecieptNumber`) is fetched and stored by
    `saveTwinGatewayInvoicePdf` (`services/twin-order/twin-payment-service.js`), which stamps
    `ccPaymentRefData.url` on both legs. Before it, twin orders had a ZCredit DocumentID and no PDF.
+   ⚠️ **A charged order with no document that the cron will not fix reaches a person.** A held
+   twin retry (any reason) and any document at `MAX_INVOICE_ATTEMPTS` (single or twin) is
+   written to `shoofi.order-invoice-alerts` (`services/payments/order-invoice-alerts.js`; one
+   row per store + order + reason, `_id` = that key, upserted, never throws) and shown in HQ
+   צריך אותך as source `order-invoice` (`services/hq/inbox-sources.js`, not urgent). A retry
+   that documents the order sets `resolvedAt`. `persistentAlerts` is new-order alerts for
+   stores, and the money audit's `receipt-missing` reads `ccPaymentRefData.invoiceStatus`,
+   which manual invoicing never sets, so neither of those covers this. Orders held before
+   2026-11-12 have no row.
    ⚠️ The customer document carries **`ua_uuid`** — Shoofi's EZcount user holds several
    businesses and this says which one issues it. `CUSTOMER_DOC_UA_UUID` in `amazonconfigs
    {app:"hyp"}` overrides the constant in `utils/hyp.js`; an **empty string there stops the
