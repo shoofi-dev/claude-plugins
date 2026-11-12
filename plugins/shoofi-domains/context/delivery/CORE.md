@@ -543,6 +543,9 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
     (rows `-3` and `4`). The order side locates "this order's row" only through
     `deliveryRowFilterForOrder` (`utils/delivery-row.js`, orders CORE invariant 23):
     `{originalBookId, bookId}`, or `{bookId, appName}` for a legacy order, never `bookId` alone.
+    An order cancel then writes `-3` only through `orderCancelDeliveryRowFilter`, which skips a
+    row already at `4`/`-1`/`-2`/`-3` (both types) inside the write filter, so a delivered
+    booking stays on the company driver report (orders CORE invariant 23).
     - **The delivery-side writes use `locateDeliveryRow`**
       (`services/delivery/delivery-row-locator.js`). These are `POST /api/delivery/admin/cancel`
       and `POST /api/delivery/update` → `updateDelivery` (`services/delivery/book-delivery.js`).
