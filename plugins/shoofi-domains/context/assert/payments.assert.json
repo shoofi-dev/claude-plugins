@@ -57,6 +57,7 @@
           "retryTwinOrderInvoices",
           "twinAtCapture",
           "INVOICES_HELD_FIELD",
+          "PENDING_GRACE_MS",
           "reconcileToCharge",
           "customerDocType"
         ],
@@ -106,6 +107,16 @@
           "file": "utils/crons/invoice-retry-cron.js",
           "regex": "\\[INVOICES_HELD_FIELD\\]: \\{ \\$exists: false \\}",
           "desc": "CORE invariant 10: the retry cron skips an order held for review (order.invoicesHeld) until a person clears it"
+        },
+        {
+          "file": "services/payments/order-invoices.js",
+          "regex": "holdTwinRetry\\(db, order, \"issue_outcome_unknown\"",
+          "desc": "CORE invariant 10: a twin record pending with issuingAt is held, never re-sent to EZcount"
+        },
+        {
+          "file": "services/twin-order/twin-payment-service.js",
+          "regex": "function saveTwinGatewayInvoicePdf\\(",
+          "desc": "CORE invariant 10: twin ZCredit documents get their PDF stored (saveTwinGatewayInvoicePdf)"
         },
         {
           "file": "services/payments/order-invoices.js",

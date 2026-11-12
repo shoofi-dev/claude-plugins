@@ -132,6 +132,19 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    until a person clears the field. Before 2026-11-06 the cron used the single planner on
    twins: a primary retry dropped the fee from the delivery doc and a degraded secondary
    retry issued a second delivery doc (prod had 0 such retries pending when fixed).
+   ⚠️ **A twin capture RECORDS before it ISSUES** (`issueInvoicesForTwin`, since HQ #b3c16c).
+   It used to issue every document and write `invoices[]` once at the end, so a throw or
+   restart in between left a charged twin with no record — invisible to the cron. Now every
+   planned doc is written `pending` + `pendingSince` first, marked `issuingAt` just before
+   its own EZcount call, and replaced by the outcome right after. The cron's `buildQuery`
+   also matches twin orders with a `pending` record older than `PENDING_GRACE_MS` (30 min);
+   the retry issues a stale `pending` with no `issuingAt`, and HOLDS one with `issuingAt`
+   (`issue_outcome_unknown` — EZcount may have it; never sent twice). A plan that throws
+   holds both legs (`capture_plan_failed`). Single orders never carry `pending` records.
+   ⚠️ **A twin ZCredit document's PDF** (card capture `ZCreditInvoiceReceiptResponse.
+   DocumentID`, web-checkout `InvoiceRecieptNumber`) is fetched and stored by
+   `saveTwinGatewayInvoicePdf` (`services/twin-order/twin-payment-service.js`), which stamps
+   `ccPaymentRefData.url` on both legs. Before it, twin orders had a ZCredit DocumentID and no PDF.
    ⚠️ The customer document carries **`ua_uuid`** — Shoofi's EZcount user holds several
    businesses and this says which one issues it. `CUSTOMER_DOC_UA_UUID` in `amazonconfigs
    {app:"hyp"}` overrides the constant in `utils/hyp.js`; an **empty string there stops the
