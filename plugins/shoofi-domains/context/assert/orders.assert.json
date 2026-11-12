@@ -784,6 +784,7 @@
         "helpers/printer/index.ts",
         "utils/print-outcome.ts",
         "utils/print-attempts.ts",
+        "utils/printer-offline-backoff.ts",
         "utils/print-queue.ts",
         "utils/print-batch.ts",
         "stores/auth/index.ts",
@@ -814,6 +815,11 @@
         ],
         "utils/print-queue.ts": [
           "captureAlignedToQueue"
+        ],
+        "utils/printer-offline-backoff.ts": [
+          "createPrinterOfflineBackoff",
+          "printerOfflineBackoff",
+          "allowProbe"
         ],
         "helpers/printer/index.ts": [
           "printImagesWithOutcome"
@@ -884,6 +890,16 @@
           "file": "utils/print-outcome.ts",
           "regex": "export const SEND_DATA_TIMEOUT_CEILING_MS = 60000;",
           "desc": "doc reference C3 Auto-print: 60s ceiling (the print lock is held for the whole wait)"
+        },
+        {
+          "file": "helpers/printer/print.ts",
+          "regex": "if \\(failure\\.report\\) \\{\\s*errorHandlerStore\\.sendClientError",
+          "desc": "doc CORE invariant 17: a failed printer connect sends a client-error row only for the first failure of an outage (HQ #719822)"
+        },
+        {
+          "file": "utils/printer-offline-backoff.ts",
+          "regex": "export const OFFLINE_COOLDOWN_MAX_MS = 2 \\* 60 \\* 1000;",
+          "desc": "doc CORE invariant 17: automatic prints skip an offline printer for at most 2 min before trying it again"
         },
         {
           "file": "utils/print-attempts.ts",
