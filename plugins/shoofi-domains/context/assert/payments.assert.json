@@ -34,7 +34,9 @@
           "chargeToken"
         ],
         "utils/invoice-mail.js": [
-          "saveInvoice"
+          "saveInvoice",
+          "docIdFilter",
+          "resolveInvoiceAppName"
         ],
         "routes/order.js": [
           "ccPaymentRefData",
