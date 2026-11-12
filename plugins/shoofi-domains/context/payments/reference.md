@@ -191,14 +191,21 @@ reference C5.
       reason, managerPin, clientRefundId? }`.
     - Returns 201 `{ order, refund, replay: false }`, or 200 with `replay: true` for a repeated
       `clientRefundId`.
+    - **Needs an open till session** (shoofi-server@feat/kopa-phase5 407a0533): otherwise 409
+      `{ code: "NO_OPEN_SESSION", message: "Start the shift before taking money" }`. This is
+      checked after the order's own refusals and BEFORE the manager PIN, so no try is spent. A
+      `clientRefundId` replay needs no session. The same rule holds for a till payment with a
+      money method (`POST …/:id/payments`, all methods but UNPAID). See accountant reference §12.
 - **Document fields** (on `kopaTillOrders`):
   - `discount = { type, value, amount, reason, source: manual|standing, profileId?,
     approvedBy: { staffId, name } | null, by: { staffId, staffName }, at }`.
   - `tip = { type, value, amount, by, at }`.
-  - `refunds[] = { refundId, amount, method, lines, reason, approvedBy, by, at,
-    clientRefundId? }`, plus `refundedAmount`.
+  - `refunds[] = { refundId, amount, method, lines, reason, sessionId, approvedBy, by, at,
+    clientRefundId? }`, plus `refundedAmount`. `sessionId` = the till session the refund was
+    taken in (tracing). `at` is the time reserved on that session.
   - On a refunded line: `refundedQty` and `refunded`.
-  - On a payment: `clientPaymentId?`.
+  - On a payment: `clientPaymentId?`, `sessionId` (ObjectId, or null for an UNPAID with no
+    session).
   - On the order: `amountDue`.
 - **Money math** (`computeTotals` in till-orders.js, agorot integers).
   - discount = percent of the subtotal (`round(subtotalC × value×100 / 10000)`, half-up) or

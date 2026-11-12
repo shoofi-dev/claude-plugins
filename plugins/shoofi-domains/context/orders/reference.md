@@ -1111,8 +1111,8 @@ Who acted is stored as `{ staffId, staffName }`. Errors are
   - A line is `{ lineId, productId | null, nameAR, nameHE, qty (1-999), unitPrice, lineTotal,
     selectedExtras, comboSelections?, note, kitchenIds, status: new|preparing|ready|served|cancelled,
     statusTimes, addedAt, addedBy, cancel? }`.
-  - A payment is `{ paymentId, method, amount, tendered?, change?, clientPaymentId?, staffId,
-    staffName, at }`.
+  - A payment is `{ paymentId, method, amount, tendered?, change?, clientPaymentId?, sessionId,
+    staffId, staffName, at }`. `sessionId` is the till session (shift) it was taken in.
 - `POST /api/kopa/till/orders`: body `{ receiptMethod, tableId?, customer?, waiterId?,
   isStaffMeal?, items? }`. Returns 201 `{ message, order }`.
   - TAKEAWAY and DELIVERY need `customer.name` + `phone`.
@@ -1146,7 +1146,10 @@ Who acted is stored as `{ staffId, staffName }`. Errors are
   - 400 `TENDERED_TOO_LOW`;
   - 409 `ALREADY_UNPAID`;
   - 409 `CONFLICT` (another device wrote first);
-  - 409 `ORDER_NOT_OPEN`.
+  - 409 `ORDER_NOT_OPEN`;
+  - 409 `NO_OPEN_SESSION` ("Start the shift before taking money"). A money method (all but
+    UNPAID) needs an open till session. This is checked after the order's own refusals; a replay
+    needs no session (shoofi-server@feat/kopa-phase5 407a0533; accountant reference §12).
 
   `amount: 0` closes a zero-balance order that has live lines (a staff meal).
 

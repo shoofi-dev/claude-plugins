@@ -1,6 +1,6 @@
 # Accountant / Settlement / Payouts — Domain Context
 
-> last-verified §12 (Kopa till sessions, Z/X, drawer, till reports, receipts built-but-off; till money separate from settlement): shoofi-server@feat/kopa-phase1 / 2026-11-12; §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
+> last-verified §12 (Kopa till sessions, Z/X, drawer, till reports, receipts built-but-off; till money separate from settlement): shoofi-server@feat/kopa-phase1 / 2026-11-12; §12 "No money without a shift" (session gate, money leases, window end): shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12; §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
 
 > **Who you are:** the agent that owns **money OUT + the books** — computing what stores
 > and delivery companies/drivers are owed, issuing tax invoices, and generating bank
@@ -709,8 +709,10 @@ or Shoofi's own invoices. Tests prove the "no `orders`" rule with a spy on every
 
 ### Session document (`kopaTillSessions`)
 `{ status: open|closing|closed, openingFloat, floatCorrections[], openedAt, openedBy, drawerMovementIds[],
-closingAt, closeClaim?, closeClaimAt?, closedAt, closedBy: {staffId,name}|{system:true}, zNumber,
-countedCash, totals }`. `closeClaim*` exist only while closing and are never returned.
+moneyLeases: [{ token, at }], lastMoneyAt, ignoredMoneyLeases?, closingAt, closeClaim?, closeClaimAt?,
+closedAt, closedBy: {staffId,name}|{system:true}, zNumber, countedCash, totals }`. `closeClaim*`
+exist only while closing. `closeClaim*`, `moneyLeases` and `ignoredMoneyLeases` are never
+returned (`publicSession`). `openedAt` is never before the last closed session's `closedAt`.
 
 ### Frozen totals (`computeSessionTotals`, agorot arithmetic)
 - `byMethod` / `paymentCounts`: CASH, EXTERNAL_CARD, TRANSFER, CHEQUE, OTHER. An unknown method
@@ -730,7 +732,11 @@ countedCash, totals }`. `closeClaim*` exist only while closing and are never ret
   1. Claim `open → closing` with a token.
   2. A claim older than `CLAIM_STALE_MS` (5 min) may be taken over. The takeover keeps `closingAt`
      and any recorded `zNumber`.
-  3. Count the totals. On an error the session goes back to open, and no number is taken.
+  3. Wait until no `moneyLeases` entry younger than `LEASE_MS` (10 s) is left
+     (`waitForMoneyWrites`, polls every 25 ms; dead leases go to `ignoredMoneyLeases`). Then set
+     `closingAt = windowEndOf(session)` = max(claimed `closingAt`, `lastMoneyAt` + 1 ms), under
+     the claim. Then count the totals for `[openedAt, closingAt)`. On an error the session goes
+     back to open, and no number is taken.
   4. Take `nextSeq` and record it under the claim.
   5. Freeze under the claim, then release the lock.
 - **Drawer:** insert the movement, then `$push` its id onto `{ _id, status: "open" }`. If that
@@ -778,13 +784,45 @@ countedCash, totals }`. `closeClaim*` exist only while closing and are never ret
 - Nothing calls `issueReceipt`. `services/kopa/settings.js` refuses to change
   `receipts.enabled`. No Open Format exporter is built: the owner said EZcount covers it.
 
+### No money without a shift — `services/kopa/till-session-gate.js`
+- **Refused with no OPEN session** (none, or `closing`): a new `POST /api/kopa/till/orders/:id/payments`
+  with CASH / EXTERNAL_CARD / TRANSFER / CHEQUE / OTHER (`addPayment`), and every new
+  `POST …/:id/refunds` (`addRefund`). The answer is `409 { message: "Start the shift before taking
+  money", code: "NO_OPEN_SESSION" }` with no extra fields, and nothing is written. The drawer uses
+  the same code ("Open a till session first").
+- **Allowed with no session:** UNPAID (`sessionId: null`); a `clientPaymentId` / `clientRefundId`
+  replay (checked on a pre-read before the session, 200 `replay: true`, writes nothing); orders,
+  lines, moves, cancels, discounts, tips, KDS.
+- **Order of checks.** Payments: 400 body → 404 → replay → the order's own 409s (a dry run on
+  the pre-read: `ORDER_NOT_OPEN`, `OVERPAY`, `ALREADY_UNPAID`…) → `NO_OPEN_SESSION`. Refunds:
+  400 → 404 → replay → `plan` 409s → `NO_OPEN_SESSION` (`assertOpenSession`, read only) →
+  manager PIN → reserve. No PIN try is spent without a shift.
+- **The reservation** (`reserveTillMoney`):
+  1. Find the open session (`{ status: "open" }`, newest `openedAt`). The entry's
+     `at = max(now, openedAt)`.
+  2. `findOneAndUpdate({ _id, status: "open" }, { $push: { moneyLeases: { token, at: realNow } },
+     $max: { lastMoneyAt: at } })`. A null result means the session was claimed meanwhile, and
+     the request is `NO_OPEN_SESSION`.
+  3. The entry is written with that `at` and `sessionId`.
+  4. `release()` in a `finally`: `$pull` the lease. If the token is in `ignoredMoneyLeases`, it
+     logs an error ("landed after its Z was counted"). A failed release only makes the next close
+     wait `LEASE_MS`.
+
+  UNPAID reserves when a session is open (it is counted in `unpaid`), and otherwise writes with
+  `sessionId: null`.
+- **`sessionId` is for tracing.** The Z counts by `at`. The lease makes the two agree.
+  Preferring `sessionId` in the Z would remove the clock from the argument, but it changes the
+  totals logic and the date-range reports, so it was not done.
+
 ### Known limits
-- A payment made while no session is open falls in no Z.
-- A payment whose write is in flight at the claim instant can miss its Z. `till-orders.js` does
-  not gate payments on an open session.
-- `kopaTillOrders` has no index on `payments.at` / `refunds.at` / `closedAt`. They belong in
-  `till-orders.js` `INDEXES`. `ensureIndexes` keys builds by collection, so another file must not
-  register them.
+- A money write that holds its lease longer than `LEASE_MS` (10 s, a frozen process) is presumed
+  dead: the close stops waiting and records the token in `ignoredMoneyLeases`. If that write lands
+  later, it is in no Z, and its release logs `[kopa] till money landed after its Z was counted`
+  with the order and session ids.
+- A lease that is never released (a crash between the write and the release) makes the next close
+  wait up to `LEASE_MS`.
+- The indexes on `payments.at` / `refunds.at` / `closedAt` live in `till-orders.js` `INDEXES` (as
+  they must: `ensureIndexes` keys builds by collection, so another file must not register them).
 
 ### Phase 7b: the partner sales figures and store analytics for a Kopa login — `routes/kopa/sales.js`
 > last-verified: shoofi-server@feat/kopa-phase7 / 2026-11-12. Service: `services/kopa/sales.js`;

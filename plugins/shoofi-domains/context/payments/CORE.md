@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -229,6 +229,11 @@ Full rules: reference §6b. Orders CORE invariant 30 owns the till order itself.
   with 200 and `replay: true`. That holds when the order is already paid, and when two
   identical requests race. The sum of refunds is at most `paidAmount`, and a refund never
   deletes or cancels a line.
+- **No money without a shift** (shoofi-server@feat/kopa-phase5 407a0533, 2026-11-12). A new
+  till payment with a money method (all but UNPAID) and every new till refund need an open till
+  session. Otherwise 409 `NO_OPEN_SESSION` and nothing is written. A replay, UNPAID, a discount
+  and a tip need none. Each new entry carries `sessionId`. Rules and the close race: accountant
+  CORE "Kopa till sessions & reports", accountant reference §12.
 - The Z / X sessions and till reports (`services/kopa/till-sessions.js`, `till-reports.js`)
   read `discount.amount`, `tip.amount` and `refunds[]` from the order. This doc does not
   cover them.

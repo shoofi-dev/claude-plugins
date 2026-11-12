@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa till money + reference 6b: a till payment with a money method and every till refund need an open till session, 409 NO_OPEN_SESSION, checked before the manager PIN; sessionId on each entry); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
