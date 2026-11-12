@@ -81,12 +81,15 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    status. The guard that used to (`rejectMixedVatPair`, 2026-08-10) was removed on
    2026-11-02 by decision of the owner: it read `accounting` off the registry, so it never
    fired, and 76 mixed groups (48 of them since 2026-08-10) were placed without a problem.
-   ⚠️ Only the gateway fallback is still wrong for a mixed pair: when manual invoicing is
-   off for the PRIMARY store (`MANUAL_INVOICES_KILL`, the global flag off, or the primary's
-   `isManualInvoicesEnabled: false`), `twin-payment-service.js` prints ONE combined
-   document under the PRIMARY's VAT status. Turning manual invoicing off re-opens that
-   case, and nothing blocks the pairing any more.
-10. **Invoicing is MANUAL and split per revenue owner — behind a flag.**
+   **Every twin charge is manually invoiced, whatever the flag says** (`TWIN_MANUAL_INVOICES
+   = true` in `services/twin-order/twin-payment-service.js`, HQ #b3c58d): ZCredit card, HYP
+   card and HYP wallet charges carry no gateway invoice parameters and `captureCombined`
+   calls `issueInvoicesForTwin` unconditionally. The old gateway fallback (ONE combined
+   document under the PRIMARY's VAT status) is gone, so `MANUAL_INVOICES_KILL`, the global
+   flag and a store's `isManualInvoicesEnabled: false` do NOT reach twins — there is no
+   switch that makes the gateway invoice a twin. Never re-introduce one.
+10. **Invoicing is MANUAL and split per revenue owner — behind a flag for single-store
+   orders; twins are always manual (invariant 9).**
    Historically each gateway issued the document itself during the charge (HYP
    `SendHesh`/`EZ.*`, ZCredit `ZCreditInvoiceReceipt`), giving one document per charge for
    the whole amount. With `invoiceConfig.manualInvoicesEnabled` on
