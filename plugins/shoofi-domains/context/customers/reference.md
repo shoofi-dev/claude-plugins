@@ -737,7 +737,7 @@ its own sessions instead (CORE invariant 21). Logic: `services/kopa/auth.js` (co
 
 A store's own card for a customer it knows at the till. Store DB, `kopaCustomerProfiles`
 (`STORE.CUSTOMER_PROFILES`), one doc per phone per store: `{ phone (0XXXXXXXXX, unique), name,
-centralCustomerId? (string), tags: [], idNumber, birthday ("YYYY-MM-DD"), email, notes,
+tags: [], idNumber, birthday ("YYYY-MM-DD"), email, notes,
 standingDiscount: { type: "percent"|"fixed", value } | null, createdAt, updatedAt, createdBy,
 updatedBy? }`. Logic `services/kopa/customer-profiles.js`, tests
 `test/integration/kopa/customer-profiles.js`.
@@ -745,16 +745,27 @@ updatedBy? }`. Logic `services/kopa/customer-profiles.js`, tests
 | Method | Path | Gate | Reply |
 |---|---|---|---|
 | GET | `/api/kopa/customer-profiles?q&tag&page` | `KOPA_REPORTS` | `{ profiles, totalCount, page, hasMore }` (50 a page, newest `updatedAt` first) |
-| GET | `/api/kopa/customer-profiles/by-phone/:phone` | `KOPA_TILL` | `{ profile, hint }`: the profile, else `hint: { name }` from `shoofi.customers`, else both null |
+| GET | `/api/kopa/customer-profiles/by-phone/:phone` | `KOPA_TILL` | `{ profile }`: this store's profile, else `{ profile: null }`. No `hint` field |
 | POST | `/api/kopa/customer-profiles` | `KOPA_TILL` | `{ phone, name }` only → 201 `{ profile }`, 409 `{ profileId }` |
 | PATCH | `/api/kopa/customer-profiles/:id` | `KOPA_OWNER` | any of name, phone, tags, idNumber, birthday, email, notes, standingDiscount → `{ profile }` |
 | POST | `/api/kopa/customer-profiles/bulk` | `KOPA_OWNER` | `{ ids (≤ 500), set: { tags?, standingDiscount? } }` → `{ matchedCount, modifiedCount }` |
 
-- **The central record is read, never written.** `shoofi.customers.findOne({ phone: { $in:
-  variants } }, { projection: { _id, fullName } })` links `centralCustomerId` on create and on a
-  phone change (unlinked if the new phone has no record). The by-phone hint carries `{ name }`
-  only. Note this lets any `cashier` / `all` staff member of any store look up a Shoofi customer's name
-  by phone.
+- **A store cannot look up a Shoofi customer by phone (owner decision, 2026-11-12).** These
+  routes never read or write `shoofi.customers`; `profileByPhone`, `createProfile` and
+  `updateProfile` take no central db handle at all. What a store sees is what it typed itself:
+  - by-phone answers the same `{ profile: null }` for an unknown phone whether or not it has a
+    Shoofi account, so it reveals neither a name nor that an account exists;
+  - no profile stores or returns a central id. The `centralCustomerId` link (the first phase 6
+    build) was dropped because nothing read it, and a non-null id in a reply said "this phone has
+    a Shoofi account";
+  - replies are built field by field (`toProfile`), so a stray field on a stored doc never rides
+    along.
+
+  The store's own app customers are named only in `GET /api/kopa/customers` (§5f), which joins
+  `shoofi.customers` for ids in this store's own completed `orders`. Linking a profile to them
+  later must go through those orders, never a central lookup by the typed phone. Pinned by
+  `test/integration/kopa/customer-profiles.js`: `shoofi.customers` there is a spy that fails any
+  call, and every reply is checked for central markers, `hint` and `centralCustomerId`.
 - **Validation.** Phone: Israeli, normalised (`+972`, dashes, spaces). Name 1–80. Tags ≤ 20 of ≤
   30 chars, trimmed, de-duplicated, `set` replaces the array. `idNumber` ≤ 20 letters / digits /
   dashes. `birthday` a real past date ≥ 1900. Email ≤ 120. Notes ≤ 1000. Discount: percent 0–100,
