@@ -620,6 +620,8 @@
         {"file": "services/money/money-cancel.js", "regex": "if \\(t\\.unknownOpen\\.length > 0\\) return \\{ attempted: false, reason: \\\"refund_in_doubt\\\" \\};", "desc": "CORE invariant 28: never retried while a refund is in doubt"},
         {"file": "routes/money.js", "regex": "const MONEY_FINANCE_ROLES = \\[\\\"accountant\\\"\\];", "desc": "CORE invariant 28: finance routes = accountant (+ master)"},
         {"file": "services/coins/coins-service.js", "regex": "cancelRefundedOrderIds: \\{ \\$ne: refundKey \\}", "desc": "CORE invariant 28: coins are refunded once per order"},
+        {"file": "services/world-cup/world-cup-service.js", "regex": "transactions: \\{ \\$not: \\{ \\$elemMatch: \\{ type: \"reverse\"", "desc": "CORE invariant 28: World Cup points are reversed once per order"},
+        {"file": "routes/order.js", "regex": "!reversalAlreadyRan && order\\.earnedWorldCupPoints > 0", "desc": "CORE invariant 28: cancel block skips reversal when the previous status was already cancelled"},
         {"file": "routes/admin/twin-order-config.js", "regex": "hypAutoRefund: false,", "desc": "CORE invariant 28: hypAutoRefund defaults off"},
         {"file": "routes/order.js", "regex": "module\\.exports\\.handleOrderUpdate = handleOrderUpdate;", "desc": "CORE invariant 28: /api/money/cancel runs the same order-update pipeline for singles"},
         {"file": "services/orders/order-source.js", "regex": "const KOPA_QR_SOURCE = \"kopa-qr\"", "desc": "CORE invariant 31: a Kopa QR table order is source \"kopa-qr\" (the literal settlement keys on, shoofi-server#583)"},
