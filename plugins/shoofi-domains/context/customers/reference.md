@@ -631,6 +631,33 @@ in `app-name`. So the identity it proves is a `shoofi.storeUsers` doc. Logic is 
   `createdAt` is the doc's `created` (the admin insert writes `created`), omitted when absent.
   The test asserts no `token` key with a fake that ignores projections.
 
+## 5i. Story media per language (`routes/stories.js`, CORE invariant 11)
+
+shoofi-server `docs/stories.md`; the rules live in `services/marketing/story-media.js`
+(`resolveStoryMedia`, `STORY_UPLOAD_FIELDS`), pinned by
+`test/integration/story-media-per-language.js`.
+
+| Field | Shape | Notes |
+|---|---|---|
+| `media` / `thumbnail` | `{uri, size, mimetype}` / `{uri}` | the shared file; with none of its own, a COPY of `mediaAR` (else `mediaHE`) — same uri |
+| `mediaAR` / `thumbnailAR` | same / `null` | Arabic file, words + voice baked in |
+| `mediaHE` / `thumbnailHE` | same / `null` | Hebrew file |
+| `mediaType` | `image` \| `video` | one for every file; a mix is 400 `MEDIA_TYPE_MISMATCH` |
+
+Add / update take the six files as multipart fields (50 MB, mp4 / mov / jpeg / png / webp);
+update also `removeMedia=1`, `removeMediaAR=1`, `removeMediaHE=1`. No file left is 400
+`MEDIA_REQUIRED`. A new or cleared file takes its thumbnail with it unless a new one is sent.
+The drafts list's story `preview` (`services/marketing/approval-queue.js`) carries
+`mediaAR`, `mediaHE`, `thumbnailAR`, `thumbnailHE`.
+
+Clients: shoofi-app `components/stories/media.ts` (`storyMedia`, `storyThumbnail`,
+`storyCaption`), used by `StoryViewer.tsx` and `StoriesBar.tsx`; shoofi-delivery-web
+`AddEditStory.tsx` (three slots), `utils/marketing-prefill.ts` (`PrefillVideo.lang`,
+`PrefillVideos` = one video or a lang-tagged list, `singleVideo` → Arabic for a social post),
+`ReelPanel.tsx` `reelContent(reel, n, channel)` (a story gets both languages of a two-language
+reel), `apis/admin/marketing-media.ts` `picksOf` (a story's Arabic + Hebrew made together are one
+pick), `place-step.ts` `savedContentOf` (`videos` per language), `StoriesList.tsx` `storyThumbs`.
+
 ## 6. Referrals (`routes/customer-referrals.js`)
 8-char code (ambiguity-free alphabet) + TinyURL short link with `/r/:code` fallback. Config on
 `shoofi.store {id:1}.referralConfig` (reward amounts, `minFriendOrderAmount`, validity,

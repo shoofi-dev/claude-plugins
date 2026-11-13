@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/kopa-phase1 / 2026-11-11 (scope + reference 5f: Kopa read-only customers and staff routes, gates, spend definition, no-token staff projection); shoofi-server@fix/current-location-addresses + shoofi-app@fix/current-location-flow / 2026-11-10 (invariant 19: no saved address is a current-location pin - guard, confirm, default endpoint, support's fix, cleanup rules; scripts applied 2026-11-10; the app's pin is session-only for everyone); shoofi-server@fix/address-scripts-real-confirmed-city-conflict / 2026-11-10 (invariant 19: backfill confirms real addresses only, dedupe skips a city-text conflict); shoofi-server@feat/address-note-apartment-entrance / 2026-11-10 (invariant 20: saved-address notes / floor / apartment / entrance / street number cleaned on add and update, add keeps apartment + entrance, the note snapshots onto order.order.address.notes); shoofi-server@feat/confirmed-delivery-address / 2026-11-07 (invariant 19: the confirmed delivery address, the requireSavedDeliveryAddress guard, the first-address push saves only real addresses, the address cleanup / backfill / dedupe scripts); shoofi-delivery-web@feat/one-editor-for-places + shoofi-server@feat/coupon-by-id / 2026-11-07 (invariant 16: add/edit a place through the wizard step, ?stepContent= on edit); shoofi-server@feat/marketing-suggestions + shoofi-delivery-web@feat/marketing-suggestions / 2026-11-07 (invariant 11: «הצעות» GET /api/admin/marketing/suggestions); shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/kopa-phase1 / 2026-11-11 (scope + reference 5f: Kopa read-only customers and staff routes, gates, spend definition, no-token staff projection); shoofi-server@fix/current-location-addresses + shoofi-app@fix/current-location-flow / 2026-11-10 (invariant 19: no saved address is a current-location pin - guard, confirm, default endpoint, support's fix, cleanup rules; scripts applied 2026-11-10; the app's pin is session-only for everyone); shoofi-server@fix/address-scripts-real-confirmed-city-conflict / 2026-11-10 (invariant 19: backfill confirms real addresses only, dedupe skips a city-text conflict); shoofi-server@feat/address-note-apartment-entrance / 2026-11-10 (invariant 20: saved-address notes / floor / apartment / entrance / street number cleaned on add and update, add keeps apartment + entrance, the note snapshots onto order.order.address.notes); shoofi-server@feat/confirmed-delivery-address / 2026-11-07 (invariant 19: the confirmed delivery address, the requireSavedDeliveryAddress guard, the first-address push saves only real addresses, the address cleanup / backfill / dedupe scripts); shoofi-delivery-web@feat/one-editor-for-places + shoofi-server@feat/coupon-by-id / 2026-11-07 (invariant 16: add/edit a place through the wizard step, ?stepContent= on edit); shoofi-server@feat/marketing-suggestions + shoofi-delivery-web@feat/marketing-suggestions / 2026-11-07 (invariant 11: «הצעות» GET /api/admin/marketing/suggestions); shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28; shoofi-server@feat/creative-design-lab / 2026-11-12 (invariant 16: the design lab and 👍/👎 feedback); shoofi-server@feat/creative-engine / 2026-11-12 (invariant 16: the creative engine and «הפוך לסרטון»); shoofi-server@feat/story-media-per-language + shoofi-delivery-web@feat/story-media-per-language + shoofi-app@feat/story-media-per-language / 2026-11-12 (invariant 11: a story's media per language - mediaAR / mediaHE, one mediaType, the legacy media is a copy of the Arabic file, the app picks the reader's language file and prints no caption over it; invariant 16: a story render goes to the shared slot, a two-language reel to the language slots); shoofi-server@fix/current-location-addresses + shoofi-app@fix/current-location-flow / 2026-11-10 (invariant 19: no saved address is a current-location pin - guard, confirm, default endpoint, support's fix, cleanup rules; scripts applied 2026-11-10; the app's pin is session-only for everyone); shoofi-server@fix/address-scripts-real-confirmed-city-conflict / 2026-11-10 (invariant 19: backfill confirms real addresses only, dedupe skips a city-text conflict); shoofi-server@feat/address-note-apartment-entrance / 2026-11-10 (invariant 20: saved-address notes / floor / apartment / entrance / street number cleaned on add and update, add keeps apartment + entrance, the note snapshots onto order.order.address.notes); shoofi-server@feat/confirmed-delivery-address / 2026-11-07 (invariant 19: the confirmed delivery address, the requireSavedDeliveryAddress guard, the first-address push saves only real addresses, the address cleanup / backfill / dedupe scripts); shoofi-delivery-web@feat/one-editor-for-places + shoofi-server@feat/coupon-by-id / 2026-11-07 (invariant 16: add/edit a place through the wizard step, ?stepContent= on edit); shoofi-server@feat/marketing-suggestions + shoofi-delivery-web@feat/marketing-suggestions / 2026-11-07 (invariant 11: «הצעות» GET /api/admin/marketing/suggestions); shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -249,6 +249,28 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
      for items saved before it (`withLink`). An admin form that sends no `link` must not flatten a
      saved one (`unchangedOrLegacyLink`). An announcement (`storeAppName: "shoofi-stories"`) has
      no menu, so its legacy default is `none`, never `store`.
+   - **A story's media is per language** (2026-11-12, shoofi-server `docs/stories.md`,
+     `services/marketing/story-media.js`; same for a launch popup). Besides the shared `media`
+     (+ `thumbnail`) a story may hold `mediaAR` / `mediaHE` `{uri, size, mimetype}` and
+     `thumbnailAR` / `thumbnailHE` `{uri}` — the words and voice are baked into the file, like a
+     banner's `imageAR` / `imageHE`. Multipart fields on `POST /api/stories/add` and
+     `/update/:id`: `media`, `thumbnail`, `mediaAR`, `thumbnailAR`, `mediaHE`, `thumbnailHE`;
+     update also `removeMedia=1` / `removeMediaAR=1` / `removeMediaHE=1`.
+     - At least one file (400 `MEDIA_REQUIRED`), every file the same `mediaType` (400
+       `MEDIA_TYPE_MISMATCH`), both checked before any upload; `mediaType` comes from the files.
+     - **Legacy fill:** older app builds read only `media`. With no shared file, `media` /
+       `thumbnail` are COPIES of the Arabic file's objects (else the Hebrew): the same key, never a
+       second upload — an old build shows Arabic to everyone (owner, 2026-11-12). "A copy" = same
+       `uri`; there is no flag. Update keeps it in step: a replaced Arabic file is copied again, a
+       removed one hands `media` to the Hebrew file; objects nothing points at any more are deleted
+       AFTER the write. A request with no file and no remove flag leaves every media field alone.
+     - The app (`components/stories/media.ts`): `storyMedia` / `storyThumbnail` = the reader's
+       `languageStore.selectedLang` file, else the shared one, in the viewer AND the bar's card
+       (still, video, its prefetch). Over a language file the caption is not printed (its words
+       are in it); a story with no language file prints its caption as before. A language file's
+       still is its own `thumbnailAR/HE`, never the shared one.
+     - The admin (`AddEditStory.tsx`): three slots — לשתי השפות / ערבית / עברית; on edit a
+       `media` with the same uri as a language file shows as an EMPTY shared slot.
    - A push campaign's `link` rides in the push `data` next to `campaignId`; the customer app's
      push-tap router (`hooks/use-notifications.ts` → `utils/marketing-link.ts`) opens it, store
      opens via `openStoreAtProduct` (twin-order guard).
@@ -543,11 +565,53 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       title ≤ 30 / body ≤ 60; story caption ≤ 80, no title; social caption ≤ 280, no title
       (the form uses the Arabic only — posts stay Arabic).
     - **Images:** banner 16:9, TWO renders (Arabic headline, Hebrew headline), because the app
-      shows no text over a banner and picks `imageAR` / `imageHE` by language. Story 9:16, ONE
-      render with NO text, because a story has one media file and the viewer prints
-      `caption.ar` / `caption.he`. Social (2026-10-31, a marketing item's Facebook / Instagram
+      shows no text over a banner and picks `imageAR` / `imageHE` by language. Story 9:16 on the one-shot path, ONE
+      render with NO text (the creative engine below makes an Arabic and a Hebrew one): it goes to the story's SHARED slot (`media`) and the viewer prints
+      `caption.ar` / `caption.he` over it. A story can also hold a file per language (invariant
+      11, `mediaAR` / `mediaHE`); the admin puts a job's lang-tagged pictures (`idAr` / `idHe`) and
+      a reel made in both languages (a lang-tagged `video` LIST, web `PrefillVideos`) there. Social (2026-10-31, a marketing item's Facebook / Instagram
       post, invariant 17) 1:1, ONE render with NO text and the story's layout — the caption
       goes under it.
+    - **The creative engine** (2026-11-12, shoofi-server `services/marketing/creative/`,
+      `docs/creative-engine.md`) draws banner / story / social pictures whenever a bridge
+      heartbeats `compose` and `shoofi.store {id:1}.marketingCreativeEngine !== false` — else the
+      one-shot path above. Its rules:
+      - The background is TEXT-FREE and drawn from the **dishes only** — the logo is NOT sent to
+        the model; the compositor places the real file. Default model GPT Image 2.6 (group 669).
+      - The layout is picked in code (`layouts.js`), **never one of the store's last two** for that
+        channel (`marketingStoreProfiles.recent`).
+      - The words on the picture (`kicker` / `tag` / `head` / `sub` per language) go through the
+        same guard (`engine.js validateWords` → `checkText`) as every generated text.
+      - A vision check (`placement.js`, API backend — images cannot ride the bridge queue) puts the
+        words where the picture is actually free and **rejects** stray lettering, wrong food or
+        props out of scale: drawn once more (counts against `marketingImageDailyLimit`), then
+        the job fails `picture_rejected`.
+      - The words are composed per language by the bridge's Chromium (`compose` task,
+        `queue.js`), so a STORY now gets an Arabic and a Hebrew picture too (`mediaAR` /
+        `mediaHE`, docs/stories.md). The text-free background of a banner / story is not
+        archived.
+      - «עוד אפשרות» = a new layout, the same words (`revision.keepWords`); «ערוך טקסט»
+        (`POST …/generate/:jobId/words`, owner tier) recomposes without a render.
+      - A store's look lives in `marketingStoreProfiles` (character, colours from the logo,
+        fonts, text style); a person's edit (`PUT /api/admin/marketing/creative/profile/:appName`,
+        owner tier) is never overwritten by the automatic pass (`edited[]`).
+      - **«הפוך לסרטון»** (`video.js`, `marketingCreativeVideos`): a finished engine STORY →
+        one 6 s MP4 per language. Free zoom, or AI motion (500); the store's music; a voice line
+        (Eleven v4); Shadi lip-synced (Wan 2.7, 800 per language). Switching an option on is the
+        owner's approval of its estimate; every paid step carries `maxCredits` and the recorded
+        credits are capped at it. The voice is transcribed and compared with the script's
+        numbers before use: re-voiced once with the numbers spelled out, then dropped (with
+        Shadi) and said on the row. The video model never draws the words — the browser's
+        overlay is laid over the motion.
+      - **«מעבדת עיצוב» (design lab, shoofi-server#568)**: the owner changes the design from the hub
+        without a deploy — layouts in `marketingLayouts` (switch off / edit / add, every edit
+        versioned, a switched-off layout is never picked, a job keeps a snapshot of its layout),
+        design settings in `marketingDesign` (bounded multipliers, versioned, previewed with the exact
+        page before saving). **👍 / 👎** on a picture (`POST …/generate/:jobId/feedback`, owner tier):
+        one reason → the cheapest fix (free re-composition, or one redraw counted against the daily
+        limit), and — unless `remember: null` — what is remembered: per-store layout scores (−4 drops
+        the layout for that store), a stronger shade, or a lesson (`marketingLessons`) the next brief
+        or placement check follows. Lessons are listed and switchable («מה למדנו»).
     - **References: the store's logo and dishes** (2026-11-02, `services/marketing/generate/references.js`).
       Every subject with ONE store (store, new store, deal, product, a single-store coupon) sends
       the store's logo (`stores.storeLogo`, `{uri}` or a bare path) as a `logo` reference and up
@@ -621,7 +685,7 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       nothing.
     - ⚠️ **The Hebrew voice is pending the owner's sign-off** (`voice.js HEBREW_VOICE`, a
       written spec; nothing was measured for Hebrew). The Arabic is the social `VOICE`.
-    Pinned by shoofi-server `test/integration/marketing-generate.js`.
+    Pinned by shoofi-server `test/integration/marketing-generate.js` and `test/integration/marketing-creative.js`.
 
 17. **Every in-app marketing item is a draft until someone approves it; the draft itself says
     when it goes out (פרסם עכשיו or תזמן), and approving only approves and then follows that;
