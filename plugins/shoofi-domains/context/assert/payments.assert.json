@@ -104,6 +104,16 @@
       },
       "patterns": [
         {
+          "file": "services/hq/data-changes.js",
+          "regex": "function checkBackupProjection\\(p\\)",
+          "desc": "CORE Known status: a secret-removal data change excludes the secret from its backup with an exclusion-only backupProjection (HQ #ba7f16)"
+        },
+        {
+          "file": "services/hq/data-changes.js",
+          "regex": "const MAX_BACKUP_DOCS = 100000;",
+          "desc": "shared guardrails: at most 100,000 documents per data change across all targets"
+        },
+        {
           "file": "services/kopa/till-orders.js",
           "regex": "const dueC = totalC \\+ tipC;",
           "desc": "CORE Kopa till money: the tip is NOT in total; amountDue = total + tip"

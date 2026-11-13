@@ -370,6 +370,13 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.
   HYP tokenization does not store CVV; this resolves as ZCredit is retired. **Do not
   independently rip out CVV handling.**
+- **Removing a card secret from orders by data change:** HQ data-change backups
+  (`hq-data-change-backups`) copy whole documents, so the target needs an exclusion-only
+  `backupProjection` (e.g. `ccPaymentRefData.payload.CVV` / `.Password`: 0) or the secret
+  survives in the backup. Undo never brings an excluded field back
+  (`services/hq/data-changes.js`, `checkBackupProjection` / `keepExcluded`; HQ #ba7f16).
+  Orders live per store, so it is one target per `<appName>` database, within the
+  100,000-document ceiling across all targets. Never target `shoofi.creditCards` this way.
 - **CONFIRMED — remove (backlog):** `hyp-test-soft` debug endpoint in `routes/hyp-pay.js`
   (charges 1 NIS with a saved token) should not exist in prod. Money file → draft HIGH-RISK PR,
   confirm nothing calls it.
