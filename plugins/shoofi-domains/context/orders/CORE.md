@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/HIGH-RISK-coins-server-total-and-cancel-refund / 2026-11-13 (invariant 29); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -1030,6 +1030,44 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests (shoofi-server): `money-cancel.js` (ledger, every endpoint, roles, concurrency,
       re-cancel, cash twin, keep→refund on a partly used coupon, HYP success/refused/timeout/cap,
       singles through the order pipeline, coins once), plus the invariant-27 tests.
+
+29. **COINS LAND ON THE TOTAL EXACTLY ONCE, AND A CANCEL GIVES BACK WHAT THE LEDGER SAYS WAS
+    SPENT, ONCE PER ORDER BY THE WALLET'S GUARD — never `order.usedCoins`.**
+    `services/coins/order-coins.js` (shoofi-server `fix/HIGH-RISK-coins-server-total-and-cancel-refund`,
+    HQ #089e7c; scope decided by the CTO in HQ #d21139).
+    - **The app already subtracts the coins from `total`** (`shoofi-app components/total-price`
+      `getTotalPrice`). Prod to 2026-11-08: 17,738 of 17,817 coin orders arrived net, 70 gross
+      (paid full price, coins debited anyway), 9 neither. So "subtract coins server-side"
+      double-discounts. `settleCoinsAtCreation` classifies the posted total
+      (`net`|`gross`|`unknown`, `classifyPostedTotal`) and applies the server-validated
+      discount once; the outcome is `order.coinsPricing`. `unknown` leaves the total alone.
+      **Prepaid providers (`PREPAID_PROVIDERS` = `APPLEPAY`, `HYP`) are never re-priced**: the
+      charge is final, the coins follow the money. (Under a separate review; HQ #d21139.)
+    - **`usedCoins` is INTENT.** Coins move only in `redeemOrderCoins` after the payment is
+      confirmed; its outcome is `order.coinsRedemption.status` (`redeemed`|`failed`), and the
+      claim makes a second call a no-op. A failed redeem never fails the order.
+    - **AMOUNTS from the ledger, ONCE from the wallet.** `reverseOrderCoins` refunds
+      `redeem − refund` and removes `earn − expire` for that `orderId` from
+      `shoofi.customerCoins.transactions` (`outstandingOrderCoins`) through `refundCoins`. The only
+      once-guard is `refundCoins`' `customerCoins.cancelRefundedOrderIds` (invariant 28), and its
+      `alreadyRefunded` answer is read as "nothing moved". `order.coinsReversal`
+      (`reversed`|`already-refunded`|`nothing-to-reverse`|`failed`) is a record of what the call
+      did, **never a gate**: a failed reversal is retried by the next cancel path, and a later
+      no-op never overwrites a `reversed` record.
+    - **Callers:** `/api/order/update` (all five cancelled statuses incl. `9`), the superseded
+      Apple Pay placeholder cancel, twin `cascadeCancel` (both legs), and `degradeToSingle`
+      through `returnLegExtras` only: ONE reversal per degrade, recorded on
+      `degrade.returnedOnDegrade.coins`. **`undoDegrade` does not take the coins back**
+      (invariant 27, `returnedOnDegradeNotReclaimed`). `reverseOrderCoins` is the only caller of
+      `refundCoins`. The old `usedCoins`-based refund minted coins on never-debited orders.
+    - **Not here:** how `redeemCoins`/`refundCoins` read the mongodb 3.7 `findOneAndUpdate` result
+      and whether a clawback may leave a negative balance belong to `coins-service.js`
+      (shoofi-server `fix/HIGH-RISK-coins-refund-idempotent`). This change leaves that file as main has it.
+    - **Data change** `data-changes/2026-11-08-return-coins-owed-by-orders.js` returns owed coins
+      and adds each order id to its wallet's `cancelRefundedOrderIds` in the same update, so no
+      later cancel refunds it again.
+    - Tests: `test/integration/order-coins.js`; `test/integration/money-cancel.js` (its twin
+      fixture carries the leg's `redeem` row).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
