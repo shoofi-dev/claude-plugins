@@ -30,6 +30,12 @@
         "test/integration/product-admin-auth.js",
         "routes/kopa/products-write.js",
         "test/integration/kopa/products-write.js",
+        "routes/kopa/qr-menu.js",
+        "routes/kopa/qr-menu-public.js",
+        "services/kopa/qr-menu.js",
+        "services/kopa/qr-menu-cache.js",
+        "test/integration/kopa/qr-menu.js",
+        "test/integration/kopa/qr-menu-public.js",
         "services/catalog/out-of-stock-extras.js",
         "test/integration/out-of-stock-extras-auth.js",
         "utils/order-pricing.js",
@@ -146,6 +152,18 @@
           "KOPA_OWNER",
           "sameStoreAsGate",
           "productImageUpload"
+        ],
+        "services/kopa/qr-menu.js": [
+          "QR_SETTINGS_ID",
+          "buildQrSnapshot",
+          "initQrMenu",
+          "listItemsWithDrift",
+          "buildPublicMenu",
+          "customerFacingPrice"
+        ],
+        "services/kopa/qr-menu-cache.js": [
+          "invalidate",
+          "generation"
         ],
         "services/catalog/product-access.js": [
           "PRODUCT_ADMIN",
@@ -596,6 +614,46 @@
           "file": "test/integration/product-admin-auth.js",
           "regex": "filter\\(\\(r\\) => r\\.handles\\[0\\] !== auth\\.required\\)",
           "desc": "doc CORE invariant 26: every route in routes/product.js runs auth.required first, no exception list"
+        },
+        {
+          "file": "services/kopa/store-data.js",
+          "regex": "QR_ITEMS: \"kopaQrItems\"",
+          "desc": "doc CORE invariant 34 / reference \u00a72: the QR menu's own items collection (never products)"
+        },
+        {
+          "file": "services/kopa/qr-menu.js",
+          "regex": "const QR_SETTINGS_ID = \"qrMenu\";",
+          "desc": "doc reference \u00a72: the QR menu settings are their own kopaStoreSettings doc, apart from phase 6's {_id:\"settings\"}"
+        },
+        {
+          "file": "services/kopa/qr-menu.js",
+          "regex": "const priced = applyProductDiscount\\(product, discountMap\\);",
+          "desc": "doc CORE invariant 34 / reference \u00a77m: the copy and the drift column price with the menu's applyProductDiscount (invariant 3)"
+        },
+        {
+          "file": "services/kopa/qr-menu.js",
+          "regex": "\\$or: \\[\\{ isSchoolProject: \\{ \\$exists: false \\} \\}, \\{ isSchoolProject: false \\}\\]",
+          "desc": "doc reference \u00a77m: the copy uses the customer menu's exact school-project filter"
+        },
+        {
+          "file": "routes/kopa/qr-menu-public.js",
+          "regex": "const storeDoc = await shoofiDb\\.stores\\.findOne\\(",
+          "desc": "doc CORE invariant 34: the public QR read looks the store up in shoofi.stores before any store DB"
+        },
+        {
+          "file": "routes/kopa/qr-menu-public.js",
+          "regex": "const db = await dbLib\\.getOrInitializeDb\\(storeDoc\\.appName, req\\.app\\.db\\);",
+          "desc": "doc CORE invariant 34: getOrInitializeDb only with a name found in shoofi.stores"
+        },
+        {
+          "file": "routes/kopa/qr-menu.js",
+          "regex": "if \\(write\\) qrCache\\.invalidate\\(appName\\);",
+          "desc": "doc reference \u00a77m: every successful owner write invalidates the store's public QR cache"
+        },
+        {
+          "file": "test/integration/kopa/qr-menu.js",
+          "regex": "must never be written by the QR menu",
+          "desc": "doc CORE invariant 34: a spy throws on any products/categories write"
         },
         {
           "file": "routes/kopa/products-write.js",
