@@ -1,6 +1,6 @@
 # Accountant / Settlement / Payouts — Domain Context
 
-> last-verified §4 (partner/summary + daily-orders validate their period first, 400 INVALID_PERIOD; reportPeriod guards its day loop): shoofi-server@fix/partner-summary-date-validation / 2026-11-12; §12 (Kopa till sessions, Z/X, drawer, till reports, receipts built-but-off; till money separate from settlement): shoofi-server@feat/kopa-phase1 / 2026-11-12; §12 "No money without a shift" (session gate, money leases, window end): shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12; §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
+> last-verified §4 Kopa QR table orders (CORE invariant 20: split off the sales row, `tableOrders*` only, every reader listed): shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13; §4 (partner/summary + daily-orders validate their period first, 400 INVALID_PERIOD; reportPeriod guards its day loop): shoofi-server@fix/partner-summary-date-validation / 2026-11-12; §12 (Kopa till sessions, Z/X, drawer, till reports, receipts built-but-off; till money separate from settlement): shoofi-server@feat/kopa-phase1 / 2026-11-12; §12 "No money without a shift" (session gate, money leases, window end): shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12; §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
 
 > **Who you are:** the agent that owns **money OUT + the books** — computing what stores
 > and delivery companies/drivers are owed, issuing tax invoices, and generating bank
@@ -189,6 +189,22 @@ Both answers validate the body first (`services/payments/partner-period.js`, 202
 `YYYY-MM-DD` dates (or ISO date-times), both or neither, start ≤ end, ≤ 366 days; `month` =
 `YYYY-MM`; `period` ∈ `day|yesterday|week|month|last30`; else 400 `code: "INVALID_PERIOD"`.
 `reportPeriod` refuses an invalid or > 366-day window itself, before its day loop.
+
+**Kopa QR table orders (CORE invariant 20, 2026-11-13).** `orders` docs with `source: "kopa-qr"`
+(`utils/table-orders.js`; never keyed on `receipt_method: "TABLE"`). `buildStoreSalesRow` splits
+them off before computing anything and returns `tableOrdersCount` / `tableOrdersRevenue` (Σ
+`orderPrice`) only when there is one; `generateStoreReportData` copies them into the details of
+`reportData`, outside every total. Readers and what each does with them:
+
+| reader | table orders |
+|---|---|
+| `stores-export-new` / the store report / PDF / admin ReportDetail / ReportsList Excel | own line only (`tableOrders*`), conditional on count > 0 |
+| partner summary `figures: "report"` + Kopa sales | `figures.tableOrders*` (always numbers), v1 `tableOrders*`, out of the card/cash counts, daily row `isTableOrder` |
+| legacy partner summary (no flag) | inside revenue / counts, out of the flat-15% commission; `tableOrders*` when present |
+| `/admin/overview`, legacy `/stores-export` | left out (`notTableOrderFilter()` in the query) |
+| exec dashboard `orders-metrics` / `daily-pulse`, instant-answers | left out at the query |
+| financial overview, exec billing metrics | inherit from the engine / stored reports, no line |
+| store analytics, Kopa orders / products / customers reports | unchanged: a CASH order of the store |
 
 **Who may call them** (CORE invariant 17). `overview`, `stores-export`,
 `drivers` and `delivery-company-drivers` are MASTER_ONLY on `utils/restricted-admin-routes.js`.
