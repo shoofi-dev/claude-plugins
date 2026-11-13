@@ -426,22 +426,17 @@ apps never read them, and they never write `products`/`categories`.
 A deleted product or category leaves its meta row behind (product delete does not know about
 Kopa). Harmless: the till joins meta onto the menu, not the other way round.
 
-### Kopa QR menu — `kopaQrCategories`, `kopaQrItems`, `kopaStoreSettings {_id:"qrMenu"}` (Kopa phase 8, §7m)
-Store DB, a SEPARATE catalog for the store's view-only table menu (CORE invariant 34). Written only by
-`/api/kopa/qr-menu/*` (`services/kopa/qr-menu.js`), read only by those routes and the public
-`GET /api/kopa/public/qr-menu/:store`. Nothing else reads them; they never write `products`/`categories`.
-- `kopaQrCategories`: `{ _id: ObjectId, nameAR, nameHE, nameEN, img: [{uri}] (0 or 1), order, visible,
-  sourceCategoryId: "<category id string>"|null, createdAt, updatedAt, updatedBy? }`. Index `{ order: 1 }`.
-- `kopaQrItems`: `{ _id: ObjectId, categoryId: "<kopaQrCategories _id string>", nameAR, nameHE, nameEN,
-  descriptionAR, descriptionHE, descriptionEN, price (2 decimals), img: [{uri}] (0 or 1), order (within
-  its category), visible, available, optionsNoteAR, optionsNoteHE, isCombo, sourceProductId:
-  "<product id string>"|null, createdAt, updatedAt, updatedBy? }`. Indexes `{ categoryId: 1, order: 1 }`,
-  `{ sourceProductId: 1 }` (background, `ensureIndexes`, never awaited before a write).
+### Kopa QR menu — `kopaQrProductRules`, `kopaQrCategoryRules`, `kopaStoreSettings {_id:"qrMenu"}` (§7m)
+Store DB. The QR menu SHARES the app catalog (CORE invariant 34); these hold only what differs.
+They are written only by `/api/kopa/qr-menu/*` (`services/kopa/qr-menu.js`) and read only by those
+routes and the public `GET /api/kopa/public/qr-menu/:store`.
+- `kopaQrProductRules`: `{ _id: "<product id string>", qrOnly, hiddenOnQr, qrPrice: number|null, updatedAt, updatedBy }`.
+- `kopaQrCategoryRules`: `{ _id: "<category id string>", qrOnly, hiddenOnQr, updatedAt, updatedBy }`.
 - `kopaStoreSettings` `{ _id: "qrMenu", enabled, titleAR, titleHE, showPrices, showOrderInAppButton,
-  initializedAt?, initializedBy?, copyStats?, initLock?, createdAt, updatedAt, updatedBy? }`. The same
-  collection holds phase 6's `{ _id: "settings" }` (Wi-Fi, receipts flag); each API writes only its own
-  `_id`. `sourceProductId` / `sourceCategoryId` are provenance only: a deleted product leaves the item
-  behind (`sourceStatus: "gone"` in the editor).
+  createdAt, updatedAt, updatedBy }`. The same collection holds phase 6's `{ _id: "settings" }`;
+  each API writes only its own `_id`.
+- A deleted product leaves its rule behind, and the rule is ignored. `kopaQrCategories` /
+  `kopaQrItems` (the first design) no longer exist; no store ever had data in them.
 
 ## 3. Category → product hierarchy & ordering
 Two levels: `general-categories` → `categories` (linked by
@@ -1486,7 +1481,8 @@ menu cache key (the customer menu cannot change). Every id is checked against TH
   "KITCHEN_NOT_FOUND", data: { kitchenIds } }`, nothing written. → `data` = the stored meta.
 - **`PUT /api/kopa/meta/categories/:categoryId`** (`KOPA_OWNER`) — `{ nameEN, showInTill, tillOnly }`,
   same replace/strict rules; category not in this store → `404`. `tillOnly` / `showInTill` affect the
-  till only: they do NOT hide anything from the customer menu (per-channel visibility is out of scope).
+  till only: they do NOT hide anything from the customer menu (per-channel visibility is out of scope;
+  the QR menu's QR-only items use `isHidden` + a Kopa rule, §7m).
 - **Kitchens:** `GET /api/kopa/kitchens` (`KOPA_TILL`) → `data: [...]`; `POST` (`KOPA_OWNER`) `{ nameAR,
   nameHE, nameEN?, order? }` (both names required; `order` omitted → last + 1; ≤ 50 per store);
   `PATCH /:id` any of those four (at least one); `DELETE /:id` → `409 { code: "KITCHEN_IN_USE", data:
@@ -1495,50 +1491,63 @@ menu cache key (the customer menu cannot change). Every id is checked against TH
   retried on failure) is called but not awaited; a test with a rejecting `createIndex` proxy proves
   every write still lands.
 
-## 7m. Kopa phase 8 — the QR menu, a separate catalog (CORE invariant 34)
+## 7m. Kopa — the QR menu shares the app menu (CORE invariant 34)
 Code: `routes/kopa/qr-menu.js` (owner), `routes/kopa/qr-menu-public.js` (no auth),
-`services/kopa/qr-menu.js`, `services/kopa/qr-menu-cache.js`; tests `test/integration/kopa/qr-menu.js`,
-`test/integration/kopa/qr-menu-public.js`; server doc `docs/kopa.md` "Phase 8" (routes, bodies, the
-public example). Collections §2.
-- **The copy** (`POST /api/kopa/qr-menu/init`, `KOPA_OWNER`; `buildQrSnapshot` is pure). Same set as
-  `GET /api/menu` (regular, not school): categories `isHidden != true` AND (`isSchoolProject` missing OR
-  `false` — the menu's exact `$or`, so `null` is out) holding ≥ 1 visible product; products
-  `isHidden != true` by `supportedCategoryIds`. Price = `applyProductDiscount` with
-  `buildCategoryDiscountMap` over THOSE categories (a hidden category's discount does not apply, as in
-  the menu), to the agora; an unusable price copies as 0 (`copyStats.priceMissing`). Each product is ONE
-  item in `primaryCategoryOf(product, menuCategories)` (`services/kopa/products.js`); categories sorted
-  by `compareGeneralCategories` (missing `order` last — the menu's Mongo `$sort` puts it first; only
-  matters for categories with no `order`), items by `categoryOrders[categoryId] ?? order ?? 999999`,
-  ties on `_id`; both renumbered from 0. `available = isInStore === true`. English from
-  `kopaCategoryMeta.nameEN` / `kopaItemMeta.nameEN|descriptionEN`. Combos: one item, `isCombo: true`,
-  their own (discounted) price, sections not copied. Extras: never copied as options;
-  `optionsNote(extras, "AR"|"HE")` = the first non-header `single` with ≥ 2 named options, named by the
-  extra or else its group header (§4: member extras often carry an empty name), ≤ 6 names, ≤ 200 chars,
-  "" for combos. Names cut at 120, descriptions at 2000 (`copyStats.truncated`).
-  `409 QR_MENU_EXISTS` once initialized; `{ replace: true, confirm: "REPLACE" }` wipes and recopies
-  (`400 CONFIRM_REQUIRED` without the confirm); `409 QR_MENU_BUSY` while another init holds `initLock`
-  (2 min); `409 QR_MENU_TOO_LARGE` over 1,000 items / 200 categories (nothing written).
-- **Owner editing** (`KOPA_OWNER`, all need an initialized menu, else `409 QR_MENU_NOT_INITIALIZED`):
-  categories CRUD + full-set reorder; items CRUD, reorder within a category (exact set), bulk
-  `{ ids, set: { visible?, available?, categoryId? } }`, move by `categoryId` (to the end). Unknown body
-  keys are 400 — `sourceProductId`, `isCombo`, `_id` cannot be written. Names/titles ≤ 120, price
-  0–100000 with ≤ 2 decimals, ≤ 1,000 items (soft cap), ≤ 200 categories. Images: one multipart `img`
-  through `routes/product.js` `productImageUpload` + `uploadFile`, folder `<appName>/qr-menu`.
-- **Drift** (`GET /api/kopa/qr-menu/items`): `appPrice` (same rule as the copy, today's data; null when
-  the source is deleted or there is none), `sourceStatus` (`live` | `hidden` | `gone` | null),
-  `priceDiffers`. Read-only on the catalog.
-- **Public** (`GET /api/kopa/public/qr-menu/:store[?t=]`): slug regex, then `shoofi.stores.findOne({
-  appName })` before any store DB (`getOrInitializeDb` is never called with an unknown name), then the
-  `qrMenu` doc must be `enabled` AND `initializedAt`. Every miss = `404 { message: "Menu not found" }`,
-  `no-store`. 200 = `{ store: { appName, nameAR, nameHE, logo }, settings: { titleAR, titleHE,
-  showPrices, showOrderInAppButton }, categories: [{ id, nameAR, nameHE, nameEN, img, items: [{ nameAR,
-  nameHE, nameEN, descriptionAR, descriptionHE, descriptionEN, price?, img, available, optionsNoteAR,
-  optionsNoteHE }] }], table }` — visible only, empty categories dropped, `price` absent when
-  `showPrices` is false, `img` a uri string or null. Cache: in-memory per store, 60 s, a known
-  disabled store cached as a miss, invalidated (with a generation guard) by every successful owner
-  write; `Cache-Control: public, max-age=60`. Per instance only — another instance may lag ≤ 60 s.
-- **No menu cache key is cleared by any of this** (invariant 2 does not apply: `products` /
-  `categories` are never written).
+`services/kopa/qr-menu.js`, `services/kopa/qr-menu-cache.js`. Tests:
+`test/integration/kopa/qr-menu.js`, `qr-menu-public.js`. Server doc: `docs/kopa.md` "Phase 8".
+- **Reads** (`readStoreCatalog`, in parallel): every `categories` row (`nameAR/HE, img, order,
+  isHidden, isSchoolProject, discountPercent`), every `products` row (names, descriptions, `price,
+  img, order, categoryOrders, isInStore, isHidden, supportedCategoryIds, extras, productType`), both
+  rule collections, `kopaItemMeta` / `kopaCategoryMeta` (English), and `store{id:1}.outOfStockExtras`.
+- **Shown** (`qrShowsCategory` / `qrShowsProduct` / `buildQrMenu`):
+  - Categories: not school (`isSchoolProject` missing or `false`), not `hiddenOnQr`, and
+    `isHidden != true` or `qrOnly`; dropped when empty.
+  - Products: not `hiddenOnQr`, `isHidden != true` or `qrOnly`, priced > 0, listed under EVERY
+    shown category in `supportedCategoryIds`.
+  - Sort: categories by `compareGeneralCategories`; items by
+    `categoryOrders[cid] ?? order ?? 999999`, ties on `_id`.
+- **Item fields:**
+  - `available = isInStore === true`.
+  - Price (`qrPriceOf`): `qrPrice > 0 ? qrPrice : price`, then `applyProductDiscount` with
+    `buildCategoryDiscountMap` over the SHOWN categories (invariant 3).
+  - `optionsNoteAR/HE`: the first non-header `single` with ≥ 2 options NOT in `outOfStockExtras`
+    (exact `nameAR`), ≤ 6 names, ≤ 200 chars, "" for combos.
+- **Owner** (`KOPA_OWNER`):
+  - `GET /catalog` returns `{ settings, categories[{ id, nameAR, nameHE, hiddenInApp, rule,
+    shownOnQr }], products[{ id, nameAR, nameHE, img, categoryIds, hiddenInApp, available,
+    appPrice, shownPrice, rule, shownOnQr }] }`. `appPrice` uses the app-visible categories'
+    discounts.
+  - `PUT /products/:id { qrOnly?, hiddenOnQr?, qrPrice? }` and `PUT /categories/:id { qrOnly?,
+    hiddenOnQr? }`:
+    - booleans are strict; `qrPrice` is > 0 with ≤ 2 decimals, or `null`;
+    - unknown keys are 400, and both flags at once is 400;
+    - setting one flag clears the other;
+    - `qrOnly` while visible in the app is 409; a school category is 404;
+    - an unknown / malformed id is 404.
+  - `GET/PUT /settings`.
+  - Every successful write invalidates the public cache.
+- **Public:**
+  - Checks, in order: the slug regex, then `shoofi.stores.findOne({ appName })` before any store
+    DB, then the `qrMenu` doc must be `enabled`. Every miss is `404 { message: "Menu not found" }`,
+    `no-store`.
+  - 200 = `{ store: { appName, nameAR, nameHE, logo }, settings: { titleAR, titleHE, showPrices,
+    showOrderInAppButton }, categories: [{ id, nameAR, nameHE, nameEN, img, items: [{ id, nameAR,
+    nameHE, nameEN, descriptionAR, descriptionHE, descriptionEN, price?, img, available,
+    optionsNoteAR, optionsNoteHE }] }], table }`.
+  - Cache: in memory per store, 20 s (`Cache-Control: public, max-age=20`). A known disabled store
+    is cached as a miss, and a generation guard runs on invalidation.
+- **Table ordering** (`tableOrdering` on; route in orders reference C5): `buildQrMenu` adds
+  `orderable` (structurally orderable AND in stock) and, for products with choices,
+  `choices: [{ extraId, nameAR, nameHE, options: [{ optionId, nameAR, nameHE, price }] }]`
+  (`tableChoicesOf`).
+  - Every `single` group is required: exactly one option that is not in `outOfStockExtras`. If
+    none is left, the product is not orderable.
+  - `multi` / `counter` / `pizza-topping` are optional in the app and not offered at the table.
+  - Not orderable: combos, `soldByWeight`, any `weight` extra, unknown types, options with a
+    missing or duplicate id, a price that isn't a number ≥ 0.
+  - Option prices are hidden when `showPrices` is off. The view-only payload (ordering off) is
+    unchanged.
+- **No menu cache key is cleared by any of this** (`products` / `categories` are never written).
 
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":

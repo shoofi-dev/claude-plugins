@@ -25,6 +25,8 @@ Primary files: `routes/order.js` (~7k lines), `routes/twin-order.js`,
 `routes/kopa/orders.js` + `services/kopa/orders.js` (Kopa's order reads, CORE invariant 29, C5),
 `routes/kopa/{reasons,tables,till-orders,kds,settings}.js` + `services/kopa/` same names (the
 Kopa till: in-store sales in `kopaTillOrders`, never `orders`; CORE invariant 30, C5).
+`routes/kopa/table-orders.js` + `services/kopa/table-orders.js` + `services/orders/order-source.js`
+(Kopa QR table orders: an `orders` doc with `source: "kopa-qr"`; CORE invariant 31, C5).
 Status constants: `consts/consts.js`.
 
 **⚠️ HIGH-RISK code (change via draft PR flagged HIGH-RISK; never merge):**
@@ -1193,6 +1195,35 @@ Who acted is stored as `{ staffId, staffName }`. Errors are
   - `gateway` / `externalIp` take an IPv4 or IPv6 address, or `""`.
   - Unknown keys are 400 `UNKNOWN_FIELD`.
   - A `receipts` value other than the stored one is 400 `RECEIPTS_LOCKED`.
+
+### Kopa QR table orders (CORE invariant 31)
+`POST /api/kopa/public/table-orders/:store` is PUBLIC (no token); the table code `k` is the proof.
+- **Body:** `{ k, items: [{ productId (24 hex), qty 1..20, choices?: [{ extraId, optionId }] }] (1..30),
+  name? ≤ 40, note? ≤ 200, coords: { lat, lng, accuracy }, idempotencyKey 8..64 [A-Za-z0-9_-], lang?: "ar"|"he" }`.
+- **Reply:** `200 { message: "ok", order: { orderId, total, table: "<label>", items: [{ productId, nameAR, nameHE, qty, unitPrice, lineTotal }] } }`.
+  A refusal is `{ message, code, data? }` with `no-store`.
+- **Codes, in check order:**
+  1. 400 `INVALID_BODY`.
+  2. 404 `STORE_NOT_FOUND`: not in `shoofi.stores` (looked up before any store DB is opened),
+     or the Kopa switch `shoofi.kopaStores` is off.
+  3. 403 `TABLE_ORDERING_OFF`: the QR menu is not `enabled`, or `tableOrdering` is off.
+  4. 403 `INVALID_TABLE`.
+  5. The idempotency key:
+     - a known key returns the same order (200);
+     - 409 `IDEMPOTENCY_KEY_REUSED` when the key belongs to another table;
+     - 409 `ORDER_IN_PROGRESS` while the first attempt (under 30 s) is still inserting.
+  6. 409 `STORE_CLOSED` `{ reason: closed|busy|notice }`, by the app cart's rule.
+  7. 400 `LOCATION_REQUIRED` `{ reason: missing|inaccurate }` (`inaccurate` = accuracy over 200 m).
+  8. 409 `TABLE_ORDERING_UNAVAILABLE`: the store has no pin.
+  9. 403 `TOO_FAR`: more than 150 m away.
+  10. 429 `RATE_LIMITED` + `Retry-After`: 20 per IP per hour, then 6 per table per 10 min,
+      counted on every attempt that gets this far.
+  11. 409 `ITEM_UNAVAILABLE` `{ productIds }`.
+- **Idempotency:** `kopaQrOrderKeys` (store DB) holds `{ _id: key, orderObjectId, tableId, createdAt, purgeAt }`
+  (TTL 24 h). It is claimed with a `$setOnInsert` upsert before the insert.
+- **Partner side:** shoofi-partner#68 shows "Table N · QR" from `order.table.label`. Its amend
+  dialog will meet the new `blockedReason` `KOPA_QR_ORDER_NOT_AMENDABLE`.
+- **Client:** shoofi-kopa#12.
 
 ## Cross-repo invariants (the whole-domain view)
 - **Status source of truth = server** (store `orders.status`). Clients each keep their
