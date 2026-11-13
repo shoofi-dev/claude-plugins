@@ -1,6 +1,6 @@
 # Accountant / Settlement / Payouts — Domain Context
 
-> last-verified §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
+> last-verified §12 (Kopa till sessions, Z/X, drawer, till reports, receipts built-but-off; till money separate from settlement): shoofi-server@feat/kopa-phase1 / 2026-11-12; §12 "No money without a shift" (session gate, money leases, window end): shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12; §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
 
 > **Who you are:** the agent that owns **money OUT + the books** — computing what stores
 > and delivery companies/drivers are owed, issuing tax invoices, and generating bank
@@ -682,3 +682,188 @@ state it in the PR; preserve the `totalForTransfer`/`balance` formula, the `actu
 cash-vs-CC branch, the pre-discount commission base, and the invoice idempotency guards; never
 introduce a new rounding/VAT point without reconciling the existing ones; and never claim an
 invoice or MASAV change is correct without a dry-run / sandbox. When in doubt on real money, stop and ask.
+
+## 12. Kopa till sessions & reports (phase 5) — `services/kopa/{till-sessions,till-reports,receipts}.js`
+> last-verified: shoofi-server@feat/kopa-phase1 / 2026-11-12. Routers: `routes/kopa/{till-sessions,till-reports,receipts}.js`
+> (mounted by the Kopa index / `app.js`). The till order model is `services/kopa/till-orders.js` and
+> `till-money.js` (orders domain).
+
+**Till money is separate from settlement.** These files read `kopaTillOrders`, `kopaTillSessions`,
+`kopaDrawerMovements`, `kopaCounters` and `kopaStoreSettings`, plus `products` / `categories` (read
+only, for the staff-sales category). They never touch `orders`, store reports, commission, MASAV
+or Shoofi's own invoices. Tests prove the "no `orders`" rule with a spy on every route.
+
+### Routes
+| Route | Gate | Notes |
+|---|---|---|
+| `POST /api/kopa/till/sessions/open` `{ openingFloat }` | KOPA_TILL | 409 `SESSION_ALREADY_OPEN` (+ `sessionId`) |
+| `GET /api/kopa/till/sessions/current` | KOPA_TILL | `{ session, totals }`, or `session: null` |
+| `GET /api/kopa/till/sessions?from=&to=` | KOPA_REPORTS | sessions OPENED in range, newest first, ≤ 200, ≤ 93 days |
+| `GET /api/kopa/till/sessions/:id/x` | KOPA_TILL | X report: live totals for an open session; writes nothing |
+| `POST /api/kopa/till/sessions/:id/close` `{ countedCash? }` | KOPA_TILL | Z: `zNumber` + frozen `totals`; 409 `SESSION_CLOSED` / `CLOSE_IN_PROGRESS` |
+| `PATCH /api/kopa/till/sessions/:id/opening-float` `{ openingFloat }` | KOPA_OWNER | open only; appends `floatCorrections[]`, logged |
+| `POST /api/kopa/till/drawer` `{ type: in\|out, amount, note, managerPin }` | KOPA_TILL | needs an open session; `verifyManagerPin` (session or `callerStaffId`); 403 / 429 |
+| `GET /api/kopa/till/drawer?sessionId=` or `?from=&to=` | KOPA_REPORTS | only movements a session counts |
+| `GET /api/kopa/till/reports/{tips,discounts,staff-sales,refunds}?from=&to=` | KOPA_REPORTS | from/to required, ≤ 93 days |
+| `GET /api/kopa/till/orders/:id/receipt-preview` | KOPA_TILL | EZcount payload + `enabled` / `connected`; never the api_key |
+
+### Session document (`kopaTillSessions`)
+`{ status: open|closing|closed, openingFloat, floatCorrections[], openedAt, openedBy, drawerMovementIds[],
+moneyLeases: [{ token, at }], lastMoneyAt, ignoredMoneyLeases?, closingAt, closeClaim?, closeClaimAt?,
+closedAt, closedBy: {staffId,name}|{system:true}, zNumber, countedCash, totals }`. `closeClaim*`
+exist only while closing. `closeClaim*`, `moneyLeases` and `ignoredMoneyLeases` are never
+returned (`publicSession`). `openedAt` is never before the last closed session's `closedAt`.
+
+### Frozen totals (`computeSessionTotals`, agorot arithmetic)
+- `byMethod` / `paymentCounts`: CASH, EXTERNAL_CARD, TRANSFER, CHEQUE, OTHER. An unknown method
+  counts as OTHER. `unpaid: { count, amount }` holds the UNPAID trail entries, which are not money.
+- `refunds: { byMethod, count, total }` by `refunds[].at`.
+- `tips`, `discounts` (`amount` sums), `staffMeals: { count, subtotal }`, `orderCount` (paid in
+  window), `ordersWithPayments`.
+- `drawer: { count, cashIn, cashOut }` from `drawerMovementIds`.
+- `cash: { openingFloat, cashSales, cashRefunds, cashIn, cashOut, expected, counted, difference }`.
+- `gross` = all payments (includes tips), `refundsTotal`, `net = gross − refundsTotal`.
+
+### Concurrency and crash cases
+- **Open:** `insertOne({ _id: "tillSession:open", sessionId, at })` in `kopaCounters`. A duplicate
+  `_id` means 409. A lock is stale, and replaced, when its session is closed, or when the session
+  is missing and the lock is older than `LOCK_ORPHAN_MS` (1 min). The lock is deleted on close.
+- **Close** (`closeSession`, shared with auto-close):
+  1. Claim `open → closing` with a token.
+  2. A claim older than `CLAIM_STALE_MS` (5 min) may be taken over. The takeover keeps `closingAt`
+     and any recorded `zNumber`.
+  3. Wait until no `moneyLeases` entry younger than `LEASE_MS` (10 s) is left
+     (`waitForMoneyWrites`, polls every 25 ms; dead leases go to `ignoredMoneyLeases`). Then set
+     `closingAt = windowEndOf(session)` = max(claimed `closingAt`, `lastMoneyAt` + 1 ms), under
+     the claim. Then count the totals for `[openedAt, closingAt)`. On an error the session goes
+     back to open, and no number is taken.
+  4. Take `nextSeq` and record it under the claim.
+  5. Freeze under the claim, then release the lock.
+- **Drawer:** insert the movement, then `$push` its id onto `{ _id, status: "open" }`. If that
+  push fails (the session closed meanwhile), the doc is deleted and the request is 409. A doc that
+  no session lists is never returned.
+- **Auto-close:**
+  - `autoCloseStaleSessions({ dbs, now, maxOpenHours = 20 })` closes old open sessions and
+    stale-claimed ones as `{ system: true }`. A 409 means someone else closed it, and is skipped.
+  - `startKopaTillAutoClose(app)` runs every 15 min over `shoofi.stores` appNames, via
+    `getOrInitializeDb`. It is a no-op unless `KOPA_TILL_AUTOCLOSE === "1"`, and returns `{ stop }`.
+
+### Reports (`till-reports.js`)
+- **tips:** per paid order closed in range: `type`, `value`, `amount`, waiter (else opener).
+  Totals by percent / fixed.
+- **discounts:** `type`, `value`, `amount`, `subtotal`, `final` (= `total`), `approvedBy`,
+  `reason`, `source` (manual / standing), `profileId`. Totals by type.
+- **staff-sales:** quantity per product (rows) × staff (columns).
+  - Each line is credited to the order's `waiterId`, else its `staffId` (opener). Never
+    `line.addedBy`.
+  - Excluded: cancelled lines, `refundedQty`, and staff meals (`staffMealsExcluded`).
+  - The category is `primaryCategoryOf` (`services/kopa/products.js`, the first menu category).
+  - `staffIds` and `categoryIds` filter the result.
+- **refunds:** refunds (by their own `at`, any order status) and counted drawer movements, in one
+  list sorted by time. Totals: refunds by method, drawer in / out.
+
+### Receipts (`receipts.js`): BUILT BUT OFF, HIGH-RISK, blocked for go-live
+- **`buildReceiptPayload(order, store)`** is pure.
+  - Doc type: `DOC_TYPE.TAX_INVOICE_RECEIPT` (320), or `RECEIPT` (400) when `isVatExempt(store)`.
+  - Lines: the live lines, VAT-inclusive (`vat_type` INC / NON). The discount is one negative line.
+  - VAT = total − `withoutVAT(total)` (agora), and 0 when exempt.
+  - Payment types: CASH 1, CHEQUE 2, EXTERNAL_CARD 3, TRANSFER 4, from `PAYMENT_TYPE`.
+  - Blockers: `OTHER` (no confirmed EZcount code), a tip (needs an accountant ruling), refunds
+    (a credit note is not built), not paid, a staff meal, a total mismatch, a payments mismatch.
+- **`issueReceipt`** refuses unless every guard passes, in this order:
+  1. `RECEIPTS_DISABLED`
+  2. `EZCOUNT_NOT_CONNECTED`
+  3. `PAYLOAD_BLOCKED`
+  4. `ADAPTER_UNFIT`: the default `createInvoiceOnBehalf` hard-codes Shoofi as the customer and
+     `payment_type: 4`.
+  5. The claim-lock: `insertOne` into `kopaTillReceipts` with `_id` = the order id.
+     `ALREADY_CLAIMED` on any repeat.
+
+  A provider failure is stored as `failed` and never retried automatically, because a timeout
+  may already have issued the document.
+- Nothing calls `issueReceipt`. `services/kopa/settings.js` refuses to change
+  `receipts.enabled`. No Open Format exporter is built: the owner said EZcount covers it.
+
+### No money without a shift — `services/kopa/till-session-gate.js`
+- **Refused with no OPEN session** (none, or `closing`): a new `POST /api/kopa/till/orders/:id/payments`
+  with CASH / EXTERNAL_CARD / TRANSFER / CHEQUE / OTHER (`addPayment`), and every new
+  `POST …/:id/refunds` (`addRefund`). The answer is `409 { message: "Start the shift before taking
+  money", code: "NO_OPEN_SESSION" }` with no extra fields, and nothing is written. The drawer uses
+  the same code ("Open a till session first").
+- **Allowed with no session:** UNPAID (`sessionId: null`); a `clientPaymentId` / `clientRefundId`
+  replay (checked on a pre-read before the session, 200 `replay: true`, writes nothing); orders,
+  lines, moves, cancels, discounts, tips, KDS.
+- **Order of checks.** Payments: 400 body → 404 → replay → the order's own 409s (a dry run on
+  the pre-read: `ORDER_NOT_OPEN`, `OVERPAY`, `ALREADY_UNPAID`…) → `NO_OPEN_SESSION`. Refunds:
+  400 → 404 → replay → `plan` 409s → `NO_OPEN_SESSION` (`assertOpenSession`, read only) →
+  manager PIN → reserve. No PIN try is spent without a shift.
+- **The reservation** (`reserveTillMoney`):
+  1. Find the open session (`{ status: "open" }`, newest `openedAt`). The entry's
+     `at = max(now, openedAt)`.
+  2. `findOneAndUpdate({ _id, status: "open" }, { $push: { moneyLeases: { token, at: realNow } },
+     $max: { lastMoneyAt: at } })`. A null result means the session was claimed meanwhile, and
+     the request is `NO_OPEN_SESSION`.
+  3. The entry is written with that `at` and `sessionId`.
+  4. `release()` in a `finally`: `$pull` the lease. If the token is in `ignoredMoneyLeases`, it
+     logs an error ("landed after its Z was counted"). A failed release only makes the next close
+     wait `LEASE_MS`.
+
+  UNPAID reserves when a session is open (it is counted in `unpaid`), and otherwise writes with
+  `sessionId: null`.
+- **`sessionId` is for tracing.** The Z counts by `at`. The lease makes the two agree.
+  Preferring `sessionId` in the Z would remove the clock from the argument, but it changes the
+  totals logic and the date-range reports, so it was not done.
+
+### Known limits
+- A money write that holds its lease longer than `LEASE_MS` (10 s, a frozen process) is presumed
+  dead: the close stops waiting and records the token in `ignoredMoneyLeases`. If that write lands
+  later, it is in no Z, and its release logs `[kopa] till money landed after its Z was counted`
+  with the order and session ids.
+- A lease that is never released (a crash between the write and the release) makes the next close
+  wait up to `LEASE_MS`.
+- The indexes on `payments.at` / `refunds.at` / `closedAt` live in `till-orders.js` `INDEXES` (as
+  they must: `ensureIndexes` keys builds by collection, so another file must not register them).
+
+### Phase 7b: the partner sales figures and store analytics for a Kopa login — `routes/kopa/sales.js`
+> last-verified: shoofi-server@feat/kopa-phase7 / 2026-11-12. Service: `services/kopa/sales.js`;
+> tests: `test/integration/kopa/sales.js`.
+
+Kopa's own login (`Authorization: Kopa <token>`) cannot call `POST /api/payments/partner/summary` or
+`GET /api/store-analytics/overview`: both take a partner JWT only (`auth.required`), and their gates
+stay unchanged. These two KOPA_REPORTS routes return the same answer. They call the same exported
+functions with the same arguments and **compute nothing of their own**:
+
+| Route | Same as | Calls |
+|---|---|---|
+| `POST /api/kopa/sales/summary` `{ startDate, endDate }` | `partner/summary` with `figures: "report"` | `computePartnerReport` + `summaryResponse` (`services/payments/partner-summary.js`) |
+| `GET /api/kopa/analytics/overview?months=` | `GET /api/store-analytics/overview` | `computeStoreAnalytics(db, { months, shoofiDb, appName })`, with the route's own `monthsFrom` clamp (exported from `routes/store-analytics.js`) |
+
+So the sales figures ARE the store report's lines (invariant 17), month-only lines included when the
+range is exactly one calendar month. A difference from the partner screen is a bug in this route.
+**Fix it by calling the shared function again, never by adjusting a number here.**
+
+**Gate mapping (sales/summary):**
+- **Store:** `appName` = `req.storeMembership.appName`, proven by KOPA_REPORTS. The partner
+  route's `partnerEarningsAccess` proves the same store from `app-name`.
+- **Who sees figures:** the gate decides. `reports` OR `all` gets the figures, and anyone else is
+  a 403. The partner route uses `canSeeStoreTotals` (`reports` only) and answers
+  `RESTRICTED_SUMMARY` with a 200. So an owner holding `all` without `reports` sees figures in
+  Kopa and a restricted answer on the partner screen. That is the KOPA_REPORTS decision.
+- **`req.partnerStoreUser`** is not set. `computePartnerReport` never reads it: it reads only
+  `req.app.db`, and the report engine, run with in-process sources, also reads only `req.app.db`.
+- **Always `figures: "report"`.** Kopa never gets the legacy answer. `partnerId` is not asked for,
+  because it selects nothing.
+- **Body:** `startDate` and `endDate` are both required, strict `YYYY-MM-DD`, start ≤ end, at most
+  93 calendar days (400 `INVALID_QUERY`). The partner route validates nothing. An unparseable
+  date there (`"garbage"`, `"2026-02-31"`) reaches `reportPeriod`'s day loop as an invalid moment.
+  Measured on a laptop: about 15 s of CPU and 1.6 GB RSS before it throws "Invalid array length"
+  and answers 500. That is a partner-gated OOM risk on the existing route, not changed here.
+
+**Pinned by** `test/integration/kopa/sales.js`, on in-memory Mongo with the
+`partner-summary-world` store-month, a stored October report and reviews:
+- The Kopa body deepEquals the partner route's body for 5 ranges (one month, one week, one day,
+  a month with no data, and a range that runs to today) and 9 `months` values, called with both a
+  partner Token and a Kopa session. `generatedAt` is checked, then left out of the compare,
+  because it is "now" to the second.
+- The gate: no token 401, customer 403, another store 403, cashier-only 403, reports via Token
+  200, owner via a Kopa session 200, `all`-only 200.
