@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-app@fix/checkout-restore-shipping-method / 2026-11-12 (abandoned-checkout section: checkout draft persistence, shipping_method_invalid); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -1047,9 +1047,14 @@ apart — always establish which is meant:
    **duplicate**: it fires after the stepped event for the same press, so ~half the rows have
    no step. Count reasons from the stepped rows only; the step-less row adds a price snapshot,
    not a reason (verified 2026-09-24: 158 of 168 blocked sessions had both).
-   `payment_method_invalid` is mostly friction, not loss — checkout starts with NO payment
-   method (the cash default is commented out) and forgets the choice on remount, so ~94% of
-   those customers pick one and order within 30 min.
+   `payment_method_invalid` is mostly friction, not loss — checkout has no default payment
+   method (the cash default is commented out); one is only pre-selected from the checkout
+   draft or the customer's last successful method (see the checkout draft below), so ~94% of
+   those customers pick one and order within 30 min (measured 2026-09-24, before the draft).
+   `shipping_method_invalid` (with `shipping_method: null`) is the same kind of friction: there
+   is no default method and shipping is never taken from a past order, so a first visit starts
+   empty. 29 Oct to 12 Nov 2026: 283 blocked visits by 251 customers, 89% ordered within an
+   hour. 21 of them were a lost draft, 20 after an app relaunch; fixed by persisting the draft.
 2. **Submitted and never paid** — status `"0"` order rows, per store DB. See the
    `FAILED_PAYMENT_STATUS` note; that is the only layer carrying an issuer reason.
 3. **Never reached checkout** — `page_viewed` with `properties.page_name` ∈
@@ -1075,9 +1080,20 @@ apart — always establish which is meant:
 Checkout-screen events that explain the "reached checkout, didn't send" layer:
 - **`checkout_left`** — checkout lost focus (`reason`: `blur`|`unmount`) without a completed
   order: `seconds_on_screen`, `attempted`, and the payment method / shipping / timing / price
-  the customer had at that moment. Payment method and order timing live in screen state
-  and **reset on every mount**, so a customer who goes back to the cart and returns loses
-  both; this event is the only record of the dropped choice.
+  the customer had at that moment. What the customer chose comes back on the next visit
+  only through the checkout draft below; the event records the choice that was left behind.
+- **The checkout draft** (`shoofi-app stores/checkout-draft`, `checkoutDraft`) keeps the
+  shipping method, payment METHOD (never card data), timing + future slot, courier note and
+  drive-in car details. It is keyed by the cart's store, expires after 2 h and is cleared when an
+  order completes. It is also written to AsyncStorage `@storage_checkoutDraft`, because Android
+  kills backgrounded apps and the cart is persisted: a memory-only draft came back with the
+  payment method (from the per-customer last-used fallback) but no shipping method. After a
+  restart `checkoutDraft.hydrate(customerId)` loads it once, only for the same customer.
+  Checkout awaits it before reading. A restore logs `checkout_choice_restored`
+  (`source`: `draft` | `last_used`; a shipping restore is usually `optimistic: true`). A
+  restored choice the store no longer offers logs `checkout_choice_dropped`.
+  Shipping comes back from the draft only, never from a past order. Payment falls back to the
+  last successful method (`@storage_last_payment_method_<customerId>`).
 - **`page_viewed` `Checkout`** carries `cart_store` and `browsed_store`. The future-order
   picker is gated on the **browsed** store's flags (`storeDataStore.storeData`), not the
   cart's — a mismatch explains a picker that is missing.
