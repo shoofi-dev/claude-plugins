@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -422,6 +422,11 @@
         },
         {
           "file": "routes/delivery/orders.js",
+          "regex": "'order\\.order\\.address': 1,",
+          "desc": "POST /api/delivery/list is a whitelist; the driver card's street, floor / apartment / entrance and landmark note (address.notes) all ride this one key"
+        },
+        {
+          "file": "routes/delivery/orders.js",
           "regex": "isApproximateLocation: true,",
           "desc": "isApproximateLocation is written in exactly one literal, beside isDeliveryOnly: true — it implies delivery-only and never the converse; the point is a town centroid, not an address anybody typed"
         },
@@ -684,6 +689,58 @@
           "file": "services/delivery/delayed-assignment.js",
           "regex": "async function createPendingDelivery\\([\\s\\S]{0,6000}?findBestAreaForLocation\\([\\s\\S]{0,300}?\\{ ignoreAreaActive: true \\}",
           "desc": "CORE 'Paused ≠ out of zone': booking a scheduled order resolves its area ignoring areas.isActive, so a scheduled order placed into a paused area is still dispatched — the reason the paused quote must carry the area's price"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:const located = await locateDeliveryRow\\(\\s*db,\\s*\\{ deliveryId, originalBookId, bookId, appName: rowAppName \\},\\s*\"admin/cancel\"\\s*\\);[\\s\\S]{0,1500}?await db\\.bookDelivery\\.updateOne\\(\\s*\\{ _id: deliveryRecord\\._id \\},\\s*\\{\\s*\\$set: \\{\\s*status: DELIVERY_STATUS\\.CANCELLED_BY_ADMIN,|const deliveryRecord = await db\\.bookDelivery\\.findOne\\(\\{ bookId: bookId \\}\\);)",
+          "desc": "CORE invariant 20: admin/cancel locates its row with locateDeliveryRow (deliveryId / originalBookId / legacy bookId) and writes -3 by the row's _id - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "(?:const located = await locateDeliveryRow\\(db, deliveryData, \"update\"\\);[\\s\\S]{0,1500}?await db\\.bookDelivery\\.updateOne\\(\\{ _id: order\\._id \\}, \\{ \\$set: updateData \\}\\);|bookId: deliveryData\\.bookId  // Match by bookId)",
+          "desc": "CORE invariant 20: updateDelivery locates ONE row with locateDeliveryRow and $sets it by _id - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "(?:hasOwnProperty\\.call\\(deliveryData, \"_id\"\\)\\) \\{\\s*return \\{\\s*ok: false,\\s*error: \"row_id_in_body\",[\\s\\S]{0,1200}?for \\(const key of LOCATOR_KEYS\\) delete updateData\\[key\\];|bookId: deliveryData\\.bookId  // Match by bookId)",
+          "desc": "CORE invariant 20: updateDelivery refuses a whole-row body (_id) before any read, and never $sets the identifier keys - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "(?:const result = await deliveryService\\.updateDelivery\\(\\{\\s*deliveryData: updateData,\\s*appDb: req\\.app\\.db,\\s*\\}\\);\\s*if \\(!result\\.ok\\) \\{\\s*return res\\.status\\(result\\.httpStatus\\)|await deliveryService\\.updateDelivery\\(\\{\\s*deliveryData: updateData,\\s*appDb: req\\.app\\.db,\\s*\\}\\);\\s*return res\\s*\\.status\\(200\\))",
+          "desc": "CORE invariant 20: POST /api/delivery/update answers updateDelivery's 400/404/409 instead of 200 on a miss - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": [
+            "services/delivery/delivery-row-locator.js",
+            "services/delivery/book-delivery.js"
+          ],
+          "regex": "(?:if \\(id\\) \\{\\s*if \\(!HEX24\\.test\\(id\\)\\) return \\{ error: \"invalid_delivery_id\" \\};\\s*const filter = \\{ _id: new ObjectId\\(id\\) \\};[\\s\\S]{0,300}?if \\(original\\) \\{\\s*if \\(!short\\) return \\{ error: \"book_id_required\" \\};\\s*return \\{ filter: \\{ originalBookId: original, bookId: short \\}, by: \"originalBookId\" \\};\\s*\\}\\s*if \\(short\\) \\{\\s*const filter = \\{ bookId: short \\};\\s*if \\(store\\) filter\\.appName = store;|bookId: deliveryData\\.bookId  // Match by bookId)",
+          "desc": "CORE invariant 20: identifier precedence deliveryId > originalBookId+bookId (no appName) > legacy bookId (+appName) - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": [
+            "services/delivery/delivery-row-locator.js",
+            "services/delivery/book-delivery.js"
+          ],
+          "regex": "(?:const LIVE_STATUSES = new Set\\(\\[\"1\", \"2\", \"3\", \"5\"\\]\\);[\\s\\S]*?if \\(rows\\.length === 1\\) return \\{ row: rows\\[0\\], rule: \"unique\" \\};\\s*const live = rows\\.filter\\(isLiveDeliveryRow\\);\\s*if \\(live\\.length === 1\\) return \\{ row: live\\[0\\], rule: \"only_live_row\" \\};\\s*return \\{ error: \"ambiguous\", live: live\\.length \\};|bookId: deliveryData\\.bookId  // Match by bookId)",
+          "desc": "CORE invariant 20: one match = that row (legacy unique bookId unchanged); several = the single live row (1/2/3/5 or pending); else refused - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": [
+            "services/delivery/delivery-row-locator.js",
+            "services/delivery/book-delivery.js"
+          ],
+          "regex": "(?:not_found: 404,\\s*ambiguous: 409,|bookId: deliveryData\\.bookId  // Match by bookId)",
+          "desc": "CORE invariant 20: an ambiguous legacy bookId is a 409 with no write, not-found stays 404 - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": [
+            "test/integration/delivery-row-delivery-side.js",
+            "services/delivery/book-delivery.js"
+          ],
+          "regex": "(?:admin/cancel legacy \\{bookId\\} shared by 3 rows cancels the single live one|bookId: deliveryData\\.bookId  // Match by bookId)",
+          "desc": "CORE invariant 20: the decoy-first tests (another store + same store older row inserted ahead of the real one) - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
         }
       ]
     },
@@ -719,7 +776,8 @@
         "components/delivery-driver/DriverReassignModal.tsx",
         "components/delivery-driver/TwinOrderCard.tsx",
         "screens/delivery-driver/index.tsx",
-        "components/delivery-driver/OrderCard.tsx"
+        "components/delivery-driver/OrderCard.tsx",
+        "utils/address-details.ts"
       ],
       "patterns": [
         {
@@ -741,6 +799,21 @@
           "file": "components/delivery-driver/OrderCard.tsx",
           "regex": "isDeliveryOnly\\s*\\?",
           "desc": "the driver card swaps the order table for the pay/collect money block on a manual booking"
+        },
+        {
+          "file": "utils/address-details.ts",
+          "regex": "clean\\(address\\?\\.notes\\)",
+          "desc": "the landmark note the driver sees is order.order.address.notes (saved on the address), not commentToCourier (typed at checkout) - reference C1"
+        },
+        {
+          "file": "components/delivery-driver/OrderCard.tsx",
+          "regex": "getLandmarkNote\\(order\\?\\.order\\?\\.order\\?\\.address\\)",
+          "desc": "the single-order card renders the landmark banner + building line under the address"
+        },
+        {
+          "file": "components/delivery-driver/TwinOrderCard.tsx",
+          "regex": "getLandmarkNote\\(primary\\.order\\?\\.order\\?\\.address\\)",
+          "desc": "twins collapse into TwinOrderCard, so the landmark banner must be wired there too or it silently does not exist for twins"
         }
       ]
     },
@@ -855,6 +928,16 @@
           "file": "src/views/admin/live-ops/strings.ts",
           "regex": "export \\{ RANK_REASON_LABELS \\} from",
           "desc": "live-ops RE-EXPORTS the labels rather than holding a second table"
+        },
+        {
+          "file": "src/apis/admin/delivery/cancel-delivery.ts",
+          "regex": "(?:if \\(deliveryOrder\\?\\._id\\) data\\.deliveryId = String\\(deliveryOrder\\._id\\);|cancelData: \\{ bookId: string, cancelReason: string, cancelledBy: string \\})",
+          "desc": "CORE invariant 20: the admin cancel payload names the row by deliveryId (= deliveryOrder._id), bookId only beside it - valid-before leg is the old bookId-only payload on main before the code PR; drop it once shoofi-delivery-web fix/admin-cancel-delivery-by-original-id has merged"
+        },
+        {
+          "file": "src/components/Modals/CancelDeliveryModal.tsx",
+          "regex": "(?:await onCancel\\(buildCancelDeliveryData\\(deliveryOrder, cancelReason\\.trim\\(\\), \"admin\"\\)\\);|bookId: deliveryOrder\\.bookId \\|\\| deliveryOrder\\._id,)",
+          "desc": "CORE invariant 20: CancelDeliveryModal builds its body with buildCancelDeliveryData (never bookId alone) - valid-before leg is the old bookId-only payload on main before the code PR; drop it once shoofi-delivery-web fix/admin-cancel-delivery-by-original-id has merged"
         }
       ]
     }

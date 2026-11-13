@@ -145,10 +145,16 @@ Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restric
 hangs the request (CORE invariant 11), so none of them answered.
 
 ## 6. Refunds (customer-side — you own these)
-- **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
-  `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.
-  Since HQ #1a2f9e (2026-11-03) **no client calls it** — its only caller was the removed
-  client-side refund dialog — and no store DB holds a `refundData` row. The route has no auth.
+- **`POST /api/order/addRefund` is GONE** — removed in shoofi-server 29ed5252 (HQ #7e2d32,
+  2026-11-03). It was bookkeeping only (pushed `refundData[]`, no provider reversal, no auth);
+  its only callers were the client refund dialogs removed under HQ #1a2f9e, and no store DB
+  held a `refundData` row. Do not look for it or restore it. A cancel's money is decided by
+  `settleCancelledOrderMoney` in `routes/order.js` (`cancelMoneyDecision`: `refund` →
+  `orderAuthorization.refundOrderPayment` releases a hold or flags a settled charge for a
+  person; `keep` → the charge is captured/kept and `services/payments/cancel-compensation.js`
+  issues a Shoofi-paid `COMP-*` coupon). A twin leg's refund is always flagged for a person
+  (`refund_twin_order_manual`). Note: the comment above `CANCEL_MONEY_DECISION` still says
+  KEEP's coupon is created by hand — stale since cancel-compensation.js; the code issues it.
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,
@@ -180,6 +186,11 @@ hangs the request (CORE invariant 11), so none of them answered.
 5. **Coins/coupons settle only AFTER payment success**; failures are logged CRITICAL for
    manual reconciliation, never rolled back against an irreversible capture.
 6. **Order dedup lock** (Redis `SET NX` + fallback + 30s window) prevents double charges.
+7. **Cancel money is settled once, and "nobody decided" is recorded as such** (CORE invariant
+   12, orders CORE invariant 27): `cancelMoneyDecision` ∈ keep/refund/undecided;
+   `paymentAuth.refundRequiredReason` reasons written on cancel are `captured_before_cancel`,
+   `release_refused_ccode_*`, `release_error` (release), `refund_*` (explicit refund) and
+   `cancel_no_decision` (an undecided settled single charge, written by `routes/order.js`).
 
 ## App — shoofi-app (customer) payment client
 - **Method resolution**: `helpers/get-supported-payment-methods.ts` → GET `payment-methods`;
@@ -211,6 +222,13 @@ hangs the request (CORE invariant 11), so none of them answered.
   `components/credit-card/HypTokenizeWebView.tsx`) — card entered in the hosted page, never
   in RN; result URL carrying `CCode` is intercepted (navigation blocked) and forwarded to
   `payments/hyp-process-token`. Saved cards via `stores/creditCards` (`/credit-cards` CRUD).
+  - **Managing saved cards** (shoofi-app PR #99): `screens/credit-cards` (route `credit-cards`) opens
+    from the profile row «بطاقات الدفع» (logged-in only) and is also rendered inside checkout's
+    card sheet (`components/CreditCardModal`, with `onClose`). Expiry is shown from `tokef`
+    (YYMM) via `helpers/credit-card-display.ts`; expired cards cannot be made default (UI-only:
+    an expired default that is already set is still preselected at checkout). Delete confirms
+    in an in-app sheet (`components/credit-card/DeleteCardSheet.tsx`). Adding a card from the
+    profile uses the same HYP hosted page (platform `hyp_enabled`, no store needed).
 - **Apple/Google Pay**: ZCredit WebCheckout session created **client-side** (`screens/checkout/
   index.tsx`, `data/zcredit-config.ts`) with `zcredit_api_key`; heavy dedup/retry guards;
   server verifies & captures. Google Pay routed through the ZCredit web-view (native button disabled).
@@ -226,6 +244,21 @@ hangs the request (CORE invariant 11), so none of them answered.
   response its effect has not superseded. Before this, a late, superseded auto-apply answer
   wrote the store directly, so an order went out at the discounted total with
   `appliedCoupon: null` (no couponUsages row; 8265-1164, GCP 5194-1334 on 2026-10-27).
+  **A coupon the total did not use is not sent either.** TotalPrice puts one flag on
+  `promotionsStore.setCheckoutSelection({ couponSuppressed })`; `use-checkout-submit.ts` sends
+  `appliedCoupon` only when it is false, and the twin split (`splitCouponForTwin`) gets `null`.
+  It is true in two cases: (1) a delivery coupon that lost to the store's delivery deal (orders
+  CORE invariant 13); (2) since shoofi-app#87, a delivery coupon (`helpers/delivery-price-coupon.ts`
+  `isDeliveryCoupon`: `type` `free_delivery` / `delivery_price` or `discountType: 'delivery'`) on a
+  pickup or drive-in order (`isDeliveryCouponOffForMethod`). Either way the card shows it as "not
+  used on this order" (`notUsedReason`; case 2 says «التوصيل غير مشمول في الاستلام»), the total takes
+  nothing off, and a one-time coupon is not spent on ₪0. In case 2 the app does not ask
+  `/api/coupons/apply` (a fixed-price coupon would come back `COUPON_NO_DISCOUNT` and be dropped);
+  it keeps the coupon with `discountAmount: 0`, and switching back to delivery re-quotes it with
+  the real fee. **Server gap, not closed:** creation does not drop a ₪0 `free_delivery` /
+  `discountType: 'delivery'` coupon on a non-delivery order (only the `delivery_price` type is
+  re-priced and dropped, orders CORE invariant 14), so an older bundle that still sends one gets a
+  ₪0 `couponUsages` row from `buildCouponUsageDocs` (`services/coupons/coupon-usage.js`).
   Checkout also clears a store coupon left from an earlier visit on mount. It declares what
   its bundle can render in `x-client-features` (`consts/shared.ts` `CLIENT_FEATURES`, sent by
   `utils/http-interceptor`); `delivery-price-coupon` unlocks fixed-delivery-price coupons.

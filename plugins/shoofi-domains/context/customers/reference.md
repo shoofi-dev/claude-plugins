@@ -95,11 +95,15 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
 ## 4. Data model
 - **`shoofi.customers`** — identity (`fullName`, `phone`, `email`, `language`), auth
   (`authCode`, `token`, `notificationToken`), `addresses[]`
-  (`{name,street,city,cityId,location{Point},isDefault,…}`), **`orders[]` snapshot**,
+  (`{_id,name,street,streetNumber,city,cityId,selectedCity,location{Point},floorNumber,
+  apartmentNumber,entrance,notes,isDefault,isCurrentLocation,createdAt,updatedAt}` — `notes` is
+  the courier landmark ≤ 200, the floor / apartment / entrance / street number ≤ 20, cleaned on
+  add and update: CORE invariant 20), **`orders[]` snapshot**,
   referral (`referralCode`, `referral{clickId,inviterCustomerId,…}`), flags
   (`isBlocked`, `isDeleted`+`deletedAt`, `cashRestricted`), location (`cityId`, `cityAreaId`),
   `schoolProject{…}`, marketing (`marketingPushOptOut` + `marketingPushOptOutUpdatedAt`; unset
-  = opted in, §5b). **No `tokenExpiry` field** — expiry lives only inside the JWT.
+  = opted in, §5b), `confirmedAddressId` (string `addresses[]._id` of the last delivery order's
+  saved address; unset = none — CORE invariant 19). **No `tokenExpiry` field** — expiry lives only inside the JWT.
 - **`schoolProject{schoolId, classId, isActive, studentIds[]}`** (school-project / "مدارس"
   customers; all ids are strings). `isActive` alone puts the customer app into school mode
   (schools category, pickup-only cart, student card at checkout); the card / student picker
@@ -265,8 +269,25 @@ It does **not** overwrite the subject's stored token. **Keep the master gate + a
 Profile: `GET /api/customer/details` (joins store orders for a valid-order count),
 `update`, `update-name`, `update-language`, `update-city-area` (resolves city from lat/lng
 via `delivery-company.cities`). Addresses: `controllers/customerAddressController.js` —
-add/get/update/delete/setDefault on the `addresses[]` subdoc (default toggling clears all
-then sets one). Push tokens: `update-notification-token` — writes `notificationToken` on the
+add/get/update/delete/setDefault on the `addresses[]` subdoc. setDefault validates first — a
+malformed id (`"current-location"`, junk) is 400, an unknown customer or address 404, a
+current-location row 400 — and only then clears every default and sets the one (by the row's
+stored `_id`, ObjectId or string). `PUT` also answers 400 to a malformed id before it clears
+any default, and add / update answer 400 to `isCurrentLocation: true`: a current-location pin
+is never a saved address (CORE invariant 19, 2026-11-10). Add and update both pass the body through `cleanAddressFields`
+(`services/customer/address-fields.js`): `notes` trimmed + whitespace collapsed + ≤ 200;
+`floorNumber` / `apartmentNumber` / `entrance` / `streetNumber` trimmed + ≤ 20; numbers
+stringified; an unsent key stays unsent. Add builds an explicit field list (`buildAddress`) and
+keeps `apartmentNumber` / `entrance` only when sent; update `$set`s every sent key on
+`addresses.$` (minus `_id`). The customer app's add-address sheet sends the whole form, so all of
+these arrive together. At checkout the app sends the selected address object, so the note lands
+on the order as `order.order.address.notes` — a snapshot; a later edit doesn't touch past orders
+(CORE invariant 20). `delete` also unsets `confirmedAddressId` when it named the deleted row; `update`
+keeps the row's `_id` and so the confirmed address. `GET /details` returns `confirmedAddressId`
+(string | null) to the customer app only. Order creation sets it (CORE invariant 19,
+shoofi-server `docs/confirmed-delivery-address.md`). Order creation also seeds `addresses[]` for a
+customer who has none — only with a real address (street + location, not GPS-only), always with
+an ObjectId `_id` (`addressToSaveFromOrder`); a town-only order seeds nothing. Push tokens: `update-notification-token` — writes `notificationToken` on the
 identity doc `req.auth.id` names, and **for a partner then mirrors it onto every sibling
 `storeUsers` doc sharing that phone** (`updateMany`, self excluded). The mirror exists
 because a new-order push is addressed to the token on the doc of *the store that got the
@@ -286,7 +307,7 @@ failure there is logged, never fails the registration.
 | `GET /:customerId` | `getCustomerDetailsApi`, `CouponForm` | name, phone, flags, `deletedAt`, addresses |
 | `GET /:customerId/status` | `getCustomerStatusApi` | `badges` |
 | `GET /:customerId/whatsapp-summary` | `getCustomerWhatsappSummaryApi` | the respond.io mirror's summary |
-| `POST /:customerId/update-address-to-current-location` | support's location fix | writes the order, the customer and the booking |
+| `POST /:customerId/update-address-to-current-location` | support's location fix | writes the order and the booking (never `isCurrentLocation`); moves a saved row only when the order went to a real one, never adds one (`customerAddressSkipped`) — CORE invariant 19 |
 
 - `status.authCode` is the customer's pending OTP. Support shows it on purpose ("מנסה להתחבר
   (code)"), so the reply includes it only for a dashboard role (`mayReadPendingCode`). Prod
@@ -560,6 +581,33 @@ Approve / revert are the item's and the drafts routes' (`channel = social`). Aud
 Admin client: `shoofi-delivery-web` `src/apis/admin/marketing-social.ts`,
 `src/views/admin/marketing/social/SocialPostForm.tsx`, the item card's social preview
 (`MarketingItemCard.tsx`, `socialState` in `utils/marketing-approval.ts`).
+
+## 5f. Story media per language (`routes/stories.js`, CORE invariant 11)
+
+shoofi-server `docs/stories.md`; the rules live in `services/marketing/story-media.js`
+(`resolveStoryMedia`, `STORY_UPLOAD_FIELDS`), pinned by
+`test/integration/story-media-per-language.js`.
+
+| Field | Shape | Notes |
+|---|---|---|
+| `media` / `thumbnail` | `{uri, size, mimetype}` / `{uri}` | the shared file; with none of its own, a COPY of `mediaAR` (else `mediaHE`) — same uri |
+| `mediaAR` / `thumbnailAR` | same / `null` | Arabic file, words + voice baked in |
+| `mediaHE` / `thumbnailHE` | same / `null` | Hebrew file |
+| `mediaType` | `image` \| `video` | one for every file; a mix is 400 `MEDIA_TYPE_MISMATCH` |
+
+Add / update take the six files as multipart fields (50 MB, mp4 / mov / jpeg / png / webp);
+update also `removeMedia=1`, `removeMediaAR=1`, `removeMediaHE=1`. No file left is 400
+`MEDIA_REQUIRED`. A new or cleared file takes its thumbnail with it unless a new one is sent.
+The drafts list's story `preview` (`services/marketing/approval-queue.js`) carries
+`mediaAR`, `mediaHE`, `thumbnailAR`, `thumbnailHE`.
+
+Clients: shoofi-app `components/stories/media.ts` (`storyMedia`, `storyThumbnail`,
+`storyCaption`), used by `StoryViewer.tsx` and `StoriesBar.tsx`; shoofi-delivery-web
+`AddEditStory.tsx` (three slots), `utils/marketing-prefill.ts` (`PrefillVideo.lang`,
+`PrefillVideos` = one video or a lang-tagged list, `singleVideo` → Arabic for a social post),
+`ReelPanel.tsx` `reelContent(reel, n, channel)` (a story gets both languages of a two-language
+reel), `apis/admin/marketing-media.ts` `picksOf` (a story's Arabic + Hebrew made together are one
+pick), `place-step.ts` `savedContentOf` (`videos` per language), `StoriesList.tsx` `storyThumbs`.
 
 ## 6. Referrals (`routes/customer-referrals.js`)
 8-char code (ambiguity-free alphabet) + TinyURL short link with `/r/:code` fallback. Config on

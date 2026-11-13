@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -114,6 +114,24 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    sale — and never fails the order: failures land on `order.invoices[]` and are retried by
    `utils/crons/invoice-retry-cron.js`, which is deliberately **not** gated on the flag so
    a rollback cannot strand a customer who paid while it was on.
+   ⚠️ **The documents are FIXED AT CAPTURE.** Capture plans them once and records every one
+   on `order.invoices[]` (failed ones too, with their `amount`). A retry re-issues only a
+   recorded, not-`issued` document at the amount capture planned — never re-plans from
+   post-capture totals, never re-issues an `issued` one, never originates an unrecorded one.
+   **A TWIN leg never reaches `planSingleOrderInvoices`:** `issueInvoicesForOrder` routes any
+   `order.twinGroup.groupId` to `retryTwinOrderInvoices`, which loads the group + both legs,
+   rebuilds the capture-time figures (`twinAtCapture`: a keep-secondary degrade's
+   `degrade.shippingTransferred` is taken back off the secondary, as `undoDegrade` does; the
+   charge is `computeCombinedTotal`, checked against a ZCredit `payload.TransactionSum` when
+   one exists), re-plans the GROUP with `planTwinInvoices`, and issues only this leg's
+   failed documents. The delivery document — shipping + combination fee — lives on the
+   primary only. If anything cannot be proven (group/peer missing, a recorded amount the
+   re-plan does not reproduce, a record the twin plan does not have — e.g. a delivery doc on
+   the secondary — or an unrecorded doc on this leg) it issues nothing and sets
+   `order.invoicesHeld {reason, detail, groupId, at}`; the cron's query skips held orders
+   until a person clears the field. Before 2026-11-06 the cron used the single planner on
+   twins: a primary retry dropped the fee from the delivery doc and a degraded secondary
+   retry issued a second delivery doc (prod had 0 such retries pending when fixed).
    ⚠️ The customer document carries **`ua_uuid`** — Shoofi's EZcount user holds several
    businesses and this says which one issues it. `CUSTOMER_DOC_UA_UUID` in `amazonconfigs
    {app:"hyp"}` overrides the constant in `utils/hyp.js`; an **empty string there stops the
@@ -145,9 +163,47 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
      2026-08-10..09-22). Their documents are in `invoices[]`, not Gmail. A fetch for `"EZ"`
      would search `subject:EZ`, publish an arbitrary customer's mail at the public key
      `invoices/doc-EZ.pdf` and mark one arbitrary order completed.
+   - **"Does this order have a receipt?" is answered by `invoices[]`, never by
+     `ccPaymentRefData.invoiceStatus`.** A real document is an entry with
+     `status: "issued"` (`INVOICE_STATUS.ISSUED` in `services/payments/order-invoices.js`)
+     and a `docNumber`/`docUuid`/`pdfLink`; a `failed` entry is a pending retry. Any reader
+     that projects orders must include `invoices`. The HQ money audit's `receipt-missing`
+     check (`hasIssuedDocument`, `services/hq/money-audit/checks-money-in.js`) false-flagged
+     all 2,894 of those orders until it did.
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.
+12. **A cancel's `cancelMoneyDecision` is `keep` | `refund` | `undecided`, and an undecided
+   settled charge is FLAGGED, never refunded** (shoofi-server `fix/twin-cancel-safety`,
+   2026-11-06; full rules in orders CORE invariant 27). `undecided` is stamped on a cancel that
+   arrived with no decision on an order with money at stake (it used to read `refund`). For a
+   single order charged outright (no `paymentAuth`), the order route writes the same flag
+   fields as `refundOrderPayment` with **`paymentAuth.refundRequiredReason:
+   "cancel_no_decision"`** and `refundRequiredAmount = order.total`; `order-authorization.js`
+   is unchanged — a J5 hold is still released by `releaseOrderAuthorization` (a captured one
+   flagged `captured_before_cancel`), and `refundOrderPayment` still runs only on an explicit
+   `refund`. Twin legs get no per-order flag (`refund_twin_order_manual` stays the explicit-refund
+   answer). A cancel is settled once: a second cancel records `cancelSettlementSkipped` instead.
+   Readers: admin `charge-state.ts` (badge), HQ money audit (`cancelled-not-refunded`,
+   `uncancel-leftovers`).
+   **Since 2026-11-07 every cancel is also recorded in the charge's money ledger** (orders CORE
+   invariant 28, `services/money/*`): `refunded + compensated + owed ≤ captured` is enforced on
+   every write. What touches money-in code: (a) `applyCaptureSuccess` (twin) records
+   `group.capturedAmount` = `computeCombinedTotal` + a ledger `capture` entry, best-effort after
+   the capture; (b) **HYP twin partial refunds** (`attemptHypTwinRefund` → `utils/hyp-pay`
+   `refundTransaction`, `zikoyAPI`) run only with `twinOrderConfig.hypAutoRefund` (default
+   **false**): a `refund_unknown` slot is written BEFORE the call, the amount is capped by the
+   ledger, one attempt per decision, never retried, and a thrown call stays in doubt for
+   `POST /api/money/resolve-unknown`. HYP's sandbox (2026-11-06, test masof 0010332520) approved
+   an over-refund (₪6 on ₪3) and every duplicate, so these guards are the only ones. (c) **ZCredit
+   is never refunded automatically** — `degradeAutoRefund` is no longer read and
+   `refundPartial` is not called; finance records portal refunds with
+   `POST /api/money/record-refund`, which on a single order also clears
+   `paymentAuth.refundRequired` once nothing is owed and adds `paymentAuth.refundedAmount`.
+   (d) `createCancelCompensation` takes `scope: "twin"` + an explicit `amount` + `decisionKey`
+   (idempotent: a compensation row with that `cancelDecisionKey` is reused) — one Shoofi-funded
+   `COMP-<primary originalOrderId>[-n]` per twin decision; per-side calls still refuse twins.
+   Invoices are untouched.
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
@@ -182,7 +238,10 @@ formula module, `utils/coupon-discount.js` (`computeCouponDiscount`), used by
 (`enforceCouponEntitlement`) — **except** for the fixed-delivery-price type.
 Creation does NOT notice a total lower than items + fee − coupon − deals − coins with nothing to
 explain it (shadow pricing records the drift and the order is kept), so the app must send the
-coupon its total took off: TotalPrice is its only writer (reference.md, "Coupons").
+coupon its total took off: TotalPrice is its only writer (reference.md, "Coupons"). The
+converse holds too: a coupon the total did NOT use (`couponSuppressed`: it lost to a delivery
+deal, or it is a delivery coupon on a pickup / drive-in order) stays on the card as "not used" and
+is not sent.
 
 **What is advertised** — `GET /api/coupons/active` feeds the store-page carousel AND the home
 store-card tag (shoofi-app `couponsStore.activeCoupons`, label `t(storeTagName)`). It lists public,
