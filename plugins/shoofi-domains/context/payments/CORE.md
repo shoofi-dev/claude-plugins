@@ -169,6 +169,12 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    taken. A `refundRequired` with reason `release_refused_ccode_920` is a hold to confirm in the
    HYP portal, not a refund to issue. Why HYP refuses saved-card holds is still unknown
    (`scripts/hyp-j5-spike.js` only tested a raw card).
+   **Clearing `refundRequired` needs proof, never age.** `services/payments/refund-flag-drain.js`
+   (daily cron 06:50) clears it only when `refundedAmount` covers what was owed AND a refund
+   trace exists (`refundTransId` / `refundedAt` / `refundRecordedAt`) AND the ledger owes
+   nothing. It leaves `paymentAuth.refundFlagCleared`. It never refunds and never clears an
+   uncaptured hold. `refund_unsupported_provider_unknown` flags are **ZCredit** charges
+   (ZCredit data has no `provider`), which means real money owed and a portal refund.
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
