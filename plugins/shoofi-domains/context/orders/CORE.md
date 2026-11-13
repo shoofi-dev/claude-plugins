@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-partner@fix/partner-blank-printer-target-no-printer bc423a8 + shoofi-server@fix/printer-target-explicit-data-change 9890ba7f / 2026-11-13 (invariant 17: a blank printerTarget is no printer, utils/printer-target.ts; the data change that runs first); shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -447,15 +447,31 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     never drop the sweep's date or cap. A stuck order is diagnosed from
     `<store>.client-error` `source: "printer-testPrint"` rows (they now carry `outcome`),
     plus the store's only `isPrinted:false, isViewd:true` orders.
-    - **A blank `printerTarget` is not "no printer".** `App.tsx` (`initPrinter`) falls back
-      to the hardcoded `"BT:00:01:90:42:95:AA"`, so a store with no printer configured still
-      tries to connect on every accept/sweep and logs `printer-testPrint` `failed` rows (two
-      per copy: `maxAttempts: 2`). On 2026-11-13, 45 of 117 active stores had no target; 44
-      printed 0 orders and produced 87% of all printer error rows, while olamhayam (blank
-      target, 8/8 printed) actually depends on the fallback. So a store whose orders are ALL
-      `isPrinted:false` has no printer, not missed orders, and a "Failed to connect to
-      printer" digest cluster is mostly these stores. `hq-tech-digests` `since`/`until` are
-      UTC; `client-error` rows carry no device id, `customerId` (the store user) is the key.
+    - **A blank `printerTarget` means "no printer"** (shoofi-partner
+      `utils/printer-target.ts`, HQ #6956c4). The config lives on `<appName>.store {id:1}`
+      (`storeDataStore.storeData`), never on `shoofi.stores`. Blank = missing, null, not a
+      string, empty/whitespace, `"null"`, `"<null>"`, `"undefined"` (`normalizePrinterTarget`).
+      `printerConfigForStore` returns null for a blank target unless the store prints on a
+      built-in head (`printerType` urovo/sunmi, which never reads the target) or has
+      `isDisablePrinter`. With null, `printNotPrinted` returns before fetching, capturing or
+      connecting, the prewarm capture is skipped, no order is marked `isPrinted`, no
+      `client-error` row is sent, and one console line is logged per store per session.
+      `isDisablePrinter` is different on purpose: its config exists, the print path answers
+      "printed" without connecting, and the order IS marked printed (so the sweep finds
+      nothing). Before shoofi-partner `fix/partner-blank-printer-target-no-printer`,
+      `initPrinter` replaced a blank target with the hardcoded `"BT:00:01:90:42:95:AA"`, so
+      every store without a printer connected on every accept/sweep and logged
+      `printer-testPrint` connect failures. That change ships only after shoofi-server
+      `data-changes/2026-11-13-printer-target-explicit-or-disabled.js` has run, which gives
+      every blank-target store with orders since 2026-10-01 an explicit answer: olamhayam
+      (9/9 printed through the fallback) gets that MAC as its target, 53 never-printing
+      stores get `isDisablePrinter: true`, and 94 with no orders stay blank (they are "no
+      printer" afterwards). That MAC is also greg's and pizza-gmel's explicit target; greg has never
+      printed (0 of 237), so a "Failed to connect to printer" cluster on greg is a wrong
+      target, not a fallback. "Printed" evidence must exclude the server's own `isPrinted:true`
+      writes: school orders at create, future (14) / ramadan (15) at accept.
+      `hq-tech-digests` `since`/`until` are UTC; `client-error` rows carry no device id,
+      `customerId` (the store user) is the key.
 18. **THE STORE-CALENDAR AND ORDER-ADMIN READS ARE GATED PER AUDIENCE, AND THE PARTNER GATE IS
     STORE MEMBERSHIP, NOT "THE TOKEN'S OWN STORE"** (shoofi-server `services/orders/admin-access.js`).
     Until 2026-10-30, anyone who sent a store's `app-name` could close its hours, or read its
