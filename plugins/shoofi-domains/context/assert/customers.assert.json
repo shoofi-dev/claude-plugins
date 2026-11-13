@@ -7,6 +7,8 @@
         "services/kopa/enabled.js",
         "scripts/kopa-store-enable.js",
         "test/integration/kopa/store-enabled.js",
+        "routes/kopa/admin-stores.js",
+        "test/integration/kopa/admin-stores.js",
         "routes/auth.js",
         "routes/customer.js",
         "services/customer/identity-response.js",
@@ -748,7 +750,8 @@
         {"file": "routes/kopa/index.js", "regex": "router\\.use\\(\"/api/kopa\", requireKopaStoreEnabled\\);", "desc": "CORE invariant 22: the per-store switch is mounted at /api/kopa"},
         {"file": "services/kopa/enabled.js", "regex": "const enabled = !!doc && doc\\.enabled === true;", "desc": "CORE invariant 22: only enabled === true is ON"},
         {"file": "services/kopa/store-data.js", "regex": "STORES: \"kopaStores\"", "desc": "CORE invariant 22: the switch lives in shoofi.kopaStores"},
-        {"file": "services/kopa/enabled.js", "regex": "return res\\.status\\(503\\)", "desc": "CORE invariant 22: a DB error fails closed"}
+        {"file": "services/kopa/enabled.js", "regex": "return res\\.status\\(503\\)", "desc": "CORE invariant 22: a DB error fails closed"},
+        {"file": "routes/kopa/admin-stores.js", "regex": "const KOPA_ADMIN = \\[auth\\.required, checkAdminRole\\(\\[\"admin\"\\]\\)\\];", "desc": "CORE invariant 22: the admin switch is admin (+ master) only"}
       ]
     },
     "shoofi-app": {

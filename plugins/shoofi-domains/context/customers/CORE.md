@@ -1029,10 +1029,14 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       - Every other route: `app-name`.
       - `/auth/logout` is never checked.
     - **Cache and errors:** the answer is cached 30 s per store; a DB error fails closed (503).
-    - **Turning a store on or off:** `scripts/kopa-store-enable.js` (a dry run without
-      `--apply`). The first store ON is `cacao` (2026-11-13).
+    - **Turning a store on or off:** the admin web's "קופה" checkbox on the store page calls
+      `GET/PUT /api/admin/kopa/stores/:appName` (`routes/kopa/admin-stores.js`, `auth.required` +
+      `checkAdminRole(["admin"])`, master too). PUT takes `{ enabled: boolean }`, records
+      `updatedBy` and drops this instance's cache; the route is not under `/api/kopa`. The other
+      way is `scripts/kopa-store-enable.js` (a dry run without `--apply`). The first store ON is
+      `cacao` (2026-11-13).
     - **Never** read this switch outside `/api/kopa/*`, and never turn a store on by
-      default. Pinned by shoofi-server `test/integration/kopa/store-enabled.js`.
+      default. Pinned by shoofi-server `test/integration/kopa/{store-enabled,admin-stores}.js`.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
