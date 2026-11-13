@@ -443,10 +443,23 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **Image i belongs to queue[i].** A failed capture keeps a `null` slot
       (`captureAlignedToQueue`) and is not printed. Skipping it used to shift later images
       onto the wrong order and mark an unprinted one printed.
+    - **No printer address = printed without paper, exactly like `isDisablePrinter`. There
+      is no fallback printer.** An Epson store whose `printerTarget` is missing, blank,
+      `"null"`, `"<null>"` or `"undefined"` (trimmed, any case; `hasPrinterAddress` in
+      `helpers/printer/printer-selection.ts`) gets `NON_CONNECTING_TARGET_PLACEHOLDER` =
+      `"NO_PRINTER"`, which is never an address. For such a store (and for `isDisablePrinter`)
+      the loop skips the capture (`storePrintsWithoutPaper`) and `printWithOutcome` returns
+      `"printed"` before any connect and with no `printer-testPrint` row
+      (`printsWithoutPaper`), so the order IS marked printed. Urovo/Sunmi are unchanged. The
+      cached printer config is rebuilt when `printerTarget`/`printerType` changes
+      (`printerConfigIsStale`). Until shoofi-partner#65 (2026-11) a blank target fell back to
+      `BT:00:01:90:42:95:AA`, olamhayam's printer. Never reintroduce a fallback address.
     So: never make a print path's success depend on Epson's completion callback alone, and
     never drop the sweep's date or cap. A stuck order is diagnosed from
     `<store>.client-error` `source: "printer-testPrint"` rows (they now carry `outcome`),
-    plus the store's only `isPrinted:false, isViewd:true` orders.
+    plus the store's only `isPrinted:false, isViewd:true` orders. `isPrinted:true` with no
+    `printer-testPrint` rows can mean the store has no printer address: check
+    `printerTarget` first.
 18. **THE STORE-CALENDAR AND ORDER-ADMIN READS ARE GATED PER AUDIENCE, AND THE PARTNER GATE IS
     STORE MEMBERSHIP, NOT "THE TOKEN'S OWN STORE"** (shoofi-server `services/orders/admin-access.js`).
     Until 2026-10-30, anyone who sent a store's `app-name` could close its hours, or read its

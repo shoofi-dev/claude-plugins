@@ -794,6 +794,7 @@
         "App.tsx",
         "helpers/printer/print.ts",
         "helpers/printer/index.ts",
+        "helpers/printer/printer-selection.ts",
         "utils/print-outcome.ts",
         "utils/print-attempts.ts",
         "utils/print-queue.ts",
@@ -823,6 +824,12 @@
           "ordersUnderPrintAttemptCap",
           "recordUnprintedAttempt",
           "clearPrintAttempts"
+        ],
+        "helpers/printer/printer-selection.ts": [
+          "hasPrinterAddress",
+          "printsWithoutPaper",
+          "storePrintsWithoutPaper",
+          "printerConfigIsStale"
         ],
         "utils/print-queue.ts": [
           "captureAlignedToQueue"
@@ -896,6 +903,16 @@
           "file": "utils/print-outcome.ts",
           "regex": "export const SEND_DATA_TIMEOUT_CEILING_MS = 60000;",
           "desc": "doc reference C3 Auto-print: 60s ceiling (the print lock is held for the whole wait)"
+        },
+        {
+          "file": "helpers/printer/printer-selection.ts",
+          "regex": "export const NON_CONNECTING_TARGET_PLACEHOLDER = \"NO_PRINTER\";",
+          "desc": "doc CORE invariant 17: the no-address placeholder is not a dialable address (it used to be olamhayam's real printer MAC)"
+        },
+        {
+          "file": "helpers/printer/print.ts",
+          "regex": "if \\(printsWithoutPaper\\(printerConfig, isDisablePrinter\\)\\) \\{",
+          "desc": "doc CORE invariant 17: no printer address answers printed before any connect, the same as isDisablePrinter"
         },
         {
           "file": "utils/print-attempts.ts",
