@@ -63,7 +63,10 @@
         "services/money/money-cancel.js",
         "routes/money.js",
         "scripts/money-backfill.js",
-        "test/integration/money-cancel.js"
+        "test/integration/money-cancel.js",
+        "services/coins/coins-service.js",
+        "test/integration/coins-refund-idempotent.js",
+        "test/integration/coins-find-and-modify-result.js"
       ],
       "symbols": {
         "routes/order.js": [
@@ -537,6 +540,16 @@
         {"file": "services/audit/admin-audit-routes.js", "regex": "pattern: '/api/admin/coins/expire', method: 'POST', action: 'expire_coins'", "desc": "CORE invariant 19: a coin expiry run records its actor in the admin audit log"},
         {"file": "routes/coins.js", "regex": "router\\.get\\(\"/api/admin/coins/customer/:customerId\", \\.\\.\\.COINS_ADMIN,", "desc": "CORE invariant 19: a customer's coin wallet is dashboard-only"},
         {"file": "routes/coins.js", "regex": "\"/api/admin/coins/customer/:customerId/earned\",\\s*\\.\\.\\.COINS_ADMIN,", "desc": "CORE invariant 19: the customer modal's coins tab is dashboard-only"},
+        {"file": "services/coins/coins-service.js", "regex": "addToSet: \\{ cancelRefundedOrderIds: refundKey \\}", "desc": "CORE invariant 19 (+28): the order is listed in the same atomic update as the refund"},
+        {"file": "services/coins/coins-service.js", "regex": "const doc = unwrapFindAndModify\\(result\\);\\s*if \\(!doc\\) \\{\\s*const wallet = await shoofiDB\\.customerCoins\\.findOne\\([\\s\\S]{0,200}?if \\(wallet && \\(wallet\\.cancelRefundedOrderIds \\|\\| \\[\\]\\)\\.map\\(String\\)\\.includes\\(refundKey\\)\\) \\{", "desc": "CORE invariant 19: a refund whose atomic update matched nothing is alreadyRefunded only when the wallet lists the order (a racing cancel won); no wallet is a failure"},
+        {"file": "services/coins/coins-service.js", "regex": "if \\(!orderId\\) \\{\\s*return \\{ success: false, error: 'refundCoins needs an orderId' \\};", "desc": "CORE invariant 19: an id-less cancel is refused (it would share the key \"undefined\")"},
+        {"file": "services/coins/coins-service.js", "regex": "return \\{ success: true, alreadyRefunded: true, refundedCoins: 0, removedEarnedCoins: 0 \\};", "desc": "CORE invariant 19: a repeat cancel is a no-op success"},
+        {"file": "test/integration/coins-refund-idempotent.js", "regex": "test\\(\"an amend's refund and expire rows do not block the later cancel\"", "desc": "CORE invariant 19: an amended order still gets its cancel refund"},
+        {"file": "test/integration/coins-refund-idempotent.js", "regex": "test\\(\"a cancel that passes the pre-check but loses the write is alreadyRefunded, not a refund\"", "desc": "CORE invariant 19: the pre-check passed / write lost interleave is pinned"},
+        {"file": "services/coins/coins-service.js", "regex": "function unwrapFindAndModify\\(result\\) \\{\\s*if \\(result && Object\\.prototype\\.hasOwnProperty\\.call\\(result, \"value\"\\)\\) \\{\\s*return result\\.value;", "desc": "CORE invariant 19: customerCoins.findOneAndUpdate returns { value } on mongodb 3.7; value null = nothing matched"},
+        {"file": "services/coins/coins-service.js", "regex": "const doc = unwrapFindAndModify\\(result\\);\\s*if \\(!doc\\) \\{\\s*return \\{ success: false, error: 'Failed to redeem coins - balance changed' \\};", "desc": "CORE invariant 19: a redeem whose conditional deduct matched nothing is a failure"},
+        {"file": "services/coins/coins-service.js", "regex": "const CLAMP_NEGATIVE_BALANCE = false;", "desc": "CORE invariant 19: DECISION PENDING - the negative-balance clamp stays off (production behaviour)"},
+        {"file": "test/integration/coins-find-and-modify-result.js", "regex": "test\\(\"a redeem that loses the race to another redeem fails and deducts nothing\"", "desc": "CORE invariant 19: the lost-race redeem is pinned"},
         {"file": "routes/coins.js", "regex": "router\\.get\\(\"/api/admin/coins/store/:storeAppName/stats\", \\.\\.\\.COINS_ADMIN,", "desc": "CORE invariant 19: a store's coin totals are dashboard-only"},
         {"file": "routes/shoofi-admin.js", "regex": "const \\{ DASHBOARD_ROLES: COINS_SETTINGS_ROLES \\} = require\\(\"\\.\\./utils/analytics-access\"\\);\\s*const COINS_SETTINGS_ADMIN = \\[coinsSettingsAuth\\.required, coinsSettingsRoleCheck\\(COINS_SETTINGS_ROLES\\)\\];", "desc": "CORE invariant 19: the coin-settings gate is auth.required + every dashboard role, built inside the Coins Settings block"},
         {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/admin/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,[\\s\\S]*?router\\.post\\(\"/api/admin/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,", "desc": "CORE invariant 19: reading and flipping the platform-wide coins switch is dashboard-only"},

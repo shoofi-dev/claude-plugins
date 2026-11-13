@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/HIGH-RISK-coins-refund-idempotent / 2026-11-13 (invariant 19: refundCoins once on main's cancelRefundedOrderIds, findOneAndUpdate { value }, CLAMP_NEGATIVE_BALANCE); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -537,6 +537,63 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       trigger. Prod had 0 sweep-written `expire` rows on 2026-10-30. The `expire` rows that do
       exist carry an `orderId`: they are `refundCoins` clawing back coins earned on a cancelled
       order, not the sweep.
+    - **`refundCoins` settles a cancelled order ONCE** (`services/coins/coins-service.js`,
+      verified 2026-11-13 on shoofi-server@fix/HIGH-RISK-coins-refund-idempotent after merging
+      main). Its callers are the cancel block of `handleOrderUpdate` (`POST /api/order/update`,
+      statuses `4/5/7/8`; driver-cancel `9` is left out on purpose), the twin `cascadeCancel`,
+      and `degradeToSingle` (`returnLegExtras`). A double-tap, a retry, a cascade on top of a
+      direct cancel, and cancel → reactivate → cancel all call it again for the same order.
+      The guard is the wallet's `cancelRefundedOrderIds` (invariant 28): `$ne` in the
+      `findOneAndUpdate` filter and `$addToSet` in the same update, behind a pre-check read
+      that also recognises the two legacy cancel notes. It is the ONLY guard: rows carry no
+      tag. What this branch adds on top:
+      - **A lost write is told apart.** When the atomic update matches nothing (a racing cancel
+        passed the same pre-check and won), the wallet is re-read: it lists the order →
+        `{ success: true, alreadyRefunded: true }`, nothing moved; no wallet →
+        `{ success: false }`. Until then the truthy `{ value: null }` wrapper was reported as a
+        refund in both cases (and `returnLegExtras` counted coins it never returned).
+      - **No `orderId` is refused** (`{ success: false }`, nothing written), or every id-less
+        cancel would share the key `"undefined"`.
+      - The key is `String(orderId)`, and every caller passes the SHORT `order.orderId`, which
+        is not unique (invariant 22). The list is per wallet (customer × store), so only the
+        same customer's two orders with one short number at one store would collide.
+
+      **Never key the guard on `type` + `orderId`**: amend's `reconcileOrderCoins` writes
+      `refund` and `expire` rows with the same orderId and never touches the list, so an
+      amended order still gets its cancel refund. **Reactivation re-redeems and re-earns
+      nothing**, so after cancel → reactivate → cancel the coins stay refunded once.
+      Re-applying them on reactivation is a money decision for the owner, not something to add
+      quietly. Tests: `test/integration/coins-refund-idempotent.js` (mongodb-memory-server:
+      the list, races incl. pre-check passed / write lost, amend, legacy notes, another order,
+      no wallet, no orderId); the plain repeat is also in `money-cancel.js`.
+    - **`customerCoins.findOneAndUpdate` returns `{ value }`, and a redeem that matched nothing
+      is a FAILURE** (verified 2026-11-07 on shoofi-server@fix/HIGH-RISK-coins-refund-idempotent).
+      mongodb 3.7.4 wraps the document (`{ value, ok, lastErrorObject }`), honours
+      `returnDocument: 'after'`, and gives `value: null` when the filter matched nothing. All four
+      coin writers (`earnCoins`, `redeemCoins`, `refundCoins`, `reconcileOrderCoins`) read it
+      through `unwrapFindAndModify` (`services/coins/coins-service.js`). Never `result.balance`,
+      and never `result.value || result`, which hands back the truthy wrapper on `{ value: null }`.
+      - `redeemCoins` deducts with `balance: { $gte: coinsAmount }` in the filter. A balance that
+        moved under the request after the pre-read gives `value: null`, which is now
+        `{ success: false }` with nothing deducted. Before, the wrapper was truthy, so it reported
+        success. `reconcileOrderCoins` with no wallet is also `{ success: false }`.
+      - **What a redeem failure does to the order: nothing.** Every caller redeems AFTER the
+        charge and only logs CRITICAL on `success: false` (the "Awareness" note in Known status).
+        The callers are `redeemCoinsOnPaymentSuccess` and `finalizeApplePayOrder` in
+        `routes/order.js`, the cash twin in `routes/twin-order.js`, and the card twin in
+        `services/twin-order/twin-payment-service.js`. The order keeps the coins discount and its
+        `usedCoins`. A later cancel then refunds those coins through `refundCoins`, although they
+        were never deducted. Amend calls only `reconcileOrderCoins` and ignores its result.
+      - `newBalance` is the stored balance after the write. No client reads it.
+      - ⚠️ **DECISION PENDING: may a stored balance go negative?** The "never below zero" clamps in
+        `refundCoins` and `reconcileOrderCoins` read `result.balance`, so they never fired.
+        That is why 3 prod wallets are negative (`test/integration/coins-buckets.js`). They are
+        now gated on `CLAMP_NEGATIVE_BALANCE = false`, so behaviour is unchanged: a clawback can
+        leave the balance, and `newBalance`, negative. Reading is safe because
+        `computeAvailableBalance` clamps at 0. Turning the clamp on zeroes negative balances and
+        forgives clawed-back coins. That is the owner's call, made with the one constant.
+      Tests: `test/integration/coins-find-and-modify-result.js` (mongodb-memory-server; the
+      lost-race redeem, `newBalance` after each writer, and the two clamp-off pins).
     - Tests: `test/integration/coins-admin-auth.js` (static gate check on every route plus every
       `/api/admin/*` route in `routes/coins.js`, 401/403 matrix, every dashboard role on seven
       routes, master-only on expire, the audit entry, refused writes write nothing).
