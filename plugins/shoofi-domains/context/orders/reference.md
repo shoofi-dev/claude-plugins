@@ -21,7 +21,10 @@ Primary files: `routes/order.js` (~7k lines), `routes/twin-order.js`,
 `routes/admin/twin-order-config.js`, `services/twin-order/*`,
 `utils/order-stock.js` (stock semantics), `utils/crons/*order*`,
 `services/monitoring/centralized-flow-monitor.js`, `routes/order-history.js` +
-`services/orders/order-history.js` (the partner's one-day history, CORE invariant 21).
+`services/orders/order-history.js` (the partner's one-day history, CORE invariant 21),
+`routes/kopa/orders.js` + `services/kopa/orders.js` (Kopa's order reads, CORE invariant 29, C5),
+`routes/kopa/{reasons,tables,till-orders,kds,settings}.js` + `services/kopa/` same names (the
+Kopa till: in-store sales in `kopaTillOrders`, never `orders`; CORE invariant 30, C5).
 Status constants: `consts/consts.js`.
 
 **⚠️ HIGH-RISK code (change via draft PR flagged HIGH-RISK; never merge):**
@@ -995,6 +998,182 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
     `DeliveryListAnalytics`. Those are courier-dispatch views.
   - **No edit path and no `bookDelivery` mirror.** It is not «הערות לשליח» (`commentToCourier`),
     which is delivery-only and editable through `POST /api/order/comment-to-courier`.
+
+## C5. shoofi-kopa — the store till back-office (web)
+Kopa (repo `shoofi-kopa`) is the store's back-office web app. It calls the server like the
+partner app: a partner token, `app-type: shoofi-partner`, the store in `app-name`. Its order
+reads are three new read-only routes in shoofi-server `routes/kopa/orders.js` (logic in
+`services/kopa/orders.js`, tests `test/integration/kopa/orders.js`), built on
+`feat/kopa-phase1` (2026-11-11, not on `main` yet). Rules: CORE invariant 29.
+
+- **Gate (all three):** `KOPA_REPORTS` (`services/kopa/access.js`) = `auth.required` +
+  `requireStoreMembership()` + `requireStoreRole("reports", "all")` (an owner holding `all` without
+  `reports` passes; 38 of 406 prod docs, 2026-11-11). The store is
+  `req.storeMembership.appName`, never the raw header. No token → 401; a customer token → 403;
+  a member of another store → 403; a non-`isAdmin` doc or one whose `roles` has neither `reports` nor `all` →
+  403 `Insufficient role`. `storeUserHasRole` does not treat `all` as a superset, so
+  `KOPA_REPORTS` lists `all` explicitly. The store-analytics routes do not, and those 38 owners
+  still get 403 there. (Corrected 2026-11-11: this line used to say they get 403 here too.)
+- **`POST /api/kopa/orders`** — body `{ from, to, page?, limit?, receiptMethod?, paymentMethod?,
+  status?, productId? }`. `from`/`to` are real `YYYY-MM-DD` days, `from ≤ to`, at most 93 days
+  (both ends counted), else 400. `limit` defaults to 50 and is clamped to 200. `status` is a
+  status string, a bucket (`completed` | `cancelled` | `inProgress`) or an array of them, and
+  must be in the listed set. The filters must be plain strings: an object is a 400.
+  `productId` matches `order.items.item_id` or a combo component
+  (`order.items.comboSelections.productId`).
+  Response `{ message, from, to, window: {start, end}, orders, totalCount, page, limit, hasMore,
+  summary }`. The summary is over the whole filtered range:
+  `{ byPayment: { CASH, CREDITCARD, OTHER }, total, cancelled, inProgress: {count} }`.
+  Each bucket is `{count, amount}`. Rows are an allowlist: `_id, orderId, status, created,
+  orderDate, viewdAt, completedAt, cancelledAt, amount, orderPrice, originalOrderPrice, total,
+  shippingPrice, customerDetails{name, phone}, order{items[{item_id, nameAR, nameHE, qty, price,
+  selectedExtras, note, comboSelections?}], receipt_method, payment_method, commentToStore},
+  appliedCoupon{discountAmount}, usedCoins{amount, shekelValue}, promotions{items, delivery},
+  cancelReason, updatedByName, amendments[{at, byName, reason, previousTotal, newTotal, diff}],
+  twinGroupId`. It makes two reads. The first is every match, with a 5-field projection
+  (summary, count and the sort by the instant of `created`). The second is the page's
+  `_id`s only, with `ORDER_PROJECTION`.
+- **`GET /api/kopa/cancel-log?from=&to=`** — same range rules. Response `{ message, from, to,
+  window, rows, totalCount, truncated }`, newest first, capped at 2000 rows. The rows are:
+  - **order** rows: one per order in `CANCELLED_STATUSES` (`4,5,7,8,9`) in the window,
+    `price = orderPrice`, `priceBasis: "order_price"`.
+  - **item** rows: one per `amendments[].diff` entry with `change: "removed"`, on any listed
+    order in the window, `qty = diff.from`.
+
+  Every row carries `{ kind, orderId, _id, name, price, by, at, reason }`, plus `status`,
+  `byRole` (`support|store|customer|driver|system`) and `orderCreated` (and `itemId`, `qty`,
+  `priceBasis` on items). Where "who" comes from is CORE invariant 29.
+- **`GET /api/kopa/stories`** — `shoofi.stories` that are not archived, with `storeAppName`
+  = the store OR `link.appName` = the store. Prod 2026-11-11 had 154 stories: 141 with no
+  `link` (legacy, `target` only) and 0 whose `link.appName` differs from `storeAppName`. So the
+  scope is reliable: it is the owning store. Rows: `_id, storeAppName, isOwnStory, mediaType,
+  media{uri}, thumbnail{uri}, durationMs, caption{ar, he}, link, publishedAt, expiresAt,
+  isActive, state (draft|inactive|scheduled|expired|live), viewsCount`. Never `approval` (it
+  names admins), `marketingItemId` or `cityAreas`. The `stories` TTL index deletes a story a
+  day after `expiresAt`, so `expired` rows only last that long.
+
+### Kopa till: phases 3, 4 and 6 (CORE invariant 30)
+These routes write only Kopa collections (`services/kopa/store-data.js` `STORE`), never `orders`,
+`products` or `categories`. They are built on `feat/kopa-phase1` (2026-11-11, uncommitted) and
+are not yet mounted in `routes/kopa/index.js`. Gates are in `services/kopa/access.js`:
+- `KOPA_TILL` is `cashier | all | reports`.
+- `KOPA_OWNER` is `all`.
+- Both put the store and the acting staff member (`req.storeMembership.me`) on the request.
+
+Who acted is stored as `{ staffId, staffName }`. Errors are
+`{ message, code }` (plus `productIds` / `comboIssues` / `orderId` / `tableIds` where named). A
+`createIndex` is never awaited (`ensureIndexes`).
+
+#### Kopa phase 3: cancellation reasons (`routes/kopa/reasons.js`)
+- `GET /api/kopa/cancel-reasons?appliesTo=item|order&includeInactive=1` (`KOPA_TILL`): returns
+  `{ message, reasons }`, active only by default, sorted by `order`. `appliesTo=item` also lists
+  `both`.
+- `POST` (`KOPA_OWNER`): body `{ nameAR?, nameHE? (one required, ≤ 80), appliesTo = "both",
+  returnToStock = false, order = 0 (int 0-10000), active = true }`. Returns 201 `{ message,
+  reason }`. At most 200 per store.
+- `PATCH /:id` (`KOPA_OWNER`): partial. `DELETE /:id` (`KOPA_OWNER`): soft, `active: false`.
+  Both return `{ message, reason }` and 404 on an unknown id.
+
+#### Kopa phase 4: tables (`routes/kopa/tables.js`)
+- **Collections.** `kopaTables` holds `{ number (int 1-99999, unique per store), seats,
+  sectionId (string | null), visible, layout: { x, y, w, h, shape: square|circle|rect, rotation } }`.
+  `kopaTableSections` holds sections `{ nameAR, nameHE, order }` and ONE layout doc
+  `{ _id: "floorLayout", walls: [{ x1, y1, x2, y2 }], canvas: { orientation:
+  landscape|portrait } }`. Every section query excludes the layout doc.
+- `GET /api/kopa/tables` (`KOPA_TILL`): returns `{ message, tables, sections, layout: { walls,
+  canvas, updatedAt } }`. Every table is listed, hidden ones too. Each carries `status:
+  "free" | "occupied"` and `occupiedBy: { orderId, number, total, balance, createdAt } | null`
+  (an OPEN till order on it).
+- `POST /api/kopa/tables`, `PATCH` / `DELETE /api/kopa/tables/:id` (`KOPA_OWNER`).
+  - A duplicate number is 409 `TABLE_NUMBER_TAKEN`.
+  - PATCH merges a partial `layout` over the stored one.
+  - Hiding or deleting a table with an open order is 409 `TABLE_OCCUPIED`.
+  - Delete is a hard delete. A till order keeps its own `tableNumber`.
+- `PUT /api/kopa/tables/layout` (`KOPA_OWNER`): body `{ tables: [{ id, layout }], walls,
+  canvas: { orientation } }`.
+  - Validation is all-or-nothing: an unknown id is 400 with `tableIds`, and nothing is written.
+  - The positions are bulk-written, and the walls and canvas are upserted onto `floorLayout`.
+  - Returns the GET shape.
+- `GET` / `POST /api/kopa/table-sections`, `PATCH` / `DELETE /api/kopa/table-sections/:id`
+  (read `KOPA_TILL`, write `KOPA_OWNER`). Deleting a section a table uses is 409
+  `SECTION_IN_USE`.
+
+#### Kopa phase 4: till orders (`routes/kopa/till-orders.js`, all `KOPA_TILL`)
+- **Document (`kopaTillOrders`).**
+  - Header fields: `{ number (nextSeq "tillOrder", gapless), status: open|paid|cancelled,
+    receiptMethod: TABLE|TAKEAWAY|DELIVERY, tableId, tableNumber, customer: { name, phone,
+    profileId? } | null, staffId, staffName, waiterId, waiterName, isStaffMeal`.
+  - Lines and money: `items, subtotal, total, amountDue, payments, paidAmount, balance, unpaid,
+    unpaidAt, cancel, createdAt, updatedAt, closedAt, rev }`.
+  - Phase 4d adds `discount?`, `discountLog?`, `tip?`, `refunds?` and `refundedAmount?`, and
+    `refundedQty` / `refunded` on a line. They are written by `services/kopa/till-money.js`;
+    shapes and rules are in payments reference §6b.
+  - A line is `{ lineId, productId | null, nameAR, nameHE, qty (1-999), unitPrice, lineTotal,
+    selectedExtras, comboSelections?, note, kitchenIds, status: new|preparing|ready|served|cancelled,
+    statusTimes, addedAt, addedBy, cancel? }`.
+  - A payment is `{ paymentId, method, amount, tendered?, change?, clientPaymentId?, sessionId,
+    staffId, staffName, at }`. `sessionId` is the till session (shift) it was taken in.
+- `POST /api/kopa/till/orders`: body `{ receiptMethod, tableId?, customer?, waiterId?,
+  isStaffMeal?, items? }`. Returns 201 `{ message, order }`.
+  - TAKEAWAY and DELIVERY need `customer.name` + `phone`.
+  - TABLE needs a visible table with no open order. Otherwise 409 `TABLE_OCCUPIED` with
+    `orderId`.
+  - `waiterId` must be a `storeUsers` doc of this store.
+  - An item is `{ productId, qty, selectedExtras, comboSelections?, note }` or
+    `{ productId: null, nameAR, nameHE?, price, qty, note }`.
+- `GET /api/kopa/till/orders?status=&from=&to=&tableId=&unpaid=1&limit=` returns `{ message,
+  orders, totalCount }`, newest first.
+  - `from` / `to` are a `YYYY-MM-DD` Israel day or an ISO time, on `createdAt`, ≤ 93 days.
+  - `limit` defaults to 100, max 500.
+- `GET /api/kopa/till/orders/:id` returns `{ message, order }`, or 404.
+- `POST /:id/items` takes `{ items }`. `PATCH /:id/items/:lineId` takes `{ qty?, note? }` and
+  works only while the line is `new`, else 409 `LINE_NOT_EDITABLE`.
+  `POST /:id/items/:lineId/cancel` takes `{ reasonId }` (an item reason). Each returns
+  `{ message, order }`.
+- `POST /:id/cancel` takes `{ reasonId }` (an order reason). It is 409 `PAYMENT_RECORDED` once
+  any payment exists.
+- `POST /:id/move` takes `{ tableId }`. It works on TABLE orders only, to a free visible
+  table.
+- `POST /:id/payments` takes `{ method, amount, tendered?, clientPaymentId? }`.
+  - It returns 201 `{ message, order, payment, replay: false }`.
+  - A repeated `clientPaymentId` returns 200 with the original payment and `replay: true`.
+    This holds after the order is paid too. The same id with another method or amount is
+    409 `CLIENT_PAYMENT_ID_REUSED`.
+  - The order is paid when the payments reach `amountDue` (total + tip).
+
+  Refusals:
+  - 409 `OVERPAY` (amount > balance, tip included);
+  - 400 `TENDERED_TOO_LOW`;
+  - 409 `ALREADY_UNPAID`;
+  - 409 `CONFLICT` (another device wrote first);
+  - 409 `ORDER_NOT_OPEN`;
+  - 409 `NO_OPEN_SESSION` ("Start the shift before taking money"). A money method (all but
+    UNPAID) needs an open till session. This is checked after the order's own refusals; a replay
+    needs no session (shoofi-server@feat/kopa-phase5 407a0533; accountant reference §12).
+
+  `amount: 0` closes a zero-balance order that has live lines (a staff meal).
+
+#### Kopa phase 4: kitchen screen (`routes/kopa/kds.js`, `KOPA_TILL`)
+- `GET /api/kopa/kds?kitchenId=&receiptMethod=` returns `{ message, tickets: [{ orderId,
+  number, receiptMethod, tableId, tableNumber, customerName, isStaffMeal, createdAt,
+  waitingSince, lines: [{ lineId, productId, nameAR, nameHE, qty, selectedExtras,
+  comboSelections, note, kitchenIds, status, statusTimes, addedAt }] }], lineCount }`.
+  - Only lines of open orders that are not served or cancelled are shown.
+  - Tickets are sorted oldest waiting line first. No prices or payments are returned.
+  - `kitchenId` is matched lowercased. A line with no kitchen shows only with no `kitchenId`
+    (or `all`).
+- `PATCH /api/kopa/kds/:orderId/lines/:lineId` takes `{ status: preparing|ready|served }`. It
+  moves forward only, else 409 `NOT_FORWARD`. Returns `{ message, orderId, line }`.
+
+#### Kopa phase 6: store settings (`routes/kopa/settings.js`, `KOPA_OWNER`)
+- `GET /api/kopa/settings` returns `{ message, settings: { wifi: { ssid, password }, guestWifi,
+  gateway, externalIp, receipts: { enabled }, updatedAt, updatedBy } }`, with defaults when
+  nothing has been saved.
+- `PUT /api/kopa/settings` is a partial update of `{ wifi?, guestWifi?, gateway?, externalIp? }`.
+  - SSID ≤ 32 characters, password ≤ 63.
+  - `gateway` / `externalIp` take an IPv4 or IPv6 address, or `""`.
+  - Unknown keys are 400 `UNKNOWN_FIELD`.
+  - A `receipts` value other than the stored one is 400 `RECEIPTS_LOCKED`.
 
 ## Cross-repo invariants (the whole-domain view)
 - **Status source of truth = server** (store `orders.status`). Clients each keep their

@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@fix/partner-summary-date-validation / 2026-11-12 (invariant 17 partner/summary + daily-orders validate period/month/startDate/endDate/date before any read, 400 INVALID_PERIOD; reportPeriod guards its day loop; ref §4); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 6 — cancelled excluded from settlement, keep → Shoofi COMP credited at redemption, customer documents fixed at capture); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData run in-process, OPT-IN via body `figures: "report"`; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's body moved to services/payments/store-sales.js — invariant 7/13/14/15 line refs repointed; ref §4); shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08 (invariant 17 partner/details deleted with admin/partners + admin/analytics, the flat-15% routes; ref §3/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@feat/code-coupons-filter + shoofi-delivery-web@feat/code-coupons-filter / 2026-11-07 (invariant 14 code coupons out of funder buckets, kind=code, ref); shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@fix/partner-summary-date-validation / 2026-11-12 (invariant 17 partner/summary + daily-orders validate period/month/startDate/endDate/date before any read, 400 INVALID_PERIOD; shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till sessions: no money without a shift, ref §12); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 6 — cancelled excluded from settlement, keep → Shoofi COMP credited at redemption, customer documents fixed at capture); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData run in-process, OPT-IN via body `figures: "report"`; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's body moved to services/payments/store-sales.js — invariant 7/13/14/15 line refs repointed; ref §4); shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08 (invariant 17 partner/details deleted with admin/partners + admin/analytics, the flat-15% routes; ref §3/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@feat/code-coupons-filter + shoofi-delivery-web@feat/code-coupons-filter / 2026-11-07 (invariant 14 code coupons out of funder buckets, kind=code, ref); shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -1018,6 +1018,63 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       (`utils/run-with-concurrency.ts`) with a per-store result, and shows each report's derived
       steps, reasons and next actions (reference §9).
     Tests: shoofi-server `test/integration/hyp-invoice-steps.js`, `test/integration/hyp-store-invoice-guard.js`.
+
+## Kopa till sessions & reports (phase 5)
+*(shoofi-server@feat/kopa-phase1, 2026-11-12; "no money without a shift": shoofi-server@feat/kopa-phase5 407a0533, 2026-11-12. Detail: reference §12.)*
+**Till money is the store's own in-store money and is SEPARATE from settlement.** The Kopa till
+(`services/kopa/till-sessions.js`, `till-reports.js`, `receipts.js`) reads `kopaTillOrders`,
+`kopaTillSessions` and `kopaDrawerMovements` only. It never reads or writes `orders`, and it
+feeds nothing on this page: no store report, commission, `totalForTransfer`, MASAV, or Shoofi
+invoice. A Z report is the store's cash-up, not a payout figure. Do not add till sales to any
+settlement sum. If that is ever wanted, it is a new owner decision, not a fix.
+- **One open session per store**, enforced by a fixed-`_id` lock doc (`OPEN_LOCK_ID`) in
+  `kopaCounters`. `_id` uniqueness holds without any built index.
+- **Z number = `nextSeq(db, "zReport")`, gapless, taken only on close**, through ONE
+  `closeSession`. The route and the auto-close cron both call it. The order is: claim
+  (`{ _id, status: "open" }` → `closing`), then count, then number (recorded at once), then
+  freeze. A lost race or a refused close burns no number. A counting failure re-opens the
+  session. The only gap is a crash between `nextSeq` and the write that records it.
+- **expected cash = openingFloat + CASH payments − CASH refunds + drawer in − drawer out**.
+  CASH counts `amount`, never `tendered`. difference = countedCash − expected, or null.
+  The window is `[openedAt, closingAt)` on `payments[].at` / `refunds[].at`. Tips, discounts
+  and staff meals come from orders paid (`closedAt`) in the window. `gross` (all payments)
+  INCLUDES tips, because `total` excludes the tip and the payments cover `amountDue`.
+- **No money without a shift** (`services/kopa/till-session-gate.js`, owner decision
+  2026-11-12). A new payment with a money method (CASH, EXTERNAL_CARD, TRANSFER, CHEQUE, OTHER)
+  and every new refund need an OPEN session. Otherwise the answer is 409 `NO_OPEN_SESSION`
+  ("Start the shift before taking money") and nothing is written. "closing" is not open.
+  UNPAID, a `clientPaymentId` / `clientRefundId` replay, and every non-money action (orders,
+  lines, discounts, tips, cancels, the kitchen screen) need no session. Each new entry carries
+  `sessionId`, which is for TRACING: **the Z still counts by `at` in the window.** Do not
+  switch the Z to `sessionId` without an owner decision.
+  - **Why no money falls outside every Z, even in a race:**
+    - A money write first reserves a lease on the session doc (`moneyLeases`, conditional
+      on `status: "open"`) and raises `lastMoneyAt` (`$max`). The close claim is conditional
+      on `open` too, so no write reserves after the claim.
+    - `closeSession` then waits for the leases to clear (`waitForMoneyWrites`) before it
+      counts, and ends the window at `windowEndOf` = max(claim time, lastMoneyAt + 1 ms).
+      This also covers the auto-close cron's stale tick time.
+    - An entry's `at` is clamped to ≥ `openedAt`, and `openSession` opens no earlier than the
+      last Z's `closedAt`, so windows never overlap.
+
+    Keep all four (the reserve's `status: "open"` condition, the wait, the window extension and
+    the open clamp). Each one has a red test.
+  - **Known limit:** a write that holds its lease over `LEASE_MS` (10 s) is presumed dead. The
+    close records it in `ignoredMoneyLeases`. If it lands later it is in no Z, and its release
+    logs `[kopa] till money landed after its Z was counted`.
+- **Closed sessions are immutable.** The opening float is editable only while open (owner,
+  audited). Drawer movements need a manager PIN, have no edit route, and are counted only via
+  the session's `drawerMovementIds` (`$push` conditional on `status: "open"`).
+- **Receipts as the store (EZcount) are BUILT BUT OFF and HIGH-RISK / BLOCKED for go-live.**
+  `issueReceipt` refuses unless `kopaStoreSettings.receipts.enabled === true` (no route sets it)
+  AND `store.hyp.status === "connected"` AND the payload has no blockers. It also refuses
+  `createInvoiceOnBehalf` as its adapter (`ADAPTER_UNFIT`): that function always makes Shoofi the
+  customer and sends `payment_type: 4`. It is the store→Shoofi settlement document and cannot
+  carry a till receipt. Going live needs a dedicated adapter in `utils/hyp.js` (do-not-touch, so
+  it needs owner approval), an accountant ruling on tips and negative discount lines, and an
+  EZcount account per store. VAT comes from `utils/vat.js` only. Doc type 320, or 400 when
+  `isVatExempt`. Note the settlement path uses 305/300 for the same distinction.
+  Tests: shoofi-server `test/integration/kopa/{till-sessions,till-reports,receipts}.js`.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **FIXED, keep it that way:** the overlap guard now covers sent reports; VAT is centralized
