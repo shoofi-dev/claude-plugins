@@ -1213,13 +1213,18 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       written**, for: a twin leg; card / Apple / Google money in the order
       (`cancelMoney.hasCancelMoneyAtStake`); a COMP coupon (`cancelCompensation`); a refund
       flag or amount; a DELIVERY order whose booking the cancel cancelled; coins spent since;
-      a coupon the customer can no longer spend. Flow event `order_reactivation_refused`.
+      a coupon the customer can no longer spend; a deal over its cap (`deal_unavailable`:
+      only when the cancel released the order's `promotionRedemptions`; the deal is deleted,
+      not `isRunning`, or `checkRedemptionAllowance` fails on its total / per-customer cap —
+      the same checks as `enforcePromotions`, except that a deleted deal refuses). Flow event
+      `order_reactivation_refused`.
     - **Otherwise re-taken, in this order**: coins (`retakeRefundedCoins`, one conditional
       update; `coinsRetakenOrderIds` re-arms `refundCoins` so a second cancel refunds again),
       coupon usages, deal redemptions, stock (only when `stockRestored`). Recorded on
       `order.reactivation`, flow event `order_reactivated`. A `reactivatingAt` claim (2 min)
       stops a double press.
-    - Not re-taken, by choice: world-cup points, influencer/referral attribution. Twin
+    - Not re-taken, by choice (finance owner, 2026-11-13: no double benefit, small loss):
+      world-cup points, influencer/referral attribution. Twin
       `undoDegrade` is a separate path (invariant 27).
     - Tests: shoofi-server `test/integration/order-reactivate-cancelled.js`.
 
