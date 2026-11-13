@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-delivery-web@feat/one-editor-for-places + shoofi-server@feat/coupon-by-id / 2026-11-07 (invariant 16: add/edit a place through the wizard step, ?stepContent= on edit); shoofi-server@feat/marketing-suggestions + shoofi-delivery-web@feat/marketing-suggestions / 2026-11-07 (invariant 11: «הצעות» GET /api/admin/marketing/suggestions); shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/creative-design-lab / 2026-11-12 (invariant 16: the design lab and 👍/👎 feedback); shoofi-server@feat/creative-engine / 2026-11-12 (invariant 16: the creative engine and «הפוך לסרטון»); shoofi-server@feat/story-media-per-language + shoofi-delivery-web@feat/story-media-per-language + shoofi-app@feat/story-media-per-language / 2026-11-12 (invariant 11: a story's media per language - mediaAR / mediaHE, one mediaType, the legacy media is a copy of the Arabic file, the app picks the reader's language file and prints no caption over it; invariant 16: a story render goes to the shared slot, a two-language reel to the language slots); shoofi-server@fix/current-location-addresses + shoofi-app@fix/current-location-flow / 2026-11-10 (invariant 19: no saved address is a current-location pin - guard, confirm, default endpoint, support's fix, cleanup rules; scripts applied 2026-11-10; the app's pin is session-only for everyone); shoofi-server@fix/address-scripts-real-confirmed-city-conflict / 2026-11-10 (invariant 19: backfill confirms real addresses only, dedupe skips a city-text conflict); shoofi-server@feat/address-note-apartment-entrance / 2026-11-10 (invariant 20: saved-address notes / floor / apartment / entrance / street number cleaned on add and update, add keeps apartment + entrance, the note snapshots onto order.order.address.notes); shoofi-server@feat/confirmed-delivery-address / 2026-11-07 (invariant 19: the confirmed delivery address, the requireSavedDeliveryAddress guard, the first-address push saves only real addresses, the address cleanup / backfill / dedupe scripts); shoofi-delivery-web@feat/one-editor-for-places + shoofi-server@feat/coupon-by-id / 2026-11-07 (invariant 16: add/edit a place through the wizard step, ?stepContent= on edit); shoofi-server@feat/marketing-suggestions + shoofi-delivery-web@feat/marketing-suggestions / 2026-11-07 (invariant 11: «הצעות» GET /api/admin/marketing/suggestions); shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -18,6 +18,12 @@ Accounts, phone+OTP login, tokens & sessions, profiles, addresses, referrals.
 Server: `routes/{auth,customer,customer-referrals,customer-campaigns,customer-feedback,
 shoofi-admin-users}.js`, `utils/{auth-service,admin-auth-service,app-name-helper}.js`,
 `controllers/customerAddressController.js`. Clients: login/OTP/profile in all four apps.
+Also yours: the **confirmed delivery address** and the saved-address guard
+(`services/customer/confirmed-address.js`), which saved row support's location fix may move
+(`services/customer/support-location-fix.js`), and the near-duplicate address rules
+(`services/customer/address-dedupe.js`, used by `scripts/dedupe-customer-addresses.js`) —
+invariant 19. The hook sits inside order creation, which is `orders`' file: keep it one
+fire-and-forget call.
 Also yours: **who a push campaign may reach**: the customer's marketing-push opt-out
 (`routes/customer-marketing-preferences.js`), the frequency cap
 (`services/customer-campaigns/marketing-push-policy.js`), and the campaign send and schedule
@@ -238,6 +244,28 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
      for items saved before it (`withLink`). An admin form that sends no `link` must not flatten a
      saved one (`unchangedOrLegacyLink`). An announcement (`storeAppName: "shoofi-stories"`) has
      no menu, so its legacy default is `none`, never `store`.
+   - **A story's media is per language** (2026-11-12, shoofi-server `docs/stories.md`,
+     `services/marketing/story-media.js`; same for a launch popup). Besides the shared `media`
+     (+ `thumbnail`) a story may hold `mediaAR` / `mediaHE` `{uri, size, mimetype}` and
+     `thumbnailAR` / `thumbnailHE` `{uri}` — the words and voice are baked into the file, like a
+     banner's `imageAR` / `imageHE`. Multipart fields on `POST /api/stories/add` and
+     `/update/:id`: `media`, `thumbnail`, `mediaAR`, `thumbnailAR`, `mediaHE`, `thumbnailHE`;
+     update also `removeMedia=1` / `removeMediaAR=1` / `removeMediaHE=1`.
+     - At least one file (400 `MEDIA_REQUIRED`), every file the same `mediaType` (400
+       `MEDIA_TYPE_MISMATCH`), both checked before any upload; `mediaType` comes from the files.
+     - **Legacy fill:** older app builds read only `media`. With no shared file, `media` /
+       `thumbnail` are COPIES of the Arabic file's objects (else the Hebrew): the same key, never a
+       second upload — an old build shows Arabic to everyone (owner, 2026-11-12). "A copy" = same
+       `uri`; there is no flag. Update keeps it in step: a replaced Arabic file is copied again, a
+       removed one hands `media` to the Hebrew file; objects nothing points at any more are deleted
+       AFTER the write. A request with no file and no remove flag leaves every media field alone.
+     - The app (`components/stories/media.ts`): `storyMedia` / `storyThumbnail` = the reader's
+       `languageStore.selectedLang` file, else the shared one, in the viewer AND the bar's card
+       (still, video, its prefetch). Over a language file the caption is not printed (its words
+       are in it); a story with no language file prints its caption as before. A language file's
+       still is its own `thumbnailAR/HE`, never the shared one.
+     - The admin (`AddEditStory.tsx`): three slots — לשתי השפות / ערבית / עברית; on edit a
+       `media` with the same uri as a language file shows as an EMPTY shared slot.
    - A push campaign's `link` rides in the push `data` next to `campaignId`; the customer app's
      push-tap router (`hooks/use-notifications.ts` → `utils/marketing-link.ts`) opens it, store
      opens via `openStoreAtProduct` (twin-order guard).
@@ -532,11 +560,53 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       title ≤ 30 / body ≤ 60; story caption ≤ 80, no title; social caption ≤ 280, no title
       (the form uses the Arabic only — posts stay Arabic).
     - **Images:** banner 16:9, TWO renders (Arabic headline, Hebrew headline), because the app
-      shows no text over a banner and picks `imageAR` / `imageHE` by language. Story 9:16, ONE
-      render with NO text, because a story has one media file and the viewer prints
-      `caption.ar` / `caption.he`. Social (2026-10-31, a marketing item's Facebook / Instagram
+      shows no text over a banner and picks `imageAR` / `imageHE` by language. Story 9:16 on the one-shot path, ONE
+      render with NO text (the creative engine below makes an Arabic and a Hebrew one): it goes to the story's SHARED slot (`media`) and the viewer prints
+      `caption.ar` / `caption.he` over it. A story can also hold a file per language (invariant
+      11, `mediaAR` / `mediaHE`); the admin puts a job's lang-tagged pictures (`idAr` / `idHe`) and
+      a reel made in both languages (a lang-tagged `video` LIST, web `PrefillVideos`) there. Social (2026-10-31, a marketing item's Facebook / Instagram
       post, invariant 17) 1:1, ONE render with NO text and the story's layout — the caption
       goes under it.
+    - **The creative engine** (2026-11-12, shoofi-server `services/marketing/creative/`,
+      `docs/creative-engine.md`) draws banner / story / social pictures whenever a bridge
+      heartbeats `compose` and `shoofi.store {id:1}.marketingCreativeEngine !== false` — else the
+      one-shot path above. Its rules:
+      - The background is TEXT-FREE and drawn from the **dishes only** — the logo is NOT sent to
+        the model; the compositor places the real file. Default model GPT Image 2.6 (group 669).
+      - The layout is picked in code (`layouts.js`), **never one of the store's last two** for that
+        channel (`marketingStoreProfiles.recent`).
+      - The words on the picture (`kicker` / `tag` / `head` / `sub` per language) go through the
+        same guard (`engine.js validateWords` → `checkText`) as every generated text.
+      - A vision check (`placement.js`, API backend — images cannot ride the bridge queue) puts the
+        words where the picture is actually free and **rejects** stray lettering, wrong food or
+        props out of scale: drawn once more (counts against `marketingImageDailyLimit`), then
+        the job fails `picture_rejected`.
+      - The words are composed per language by the bridge's Chromium (`compose` task,
+        `queue.js`), so a STORY now gets an Arabic and a Hebrew picture too (`mediaAR` /
+        `mediaHE`, docs/stories.md). The text-free background of a banner / story is not
+        archived.
+      - «עוד אפשרות» = a new layout, the same words (`revision.keepWords`); «ערוך טקסט»
+        (`POST …/generate/:jobId/words`, owner tier) recomposes without a render.
+      - A store's look lives in `marketingStoreProfiles` (character, colours from the logo,
+        fonts, text style); a person's edit (`PUT /api/admin/marketing/creative/profile/:appName`,
+        owner tier) is never overwritten by the automatic pass (`edited[]`).
+      - **«הפוך לסרטון»** (`video.js`, `marketingCreativeVideos`): a finished engine STORY →
+        one 6 s MP4 per language. Free zoom, or AI motion (500); the store's music; a voice line
+        (Eleven v4); Shadi lip-synced (Wan 2.7, 800 per language). Switching an option on is the
+        owner's approval of its estimate; every paid step carries `maxCredits` and the recorded
+        credits are capped at it. The voice is transcribed and compared with the script's
+        numbers before use: re-voiced once with the numbers spelled out, then dropped (with
+        Shadi) and said on the row. The video model never draws the words — the browser's
+        overlay is laid over the motion.
+      - **«מעבדת עיצוב» (design lab, shoofi-server#568)**: the owner changes the design from the hub
+        without a deploy — layouts in `marketingLayouts` (switch off / edit / add, every edit
+        versioned, a switched-off layout is never picked, a job keeps a snapshot of its layout),
+        design settings in `marketingDesign` (bounded multipliers, versioned, previewed with the exact
+        page before saving). **👍 / 👎** on a picture (`POST …/generate/:jobId/feedback`, owner tier):
+        one reason → the cheapest fix (free re-composition, or one redraw counted against the daily
+        limit), and — unless `remember: null` — what is remembered: per-store layout scores (−4 drops
+        the layout for that store), a stronger shade, or a lesson (`marketingLessons`) the next brief
+        or placement check follows. Lessons are listed and switchable («מה למדנו»).
     - **References: the store's logo and dishes** (2026-11-02, `services/marketing/generate/references.js`).
       Every subject with ONE store (store, new store, deal, product, a single-store coupon) sends
       the store's logo (`stores.storeLogo`, `{uri}` or a bare path) as a `logo` reference and up
@@ -610,7 +680,7 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       nothing.
     - ⚠️ **The Hebrew voice is pending the owner's sign-off** (`voice.js HEBREW_VOICE`, a
       written spec; nothing was measured for Hebrew). The Arabic is the social `VOICE`.
-    Pinned by shoofi-server `test/integration/marketing-generate.js`.
+    Pinned by shoofi-server `test/integration/marketing-generate.js` and `test/integration/marketing-creative.js`.
 
 17. **Every in-app marketing item is a draft until someone approves it; the draft itself says
     when it goes out (פרסם עכשיו or תזמן), and approving only approves and then follows that;
@@ -801,6 +871,126 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       approved styles, rotated.
     Pinned by shoofi-server `test/integration/marketing-templates.js` and
     `marketing-routes-auth.js`.
+
+19. **The confirmed delivery address is the saved address the LAST delivery order went to,
+    stored on the ACCOUNT** (2026-11-07, shoofi-server `services/customer/confirmed-address.js`,
+    `docs/confirmed-delivery-address.md`). `customers.confirmedAddressId` is the `String()` of an
+    `addresses[]._id` (ObjectId on disk, string in an order body — always compared as strings).
+    The customer app stops auto-opening the address picker while it is selected. That picker,
+    opened on every delivery tap, is where the duplicate addresses came from.
+    - **Set** by `rememberConfirmedAddress` from `/api/order/create` (right AFTER the customer
+      `findOneAndUpdate` — that one `$set`s the whole doc from a snapshot read before the
+      order, so an earlier write is clobbered) and from twin `/place` + `/digital-place-pending`.
+      Only for a DELIVERY order whose `order.address._id` names a saved row that is a REAL
+      address (`isRealAddress`: a street, a usable location, not a current-location pin). It
+      reads the saved addresses and judges the SAVED row, not the order body; the "is it still
+      saved" test is also IN the update filter (`"addresses._id": {$in: [ObjectId, string]}`).
+      **Fire-and-forget: never awaited, never throws** — it must never fail or slow an order.
+      Pickup, a town-only fallback (no `_id`), a current-location address, a foreign id, or a
+      saved row that is not real (a pin, a street-less row) leave the previous value alone.
+      **Before 2026-11-10 the update filter alone decided**, so a current-location order
+      (`_id: "current-location"`) confirmed a leftover saved row of that same id when the
+      customer had one; `rememberConfirmedAddress` now returns `current-location` /
+      `not-a-real-address` for those.
+    - **Unset** only by `deleteAddress` when the deleted id equals it (`forgetConfirmedAddress`).
+      An edit keeps the `_id`, so it keeps the value.
+    - **Read** by `GET /api/customer/details` as `data.confirmedAddressId` (string or `null`;
+      `null` too when the id no longer names a saved REAL address — `resolveConfirmedAddressId`)
+      — **customer app only**; partner and driver replies never carry the key.
+    - **Guard, OFF by default:** `shoofi.store{id:1}.requireSavedDeliveryAddress === true` (a
+      literal `true`; not in `SHOOFI_CONFIG_PUBLIC_FIELDS`, no admin UI) makes `/api/order/create`
+      and twin `/place` answer **400 `code: "DELIVERY_ADDRESS_REQUIRED"`** for a DELIVERY order
+      whose address is not saved, or is a current-location pin (the order's own `_id` /
+      `isCurrentLocation`, or the saved row it names — a leftover saved
+      `_id: "current-location"` row does not let the GPS card through; reason
+      `current-location`) — before the lock, the group and any charge. **APPLEPAY and HYP
+      (hosted page) on `/create`, and twin `/digital-place-pending`, are exempt**: their money has
+      moved (or is moving) before the route runs, so a 400 there is a charge with no order. Never
+      extend the guard to them. A lookup error fails open. Old bundles still send town-only
+      addresses — the owner turns it on after the app update spreads.
+    - **Only a real address is ever saved by order creation.** The "first address" push in
+      `/api/order/create` (a customer with an empty `addresses[]`) goes through
+      `addressToSaveFromOrder` (`services/customer/address-validity.js`): street + usable
+      location + not GPS-only, else nothing is pushed; the row always gets an ObjectId `_id`
+      (the order's own when valid). It used to push `order.address` as-is, leaving 185 prod
+      customers with an `_id`-less town-only "saved address" (117 with nothing else). The
+      non-address signature is an **empty street** — never a "منطقة"/"אזור" prefix on the
+      street: "אזור תעשיה …" is a real street on 71 named, saved addresses. Two street texts
+      are NOT the signature either way: the app form's unnamed-road placeholder
+      (`t("street-has-no-name")`, «شارع بدون اسم» / «רחוב ללא שם») IS a street — the customer
+      saved that pin on purpose — while support's old invented 'מיקום נוכחי'
+      (`SUPPORT_PLACEHOLDER_STREET`) is NOT (2026-11-10).
+    - **A current-location pin is never a saved address** (2026-11-10, shoofi-server
+      `fix/current-location-addresses`, test `test/integration/current-location-addresses.js`).
+      Server: the guard and the confirm above; `addressToSaveFromOrder` never saves one; add /
+      update answer 400 to `isCurrentLocation: true`; `PATCH …/addresses/:addressId/default`
+      validates the id (400 malformed, 404 unknown, 400 a current-location row) BEFORE it
+      clears the other defaults — it used to clear them all, then throw on
+      `ObjectId("current-location")`, leaving none (`PUT` likewise checks the id first).
+      App (shoofi-app `fix/current-location-flow`): the current-location selection is
+      **session-only for everyone** — guests too, a pin an older build stored is discarded on
+      launch — the picker never lists a saved `_id: "current-location"` row, and the card is
+      **hidden in the checkout delivery picker** (`components/address/index.tsx` passes
+      `hideCurrentLocation` for delivery; already so before that PR). The sheet offers
+      "save as an address", which opens the normal add-address form on the pin.
+    - **Support's «update to current location»** (`POST /:customerId/update-address-to-current-location`,
+      the row choice in `pickSupportFixTarget`, `services/customer/support-location-fix.js`):
+      the order and the booking get the verified pin and `updatedBySupport: true`, and are
+      **no longer** marked `isCurrentLocation: true` (that flag means only "the customer picked
+      the card"). "Update the customer too" moves a saved row only when the order went to a
+      real one (its `_id`, or — for an order with no id at all — a saved row at the exact
+      coordinates); a current-location order never moves one. Otherwise **it saves nothing**
+      (`customerAddressSkipped: "no-saved-address"`). It used to push a row named
+      'מיקום נוכחי (עודכן ע"י תמיכה)' with the invented street 'מיקום נוכחי', the order's area
+      text as city and `isDefault: true` without clearing the other defaults — a pin the customer
+      never chose that `isRealAddress` counted as real. Saving the pin in the app form's
+      no-name shape was rejected for the same reason: it would be confirmable without the
+      customer choosing it. Moving a real saved row's pin (the admin box is ticked by default)
+      is unchanged.
+    - **Scripts** (dry-run default, `--apply`, JSON backup + compare-and-set, ids and counts
+      only in the output), run in this order:
+      `clean-invalid-customer-addresses.js` (removes no-street rows without an `_id` or with an
+      area city; since 2026-11-10 also every saved current-location pin and every row with
+      support's 'מיקום נוכחי' street; gives an `_id` to any remaining row without one; when a
+      removed row was the default and none is left, the kept confirmed row, else the newest
+      real row, becomes the default; unsets `confirmedAddressId` naming a removed row; keeps a
+      street-less GPS pin the customer named), then
+      `backfill-confirmed-address.js` (latest DELIVERY order per customer whose address is still
+      saved AND real — `isRealAddress`, a street + usable location; a street-less saved GPS pin is
+      NEVER confirmed, or the app would never ask for a proper address: reported
+      `onlyStreetlessMatch`, left unset) and `dedupe-customer-addresses.js` (same place = ≤ 30 m
+      complete-linkage AND same normalized street + number; keeper confirmed > default > named >
+      most-used > newest; a group with two different non-empty names OR two different non-empty
+      city texts skips the WHOLE customer — customers type directions into `city` («دار علي …»),
+      so a merge must never drop one; an empty kept `city` is filled like the other fields).
+      **Applied to prod 2026-11-10, ~15:15–15:30 UTC** (owner's OK), `raced: 0` on all three:
+      cleanup 185 customers / 185 rows; backfill 11,582 set (150 already set, 5 street-less-only
+      left unset); dedupe 1,323 customers / 2,411 rows (550 name-conflict + 81 city-conflict
+      customers skipped). Afterwards no saved row lacks an `_id`; 11,734 customers have a
+      `confirmedAddressId` (read-only count that evening). That first cleanup kept 10
+      `_id`-bearing street-less rows: **7 were saved current-location pins** (all
+      `_id: "current-location"`, named "Current location", one on 28 orders) and 3 are pins
+      the customer named. The 2026-11-10 rules (shoofi-server `fix/current-location-addresses`)
+      dry-run on prod: 15 customers / 21 rows — the 7 pins + the 14 support rows (8 customers;
+      one customer had 7, all default, none ordered to; 12 of 14 never ordered to); 6 customers
+      left with no saved address, 0 defaults promoted, 0 confirmed ids unset, the 3 named pins
+      kept. **Not applied yet — needs the owner's OK**, after the server PR merges.
+    Pinned by shoofi-server `test/integration/confirmed-delivery-address.js` and
+    `test/integration/current-location-addresses.js`.
+20. **A saved address's free-text fields are cleaned on add AND update** (2026-11-10,
+    shoofi-server `services/customer/address-fields.js` → `cleanAddressFields`, called by
+    `buildAddress` and `updateAddress` in `controllers/customerAddressController.js`).
+    `notes` is the **courier landmark** («علامة مميزة للسائق»): trimmed, whitespace runs collapsed
+    to one space, **≤ 200** chars. `floorNumber`, `apartmentNumber`, `entrance`, `streetNumber`:
+    trimmed, **≤ 20** chars. A number is stringified; null / undefined pass through; a key that was
+    not sent stays absent (an update never invents a field); an object / array is dropped. Add
+    keeps `apartmentNumber` and `entrance` (it used to drop both) — only when sent. Plain text,
+    no HTML handling. Every other field is unchanged (update still spreads the rest of the body).
+    **The note reaches the courier as a snapshot:** checkout copies the selected address object
+    onto the order as `order.order.address.notes` (also into `customers.orders[].address`), so
+    editing a saved address never changes an order already placed. What the courier/partner
+    screens do with that order field is `orders` / `delivery`'s.
+    Pinned by shoofi-server `test/integration/customer-address-fields.js`.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:
