@@ -1207,7 +1207,7 @@ boundary and say so in the PR.
 34. **THE QR MENU IS A SEPARATE CATALOG: COPIED ONCE, THEN NEVER WRITTEN FROM OR TO `products` /
     `categories`** (Kopa phase 8, added 2026-11-13; reference §7m, server `docs/kopa.md` "Phase 8").
     `kopaQrCategories` / `kopaQrItems` and the `{ _id: "qrMenu" }` doc in `kopaStoreSettings` (store DB)
-    are the store's view-only table menu at `<store>.shoofi.app/qr-menu`.
+    are the store's view-only table menu at `<store>.kopa.shoofi.app/qr-menu`.
     - **One-time copy** (`POST /api/kopa/qr-menu/init`, `initQrMenu` → `buildQrSnapshot`): the customer
       menu's own rules (categories `isHidden != true` and `isSchoolProject` missing or false, holding a
       visible product; products `isHidden != true`), the CUSTOMER price (`applyProductDiscount` over
