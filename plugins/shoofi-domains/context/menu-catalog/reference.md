@@ -1536,6 +1536,17 @@ Code: `routes/kopa/qr-menu.js` (owner), `routes/kopa/qr-menu-public.js` (no auth
     optionsNoteAR, optionsNoteHE }] }], table }`.
   - Cache: in memory per store, 20 s (`Cache-Control: public, max-age=20`). A known disabled store
     is cached as a miss, and a generation guard runs on invalidation.
+- **Table ordering** (`tableOrdering` on; route in orders reference C5): `buildQrMenu` adds
+  `orderable` (structurally orderable AND in stock) and, for products with choices,
+  `choices: [{ extraId, nameAR, nameHE, options: [{ optionId, nameAR, nameHE, price }] }]`
+  (`tableChoicesOf`).
+  - Every `single` group is required: exactly one option that is not in `outOfStockExtras`. If
+    none is left, the product is not orderable.
+  - `multi` / `counter` / `pizza-topping` are optional in the app and not offered at the table.
+  - Not orderable: combos, `soldByWeight`, any `weight` extra, unknown types, options with a
+    missing or duplicate id, a price that isn't a number ≥ 0.
+  - Option prices are hidden when `showPrices` is off. The view-only payload (ordering off) is
+    unchanged.
 - **No menu cache key is cleared by any of this** (`products` / `categories` are never written).
 
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)

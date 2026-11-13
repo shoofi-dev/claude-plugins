@@ -1234,6 +1234,14 @@ boundary and say so in the PR.
         price, the rules, staff or timestamps.
       - It is cached 20 s per store in memory, and every owner write invalidates it
         (`qr-menu-cache.js`). An app-side change shows within 20 s.
+    - **Table ordering** (Kopa table orders, orders CORE invariant 31):
+      - When the store's `tableOrdering` is on, public items also carry `orderable` and `choices`
+        (`tableChoicesOf`).
+      - Every `single` group is a required choice of one in-stock option. `multi`, `counter` and
+        `pizza-topping` are not offered at the table.
+      - Combos, by-weight products, `weight` extras, unknown extra types and malformed options
+        make a product not orderable.
+      - A line is priced `qrPriceOf` + the option prices (not discounted).
     - **Known risks:**
       - The partner app can un-hide a QR-only product, which puts it in the customer app.
       - Order creation accepts hidden ids (orders domain).

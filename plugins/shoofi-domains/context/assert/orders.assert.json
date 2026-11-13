@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@fix/twin-cancel-safety / 2026-11-10 (CORE invariants 27-28); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (CORE invariant 31, Kopa QR table orders); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (CORE invariants 27-28); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -63,9 +63,14 @@
         "services/money/money-cancel.js",
         "routes/money.js",
         "scripts/money-backfill.js",
-        "test/integration/money-cancel.js"
+        "test/integration/money-cancel.js",
+        "routes/kopa/table-orders.js",
+        "services/kopa/table-orders.js",
+        "services/orders/order-source.js"
       ],
       "symbols": {
+        "services/kopa/table-orders.js": ["createTableOrder", "priceItems", "storeOpenState", "checkLocation", "buildTableOrderDoc"],
+        "services/orders/order-source.js": ["isKopaQrOrder"],
         "routes/order.js": [
           "processCreditCardPayment",
           "processHypTokenPayment",
@@ -616,7 +621,14 @@
         {"file": "routes/money.js", "regex": "const MONEY_FINANCE_ROLES = \\[\\\"accountant\\\"\\];", "desc": "CORE invariant 28: finance routes = accountant (+ master)"},
         {"file": "services/coins/coins-service.js", "regex": "cancelRefundedOrderIds: \\{ \\$ne: refundKey \\}", "desc": "CORE invariant 28: coins are refunded once per order"},
         {"file": "routes/admin/twin-order-config.js", "regex": "hypAutoRefund: false,", "desc": "CORE invariant 28: hypAutoRefund defaults off"},
-        {"file": "routes/order.js", "regex": "module\\.exports\\.handleOrderUpdate = handleOrderUpdate;", "desc": "CORE invariant 28: /api/money/cancel runs the same order-update pipeline for singles"}
+        {"file": "routes/order.js", "regex": "module\\.exports\\.handleOrderUpdate = handleOrderUpdate;", "desc": "CORE invariant 28: /api/money/cancel runs the same order-update pipeline for singles"},
+        {"file": "services/orders/order-source.js", "regex": "const KOPA_QR_SOURCE = \"kopa-qr\"", "desc": "CORE invariant 31: a Kopa QR table order is source \"kopa-qr\" (the literal settlement keys on, shoofi-server#583)"},
+        {"file": "services/orders/order-source.js", "regex": "SERVER_ONLY_ORDER_FIELDS = Object\\.freeze\\(\\[\"source\", \"table\", \"kopaQr\"\\]\\)", "desc": "CORE invariant 31: the fields only the table-order route may write"},
+        {"file": "routes/order.js", "regex": "for \\(const field of SERVER_ONLY_ORDER_FIELDS\\) delete parsedBodey\\[field\\];", "desc": "CORE invariant 31: /api/order/create drops a posted source / table / kopaQr before the ...parsedBodey spread"},
+        {"file": "routes/order.js", "regex": "if \\(isKopaQrOrder\\(order\\)\\) \\{\\s*finalOrders\\.push\\(order\\);", "desc": "CORE invariant 31: admin/not-viewd keeps a customer-less kopa-qr order (any other order whose customer is not found is still skipped)"},
+        {"file": "routes/order-amend.js", "regex": "KOPA_QR: \"KOPA_QR_ORDER_NOT_AMENDABLE\"", "desc": "CORE invariant 31: amend refuses a kopa-qr order (it would reprice at app prices)"},
+        {"file": "services/kopa/table-orders.js", "regex": "source: KOPA_QR_SOURCE,\\s*table: \\{ id: table\\.tableId, label: table\\.label \\},\\s*customerId: null,", "desc": "CORE invariant 31: source, a top-level table { id, label } and no customer"},
+        {"file": "services/kopa/table-orders.js", "regex": "routes\\.fireStoreOwnerNotifications\\(orderDoc, req, appName\\); // never awaited", "desc": "CORE invariants 6 + 31: the table order's store-owner alert is not awaited"}
       ]
     },
     "shoofi-app": {

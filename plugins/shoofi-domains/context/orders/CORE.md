@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -1096,6 +1096,9 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     pins this with an `orders` spy that fails on ANY call. Extending a reader of `orders` to
     "also include till sales" is a product decision across settlement, invoicing and
     analytics. It is not a refactor. Endpoint shapes: reference C5.
+    **One exception, and only for QR table orders** (invariant 31): a diner's order from a table's
+    QR IS an `orders` document (`source: "kopa-qr"`), because the partner app must accept and
+    print it. Till sales are unchanged.
 
     **Kopa phase 3 (cancellation reasons).** `kopaCancelReasons` `{ nameAR, nameHE, appliesTo:
     order|item|both, returnToStock, order, active }`. `returnToStock` is stored only: nothing
@@ -1146,6 +1149,56 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `till-orders.js` (81), `kds.js` (21), `settings.js` (17), 212 in all. Each covers the full gate matrix
       on every route, a failing and a never-settling `createIndex`, and the `orders` spy. In
       2026-11-11 fault-injection runs, 23 injected faults were each caught.
+
+31. **A KOPA QR TABLE ORDER IS AN `orders` DOCUMENT WITH `source: "kopa-qr"`, CREATED ONLY BY
+    `POST /api/kopa/public/table-orders/:store`, AND EVERY SPECIAL CASE KEYS ON `source`, NEVER ON
+    `receipt_method`** (shoofi-server `services/kopa/table-orders.js` + `routes/kopa/table-orders.js`,
+    branch `feat/HIGH-RISK-kopa-table-orders`, stacked on #580/#581, 2026-11-13; `docs/kopa.md`
+    "Phase 8b"). Rules (Sari, 2026-11-13): no login, a per-table code, within 150 m of
+    `shoofi.stores.location`, cash at the table, no coupon / coins / delivery / commission, and
+    the partner app accepts / prepares / prints it.
+    - **Shape:** `source: "kopa-qr"`, top-level `table: { id, label }` (the partner badge reads
+      `order.table.label`, shoofi-partner#68), `customerId: null`,
+      `customerDetails: { name, phone: "" }`, `order.receipt_method: "TABLE"`,
+      `payment_method`/`payment_provider: "CASH"`, status `"6"`, `isViewd`/`isPrinted` false,
+      `total` = `orderPrice`, `shippingPrice: 0`, `appliedCoupon: null`, `usedCoins: null`,
+      `earnedCoins: 0`, `storeData` (an allowlist of the store doc), and `kopaQr: { idempotencyKey,
+      location }`. The diner's note is `order.commentToStore` (invariant 25), never top-level
+      `note`. `isFirstOrderAtStore` is ABSENT on purpose (invariant 24). The lines have the app
+      shape `{ item_id, name, nameAR, nameHE, qty, price (unit), selectedExtras, img }`.
+    - **The price is the server's only, from the QR menu build** (`buildQrMenu`: `qrPrice` or
+      `price`, then the category discount), plus the chosen `single` options' prices, which are
+      not discounted. This deliberately differs from `calculateItemUnitPrice` (invariant 11), which
+      discounts extras. So **amend refuses these orders** (409 `KOPA_QR_ORDER_NOT_AMENDABLE` in
+      `evaluateEligibility`), because it would reprice at app prices.
+    - **What's orderable in v1** (`tableChoicesOf`, menu-catalog's `services/kopa/qr-menu.js`):
+      every `single` group is required. `multi`, `counter` and `pizza-topping` are not offered.
+      Combo, weight, by-weight, unknown types and option prices that are not numbers are not
+      orderable.
+    - **After the insert**, as a cash app order: `decrementOrderStock` (invariant 3 gates),
+      `fireStoreOwnerNotifications` (not awaited, invariant 6), and an `orderFlowEvents` row with
+      `actorType: "table"`. Nothing customer-side runs.
+    - **The existing paths** were changed additively, each keyed on `isKopaQrOrder`
+      (`services/orders/order-source.js`):
+      - `/api/order/create` deletes a posted `source` / `table` / `kopaQr` before the
+        `...parsedBodey` spread (`SERVER_ONLY_ORDER_FIELDS`). No app sends them.
+      - `/api/order/admin/not-viewd` (the store tablet's new-orders list) used to `continue` on
+        any order whose customer is not found. It now keeps a `kopa-qr` order.
+      - The overdue cron labels it `طاولة <n>`.
+      - `generateUniqueOrderId` / `fireStoreOwnerNotifications` are now exported from
+        `routes/order.js`, unchanged.
+      - Untouched and safe with `customerId: null`: accept (`update/viewd`: a non-DELIVERY order
+        books no courier, the customer notification finds no customer and returns), the cancel
+        side-effects (no coins / coupon), the feedback scheduler (`order?.customerId` guard),
+        `fix-stuck-orders` (non-DELIVERY → `"2"`), and Kopa's customer reads (skip a null
+        `customerId`).
+    - **A legacy app order with `receipt_method: "TABLE"` and no `source` behaves exactly as
+      before**, everywhere: the create path, amend, the not-viewd list and settlement.
+    - **Settlement** excludes a table order from commission on `source === "kopa-qr"` ONLY
+      (shoofi-server#583 `utils/table-orders.js` `TABLE_ORDER_SOURCE`; accountant CORE invariant
+      20, claude-plugins#369). **Deploy order: #583 must be live before the first `kopa-qr` order
+      is written.** Nothing is written while a store's `tableOrdering` is off (the default).
+    - Tests: shoofi-server `test/integration/kopa/table-orders.js` (20).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
