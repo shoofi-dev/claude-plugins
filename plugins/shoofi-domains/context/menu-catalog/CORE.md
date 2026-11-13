@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@feat/kopa-phase8 (invariant 34 + reference §7m — Kopa phase 8 QR menu: its own catalog kopaQrCategories/kopaQrItems, copied once, public read; uncommitted worktree) / 2026-11-13; shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@feat/kopa-phase1 (invariant 33 — Kopa phase 2 category writes + phase 3 till-only meta, /api/kopa/{categories,meta,kitchens}; uncommitted worktree) / 2026-11-11; shoofi-server@feat/kopa-phase1 (invariant 32 — Kopa product and extras stats, /api/kopa/{products,extras}/stats; uncommitted worktree on origin/main cf25d5c2) / 2026-11-11; shoofi-app@design/round-2 67d4533 (invariant 29 — where the app draws option icons; the app files are committed) / 2026-11-08; shoofi-server@feat/store-closed-until (invariant 31 — special hours closedUntil / closedDays on isStoreClose, the same cron; invariant 28 partner fields; /api/store/holiday/* removed) / 2026-11-08; shoofi-server@feat/timed-busy-prep-extra (invariant 30 — timed busy busyUntil, extra prep time prepExtra, the expiry cron; invariant 28 partner fields) / 2026-11-07; shoofi-server@feat/prep-time-suggestion-field (invariant 28 — prepTimeSuggestion, a partner store field) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 — outOfStoreUntil, the 07:00 restore, store-wide outOfStockExtras) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@feat/kopa-qr-shared-menu / 2026-11-13 (invariant 34 + reference §7m: the QR menu SHARES the app menu - kopaQrProductRules / kopaQrCategoryRules, qrOnly needs isHidden, qrPrice on the base price with the category discount, 20 s public cache); shoofi-server@feat/kopa-phase8 (invariant 34 + reference §7m — Kopa phase 8 QR menu: its own catalog kopaQrCategories/kopaQrItems, copied once, public read; uncommitted worktree) / 2026-11-13; shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@feat/kopa-phase1 (invariant 33 — Kopa phase 2 category writes + phase 3 till-only meta, /api/kopa/{categories,meta,kitchens}; uncommitted worktree) / 2026-11-11; shoofi-server@feat/kopa-phase1 (invariant 32 — Kopa product and extras stats, /api/kopa/{products,extras}/stats; uncommitted worktree on origin/main cf25d5c2) / 2026-11-11; shoofi-app@design/round-2 67d4533 (invariant 29 — where the app draws option icons; the app files are committed) / 2026-11-08; shoofi-server@feat/store-closed-until (invariant 31 — special hours closedUntil / closedDays on isStoreClose, the same cron; invariant 28 partner fields; /api/store/holiday/* removed) / 2026-11-08; shoofi-server@feat/timed-busy-prep-extra (invariant 30 — timed busy busyUntil, extra prep time prepExtra, the expiry cron; invariant 28 partner fields) / 2026-11-07; shoofi-server@feat/prep-time-suggestion-field (invariant 28 — prepTimeSuggestion, a partner store field) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 — outOfStoreUntil, the 07:00 restore, store-wide outOfStockExtras) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -1202,31 +1202,42 @@ boundary and say so in the PR.
       write (pinned with a failing-`createIndex` proxy).
     - **Not built, because they change customer-app behaviour:** the extras `required` / `freeCount`
       fixes, deal days/hours in the app, a shared ingredient library in the product schema, and
-      per-channel visibility in the customer menu.
+      per-channel visibility in the customer menu (the QR menu, invariant 34, gets its QR-only items
+      from `isHidden` + a Kopa rule instead, so the customer menu is untouched).
 
-34. **THE QR MENU IS A SEPARATE CATALOG: COPIED ONCE, THEN NEVER WRITTEN FROM OR TO `products` /
-    `categories`** (Kopa phase 8, added 2026-11-13; reference §7m, server `docs/kopa.md` "Phase 8").
-    `kopaQrCategories` / `kopaQrItems` and the `{ _id: "qrMenu" }` doc in `kopaStoreSettings` (store DB)
-    are the store's view-only table menu at `<store>.shoofi.app/qr-menu`.
-    - **One-time copy** (`POST /api/kopa/qr-menu/init`, `initQrMenu` → `buildQrSnapshot`): the customer
-      menu's own rules (categories `isHidden != true` and `isSchoolProject` missing or false, holding a
-      visible product; products `isHidden != true`), the CUSTOMER price (`applyProductDiscount` over
-      those categories, invariant 3), one item per product in its `primaryCategoryOf` category, combos
-      as one item, extras NOT copied (only a read-only `optionsNoteAR/HE` hint). After it, nothing
-      flows either way: app edits never reach the QR menu (re-copy is an explicit `{ replace: true,
-      confirm: "REPLACE" }` that wipes the QR data), and QR edits never touch the app catalog.
-    - **`products` / `categories` are only READ** (the copy, and the editor's `appPrice` drift column,
-      which uses the same price rule). No QR write clears a menu cache key: the customer menu cannot
-      change. The customer app, search, For you, the partner app and the till never read the QR
-      collections; the till keeps pricing from the app catalog. Pinned by a spy in
+34. **THE QR MENU SHARES THE APP MENU; IT ONLY ADDS QR RULES, AND NEVER WRITES `products` /
+    `categories`** (Kopa, product decision 2026-11-13. It replaced the first separate-catalog design
+    before any store used it. See reference §7m and server `docs/kopa.md` "Phase 8".)
+    - **What it reads:** the view-only table menu at `<store>.kopa.shoofi.app/qr-menu` is built LIVE
+      from the store's `categories` / `products`. Names, images, order and stock are shared: `isInStore`,
+      which `outOfStoreUntil` drives, and `outOfStockExtras` by option `nameAR`.
+    - **What differs**, in `kopaQrProductRules` / `kopaQrCategoryRules` (store DB, `_id` = the
+      product / category id string):
+      - `qrOnly`: shown on the QR while HIDDEN in the app. It can only be set while `isHidden: true`,
+        else 409 `PRODUCT_VISIBLE_IN_APP` / `CATEGORY_VISIBLE_IN_APP`. That is why the customer
+        menu, search, For you and the chat need no change: they already drop hidden items
+        (invariant 11).
+      - `hiddenOnQr`.
+      - `qrPrice` (products only): replaces the BASE `price`; extras keep the app's prices. The
+        category discount still applies (invariant 3). It must be > 0 (invariant 8).
+    - **What the QR shows** (`buildQrMenu`, pure):
+      - Categories: not school, not `hiddenOnQr`, and app-visible or `qrOnly`.
+      - Products: not `hiddenOnQr`, app-visible or `qrOnly`, price > 0, in EVERY shown category of
+        `supportedCategoryIds`, in the app's order.
+    - **`products` / `categories` are only READ.** No menu cache key is cleared (the customer menu
+      cannot change), and the customer app never reads the rule collections. Pinned by a spy in
       `test/integration/kopa/qr-menu.js` that throws on any write to either collection.
-    - **The public read** (`GET /api/kopa/public/qr-menu/:store`, no auth) looks `:store` up in
-      `shoofi.stores` BEFORE opening any store DB (never `getOrInitializeDb` an arbitrary name), answers
-      one identical 404 for every miss, and returns an allowlist (`buildPublicMenu`): no item ids,
-      `sourceProductId`, app prices, staff or timestamps. It is cached ~60 s per store in memory and
-      every owner write invalidates that store's entry (`qr-menu-cache.js`).
-    - Any new field on the public payload must be added to `buildPublicMenu`'s projection AND its
-      mapping deliberately; the test asserts the exact key sets.
+    - **The public read** (`GET /api/kopa/public/qr-menu/:store`, no auth):
+      - It looks `:store` up in `shoofi.stores` BEFORE opening any store DB, and answers one
+        identical 404 for every miss.
+      - It returns an allowlist (`buildPublicMenu`): ids are product / category ids. Never the app
+        price, the rules, staff or timestamps.
+      - It is cached 20 s per store in memory, and every owner write invalidates it
+        (`qr-menu-cache.js`). An app-side change shows within 20 s.
+    - **Known risks:**
+      - The partner app can un-hide a QR-only product, which puts it in the customer app.
+      - Order creation accepts hidden ids (orders domain).
+      - The zero-price cron hides a product priced 0.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
