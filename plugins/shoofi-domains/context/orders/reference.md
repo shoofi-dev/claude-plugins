@@ -851,6 +851,25 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   (the printed RIGHT edge under forced RTL; never a label/value row — the partner#41 clipping).
   **Not yet on the v3 redesign** (`components/orders-v3/*`, only on the unmerged stack #47–#58):
   hook `OrderCardV3` / `NewOrderViewV3` to the same helper once that stack rebases.
+- **Table orders (Kopa table QR)** — branch `feat/table-order-label` (shoofi-partner, not on
+  `main` as of 2026-11-13). A diner scans a per-table QR code, orders from the store's Kopa web
+  page and pays cash at the table; the server route that writes it into the store's normal
+  `orders` is being built in parallel (NOT the till: till sales live in `kopaTillOrders`, C5).
+  The contract the partner reads: `source: "kopa-qr"`, `order.receipt_method: "TABLE"`,
+  `order.payment_method: "CASH"`, top-level `table: { id, label }` (label = the table number),
+  `customerId: null`, `customerDetails: { name (may be ""), phone: "" }`; `storeData` may be absent.
+  One reader: `helpers/order-table.ts` (`getOrderTableLabel` reads `table.label`, falling back to
+  `order.order.table.label`; strings/finite numbers only; returns null with no table, so
+  DELIVERY / TAKEAWAY / DRIVEIN render and print unchanged). Words are inline (طاولة / שולחן), not
+  served keys, and TABLE's receipt word uses them instead of `t("table")`.
+  Shown by `components/order-table-badge` («طاولة 7 · QR», wrapped in a U+202B embedding because the
+  controls Text renders `direction: "ltr"`): list v2 (chip in the collapsed header where the
+  phone goes, box in the drive-in slot of the expanded card) and new-orders v2 (box under the
+  payment | receipt line; the empty name/phone rows are skipped for table orders only). Both
+  tickets print a large «طاولة 7» + «QR» box in the drive-in slot. v1 screens, item details and the
+  v3 stack are not wired. The same PR fixed the 80mm ticket's unguarded
+  `invoiceOrder.storeData.name_he` (a Hebrew store crashed on an order without `storeData`).
+  The ticket icon `table` is NOT in `components/icon/selection.json`; react-icomoon renders null.
 
 ## C4. shoofi-delivery-web — the ADMIN dashboard (React web)
 Role: oversight — list/monitor, manual intervention, fraud queue, **twin group admin**, config.
