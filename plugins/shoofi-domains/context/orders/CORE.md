@@ -447,6 +447,15 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     never drop the sweep's date or cap. A stuck order is diagnosed from
     `<store>.client-error` `source: "printer-testPrint"` rows (they now carry `outcome`),
     plus the store's only `isPrinted:false, isViewd:true` orders.
+    - **A blank `printerTarget` is not "no printer".** `App.tsx` (`initPrinter`) falls back
+      to the hardcoded `"BT:00:01:90:42:95:AA"`, so a store with no printer configured still
+      tries to connect on every accept/sweep and logs `printer-testPrint` `failed` rows (two
+      per copy: `maxAttempts: 2`). On 2026-11-13, 45 of 117 active stores had no target; 44
+      printed 0 orders and produced 87% of all printer error rows, while olamhayam (blank
+      target, 8/8 printed) actually depends on the fallback. So a store whose orders are ALL
+      `isPrinted:false` has no printer, not missed orders, and a "Failed to connect to
+      printer" digest cluster is mostly these stores. `hq-tech-digests` `since`/`until` are
+      UTC; `client-error` rows carry no device id, `customerId` (the store user) is the key.
 18. **THE STORE-CALENDAR AND ORDER-ADMIN READS ARE GATED PER AUDIENCE, AND THE PARTNER GATE IS
     STORE MEMBERSHIP, NOT "THE TOKEN'S OWN STORE"** (shoofi-server `services/orders/admin-access.js`).
     Until 2026-10-30, anyone who sent a store's `app-name` could close its hours, or read its

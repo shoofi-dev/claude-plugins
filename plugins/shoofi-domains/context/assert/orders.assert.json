@@ -927,6 +927,7 @@
           "regex": "await printCopy\\(\\s*orderImage,",
           "desc": "doc CORE invariant 17: the regular print loop goes through the outcome-aware printCopy (no retry on unconfirmed)"
         },
+        {"file": "App.tsx", "regex": "let printerTarget = storeDataStore\\.storeData\\?\\.printerTarget \\|\\| \"BT:00:01:90:42:95:AA\";", "desc": "CORE invariant 17: a blank printerTarget silently falls back to one hardcoded BT printer - why unconfigured stores flood printer-testPrint failures (HQ #6956c4)"},
         {"file": "stores/auth/index.ts", "regex": "await shoofiAdminStore\\.setStoreDBName\\(appName\\);\\s*await this\\.updateUserToken\\(newToken\\);", "desc": "CORE invariant 18: switchStore persists the new store BEFORE the new token, so a poll can carry B with A's token - why the server gate is membership, not exact match"},
         {"file": "stores/orders/index.tsx", "regex": "isAdminAll\\s*\\?\\s*ORDER_API\\.GET_ADMIN_ALL_NOT_VIEWD_ORDERS_API\\s*:\\s*ORDER_API\\.GET_ADMIN_NOT_VIEWD_ORDERS_API", "desc": "CORE invariant 18 / ref C3: the feed is all/not-viewd when isAdmin(ROLES.all) (every prod store user), not-viewd otherwise"},
         {"file": "utils/http-interceptor/index.ts", "regex": "config\\.headers\\[\"Authorization\"\\] = \"Token \" \\+ token;[\\s\\S]{0,600}?config\\.headers\\[\"app-type\"\\] = \"shoofi-partner\";", "desc": "ref C3: partner requests send Token auth + app-type shoofi-partner (what storeMemberGate keys on)"},
