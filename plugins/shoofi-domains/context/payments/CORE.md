@@ -145,6 +145,19 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    Reach: wallet orders always (unconditionally manual), card orders only where the flag is
    on — a gateway-issued document cannot take a `ua_uuid`, and `EZ.*` is an undocumented
    pass-through that can reject the whole charge, so do not try `EZ.ua_uuid`.
+   ⚠️ **Under manual invoicing, no saved-card charge gets a PrintHesh link.** HYP issued
+   no document, so a link would point at nothing. The single order
+   (`processHypTokenPayment`), the twin group (`chargeCombinedHyp` in
+   `twin-payment-service.js`) and the background retry
+   (`services/payments/hyp-invoice-url-retry.js`, which runs only when the charge-time
+   decision says `gatewayInvoiced: true`) all leave `url` null. Until HQ #a92992 the twin
+   charge signed the link unconditionally. The result was 164 twin legs, from 2026-08-13 to
+   2026-11-13, with real EZcount `invoices[]` and also a PrintHesh `url` marked
+   `invoiceStatus: "completed"`. That pair on a twin leg is this bug's signature, not a
+   second document. **The hosted page is never manual:** `/hyp-create-session` signs with
+   `SendHesh` and no `manualInvoices` at every store, and nothing issues EZcount documents
+   for a `paymentProvider: 'HYP'` order. Its PrintHesh link is the customer's only
+   document, so do not skip its retry.
 11. **Only admin-dashboard users may call the per-order invoice queue routes, and only
    owners may write to the queue.** `/api/admin/invoices/{pending,retry,process-all,webhook}`
    (`routes/admin.js`) drive the `utils/invoice-mail.js` Gmail-fetch queue. No client, cron,
