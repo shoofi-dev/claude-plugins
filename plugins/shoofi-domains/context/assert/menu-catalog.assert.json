@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@fix/pizza-free-topping-count (#479) + shoofi-app@design/round-2 b581604 (reference §4 free pizza-topping slots) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 outOfStoreUntil admin-only projection + 07:00 restore) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 misheard dish name, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@feat/kopa-qr-shared-menu / 2026-11-13 (invariant 34 + reference 7m: the QR menu shares the app menu, rule collections, qrOnly needs isHidden, 20 s cache); shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@fix/pizza-free-topping-count (#479) + shoofi-app@design/round-2 b581604 (reference §4 free pizza-topping slots) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 outOfStoreUntil admin-only projection + 07:00 restore) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 misheard dish name, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -155,11 +155,14 @@
         ],
         "services/kopa/qr-menu.js": [
           "QR_SETTINGS_ID",
-          "buildQrSnapshot",
-          "initQrMenu",
-          "listItemsWithDrift",
-          "buildPublicMenu",
-          "customerFacingPrice"
+          "buildQrMenu",
+          "qrShowsCategory",
+          "qrShowsProduct",
+          "qrPriceOf",
+          "getOwnerCatalog",
+          "putProductRule",
+          "putCategoryRule",
+          "buildPublicMenu"
         ],
         "services/kopa/qr-menu-cache.js": [
           "invalidate",
@@ -617,8 +620,8 @@
         },
         {
           "file": "services/kopa/store-data.js",
-          "regex": "QR_ITEMS: \"kopaQrItems\"",
-          "desc": "doc CORE invariant 34 / reference \u00a72: the QR menu's own items collection (never products)"
+          "regex": "QR_PRODUCT_RULES: \"kopaQrProductRules\"",
+          "desc": "doc CORE invariant 34 / reference \u00a72: the QR menu keeps only its per-product rules (it shares products)"
         },
         {
           "file": "services/kopa/qr-menu.js",
@@ -627,13 +630,13 @@
         },
         {
           "file": "services/kopa/qr-menu.js",
-          "regex": "const priced = applyProductDiscount\\(product, discountMap\\);",
-          "desc": "doc CORE invariant 34 / reference \u00a77m: the copy and the drift column price with the menu's applyProductDiscount (invariant 3)"
+          "regex": "const\\ priced\\ =\\ applyProductDiscount\\(\\{\\ \\.\\.\\.product,\\ price:\\ base\\ \\},\\ discountMap\\);",
+          "desc": "doc CORE invariant 34 / reference \u00a77m: the QR price replaces the base price and the category discount still applies (invariant 3)"
         },
         {
           "file": "services/kopa/qr-menu.js",
-          "regex": "\\$or: \\[\\{ isSchoolProject: \\{ \\$exists: false \\} \\}, \\{ isSchoolProject: false \\}\\]",
-          "desc": "doc reference \u00a77m: the copy uses the customer menu's exact school-project filter"
+          "regex": "const\\ isSchoolCategory\\ =\\ \\(c\\)\\ =>\\ !\\(c\\.isSchoolProject\\ ===\\ undefined\\ \\|\\|\\ c\\.isSchoolProject\\ ===\\ false\\);",
+          "desc": "doc reference \u00a77m: the QR uses the customer menu's school-project rule (missing or false)"
         },
         {
           "file": "routes/kopa/qr-menu-public.js",
@@ -652,8 +655,18 @@
         },
         {
           "file": "test/integration/kopa/qr-menu.js",
-          "regex": "must never be written by the QR menu",
+          "regex": "QR\\ must\\ never\\ write\\ \\$\\{name\\}",
           "desc": "doc CORE invariant 34: a spy throws on any products/categories write"
+        },
+        {
+          "file": "services/kopa/qr-menu.js",
+          "regex": "throw\\ fail\\(409,\\ \"PRODUCT_VISIBLE_IN_APP\"",
+          "desc": "doc CORE invariant 34: qrOnly needs the product hidden in the app (so no customer surface changes)"
+        },
+        {
+          "file": "services/kopa/qr-menu-cache.js",
+          "regex": "const\\ TTL_MS\\ =\\ 20\\ \\*\\ 1000;",
+          "desc": "doc CORE invariant 34 / reference §7m: the public QR cache is 20 s (shared stock must show soon)"
         },
         {
           "file": "routes/kopa/products-write.js",
