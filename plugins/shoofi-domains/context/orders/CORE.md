@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/HIGH-RISK-cancel-paths-skip-terminal-delivery / 2026-11-13 (CORE invariant 23: order-side cancels never overwrite a finished delivery row); shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -718,6 +718,18 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `{ _id: row._id }`, so the row whose driver is notified is the row that changed:
       `/api/order/update` cancel (`4`/`7`/`8` → delivery `-3`) and ready-for-pickup (`3` →
       `isReadyForPickup`), `/api/order/update-delay`, and order-amend `syncDeliverySnapshot`.
+    - **An order-side cancel never overwrites a FINISHED row.** The three `-3` writes
+      (`/api/order/update` cancel, twin `cascadeCancel`, twin `degradeToSingle`) spread
+      `cancellableDeliveryClause()` (`utils/delivery-row.js`) into their own filter: status not
+      in `4`/`-1`/`-2`/`-3`, each as string AND int (72 prod rows hold an int `-3`), and
+      `completedAt: null`. Delivered `-3` drops the run out of the courier's earnings; a
+      re-cancel rewrites the first cancel's `cancelledAt`/`cancelReason`/`cancelledBy`. A miss
+      is a no-op: the order cancel goes on, `/api/order/update` sends no
+      `delivery_cancelled_*` flow event and no driver push, only a `logger.warn`. Degrade
+      records `cancelledDeliveryByDegrade` (`false` → `deliveryAction:
+      "left_finished_delivery"`), and `undoDegrade` does not restore a row that is `false`.
+      Test: `test/integration/cancel-paths-skip-terminal-delivery.js`. The delivery-side
+      `POST /api/delivery/admin/cancel` is NOT behind this clause.
     - **Twin legs** are two orders with their own `originalOrderId` and their own row, so the
       same filter works per leg. The group document stores only each leg's SHORT number, so
       `services/twin-order/twin-group-service.js` resolves a leg through `legDeliveryFilter`
@@ -932,7 +944,15 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       REJECTED only for the store side (timeout sweeper / store reject) — partner reports, HQ and
       store metrics read 5 as "the store rejected". The customer app's twin header checks
       "degraded" before "cancelled" (shoofi-app#96). **`degradeToSingle`** returns the dropped leg's coins,
-      coupon uses and store-deal uses (`returnLegExtras`, recorded on `degrade.returnedOnDegrade`).
+      World Cup points, coupon uses and store-deal uses (`returnLegExtras`, recorded on
+      `degrade.returnedOnDegrade`, points as `worldCupPointsReversed`). **`cascadeCancel`** re-reads
+      both legs after its cancels and reverses the World Cup points of every leg in a cancel
+      status (`reverseLegWorldCupPoints`), so a leg whose cancel failed keeps its points. Its coin
+      step (used refunded, earned removed) follows the same rule: only a leg whose re-read status
+      is a cancel status (4/5/7/8/9, `isCancelledStatus`). A leg whose cancel write failed stays
+      live and keeps its coins for its own later cancel, because refunding it would spend
+      `refundCoins`' once-per-order key on a live order. A leg already cancelled before the cascade
+      (e.g. driver-cancel `9`) is still refunded, once.
     - **Flow events** (`shoofi.orderFlowEvents`, the `trackOrderFlowEvent` writer, swallowed on
       failure): `twin_degrade`, `twin_undo_degrade`, `twin_cascade_cancel` on BOTH legs
       (metadata `groupId`, `side`, `role`, actor = the admin), `cancel_money_undecided`
@@ -952,7 +972,8 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       the 3 failed-undo groups' kept orders were never seen.
     - Tests (shoofi-server): `twin-cancel-safety.js`, `twin-admin-auth.js`,
       `order-cancel-undecided.js`, `order-cancel-settle-money.js`,
-      `order-cancel-money-before-status.js`, `hq-money-audit.js`, `money-cancel.js`.
+      `order-cancel-money-before-status.js`, `hq-money-audit.js`, `money-cancel.js`,
+      `twin-cancel-coins-only-cancelled-legs.js`, `twin-cancel-reverses-world-cup-points.js`.
 
 28. **THE CHARGE IS THE UNIT OF MONEY: ONE APPEND-ONLY LEDGER PER CHARGE, ONE SUMMARY, ONE
     DECISION** (shoofi-server `fix/twin-cancel-safety`, 2026-11-07; contract
@@ -1024,7 +1045,13 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `["accountant"]` (+ master). Errors: `{reason, message, code}`.
     - **Coins are refunded once per order** (`refundCoins`: `customerCoins.cancelRefundedOrderIds`
       in the same atomic update; legacy rows recognised by their notes) — the twin path refunded
-      the trigger leg twice (order route + cascade).
+      the trigger leg twice (order route + cascade). In a twin cascade, only for a leg that is
+      actually cancelled (invariant 27).
+    - **World Cup points are reversed once per twin leg.** `reverseLegWorldCupPoints`
+      (`services/twin-order/twin-group-service.js`) skips a leg whose wallet already holds a
+      `reverse` transaction for that `orderId`. That is what keeps the order route's reversal of
+      the trigger leg from being repeated by the cascade. The check runs before the write, so it is
+      not atomic: only `reversePoints`' own guard (shoofi-server#592) covers two concurrent cancels.
     - **Backfill**: `scripts/money-backfill.js`, DRY-RUN by default; `--apply` only with Sari's OK.
       Coupons already issued against a twin group count as ONE `compensate` entry each
       (`collectTwinCompensations`): compensation rows naming a leg / the group, and a manual twin
@@ -1033,7 +1060,8 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       BOTH legs) — deduped by coupon code / compensation id, so a group so covered owes 0.
     - Tests (shoofi-server): `money-cancel.js` (ledger, every endpoint, roles, concurrency,
       re-cancel, cash twin, keep→refund on a partly used coupon, HYP success/refused/timeout/cap,
-      singles through the order pipeline, coins once), plus the invariant-27 tests.
+      singles through the order pipeline, coins once per leg with both legs carrying used and
+      earned coins), plus the invariant-27 tests.
 
 29. **KOPA'S ORDER READS USE THE STORE REPORT'S DAY ON `created`, SUM `orderPrice`, AND COUNT
     ONLY COMPLETED ORDERS AS SALES** (shoofi-server `routes/kopa/orders.js` +
