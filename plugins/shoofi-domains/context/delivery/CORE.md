@@ -599,6 +599,30 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
       an older same-store decoy are inserted first. On the old code 12 of 16 fail; the 4 that
       pass are the pure-module and unique-bookId compatibility pins.
 
+21. **An ORDER cancel never overwrites a delivered or already-cancelled delivery row.**
+    `POST /api/order/update` with order status `4`/`7`/`8` on a DELIVERY order cancels its row
+    through `cancelDeliveryRowForOrderCancel` (`utils/delivery-row.js`). The update filter is
+    `{_id, status: {$nin: ORDER_CANCEL_KEEPS_DELIVERY_STATUS_FORMS}}`, which covers delivered
+    `"4"` and the cancels `-1/-2/-3`, each as both a string and an int (invariant 1). Because the
+    guard is atomic, a driver who completes between the read and the write still wins.
+    - The `delivery_cancelled_by_order_cancellation` flow event and the driver push fire only on
+      `outcome: "cancelled"`.
+    - A delivered row gets a `warn` and a `delivery_cancel_skipped_already_delivered` flow event
+      instead.
+    - **Why it matters:** a delivered row that becomes `-3` drops out of the delivery-company
+      report, and the courier's fee goes with it.
+    - **Evidence:** before the fix, `orderFlowEvents` held 34
+      `delivery_cancelled_by_order_cancellation` events with `metadata.previousStatus: "4"`. All
+      34 came from order status `"7"`, and in 2026 they were support (`shoofi_support`)
+      cancelling an order after it was delivered. Examples: `2364-8805` and `6128-4823` on
+      2026-11-10. The rows still read `-3` (HQ #e61c53).
+    - **Still unguarded:** `POST /api/delivery/admin/cancel` (`routes/delivery/admin.js`)
+      refuses only rows that are already cancelled; 6 delivered rows were cancelled through it.
+      `POST /api/delivery/admin/order/cancel` has no check at all. The twin `cascadeCancel` and
+      `degradeToSingle` (`services/twin-order/twin-group-service.js`) write `'-3'` with no check
+      either.
+    - Tests: `test/integration/order-cancel-keeps-delivered-booking.js`.
+
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
