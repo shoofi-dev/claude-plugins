@@ -796,6 +796,12 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     "printer-testPrint"` (and `error.outcome` since 2026-10-29). `customerId` there is the
     `shoofi.store-users` `_id` of the tablet's user. Then the store's
     `isPrinted:false, isViewd:true` orders, which are exactly what the sweep can return.
+    Since HQ #08a00a a failed copy is one row from its last try (`error.attempt`,
+    `error.attempts`; `error.stage: "printOrder"` replaces the old separate
+    `printer-printOrder` rows), so older data counts each failure twice (four times for a
+    job-building failure). Every partner client-error body also carries
+    `allErrorBody.appVersion` (`stores/error-handler/index.ts`): the server keeps the body,
+    not the `app-version` header.
 - **The loud new-order alarm has ONE source, and an id ledger decides whether it rings.**
   `schedulePushNotification` (`utils/notification/index.ts`, `sound: 'store.wav'`) *is* the
   alarm, and its only live callers are the two in `hooks/use-notifications.ts` — the 30s poll
