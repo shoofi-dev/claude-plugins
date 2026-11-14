@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (CORE invariants 2, 9; reference §2, C3); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (CORE invariant 31, Kopa QR table orders); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (CORE invariants 27-28); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-partner@feat/new-order-alarm-loop / 2026-11-07 (ref C3: the new-order alarm repeats until accepted); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (CORE invariants 2, 9; reference §2, C3); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (CORE invariant 31, Kopa QR table orders); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (CORE invariants 27-28); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -791,6 +791,13 @@
         "hooks/use-notifications.ts",
         "stores/new-order-alerts/index.ts",
         "utils/notification/index.ts",
+        "utils/new-order-alarm.ts",
+        "utils/notification/new-order-alarm.ts",
+        "utils/__tests__/new-order-alarm.test.ts",
+        "utils/cross-store-alerts.ts",
+        "components/global/CrossStoreOrdersGlobal.tsx",
+        "utils/notification-tap-intent.ts",
+        "screens/home/home.tsx",
         "App.tsx",
         "helpers/printer/print.ts",
         "helpers/printer/index.ts",
@@ -811,6 +818,31 @@
           "takeNewOrders",
           "takeNewOrdersOnRefresh",
           "seedSeen"
+        ],
+        "utils/notification-tap-intent.ts": [
+          "decideTapIntent",
+          "requestNewOrdersFromTap",
+          "markStartupRedirectDone",
+          "takeTapIntent"
+        ],
+        "utils/cross-store-alerts.ts": [
+          "decideNotificationTap",
+          "ORDER_WAITING_NOTIFICATION_TYPES",
+          "notificationResponseKey"
+        ],
+        "utils/new-order-alarm.ts": [
+          "decideAlarm",
+          "buildAlarmSeries",
+          "alarmCycleGrid",
+          "serverReminderTimes",
+          "ALARM_SETTINGS",
+          "new-order-alarm-"
+        ],
+        "utils/notification/new-order-alarm.ts": [
+          "updateNewOrderAlarm",
+          "newOrderAlarmApprovedLocally",
+          "stopNewOrderAlarm",
+          "store.wav"
         ],
         "utils/print-outcome.ts": [
           "classifyPrintError",
@@ -854,6 +886,36 @@
           "file": "hooks/use-notifications.ts",
           "regex": "newIds\\.length > 0 && shoofiAdminStore\\.storeData\\?\\.isUnviewOrdersEnabled",
           "desc": "the refresh ring is gated on isUnviewOrdersEnabled, the platform switch that owns the whole new-order ring and already gates the 30s poll (ref C3)"
+        },
+        {
+          "file": "utils/new-order-alarm.ts",
+          "regex": "serverReminderCount: 5,\\s*serverReminderIntervalMs: 60 \\* 1000,\\s*halfwayOffsetMs: 30 \\* 1000,\\s*urgentIntervalMs: 25 \\* 1000,\\s*urgentWindowMs: 10 \\* 60 \\* 1000,\\s*reminderIntervalMs: 5 \\* 60 \\* 1000,\\s*hardStopMs: 60 \\* 60 \\* 1000,",
+          "desc": "ref C3: the repeating new-order alarm rings once a minute at :30 while the server's 5 on-the-minute reminders run, then every 25s to 10 minutes, then every 5 minutes, hard stop 1 hour after the cycle started (product decision 2026-11-07, revised at review). serverReminderCount/serverReminderIntervalMs mirror MAX_REMINDERS/REMINDER_INTERVAL_MS in shoofi-server utils/persistent-alerts.js - change them together"
+        },
+        {
+          "file": "screens/home/home.tsx",
+          "regex": "navigation\\.navigate\\(\"admin-dashboard\"\\);[\\s\\S]{0,400}?markStartupRedirectDone\\(\\);\\s*const tapRoute = takeTapIntent\\(",
+          "desc": "ref C3: the startup redirect to the dashboard flushes a pending notification-tap intent right after it, so a cold-start tap opens the new-orders list on top instead of being overridden (real iPad, 2026-11-07)"
+        },
+        {
+          "file": "components/global/CrossStoreOrdersGlobal.tsx",
+          "regex": "const tapsEnabled = authStore\\.isLoggedIn\\(\\) && userDetailsStore\\.isAdmin\\(\\);[\\s\\S]*if \\(!tapsEnabled\\) return;[\\s\\S]*decideNotificationTap\\(",
+          "desc": "ref C3: notification taps are routed for EVERY store user, not only multi-store owners (a single-store iPad opened on the dashboard when a new-order alarm was tapped, 2026-11-07)"
+        },
+        {
+          "file": "hooks/use-notifications.ts",
+          "regex": "if \\(Array\\.isArray\\(response\\)\\) \\{\\s*updateNewOrderAlarm\\(",
+          "desc": "ref C3: the alarm loop is fed the bell's count after every fetch, only on a real list - a failed fetch must never silence it"
+        },
+        {
+          "file": "hooks/use-notifications.ts",
+          "regex": "\"ORDER_APPROVED_LOCALLY\",[\\s\\S]{0,300}?newOrderAlarmApprovedLocally\\(\\)",
+          "desc": "ref C3: accepting on this device steps the alarm's count down at once, so the last accept stops the ringing without waiting for a refresh"
+        },
+        {
+          "file": "stores/auth/index.ts",
+          "regex": "this\\.userToken = null\\s*(?://[^\\n]*\\s*)*stopNewOrderAlarm\\(\\);",
+          "desc": "ref C3: logout stops the repeating alarm, after the token is cleared so an in-flight count fetch cannot schedule it again"
         },
         {
           "file": "stores/new-order-alerts/index.ts",
