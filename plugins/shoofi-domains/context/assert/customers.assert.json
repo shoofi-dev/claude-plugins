@@ -482,6 +482,16 @@
         },
         {
           "file": "routes/customer.js",
+          "regex": "'/api/customer/:customerId/orders', auth\\.required, checkAdminRole\\(CUSTOMER_ADMIN_ROLES\\)",
+          "desc": "CORE invariant 7: the only by-id customer-orders route is admin-gated (HQ #e5e429)"
+        },
+        {
+          "file": "routes/customer.js",
+          "regex": "customer/orders\", auth\\.required, \\(req, res\\) =>\\s*sendCustomerOrders\\(req, res, \\{\\s*customerId: req\\.auth\\.id",
+          "desc": "CORE invariant 7: the customer's own order history reads the token's id, never a body customerId (HQ #e5e429)"
+        },
+        {
+          "file": "routes/customer.js",
           "regex": "customer/logout\"[\\s\\S]{0,2400}storeUsers\\.updateMany",
           "desc": "logout sweeps every storeUsers doc sharing the phone - the bounded tail pins the sweep to the logout handler, and it only appears once logout resolves the identity doc by app-type at all (shoofi-server#47)"
         },
