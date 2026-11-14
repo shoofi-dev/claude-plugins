@@ -57,7 +57,7 @@
         "services/courier-applications/contract.js": ["CONTRACT", "placeholder: true", "currentContract"],
         "services/courier-applications/document-versions.js": ["writeVersionedDocument", "MAX_VERSIONS_PER_KIND", "deleteMany"],
         "routes/courier-applications.js": ["/api/courier-applications/contract", "/api/courier-applications/me/work-areas", "UPLOAD_LIMIT"],
-        "services/courier-documents/documents.js": ["listForDriver", "courierDocumentFiles", "fromApplicationId"],
+        "services/courier-documents/documents.js": ["listForDriver", "courierDocumentFiles", "fromApplicationId", "writeVersionedDocument", "upsert: true"],
         "routes/courier-documents.js": ["/api/courier-documents/mine", "/api/admin/drivers/:driverId/documents"],
         "services/delivery/availability.js": [
           "checkStoreDeliveryAvailability",

@@ -610,7 +610,11 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     `fromApplicationId`, plus any the back office added. The back office adds a document to ANY
     driver (`POST /api/admin/drivers/:driverId/documents/:kind`, any dashboard role); it is stored
     `verified`, wins over the request's one of the same kind, and its bytes are in
-    `courier-document-files` — private like the request's, never the CDN.
+    `courier-document-files` — private like the request's, never the CDN. The driver's row
+    (unique `driverId`) is created with an UPSERT, so two first uploads at once land on one row
+    (a find-then-insert gave the second a duplicate-key 500); each kind keeps 3 files with older
+    bytes deleted, through the requests' `document-versions.js`. The courier's contract carries
+    `lang` / `hash` / `text` (the signed snapshot) when the request stored them.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
