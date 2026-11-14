@@ -511,8 +511,8 @@ body (test: "a client cannot set owner or inferred"). `inferred` is written only
   `updateUserToken` but does **not** merge (verify-code is the only `mergeAfterLogin` caller), so
   a master operator's own visitor answers never land on the customer they open. Keep it so.
 - **Logout / delete:** `stores/auth` `logOut` and `deleteAccount` call `aiHelperStore.clear()`
-  (the in-memory profile and the cache key). `resetAppState` — the forced sign-out the
-  general-server-error dialog runs on a 401 — does **not**; there the account's copy stays cached
+  (the in-memory profile and the cache key). `resetAppState` (the full wipe; since HQ #717844
+  no longer run on a 401 — a lost session calls `endExpiredSession`, token only) does **not**; there the account's copy stays cached
   until the next `refresh()` replaces it with the device's profile (or null). The server keeps
   the account's profile across logout: it belongs to the account.
 - **Deletion:** `POST /api/customer/delete` leaves the `tasteProfiles` doc in place — §7 item 10.
@@ -836,6 +836,17 @@ Profile → **"إشعارات العروض / התראות על מבצעים"** s
 logged-in only): `GET/PUT customer/marketing-preferences` with `silent: true`. Hidden until the
 server answers, and reverts on a failed save. ON = receives campaigns. Its copy carries ar/he
 `defaultValue`s, because translations come from the DB.
+
+**A 401 is not proof of a lost session.** The server answers the same 401 `No authorization
+token was found` when no token is sent **and** when the token is bad, expired or replaced
+(`routes/auth.js` `getTokenFromHeaders` returns `null` → express-jwt `credentials_required`).
+So the app treats a 401 as a sign-out only when it sent the token it still holds, to our API
+(`utils/http-interceptor` `isSessionLoss`). A guest call, an older token, or another host's
+401 is passed back to the caller untouched. A lost session drops the **token only**
+(`authStore.endExpiredSession`), keeps the cart, shows "you were signed out" in
+`components/dialogs/general-server-error.tsx`, and sends the customer to login. After login,
+`screens/verify-code` returns to `checkout-screen` if that is where it expired.
+`resetAppState` (the full wipe) is no longer called on a 401. (HQ #717844)
 
 ### C2. shoofi-partner (store owner) — `app-type: shoofi-partner`
 **Same phone+OTP flow** (not admin creds). The partner-specific mechanism is
