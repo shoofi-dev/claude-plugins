@@ -141,6 +141,13 @@ role check, and no client calls any of them.
 The queue keeps the whole `req` and reads only `req.app.db` and the `app-name` header from
 it. It makes no HTTP call that carries request headers. `retry` puts `docId` into the Gmail
 query (`subject:<docId>`) and the public Spaces key (`invoices/doc-<docId>.pdf`) unvalidated.
+**Superseded once shoofi-server `fix/HIGH-RISK-invoice-pdf-key-per-order` (HQ #d211e0) is on
+main:** the key becomes `invoices/<appName>/<order _id>-doc-<docId>-<32 hex random>.pdf`
+(`utils/invoice-pdf-store.js` `publishInvoicePdfOnce`). It is written once, still public-read,
+and protected by the random part. The url is returned by the upload and written by `_id`,
+never rebuilt from the docId. A mail Gmail received more than an hour before the order's
+`created` is not a candidate (`receiptNotBefore`). The repo's CLAUDE.md "Invoice queue
+routes" section is the full description.
 Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restrict`, which
 hangs the request (CORE invariant 11), so none of them answered.
 

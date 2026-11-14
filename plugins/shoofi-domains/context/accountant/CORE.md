@@ -1200,9 +1200,13 @@ keeps them out of settlement by their `source`.)
   bytes** + counter, so cold guessing is infeasible. But every report in one monthly run is
   inserted in a single loop in a single process, so they share those bytes and differ only
   by a consecutive counter: **one leaked report id exposes that whole batch's ids by
-  arithmetic** — i.e. every store's settlement for that month. Worst case in the repo is not
-  the report key at all but `utils/invoice-mail.js:121`, `invoices/doc-<providerDocId>.pdf`,
-  where the id is a short sequential provider number.
+  arithmetic** — i.e. every store's settlement for that month. Worst case in the repo was not
+  the report key at all but the customer invoice, `invoices/doc-<providerDocId>.pdf`, where
+  the id is a short sequential provider number. Since HQ #d211e0 (shoofi-server
+  `fix/HIGH-RISK-invoice-pdf-key-per-order`) new ones go to
+  `invoices/<appName>/<order _id>-doc-<docId>-<32 hex random>.pdf`
+  (`utils/invoice-pdf-store.js`). They are still public-read but unguessable. Orders from
+  before keep their stored `doc-<docId>` links, and those objects stay where they are.
 - **Awareness — you cannot un-send those links, so design around them.** This is a
   **property, not a bug to fix opportunistically**: `pdfUrl` is stored on the report doc
   (`admin-reports.js:1630`, `driver-reports.js:1168`) and has already gone out as parameter
