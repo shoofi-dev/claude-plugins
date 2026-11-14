@@ -382,7 +382,7 @@
           "desc": "CORE invariant 10: auth.required alone passes a customer token \u2014 checkAdminRole is the half that keeps one out"
         },
         {"file": "utils/analytics-access.js", "regex": "const ANALYTICS_ROLES = \\[\"master\", \"admin\"\\];", "desc": "reference C4: the admin analytics screens are master/admin only"},
-        {"file": "utils/admin-token-routes.js", "regex": "\\{ method: \"GET\", path: \"/api/shoofiAdmin/store/z-cr\" \\},", "desc": "reference C4: store/z-cr stays open — the three apps read it at startup, before login"},
+        {"file": "utils/admin-token-routes.js", "regex": "\\{ method: \"GET\", path: \"/api/shoofiAdmin/store/z-cr\" \\},", "desc": "reference C4: store/z-cr stays open (returns {}) — installed apps sign out on a 401 from it"},
         {"file": "utils/admin-token-routes.js", "regex": "\\{ method: \"POST\", path: \"/api/shoofiAdmin/store/update\", roles: DASHBOARD_ROLES \\},", "desc": "reference C4: the platform settings write needs an admin token (it took none before)"},
         {"file": "app.js", "regex": "app\\.use\\(restrictedAdminGuard\\);\\n// [^\\n]*\\napp\\.use\\(adminTokenGuard\\);", "desc": "reference C4: the admin-token guard runs right after the restricted guard, ahead of every router"},
         {"file": "utils/analytics-access.js", "regex": "const adminAnalytics = \\[auth\\.required, checkAdminRole\\(ANALYTICS_ROLES\\)\\];", "desc": "reference C4: /api/analytics/* needs an admin token AND a role (auth.required alone passes a customer token)"},
