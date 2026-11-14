@@ -443,6 +443,15 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **Image i belongs to queue[i].** A failed capture keeps a `null` slot
       (`captureAlignedToQueue`) and is not printed. Skipping it used to shift later images
       onto the wrong order and mark an unprinted one printed.
+    - **A switched-off printer is one error row per outage, not one per print call**
+      (`utils/printer-offline-backoff.ts`, HQ #719822). Before it, every print call made 3
+      connects and sent one row; with the copy retry and the sweep that was 4 rows and 12
+      connects per order per session. Now a failed connect marks the printer address
+      offline and only that first failure sends a row (`stage: "connect"`). Automatic prints
+      skip the address for 15s, doubling up to 2 min, then try once. Explicit prints call
+      `allowProbe()` and always get one try. `watchdogCounters.printerOfflineSince` rides the
+      device heartbeat. So a missing `stage:"connect"` row after the first does NOT mean the
+      printer came back: look at `printerOfflineSince`.
     So: never make a print path's success depend on Epson's completion callback alone, and
     never drop the sweep's date or cap. A stuck order is diagnosed from
     `<store>.client-error` `source: "printer-testPrint"` rows (they now carry `outcome`),
