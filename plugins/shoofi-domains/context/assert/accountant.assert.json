@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13 (CORE invariant 20: Kopa QR table orders - the classifier, the sales-row split, the details-only report keys, overview / exec readers filtered; invariant 17 legacy pin gains the table-orders leg); shoofi-server@fix/partner-summary-date-validation / 2026-11-12 (invariant 17 partner/summary + daily-orders validate their period before any read, 400 INVALID_PERIOD; shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa section + reference 12: no money without a shift - a money payment / refund needs an open till session (409 NO_OPEN_SESSION), money leases on the session doc, the close waits for them and ends the window past lastMoneyAt, openedAt never before the last Z, sessionId for tracing); shoofi-server@feat/kopa-phase1 / 2026-11-12 (CORE section + reference 12: Kopa till sessions & reports, phase 5 - till money separate from settlement, one open session via a fixed-_id lock, gapless Z on the shared close, the expected-cash formula, the drawer counted via drawerMovementIds, receipts built but off and refusing createInvoiceOnBehalf); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData in-process, OPT-IN via body figures: \"report\"; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's per-store body in services/payments/store-sales.js; ref §1/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-delivery-web@fix/bank-codes-export + shoofi-shoofir@fix/bank-codes / 2026-11-14 (reference 7a: the one bank list, stored NAME or CODE, exact match after normalising, unknown values flagged in the MASAV Excel, server getBankNumber copies still wrong for invoice text only); shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13 (CORE invariant 20: Kopa QR table orders - the classifier, the sales-row split, the details-only report keys, overview / exec readers filtered; invariant 17 legacy pin gains the table-orders leg); shoofi-server@fix/partner-summary-date-validation / 2026-11-12 (invariant 17 partner/summary + daily-orders validate their period before any read, 400 INVALID_PERIOD; shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa section + reference 12: no money without a shift - a money payment / refund needs an open till session (409 NO_OPEN_SESSION), money leases on the session doc, the close waits for them and ends the window past lastMoneyAt, openedAt never before the last Z, sessionId for tracing); shoofi-server@feat/kopa-phase1 / 2026-11-12 (CORE section + reference 12: Kopa till sessions & reports, phase 5 - till money separate from settlement, one open session via a fixed-_id lock, gapless Z on the shared close, the expected-cash formula, the drawer counted via drawerMovementIds, receipts built but off and refusing createInvoiceOnBehalf); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData in-process, OPT-IN via body figures: \"report\"; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's per-store body in services/payments/store-sales.js; ref §1/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -1583,6 +1583,51 @@
           "file": "src/views/admin/reports/ReportsList.tsx",
           "regex": "reportDetails\\.filter\\(r => r && hasSendableInvoice\\(r\\)\\)",
           "desc": "CORE invariant 19: the bulk invoice send includes a store-only report (Shoofi owes the store)"
+        },
+        {
+          "file": [
+            "src/utils/israeli-banks.ts",
+            "src/views/admin/reports/ReportsList.tsx"
+          ],
+          "regex": "return /\\\\d/\\.test\\(raw\\) \\? `\\$\\{UNKNOWN_BANK_CODE_LABEL\\}: \\$\\{raw\\}` : raw;|b\\.name\\.includes\\(val\\) \\|\\| val\\.includes\\(b\\.name\\.replace\\('בנק ', ''\\)\\)",
+          "desc": "reference 7a: bankCodeFor gives a list code, an unknown name as stored, and flags an unknown value with digits ('קוד בנק לא ברשימה: 13') instead of passing it to the MASAV Excel as a code - valid-before leg is main before shoofi-delivery-web#382; drop it once that PR has merged"
+        },
+        {
+          "file": [
+            "src/utils/israeli-banks.ts",
+            "src/views/admin/reports/ReportsList.tsx"
+          ],
+          "regex": "\\(b\\) => normalizeBankName\\(b\\.name\\) === n \\|\\| b\\.aliases\\.some\\(\\(a\\) => normalizeBankName\\(a\\) === n\\),|b\\.name\\.includes\\(val\\) \\|\\| val\\.includes\\(b\\.name\\.replace\\('בנק ', ''\\)\\)",
+          "desc": "reference 7a: findBank matches a stored bank name EXACTLY after normalising (name or alias), never by substring - valid-before leg is main before shoofi-delivery-web#382; drop it once that PR has merged"
+        },
+        {
+          "file": "src/views/admin/reports/ReportsList.tsx",
+          "regex": "const formatBankWithCode = bankCodeFor;|const formatBankWithCode = \\(bank\\?: string\\): string =>",
+          "desc": "reference 7a: the store reports Excel's בנק column goes through the one list's bankCodeFor - valid-before leg is main before shoofi-delivery-web#382; drop it once that PR has merged"
+        },
+        {
+          "file": "src/views/admin/driver-reports/DriverReportsList.tsx",
+          "regex": "const formatBankWithCode = bankCodeFor;|const formatBankWithCode = \\(bank\\?: string\\): string =>",
+          "desc": "reference 7a: the company reports Excel's בנק column goes through the one list's bankCodeFor - valid-before leg is main before shoofi-delivery-web#382; drop it once that PR has merged"
+        },
+        {
+          "file": "src/views/admin/DriverPayments.tsx",
+          "regex": "'בנק': bankCodeFor\\(bankAccount\\?\\.bank\\),|'בנק': bankAccount\\?\\.bank \\|\\| '',",
+          "desc": "reference 7a: the DriverPayments Excel's בנק column goes through the one list's bankCodeFor - valid-before leg is main before shoofi-delivery-web#382; drop it once that PR has merged"
+        }
+      ]
+    },
+    "shoofi-shoofir": {
+      "files": [],
+      "symbols": {},
+      "patterns": [
+        {
+          "file": [
+            "utils/israeli-banks.ts",
+            "screens/delivery-driver/profile.tsx"
+          ],
+          "regex": "export const bankNeedsReselect = \\(value\\?: string \\| null\\): boolean =>|\\{ label: 'בנק ערבי ישראלי', value: '31' \\}",
+          "desc": "reference 7a: the courier bank picker reads the same 12-bank list and accepts a saved code OR a saved name that normalises to a list bank; the pick-again warning is for legacy/unknown values only - valid-before leg is main before shoofi-shoofir#35; drop it once that PR has merged"
         }
       ]
     }
