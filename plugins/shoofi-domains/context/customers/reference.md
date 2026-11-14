@@ -527,6 +527,10 @@ body (test: "a client cannot set owner or inferred"). `inferred` is written only
 | `GET /api/admin/marketing/generate/:jobId/images/:imageId` | same | the bytes of a rendered image, fetched server-side from our CDN only (the CDN sends no CORS) |
 | `POST /api/admin/marketing/generate/:jobId/revise` | same | `{notes?, model?}` ≤ 600; `model` without notes = the same brief drawn by another model. No notes = re-render the same brief and words; notes = a new brief told what to change, through the guard. 202 the job; 400 notes too long / not an image job; 409 `busy` or not promotable; 429 image limit |
 | `POST /api/admin/marketing/generate/:jobId/versions/:versionId/restore` | same | 200 the job with that version current; the current result becomes a version. 404 no such version, 409 `busy` |
+| `POST /api/admin/marketing/creative/sets` | same | creation set: `{subject, places[banner\|story\|social\|popup\|note\|push], timing{mode: now\|schedule, start?, end?}, note?, styleMode?, useInstagram?, useFieldStyle?, model?, references?}` → 202 `{data: Set}`; ONE director call, one picture job per banner/story/social (popup reuses the story's), copy for note/push. Refusals `{code, message_he}`: `places_empty`, `place_unknown`, `reel_from_story`, `story_needs_store`, `timing_bad\|past\|far\|end`, `note_too_long`, `budget` |
+| `GET /api/admin/marketing/creative/sets/:id` | same | the poll: place `status` queued\|working\|ready\|failed + `stage_he`, derived from the jobs (no AI) |
+| `PUT /api/admin/marketing/creative/sets/:id` | same | `{places?, timing?, note?, retry?, copy?}` — a place added later uses the SAME plan; `copy` (note / push words) passes the guard |
+| `POST /api/admin/marketing/creative/sets/:id/save` | same | `{approve}` → `{itemId, places[{place, docId, editPath, state, error_he}], approved, approveError}`; idempotent; drafts via each place's own writer (CORE invariant 17) |
 
 Data: `shoofi.marketingGenerations` `{what: "image", channel, subject, facts:{lines,name}, status,
 copy, brief, assets[{id, lang, aspectRatio, status pending\|queued\|rendering\|rendered\|failed,
