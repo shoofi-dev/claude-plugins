@@ -131,6 +131,11 @@
       },
       "patterns": [
         {
+          "file": "services/twin-order/twin-delivery-price.js",
+          "regex": "shippingPrice:\\s*isPrimary\\s*\\?\\s*sideBody\\.shippingPrice\\s*:\\s*0",
+          "desc": "a twin secondary's delivery fee is 0 by design; only the primary carries the area fee, so a DELIVERY order at shippingPrice 0 with twinGroup.role 'secondary' is not a missing quote"
+        },
+        {
           "file": "consts/consts.js",
           "regex": "DELIVERY_STATUS",
           "desc": "authoritative delivery status enum"
