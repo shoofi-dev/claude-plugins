@@ -45,7 +45,18 @@
         "utils/crons/shift-waiting-list-cron.js"
       ],
       "symbols": {
-        "services/driver-shift/waiting-list-offers.js": ["runWaitingListPass", "bookableSeatsFor", "OFFER_MINUTES"],
+        "services/driver-shift/waiting-list-offers.js": [
+          "runWaitingListPass",
+          "bookableSeatsFor",
+          "OFFER_MINUTES",
+          "OFFER_FRAME_TYPE",
+          "holdsOffer",
+          "busyDriverIds",
+          "seatStillFreeExpr",
+          "makeOfferNotifier",
+          "withdrawUnbackedOffers",
+          "offerMessage"
+        ],
         "services/delivery/availability.js": [
           "checkStoreDeliveryAvailability",
           "isDeliveryPaused"
@@ -744,6 +755,31 @@
           ],
           "regex": "(?:admin/cancel legacy \\{bookId\\} shared by 3 rows cancels the single live one|bookId: deliveryData\\.bookId  // Match by bookId)",
           "desc": "CORE invariant 20: the decoy-first tests (another store + same store older row inserted ahead of the real one) - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": "services/driver-shift/waiting-list-offers.js",
+          "regex": "OFFER_FRAME_TYPE = \"shift_waiting_list_offer\"",
+          "desc": "the websocket frame + push type the driver app refreshes / routes on; renaming it silently breaks the app"
+        },
+        {
+          "file": "services/driver-shift/waiting-list-offers.js",
+          "regex": "\\$expr: seatStillFreeExpr\\(now\\)",
+          "desc": "the offer write re-checks the seat count atomically, so a seat booked mid-pass is not offered"
+        },
+        {
+          "file": "routes/driver-shift-manager.js",
+          "regex": "ACTIVE_WAITING_STATUSES = \\['waiting', 'offered'\\]",
+          "desc": "leave-waiting-list and the admin board treat an offered courier as still on the list"
+        },
+        {
+          "file": "routes/driver-shift-manager.js",
+          "regex": "code: 'HELD_FOR_WAITING_LIST'",
+          "desc": "book and admin assign refuse a seat held for another courier"
+        },
+        {
+          "file": "routes/driver-shift-manager.js",
+          "regex": "overrideWaitingListHold",
+          "desc": "admin assign takes a held seat only with the explicit override"
         }
       ]
     },

@@ -701,14 +701,45 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
   (every minute, Redis lock `cron:shift-waiting-list`, only under `ENABLE_CRONS`) runs
   `services/driver-shift/waiting-list-offers.js` `runWaitingListPass`: for each shift not yet
   started with free seats (`maxDrivers` − booked − seats already held), the first `waiting` entries
-  by `addedAt` become `offered` with `offerExpiresAt` = +10 min and get a push
-  (`type: "shift_waiting_list_offer"`); an offer that ran out becomes `missed` (off the list for
-  this shift; joining again adds a fresh entry) and the seat goes to the next one. Blocked couriers
-  are skipped. Each write is conditional on the entry's status, so two instances offer once.
-  `POST /shifts/book` refuses (`HELD_FOR_WAITING_LIST`) a seat held for somebody else
-  (`bookableSeatsFor`), and booking still `$pull`s the courier's entry. `isOnWaitingList` counts
-  `waiting` and `offered`. It looks at the shift, not at what freed the seat, so a courier
-  cancelling, an admin removing one or raising `maxDrivers` are all covered.
+  by `addedAt` become `offered` with `offerExpiresAt` = +10 min; an offer that ran out becomes
+  `missed` (off the list for this shift; joining again adds a fresh entry) and the seat goes to the
+  next one. It looks at the shift, not at what freed the seat, so a courier cancelling, an admin
+  removing one or raising `maxDrivers` are all covered.
+  - **Who is skipped** (left `waiting`, place kept): blocked couriers, and couriers already booked
+    on a shift that overlaps this one in real time (`busyDriverIds`, same window as
+    `checkBookingConflict`) — `/shifts/book` would refuse them, so holding the seat for them would
+    only keep it from the next courier.
+  - **The offer write is atomic with the seat count**: `updateOne` carries
+    `$expr: seatStillFreeExpr(now)` (booked + live offers < `maxDrivers`, evaluated at write time)
+    besides the entry's status, so a seat booked between the pass's read and its write is not
+    offered and no push goes out; two instances offer a seat once.
+  - **What the courier gets** (`makeOfferNotifier`): a websocket frame
+    `{ type: "shift_waiting_list_offer", data }` sent to him only (`websocketService.sendToUser`,
+    app type `shoofi-shoofir`; `OFFER_FRAME_TYPE` — the driver app refreshes its shifts screen on
+    it, do not rename) plus a push through the notification service with the same `data.type`
+    (tapping it opens the shifts screen on that slot). `data.date` is the business-day label the
+    list is keyed on; `data.calendarDate` and the push text show the **calendar** date
+    (`offerMessage`), so a 00:00 / 01:00 slot reads as the next day (invariant 8).
+  - **Booking**: `POST /shifts/book` refuses (`HELD_FOR_WAITING_LIST`) a seat held for somebody else
+    (`bookableSeatsFor`), and booking still `$pull`s the courier's entry. Without a `shiftId` it
+    picks, among the courier's own regions, the one holding his offer (`holdsOffer`), then one with
+    a seat he may take, then the first.
+  - **Leaving**: `POST /shifts/leave-waiting-list` matches `waiting` OR `offered`
+    (`ACTIVE_WAITING_STATUSES`), pulls his entry from every region's copy of the slot, and when he
+    gave back a held seat runs the pass at once for that shift, so the next courier is offered it
+    without waiting for the cron tick.
+  - **Joining** without a `shiftId` is scoped to the courier's own regions (`getDriverCityAreas`,
+    optional `cityAreaId`), exactly like `/shifts/book`, and is refused when he is already on (or
+    booked in) any region's copy of the slot. `/shifts/list` adds his own entries from his other
+    regions to the grouped card's `waitingList`, so an offer in a second region is visible.
+  - **Admin**: `GET /admin/shifts` lists `waiting` and `offered` entries (with `offerExpiresAt`);
+    `waitingListCount` counts both, `offeredCount` the held seats; `missed` is off the board.
+    `POST /admin/shifts/:id/assign-driver` into a seat held for someone else answers **409
+    `HELD_FOR_WAITING_LIST`** unless the body carries `overrideWaitingListHold: true`; with the
+    override the offer that lost its seat goes back to `waiting`, place kept
+    (`withdrawUnbackedOffers`), and the audit row records it. Assigning the courier the seat is held
+    for is always allowed. The admin web asks before sending the override.
+  - `isOnWaitingList` counts `waiting` and `offered`.
 
 ## Recipe — change assignment or coverage
 1. State which of **pickup-zone / dropoff-geometry / `supportedCities` / `supportedAreas` /
