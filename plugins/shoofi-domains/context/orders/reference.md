@@ -69,7 +69,10 @@ Buckets (`docs/customer-orders-snapshot.md`): **completed** `2,3,10,11,12` ·
 **cancelled** `4,5,7,8,9` · **in-flight** `1,6,13,14`.
 
 **Transitions & who triggers them:**
-- **Create** → `0` (CC) / `6` (cash/digital) / `1` (school) / `13` (fraud) / `14`,`15` (future/ramadan). Trigger: customer app.
+- **Create** → `0` (CC) / `6` (cash/digital) / `1` (school) / `13` (fraud). Trigger: customer app.
+  Create never writes `14`/`15`: a future or iftar order is created like any other and
+  only becomes `14`/`15` at store accept (`/update/viewd`, `routes/order.js` ~6044 `14` /
+  ~6048 `15`).
 - **Payment success** → `6` (or `1` school). Trigger: CC branch, Apple Pay finalize (atomic `findOneAndUpdate {status:"0"}`), HYP.
 - **Store accept** (`/update/viewd`) → `6`→`1` (or `14`/`15`); sets `isViewd`,`viewdAt`; **books delivery in background**. Trigger: partner app.
   `orderDate` is rewritten to the ready time **only in the default branch** (`currentTime + readyMinutes`, and `currentTime` is the *tablet's* clock, not the server's). A `14` keeps the customer's requested `orderDate` and gets `startPreparingAt = orderDate - readyMinutes` + `isPrinted:true`; a `15` re-sets `orderDate` to itself. See §5 "order dates".
@@ -86,7 +89,9 @@ Buckets (`docs/customer-orders-snapshot.md`): **completed** `2,3,10,11,12` ·
 - **Twin cascade** mutates the peer side **directly via services**, not routes (avoids recursion).
 
 **Transition guards you must not weaken:** PENDING(`6`) only from FRAUD_REVIEW
-(`order.js`); `/update/viewd` rejects already-cancelled (`4732`);
+(`order.js`); `/update/viewd` rejects already-cancelled `4,7,8,9` with a 400
+`ORDER_CANCELLED` (~order.js:6002-6025). That list omits REJECTED `5`, and no other status
+check follows it, so accepting a `5` order overwrites it to `1` (or `14`/`15`);
 `start-preparing` only from `14`. Fields: `status`, `statusUpdatedAt`,
 `statusUpdateReason`, `completedAt`, `viewdAt`, `isViewd`, `isPrinted`, `orderDate`.
 **`readyMinutes` is NOT an order field** — accept takes it as a request param and does not
@@ -702,11 +707,30 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   in shoofi-server 29ed5252, 2026-11-03.)
 - **Transition rule**: ACCEPT goes through **`order/update/viewd`** (NOT `order/update`);
   all other forward/back transitions use `order/update` with an explicit `status` the
-  client computes (`1→3` delivery / `1→2` takeaway; `3→11`; `2→11|10`; `15→1`).
+  client computes in `stores/orders/index.tsx`: forward `updateOrderStatus` (main ~259):
+  `1→3` delivery / `1→2` takeaway; `3→11`; `2→11` delivery / `2→10` takeaway; `10→4`;
+  `15→1`. Back `updateOrderToPrevStatus` (main ~396): `2`/`3`/`4` → `1`, without SMS. The
+  `10→4` arm is unreachable from the list: its collapsed and expanded rows both hide the next
+  button on `10`/`11` (`list/index.v2.tsx` ~2861, ~3145, `pickedUpStatuses`).
+- **Order rules helper** (shoofi-partner feat/orders-v3-rules, bf6dd52; not on main yet):
+  `helpers/orders/order-rules.ts`, pinned by `helpers/orders/__tests__/order-rules.test.ts`.
+  On that branch `updateOrderStatus` / `updateOrderToPrevStatus` call `nextStatusFor` /
+  `prevStatusFor` from it; the transitions above are unchanged. It also exports
+  `showsCollapsedNextButton` / `showsExpandedNextButton` / `showsBackToPreparing` /
+  `showsDelayButton` / `showsAmendButton` / `showsCompensationButton`, `tabStatusList` /
+  `tabCount` / `visibleTabs`, `isReadyTooEarly` (the `readyOrderUpdateStatusMinMinutes`
+  guard), `prepTimeSlots` (the twin second-store window, below), `canAccept`,
+  `buildAcceptUpdateData` (the `update/viewd` body), `timeLeft` and `suggestPrepMinutes`.
+  The live v2 screens still carry their own inline copies of these rules and are untouched
+  by that branch. A rule change has to land in the screen copy as well until they import
+  the helper.
 - **Status constants** match server 0-15 (`consts/shared.ts`).
 - **Twin**: read-only from the order payload (`order.twinGroup`, `twinPeerInfo.orderDate`);
-  the partner caps the **second store's** prep window (`TWIN_SECONDARY_EARLY_MAX_MIN=10`).
-  No twin endpoint is called — twin timing is server-computed.
+  the partner caps the **second store's** prep window (`TWIN_SECONDARY_EARLY_MAX_MIN=10`):
+  `pickupSequence === 2` may only pick a slot in [peer ready − 10, peer ready] minutes from
+  now. If none fits, it keeps the largest slot that still ends in time, else the smallest slot.
+  It lives inline in `new-orders/list/index.v2.tsx` (~144-191) and, on feat/orders-v3-rules,
+  as `prepTimeSlots`. No twin endpoint is called — twin timing is server-computed.
 - **Gates (CORE invariant 18)**: everything the partner reads from the order admin takes
   `ORDERS_DASHBOARD_OR_STORE_MEMBER`, so the phone must own the `app-name` store:
   - the live feed `admin/all/not-viewd` (and `admin/not-viewd`);
@@ -859,10 +883,78 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   string-keyed client map; the Redis fallback record loses `appType` after its 5-min TTL; the Redis
   subscriber never subscribes), so expect no `via: "socket"` rows until that is fixed.
 - **Key files**: `stores/orders/index.tsx` (core + transition logic),
-  `screens/admin/order/new-orders/list/index.tsx` (ACCEPT + twin caps),
-  `screens/admin/order/list/index.tsx` (dashboard, transitions), `hooks/{use-websocket,use-notifications}.ts`, `App.tsx`.
-- **Gotcha**: no explicit REJECT endpoint — the accept screen is accept-only; rejection/cancel
-  is a generic `order/update` to status `4`/`5` from the main list.
+  `screens/admin/order/new-orders/list/index.v2.tsx` (ACCEPT + twin caps),
+  `screens/admin/order/list/index.v2.tsx` (dashboard, transitions),
+  `hooks/{use-websocket,use-notifications}.ts`, `App.tsx`. The **live** screens are the
+  `*.v2.tsx` siblings: `navigation/MainStackNavigator.tsx` (~33-38) picks them while
+  `FEATURE_FLAGS.ORDERS_LIST_V2` / `NEW_ORDERS_V2` are `true` (`consts/feature-flags.ts`
+  ~20, ~22). The `index.tsx` originals are the v1 fallback, kept unedited. Edit the v2 file.
+- **v3 screens** (shoofi-partner feat/orders-v3-screens, 2a10861, stacked on
+  feat/orders-v3-rules; not on main yet). These are redesigned siblings,
+  `screens/admin/order/list/index.v3.tsx` and `new-orders/list/index.v3.tsx`.
+  - **How they are built.** `scripts/orders-v3/build_{list,new}_v3.py` generate them from the
+    v2 files. The state, latches, fetches and handlers are kept, and only the render is
+    replaced, by `components/orders-v3/*`. The accept handler `updateViewedOrder` is
+    byte-identical to v2, so ACCEPT is still `ordersStore.updatOrderViewd` →
+    `POST order/update/viewd`.
+  - **Flags.** `ORDERS_LIST_V3` / `NEW_ORDERS_V3` / `HEADER_V3` (`consts/feature-flags.ts`
+    ~23-44) are off in shipped builds. They turn on for one bundle when Metro/EAS runs with
+    `EXPO_PUBLIC_PARTNER_ORDERS_V3=1`. When on, v3 wins over v2 in `MainStackNavigator.tsx`.
+    `HEADER_V3` restyles only the shared header.
+  - **Rules** come from `helpers/orders/order-rules.ts` (above).
+  - **Money** is in `helpers/orders/order-money.ts`, and the two formulas differ on purpose:
+    - `orderMoneySummary` is the list's. It is built on `getPartnerPaymentSummary`, the
+      same math as the v2 list.
+    - `newOrderMoneySummary` is the new-order screen's own v2 inline formula, lifted
+      unchanged. It subtracts coins from a card order's bottom line too, takes the
+      `full_discount` coupon row from `appliedCoupon.breakdown`, and decides "full coupon"
+      without the drive-in price.
+    - Unifying the two is a money decision (accountant), not a layout one.
+  - **Order lines** are built by `helpers/orders/order-lines.ts` `buildOrderLines`. A line
+    whose product is not in the menu is KEPT, with its own `nameAR`/`nameHE`, flagged
+    `missingFromMenu` and sorted last. Its options cannot be decoded without the product's
+    extras.
+    - `stores/menu` `getFromCategoriesMealByKey` returns `{}` (not `null`) for a missing
+      product, so v2 behaves differently per screen.
+    - The live v2 list row (`list/index.v2.tsx` `sortedItems` ~289-300, filter `!!meal`)
+      lets `{}` through and draws the line with a BLANK name.
+    - The live v2 new-order screen (`new-orders/list/index.v2.tsx` `renderOrderItems`
+      ~1562-1573, `!isEmpty(meal)`) DROPS the line.
+    - The list's screen-level `renderOrderItems` (~3318, which also drops) is never called.
+  - **New-order v3** shows one waiting order at a time with a pager.
+    - The suggested prep time is the last time this device picked today (AsyncStorage
+      `@partner_last_prep_minutes`, `helpers/orders/last-prep-time.ts`), falling back to
+      `storeData.prepTimeSuggestion.defaultMinutes`, and snapped to an offered slot
+      (`suggestPrepMinutes` over `prepTimeSlots`).
+    - It is pre-selected only, never accepts by itself, and is skipped for iftar orders.
+    - It is off when `storeData.prepTimeSuggestion.enabled === false`. That field is not in
+      shoofi-server at all yet, and not in `PARTNER_STORE_FIELDS`
+      (`services/catalog/store-update-access.js` ~57), so it is on for every store until a
+      follow-up adds it.
+  - **Bell count.** `stores/new-orders-badge` holds the header bell's unviewed count.
+    `useNotifications` publishes it (`hooks/use-notifications.ts`), and the v3 list reads it
+    there. Mounting that hook a second time would double the polling and the new-order alarm.
+- **Gotcha**: no explicit REJECT endpoint, and **no reachable cancel/reject in the live
+  partner screens**. Neither v2 screen writes `4` or `5` itself; the only `4` the store can
+  compute is the `10→4` arm above. The list tabs are `1`, `2` (+`3`), `10` (+`11`), `14` and `15`
+  (`list/index.v2.tsx` ~3936-4184; the `3` tab is commented out), so a `4`/`5` order is never
+  listed. Cancel/reject happens outside the partner app (admin `order/update`, C4).
+- **`14` → `1` (future order release) is the partner app's own poll, not a server cron.**
+  `components/global/FutureOrderReminderGlobal.tsx` polls `GET /api/order/future-orders-ready`
+  every 2 min while the app is open; its "ابدأ التحضير" calls `POST /api/order/start-preparing`
+  (only from `14`). `utils/crons/future-order-reminder.js` (push + `future_order_start_preparing`
+  frame) exists but its start is commented out in `app.js` (~54, ~790), so nothing reminds a
+  store whose app is closed. The `14` order never moves by itself.
+- **The v3 tablet board** (`components/orders-v3/OrdersBoardV3.tsx`, shoofi-partner #50, flag
+  `ORDERS_BOARD_V3`) has columns for `1`, `2`+`3`, `10`+`11` only; `14`/`15` are listed in a
+  "مجدولة" section under the new column (one extra fetch with the same endpoint, statuses from
+  `visibleTabs`). A drive-in card shows "الزبون برّا" while `driveInArrival.arrivedAt` is set
+  and the order is not picked up (#51); the list refetches on the `drive_in_arrival` frame.
+- **List date window.** `POST /api/order/admin/orders` drops the upper `orderDate` bound when the
+  body says `isOrderLaterSupport: true`, so a day query means "that day ONWARD". v2's 14-day
+  strip sent it for every day; v3 (#50) shows today only (live) and puts past days behind
+  "السجل", whose fetches pass `boundedDay` → `isOrderLaterSupport: false` (stores/orders
+  `getOrders`/`getOrdersFromServer`, optional last argument) to keep the day's bound.
 
 - **Customer note to the store** (CORE invariant 25): `order.order.commentToStore` arrives on
   the whole order documents the partner already reads (`admin/orders`, `admin/not-viewd`,
