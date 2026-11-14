@@ -1558,7 +1558,10 @@ Code: `routes/kopa/qr-menu.js` (owner), `routes/kopa/qr-menu-public.js` (no auth
   is sent as the same `text`); a card tap navigates to
   `menuScreen` with `productId` (`utils/open-store-at-product.ts`, wrapped by the
   `hooks/useOpenStoreAtProduct.ts` hook; marketing links — banner, story, push — use the same
-  function), and the menu list opens the
+  function, EXCEPT a banner whose link is `store` (or a legacy ad with only `appName`):
+  `components/shared/AdsCarousel.tsx` keeps its own takeaway + clear-menu path and runs
+  only the twin guard, `guardTwinBeforeStoreSwitch` exported from the same file, before it),
+  and the menu list opens the
   sheet by matching `products[]._id`: `AllCategoriesList` searches `categoryList[].products`;
   for tile-grid stores (`store.hasGeneralCategories`) `GeneralCategoriesList` receives the
   general categories, which carry NO `products` of their own, so it searches
