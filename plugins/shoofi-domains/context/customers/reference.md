@@ -51,7 +51,12 @@ for **orders** (joined via `order.appName`).
 
 ## 2. Customer auth flow (phone + OTP)
 1. **Request** — `POST /api/customer/create` (`customer.js`): generates a 4-digit
-   `authCode`, upserts the identity, sends SMS + WhatsApp (`user_verification` template).
+   `authCode`, upserts the identity, and sends the code. With no `channel` in the body (the
+   customer and partner apps, and every older build), it goes on **both** SMS and WhatsApp
+   (`user_verification` template). The courier app sends `channel: "sms" | "whatsapp"`, and
+   then **only the chosen one** goes out (`services/customer/otp-channel.js` `otpChannels`,
+   shoofi-server#541). WhatsApp-only has **no SMS fallback** when that send fails. That
+   fallback is pending Sari's decision (CORE Known status).
    Test phones (`config/test-phones.js`) skip SMS and accept a fixed code. The reply never
    carries the code. Until 2026-10-30 the new-customer branch echoed the whole new doc, code
    included. The login screens read only `phone` and `isBlocked`.
@@ -849,6 +854,12 @@ request gets scoped to the right store. Supports multi-store membership (`stores
 Same OTP flow; `app-name` defaults to **`delivery-company`**, and `customer/details` is
 fetched with that app-name, so the identity resolves to `delivery-company.customers`.
 Driver profile via `delivery/company/employee/{driverId}`.
+The only app that picks the OTP channel (shoofi-shoofir#38). The login screen has an
+SMS / WhatsApp toggle, remembered as `@otp_channel` (default SMS), and sends it as `channel`.
+The code screen resends on this screen, on the same channel or the other one. It allows one
+request at a time, and the countdown starts on the tap. A reply with `isBlocked` stores
+`@storage_user_b` and goes back to login, as the first request does. Words per channel and
+language: `utils/otp-channel-text.ts`.
 
 ### C4. shoofi-delivery-web (admin) — `app-type: shoofi-admin`
 **Password login** `admin/users/login` → `{user, token}`; `isFirstLogin` forces a password
@@ -925,7 +936,9 @@ Do not "fix" them opportunistically; they are scheduled work, not bugs to discov
    attempt counter, no lockout; the `apiLimiter` (5/5min) is defined but **not wired**.
    **Planned work (do not implement unasked):** (a) add a **max-retry limit on requesting a
    code**, and (b) let the user **choose WhatsApp vs SMS** as the delivery channel. Design
-   changes here should keep both in mind.
+   changes here should keep both in mind. (b) is built (owner's decision, 2026-11-10;
+   shoofi-server#541 + shoofi-shoofir#38; §2 step 1). It applies only when the client sends
+   `channel`, and choosing WhatsApp has no SMS fallback, pending Sari (CORE Known status).
 3. **KNOWN:** `search-customer` (`customer.js`) projects `token` + `authCode` and has no
    `auth.required`. Accepted for now. Verified still true on 2026-10-30: the reply carries the
    pending OTP as `status.authCode`, and all three RN apps plus the admin web call it.
@@ -958,6 +971,12 @@ Do not "fix" them opportunistically; they are scheduled work, not bugs to discov
     (`deleteAccount` → `aiHelperStore.clear()`). Since the customer `_id` survives deletion
     (CORE invariant 8), a login after deletion finds the old profile again. Handling it touches
     `routes/customer.js` — its own HIGH-RISK draft PR, not a drive-by.
+11. **KNOWN — not fixed yet (2026-11-14):** the OTP provider error logs print the whole axios
+    error, request body (the code) and provider auth header included. The anchors are
+    `utils/sms.js` `sendSMS` `.catch` (`"SMS catch"`, `'Error sending sms:'`) and the two
+    `'WhatsApp API error for … customer:'` logs in `POST /api/customer/create`. It predates
+    the OTP channel choice and is not part of shoofi-server#541. It needs its own HIGH-RISK PR.
+    Full note in CORE Known status.
 
 ## 8. Definition of done
 Inherit `_shared-guardrails.md` §7. For identity specifically: **never log OTPs/tokens/secrets**;
