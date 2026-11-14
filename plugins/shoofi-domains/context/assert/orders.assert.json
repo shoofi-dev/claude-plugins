@@ -841,11 +841,22 @@
         "utils/notification/new-order-alarm.ts": [
           "updateNewOrderAlarm",
           "newOrderAlarmApprovedLocally",
-          "stopNewOrderAlarm"
+          "stopNewOrderAlarm",
+          "ALARM_PREVIEW_ID",
+          "stopAlarmPreview"
         ],
         "utils/new-order-alarm-prefs.ts": [
           "DEFAULT_ALARM_PREFS",
-          "store.wav"
+          "store.wav",
+          "ALARM_SOUNDS",
+          "order-phone-ring.wav"
+        ],
+        "helpers/orders/header-bell.ts": [
+          "BELL_HIDDEN_ROUTES_V3",
+          "showHeaderBell"
+        ],
+        "components/store-settings-v3/AlarmSettingsV3.tsx": [
+          "alarm-device-settings"
         ],
         "utils/print-outcome.ts": [
           "classifyPrintError",
