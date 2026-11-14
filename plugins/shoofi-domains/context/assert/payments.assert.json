@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa till money + reference 6b: a till payment with a money method and every till refund need an open till session, 409 NO_OPEN_SESSION, checked before the manager PIN; sessionId on each entry); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-no-printhesh-link-on-manual-invoices / 2026-11-13 (CORE invariant 10: no PrintHesh link under manual invoicing - twin charge, saved-card retry; the hosted page is never manual); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa till money + reference 6b: a till payment with a money method and every till refund need an open till session, 409 NO_OPEN_SESSION, checked before the manager PIN; sessionId on each entry); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -30,11 +30,32 @@
         "services/kopa/till-money.js",
         "routes/kopa/till-money.js",
         "services/kopa/till-orders.js",
-        "test/integration/kopa/till-money.js"
+        "test/integration/kopa/till-money.js",
+        "services/payments/hyp-invoice-url-retry.js"
       ],
       "symbols": {
-        "services/kopa/till-money.js": ["applyDiscount", "removeDiscount", "suggestDiscount", "setTip", "addRefund", "approveByManager", "standingDiscountOf", "verifyManagerPin", "clientRefundId", "discountLog"],
-        "services/kopa/till-orders.js": ["computeTotals", "discountCents", "tipCents", "percentOfCents", "amountDue", "clientPaymentId", "cleanClientId", "replaySignal"],
+        "services/kopa/till-money.js": [
+          "applyDiscount",
+          "removeDiscount",
+          "suggestDiscount",
+          "setTip",
+          "addRefund",
+          "approveByManager",
+          "standingDiscountOf",
+          "verifyManagerPin",
+          "clientRefundId",
+          "discountLog"
+        ],
+        "services/kopa/till-orders.js": [
+          "computeTotals",
+          "discountCents",
+          "tipCents",
+          "percentOfCents",
+          "amountDue",
+          "clientPaymentId",
+          "cleanClientId",
+          "replaySignal"
+        ],
         "utils/hyp-pay.js": [
           "buildCcPaymentRefData",
           "chargeToken"
@@ -100,6 +121,10 @@
           "couponBenefit",
           "loadPublicCoupon",
           "business_visible"
+        ],
+        "services/payments/hyp-invoice-url-retry.js": [
+          "shouldRetryHypInvoiceUrl",
+          "scheduleHypInvoiceUrlRetry"
         ]
       },
       "patterns": [
@@ -352,6 +377,26 @@
           "file": "services/coupons/public-coupon.js",
           "regex": "const UPCOMING_WINDOW_DAYS = 30;",
           "desc": "CORE: an upcoming coupon shows only within 30 days of its start"
+        },
+        {
+          "file": "services/twin-order/twin-payment-service.js",
+          "regex": "result\\.invoiceUrl = manualInvoices \\? null : await getInvoiceUrl\\(result\\.Id, hypCredentials\\);",
+          "desc": "CORE invariant 10: under manual invoicing the twin HYP charge signs no PrintHesh link (HQ #a92992)"
+        },
+        {
+          "file": "services/payments/hyp-invoice-url-retry.js",
+          "regex": "if \\(gatewayInvoiced !== true\\) return false;",
+          "desc": "CORE invariant 10: the background PrintHesh retry runs only when the charge asked HYP to invoice"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "gatewayInvoiced: hypPaymentResult\\.manualInvoices === false,",
+          "desc": "CORE invariant 10: the saved-card retry follows the charge-time manual-invoicing decision"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "paymentData: ccPaymentRefDataDigitalPayment,\\s*gatewayInvoiced: true,",
+          "desc": "CORE invariant 10: the hosted page is never manual, so its PrintHesh retry is kept"
         }
       ]
     },
