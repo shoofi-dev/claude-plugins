@@ -1025,6 +1025,14 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **Coins are refunded once per order** (`refundCoins`: `customerCoins.cancelRefundedOrderIds`
       in the same atomic update; legacy rows recognised by their notes) — the twin path refunded
       the trigger leg twice (order route + cascade).
+    - **World Cup points are reversed once per order** (`reversePoints` in
+      `services/world-cup/world-cup-service.js`: the `findOneAndUpdate` filter refuses a wallet that
+      already holds a `type:"reverse"` transaction for the orderId; a refusal returns
+      `alreadyReversed: true`). `order.earnedWorldCupPoints` / `earnedCoins` are never cleared, so
+      the services' own guards are what stop a double cancel or cancel → reactivate → cancel. The
+      cancel block in `handleOrderUpdate` (`routes/order.js`) also skips both reversals when the
+      previous status was already 4/5/7/8 (`reversalAlreadyRan`); 9 (driver cancel) → 7 still
+      reverses. Twin cascades never call `reversePoints` at all (the other leg keeps its points).
     - **Backfill**: `scripts/money-backfill.js`, DRY-RUN by default; `--apply` only with Sari's OK.
       Coupons already issued against a twin group count as ONE `compensate` entry each
       (`collectTwinCompensations`): compensation rows naming a leg / the group, and a manual twin
