@@ -841,7 +841,10 @@
         "utils/notification/new-order-alarm.ts": [
           "updateNewOrderAlarm",
           "newOrderAlarmApprovedLocally",
-          "stopNewOrderAlarm",
+          "stopNewOrderAlarm"
+        ],
+        "utils/new-order-alarm-prefs.ts": [
+          "DEFAULT_ALARM_PREFS",
           "store.wav"
         ],
         "utils/print-outcome.ts": [
@@ -969,8 +972,8 @@
         },
         {
           "file": "App.tsx",
-          "regex": "const printerTarget = printerTargetForStore\\(storeDataStore\\.storeData\\);",
-          "desc": "doc CORE invariant 17: initPrinter takes the store's own address or the non-dialable placeholder, never a fallback printer (HQ #7121e1, #719822)"
+          "regex": "const printerTarget =\\s+resolved && resolved\\.kind === \"epson\"\\s+\\? resolved\\.target\\s+: printerTargetForStore\\(storeDataStore\\.storeData\\);",
+          "desc": "doc CORE invariant 17: initPrinter takes this tablet's own Epson choice (PRINTER_SETUP_V3), else the store's own address or the non-dialable placeholder, never a fallback printer (HQ #7121e1, #719822)"
         },
         {
           "file": "helpers/printer/printer-selection.ts",
