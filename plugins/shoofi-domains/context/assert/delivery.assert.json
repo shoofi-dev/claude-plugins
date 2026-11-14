@@ -671,6 +671,31 @@
           "desc": "company secrets are removed only where a company is EMBEDDED in a delivery or a person; a company doc on its own keeps hyp/accounting for the admin web (CORE invariant 19)"
         },
         {
+          "file": "services/delivery/response-redaction.js",
+          "regex": "const ORDER_PAYMENT_SECRET_KEYS = \\[\"ccPaymentRefData\", \"paymentData\", \"paymentAuth\", \"recharges\"\\]",
+          "desc": "the order snapshot on a delivery never carries its payment record (ZCredit Password/CVV/HolderID, card token, J5 hold) (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/response-redaction.js",
+          "regex": "key === \"order\" && isDelivery",
+          "desc": "every /api/delivery response strips the payment record from the order embedded in a delivery, covering rows booked before the insert-side strip (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "\\.\\.\\.withoutOrderPaymentSecrets\\(deliveryData\\)",
+          "desc": "the immediate-assignment insert stores the order without its payment record (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "\\.\\.\\.withoutOrderPaymentSecrets\\(deliveryData\\)",
+          "desc": "createPendingDelivery (every twin booking, every delayed-assignment booking) stores the order without its payment record (CORE invariant 19)"
+        },
+        {
+          "file": "lib/delivery/helpers.js",
+          "regex": "if \\(safe\\.order\\) safe\\.order = stripOrderPaymentSecrets\\(safe\\.order\\)",
+          "desc": "redactDeliveryCredentials strips the order's payment record from a raw delivery doc (CORE invariant 19)"
+        },
+        {
           "file": "services/delivery/availability.js",
           "regex": "isDeliveryPaused: true,\\s*area: pausedArea,|isDeliveryPaused: true,\\s*reason: \"Delivery to this area is temporarily switched off\\.\"",
           "desc": "CORE 'Paused ≠ out of zone': the paused branch returns the paused area itself (isAreaSupported/available stay false), because every app version prices the fee as availableDrivers?.area?.price || 0 and scheduled orders still go through into a paused area. TRANSITIONAL: the second alternative is the pre-fix form (no area → ₪0 scheduled orders) — drop it once shoofi-server fix/paused-area-quote-price is on main"

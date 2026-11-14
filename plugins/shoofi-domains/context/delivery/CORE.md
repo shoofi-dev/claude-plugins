@@ -488,7 +488,14 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
       company records. On 2026-10-30, 4,971 of the last 5,000 rows held `driver.token`, which
       was the driver's CURRENT session on 500/500 checked, and 4,767 held `company.hyp.api_key`.
       `redactDeliveryCredentials` (`lib/delivery/helpers.js`) strips `driver.{token, authCode,
-      notificationToken}` and `{company, driver.company}.{hyp, accounting, credentials}`. Run it
+      notificationToken}`, `{company, driver.company}.{hyp, accounting, credentials}`, and the
+      order's payment record (`ORDER_PAYMENT_SECRET_KEYS`: `ccPaymentRefData`, `paymentData`,
+      `paymentAuth`, `recharges`, on `order` and on the cart `order.order`). Partner-accept, the
+      future-order accept, `book-delivery` and the admin assign pass the WHOLE order document
+      into `bookDelivery`, so rows booked before 2026-11 hold the ZCredit terminal Password, CVV
+      and HolderID. Both insert points (`book-delivery.js`, `createPendingDelivery` in
+      `delayed-assignment.js`) now store `withoutOrderPaymentSecrets(deliveryData)`. Never spread
+      `deliveryData` into a new insert without it. Run it
       on any route that hands out a raw delivery doc. `book/:bookId`, `orders/batch` and
       `GET /api/delivery/order/:id` do. Since the driver-loop change, every `/api/delivery`
       response also goes through `services/delivery/response-redaction.js` (see the driver-loop
@@ -527,7 +534,9 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
       `routes/delivery.js`. It removes `token`, `authCode` and `notificationToken` from any
       person record (any object with a `phone`, or under a `driver` key). It removes
       `{hyp, accounting, credentials}` from the `company` embedded in a delivery (an object with
-      a `bookId`) or in a person record. A **company document on its own keeps them**: the admin
+      a `bookId`) or in a person record. It removes the order's payment record from the
+      `order` embedded in a delivery (and from its cart `order.order`); drivers read only
+      `order.order.payment_method`, which stays. A **company document on its own keeps them**: the admin
       web's DriverPayments and company screens read `accounting` and `hyp` there. Driver records
       carry `token` too (235 of 258), and `company/:companyId/employees` used to return them raw
       and unauthenticated. **82 routes in `geography.js`, `company.js` and `driver.js` are still
