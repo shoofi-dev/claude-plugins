@@ -849,8 +849,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   new-orders v1/v2 (above the items), item details and the school list. Tickets print a stacked
   label + text box after the items, directly above the staff «ملاحظة:» line, `textAlign: "left"`
   (the printed RIGHT edge under forced RTL; never a label/value row — the partner#41 clipping).
-  **Not yet on the v3 redesign** (`components/orders-v3/*`, only on the unmerged stack #47–#58):
-  hook `OrderCardV3` / `NewOrderViewV3` to the same helper once that stack rebases.
+  On the v3 redesign (`components/orders-v3/*`, the unmerged partner stack #45–#64 and the PRs
+  stacked on it) the same helper is read by `OrderCardV3` (board/list cards), `NewOrderViewV3`
+  (above the lines) and, from partner#80, `SchoolOrderCardV3` (the v3 school list).
 - **Table orders (Kopa table QR)** — branch `feat/table-order-label` (shoofi-partner, not on
   `main` as of 2026-11-13). A diner scans a per-table QR code, orders from the store's Kopa web
   page and pays cash at the table; the server route that writes it into the store's normal
