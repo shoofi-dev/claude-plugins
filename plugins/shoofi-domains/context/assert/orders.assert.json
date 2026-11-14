@@ -854,8 +854,8 @@
         },
         {
           "file": "hooks/use-notifications.ts",
-          "regex": "addNotificationReceivedListener\\([\\s\\S]{0,80}?fetchUnviewedOrdersCount\\(\\)",
-          "desc": "STABILITY PIN, not a regression detector - green both before and after shoofi-partner#22, which did not introduce it. Every notification the device receives while the app runs (including the server's store.wav creation push) runs the badge refresh. This is the ONLY reason that path sees a new order ~30s before the poll, which is the whole premise of the two assertions above and of the C3 warning; drop this wiring and the doc's explanation stops being true"
+          "regex": "addNotificationReceivedListener\\((?:[\\s\\S]{0,80}?fetchUnviewedOrdersCount\\(\\)|[\\s\\S]{0,700}?fetchUnviewedOrdersCountRef\\.current\\(refreshViaForNotification\\(notification\\)\\))",
+          "desc": "STABILITY PIN, not a regression detector - green both before and after shoofi-partner#22, which did not introduce it. Every notification the device receives while the app runs (including the server's store.wav creation push) runs the badge refresh. This is the ONLY reason that path sees a new order ~30s before the poll, which is the whole premise of the two assertions above and of the C3 warning; drop this wiring and the doc's explanation stops being true. Accepts both the direct call and, since the alert-arrival measurement (shoofi-partner feat/order-alert-arrival-log), the call through fetchUnviewedOrdersCountRef with the path that triggered it"
         },
         {
           "file": "helpers/printer/print.ts",
