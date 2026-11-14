@@ -58,8 +58,9 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    `bookDelivery`. A consumer that needs post-completion data reads lazily instead (the AI
    helper's `inferred` taste cache), and the AI helper's `deliveredOrders` counts COMPLETED
    statuses, not courier deliveries (reference §5).
-2. **Transition guards:** PENDING(`6`) only from FRAUD_REVIEW; store-accept rejects
-   already-cancelled; `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
+2. **Transition guards:** PENDING(`6`) only from FRAUD_REVIEW; store-accept
+   (`update/viewd`) rejects every cancel status `4/5/7/8/9`; cancelled → active is refused
+   or re-taken (invariant 32); `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
    not `order/update`.
 3. **Stock idempotency:** `decrementOrderStock`/`restoreOrderStock` gated on
    `stockDecremented && !stockRestored` + `store.isStockManagment`. Decrement **only** on
@@ -1199,6 +1200,33 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       20, claude-plugins#369). **Deploy order: #583 must be live before the first `kopa-qr` order
       is written.** Nothing is written while a store's `tableOrdering` is off (the default).
     - Tests: shoofi-server `test/integration/kopa/table-orders.js` (20).
+
+32. **CANCELLED → ACTIVE IS REFUSED OR RE-TAKEN, NEVER A BARE STATUS WRITE** (shoofi-server
+    `services/orders/reactivate-cancelled.js`, called by `handleOrderUpdate` in
+    `routes/order.js` before any write; HQ #103415, branch
+    `fix/HIGH-RISK-reactivate-cancelled-order`, 2026-11-13). Until then, moving an order out of
+    `4/5/7/8/9` wrote only the status: the hold stayed voided, stock, coins, coupon and deal
+    usage stayed released, the courier booking stayed `-3`. Prod: ~90 such `status_change`
+    events, most with actor "System" (the store tablet pressing "ready" on an order support
+    had just cancelled).
+    - **409 `{ code: "REACTIVATION_REFUSED", reason, message (he), messageEn }`, nothing
+      written**, for: a twin leg; card / Apple / Google money in the order
+      (`cancelMoney.hasCancelMoneyAtStake`); a COMP coupon (`cancelCompensation`); a refund
+      flag or amount; a DELIVERY order whose booking the cancel cancelled; coins spent since;
+      a coupon the customer can no longer spend; a deal over its cap (`deal_unavailable`:
+      only when the cancel released the order's `promotionRedemptions`; the deal is deleted,
+      not `isRunning`, or `checkRedemptionAllowance` fails on its total / per-customer cap —
+      the same checks as `enforcePromotions`, except that a deleted deal refuses). Flow event
+      `order_reactivation_refused`.
+    - **Otherwise re-taken, in this order**: coins (`retakeRefundedCoins`, one conditional
+      update; `coinsRetakenOrderIds` re-arms `refundCoins` so a second cancel refunds again),
+      coupon usages, deal redemptions, stock (only when `stockRestored`). Recorded on
+      `order.reactivation`, flow event `order_reactivated`. A `reactivatingAt` claim (2 min)
+      stops a double press.
+    - Not re-taken, by choice (finance owner, 2026-11-13: no double benefit, small loss):
+      world-cup points, influencer/referral attribution. Twin
+      `undoDegrade` is a separate path (invariant 27).
+    - Tests: shoofi-server `test/integration/order-reactivate-cancelled.js`.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
