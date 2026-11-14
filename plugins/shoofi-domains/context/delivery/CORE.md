@@ -547,20 +547,63 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
     hand.** `routes/courier-applications.js` + `services/courier-applications/` (README there).
     Collections in `delivery-company`: `courier-applications`, `courier-application-files` (document
     BYTES, served only through an admin token — never the public-read CDN: ID cards and bank
-    letters), `applicant-otps`. The applicant has no account: a hashed 4-digit code (10 min, 5
-    tries, 5 sends/hour; a phone that is already a driver gets `ALREADY_DRIVER`) buys a request
-    KEY (`x-applicant-phone` + `x-applicant-key`) that opens only that phone's request — it is
-    NOT `POST /api/customer/create`, which refuses non-driver shoofir phones (−7) and mints
-    account tokens. Statuses `draft → new → review → info | interview → approved | rejected`;
-    reject sets `rejection.reapplyAt` = +30 days, the back office can reopen any time. Approve
-    (`master`/`admin` only; every document `verified`, contract signed, no driver with that phone,
-    `maxOrdersByAdmin` 1–10 required because an empty limit is a switched-off courier) writes
-    `delivery-company.store` (new company, `isControlledByAdmin: false`, `supportedCities` = the
-    work towns + `computeSupportedAreasForCities`, `accounting.bankAccount.bank` = the bank NAME,
-    the same names as delivery-web `israeli-banks.ts`) or attaches to an existing one, and
-    `delivery-company.customers` (`role: "driver"`, `isDriver: true`, `isActive: false`,
-    `storeAssignmentMode: "all"`, `vehicleInfo.type`), both with `fromApplicationId`. Claimed
-    via status `approving` so a double click makes one driver; a half approval is undone.
+    letters), `applicant-otps`, `applicant-rate-limits` (per-IP counters, TTL on `purgeAt`). The
+    applicant has no account: a hashed 4-digit code (10 min, 5 tries, 5 sends/hour; a phone that
+    is already a driver gets `ALREADY_DRIVER`) buys a request KEY (`x-applicant-phone` +
+    `x-applicant-key`) that opens only that phone's request — it is NOT
+    `POST /api/customer/create`, which refuses non-driver shoofir phones (−7) and mints account
+    tokens. **Both per-phone counters are claimed atomically** (`findOneAndUpdate` with
+    `attempts < 5` / `sends < 5` in the filter) BEFORE the code is compared or sent, so parallel
+    guesses get at most 5 comparisons per code — never "read attempts, compare, then increment".
+    Per `req.ip`: 20 sends and 30 FAILED verifies an hour (`rate-limit.js`, the
+    `services/kopa/auth.js` window pattern; a right code gives its slot back). Phone or IP over a
+    limit → 429 `TOO_MANY` (5 wrong tries on one code stay 429 `TOO_MANY_ATTEMPTS`).
+    `config/test-phones.js` numbers (fixed code 1234) are refused with 400 `BAD_PHONE` on this
+    flow when `NODE_ENV=production`, accepted in dev/test. `channel` goes through `otpChannels`
+    (a local copy in `services/courier-applications/otp-channel.js` until server #541 puts
+    `services/customer/otp-channel.js` on main; a test keeps the two identical).
+    **One open request per phone**: an open request carries `openKey: <phone>` (unique partial
+    index `openKey_unique`, unset on approve/reject), so a double-tapped verify opens one draft;
+    the `SH-` number has `number_unique` and a collision is drawn again.
+    Statuses `draft → new → review → info | interview → approved | rejected` (plus the transient
+    `approving`); reject sets `rejection.reapplyAt` = +30 days, the back office can reopen any time
+    (409 `PHONE_HAS_OPEN_REQUEST` if the phone opened a newer one).
+    **Work area**: `GET /api/courier-applications/me/work-areas` lists only pickup zones (`cities`)
+    that have at least one connection — an `areas` doc whose STRING `cityId` is the zone, i.e. what
+    `computeSupportedAreasForCities` would give the new company — so an applicant cannot pick a zone
+    that yields `supportedCities` with no `supportedAreas` (undispatchable). `workCityIds` must be
+    ObjectIds of existing `cities` docs, else 400 `BAD_CITY` (form save, admin form, approval).
+    **Documents**: each kind keeps its current file + 2 before it; older BYTES are deleted from
+    the files collection (`document-versions.js`, written with the previous `fileId` in the filter
+    and retried, so parallel uploads lose nothing). An applicant gets 30 uploads per request
+    (`uploadCount`), then 429 `UPLOAD_LIMIT` before multer buffers anything; back-office uploads
+    are never refused. 8 MB, one file per request.
+    **Bank details are re-verified**: changing `bankCode` / `branch` / `accountNumber` (applicant
+    in `info`, or the admin form) after the bank document was reviewed puts
+    `documents.bank.status` back to `pending` with a history note, because approval copies those
+    fields into `accounting.bankAccount`, which feeds MASAV.
+    **Contract held on the server** (`services/courier-applications/contract.js`, `CONTRACT =
+    {version: "1", placeholder: true, text: {ar, he}}` — placeholder text until the owner supplies
+    the agreement; a text change bumps `version`): `GET /api/courier-applications/contract?lang=ar|he`
+    (applicant headers) → `{version, lang, text, hash}` (sha256 hex of `text`);
+    `POST /api/courier-applications/me/contract {version, lang?, signature, device}` refuses another
+    version with 400 `BAD_CONTRACT_VERSION` (and a lang other than ar/he with `BAD_CONTRACT_LANG`;
+    absent = `ar`) and stores `contract = {version, lang, hash, textSnapshot, signedAt, device,
+    signature}`. The admin detail returns all of it, so it can show which text was signed.
+    Approve (`master`/`admin` only; every document `verified`, contract signed, no driver with
+    that phone, `maxOrdersByAdmin` 1–10 required because an empty limit is a switched-off
+    courier) writes `delivery-company.store` (new company, `isControlledByAdmin: false`,
+    `supportedCities` = the work zones + `computeSupportedAreasForCities`,
+    `accounting.bankAccount.bank` = the bank NAME, the same names as delivery-web
+    `israeli-banks.ts`) or attaches to an existing one, and `delivery-company.customers`
+    (`role: "driver"`, `isDriver: true`, `isActive: false`, `storeAssignmentMode: "all"`,
+    `vehicleInfo.type`), both with `fromApplicationId`. Claimed via status `approving`
+    (`approvingAt`, `approvingFrom`) only while the request still has the status, bank fields and
+    verified documents the reviewer saw, so a double click makes one driver; the phone is checked
+    again after the claim. **Idempotent**: the ids go on the request (`approvalProgress: {mode,
+    companyId, driverId}`) before the records are inserted with those `_id`s, and a request stuck
+    in `approving` > 5 minutes (a crash) can be approved again, reusing what was created. A caught
+    failure removes a company with no driver behind it and restores the status.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
