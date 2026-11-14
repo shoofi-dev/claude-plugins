@@ -53,6 +53,9 @@ Transitions: driver `approve`/`start`/`complete`/`cancel`/`waiting-in-store`
 `order/status/update` (`admin.js`, admin-web only, CORE invariant 19); store cancel `-2`
 (`store/order/cancel`, the delivery's own store or a dashboard role). Every transition writes a
 `centralizedFlowMonitor` event. (⚠️ status-value inconsistencies exist — see §10.)
+The driver's `start` / `complete` / `waiting-in-store` move only from `2|5` / `3` / `2`
+(`STEP_TRANSITIONS` in `services/delivery/driver-step.js`, CORE invariant 19): a retry at the
+target is a 200 `alreadyDone` with no side effects, anything else a 409 `STATUS_CONFLICT`.
 
 ## 2b. Delivery-only bookings (store books a courier, no order)
 `services/delivery/delivery-only.js` + three `auth.required` routes in
