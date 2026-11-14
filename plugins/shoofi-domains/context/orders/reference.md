@@ -900,6 +900,26 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   `invoiceOrder.storeData.name_he` (a Hebrew store crashed on an order without `storeData`).
   The ticket icon `table` is NOT in `components/icon/selection.json`; react-icomoon renders null.
 
+### C3.x Cancelled-order alert and the owner-wording rules (v3, 2026-11-11)
+
+- **Cancelled-order alert** (`components/global/CancelledOrderAlertGlobal.tsx`,
+  `helpers/orders/cancel-alert.ts`): a full-screen «أُلغي طلب!» when an order this tablet saw
+  ACTIVE (1, 3, 2, 14, 15) on the previous read is now cancelled (4, 5, 7, 8, 9). A 20 s poll +
+  on foreground, reading with `getOrdersFromServer` (not `getOrders`, which overwrites the board's
+  list/counts). Not the socket: `order_status_updated` has no order id, a twin cascade writes the
+  other store's order with no frame, and two tablets on one login lose frames. The first read
+  only learns (a restart never replays the day). Note the partner's `canceledStatuses` is only
+  4/5 — 7 (support) is the common cancel. A driver "cancel" (`bookDelivery` −1) is not an order
+  cancel and never alerts.
+- **Who hands the store cash:** on a CASH DELIVERY the courier pays the store at pickup (the
+  customer pays the courier, delivery included) → «السائق سيدفع لك نقداً عند الاستلام» on screen,
+  «السائق يدفع للمحل نقداً» on the ticket; pickup / drive-in: the customer. The ticket's «سعر الطلب»
+  is the items (`orderPrice`); drive-in is its own row.
+- **«استلمت» labels only:** ready delivery (3) → 11 «استلمها السائق», ready pickup/drive-in (2) →
+  10 «استلمها الزبون»; the transitions are unchanged and only the store makes them.
+- **Delay:** the sheet offers +5/+10/+15/+20, says the customer is notified, and keeps the
+  one-delay rule (client-side; the server stores only the LAST `delayMinutes`).
+
 ## C4. shoofi-delivery-web — the ADMIN dashboard (React web)
 Role: oversight — list/monitor, manual intervention, fraud queue, **twin group admin**, config.
 - **API client**: axios (`src/utils/http-interceptor/index.ts`), **Bearer** token
