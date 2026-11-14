@@ -10,17 +10,20 @@
  },
  "subject": {
   "kind": "coupon",
-  "store": {},
+  "store": {
+   "name": "Pizza Bella Vitta",
+   "logo": "../img/pizza-bella-vitta-logo.png"
+  },
   "coupon": {
-   "line": "خصم **₪20**",
-   "terms": "على الطلبات فوق ₪100",
-   "code": "8PL6DBZI"
+   "line": "خصم **₪20** عالتوصيل",
+   "terms": "فوق ₪135 · لغاية 31/12",
+   "note": "بينزل لحاله بالسلة"
   }
  },
  "text": {
   "pill": "شوفي",
-  "hook": "عندي إلك\nكوبون!",
-  "line2": "دخّل الكود بالسلة",
+  "hook": "خصم **₪20**\nعالتوصيل",
+  "line2": "Pizza Bella Vitta · كفر قاسم",
   "cta": "اطلب من شوفي",
   "ctaButton": "اطلب من شوفي"
  },

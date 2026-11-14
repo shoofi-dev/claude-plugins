@@ -145,15 +145,120 @@ Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restric
 hangs the request (CORE invariant 11), so none of them answered.
 
 ## 6. Refunds (customer-side — you own these)
-- **Per-order refund** (`order.js addRefund`) = **bookkeeping only** — pushes
-  `refundData[]`, **no provider reversal**. A real refund is manual/deferred by default.
-  Since HQ #1a2f9e (2026-11-03) **no client calls it** — its only caller was the removed
-  client-side refund dialog — and no store DB holds a `refundData` row. The route has no auth.
+- **`POST /api/order/addRefund` is GONE** — removed in shoofi-server 29ed5252 (HQ #7e2d32,
+  2026-11-03). It was bookkeeping only (pushed `refundData[]`, no provider reversal, no auth);
+  its only callers were the client refund dialogs removed under HQ #1a2f9e, and no store DB
+  held a `refundData` row. Do not look for it or restore it. A cancel's money is decided by
+  `settleCancelledOrderMoney` in `routes/order.js` (`cancelMoneyDecision`: `refund` →
+  `orderAuthorization.refundOrderPayment` releases a hold or flags a settled charge for a
+  person; `keep` → the charge is captured/kept and `services/payments/cancel-compensation.js`
+  issues a Shoofi-paid `COMP-*` coupon). A twin leg's refund is always flagged for a person
+  (`refund_twin_order_manual`). Note: the comment above `CANCEL_MONEY_DECISION` still says
+  KEEP's coupon is created by hand — stale since cancel-compensation.js; the code issues it.
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,
   ZCredit field shape **unverified across terminals — sandbox first**.
 → **Store/driver payouts (MASAV) and settlement refunds are the `accountant` domain, not yours.**
+
+## 6b. Kopa till money (phase 4d) — bookkeeping, separate from HYP charges
+shoofi-server `services/kopa/till-money.js`, `routes/kopa/till-money.js`, and the totals and
+payment idempotency in `services/kopa/till-orders.js` (`feat/kopa-phase1`, 2026-11-12).
+Tests: `test/integration/kopa/till-money.js`. The till order is orders CORE invariant 30 /
+reference C5.
+- **What it is NOT.** It processes no card and calls no gateway. It writes only
+  `kopaTillOrders` (store DB), plus the PIN try counter in central `kopaSessions` /
+  `kopaStaffPins`. The test spies fail on ANY call to `orders`, `paymentAuth` or
+  `creditCards`, and on any write outside `kopa*`. A till refund records that the store gave
+  money back from its drawer, its own terminal or by transfer. It never reverses a provider
+  charge, and it is unrelated to §6, the cancel money decision and the money ledger.
+- **Every route is `KOPA_TILL`** (cashier or all). The store comes from
+  `req.storeMembership.appName`.
+  - `POST /api/kopa/till/orders/:id/discount`
+    - Body: `{ type: percent|fixed, value, reason, managerPin }`. Returns 200 `{ order }`.
+    - percent is > 0 and ≤ 100. fixed is > 0 and ≤ subtotal (else 400 `DISCOUNT_TOO_LARGE`).
+    - 409 `STAFF_MEAL`, `EMPTY_ORDER`, `ORDER_NOT_OPEN` or `BELOW_PAID`.
+    - Applying again replaces the discount, and the old one goes into `discountLog` (last 20).
+  - `DELETE …/:id/discount` with `{ managerPin }`.
+    - Sets `discount: null` and logs the removed discount with `removalApprovedBy`.
+    - 409 `NO_DISCOUNT` when there is none.
+  - `GET …/:id/discount/suggest` is read only. It returns `{ suggestion: null | { source:
+    "standing", profileId, type, value, amount, needsManagerPin, applicable, code } }`.
+  - `POST …/:id/tip` with `{ type, value }`. `value: 0` removes the tip. No PIN.
+    - 409 `STAFF_MEAL`, `EMPTY_ORDER` or `BELOW_PAID`.
+  - `POST …/:id/refunds`
+    - Body: `{ lines?: [{ lineId, qty }], amount?, method: CASH|EXTERNAL_CARD|TRANSFER|OTHER,
+      reason, managerPin, clientRefundId? }`.
+    - Returns 201 `{ order, refund, replay: false }`, or 200 with `replay: true` for a repeated
+      `clientRefundId`.
+    - **Needs an open till session** (shoofi-server@feat/kopa-phase5 407a0533): otherwise 409
+      `{ code: "NO_OPEN_SESSION", message: "Start the shift before taking money" }`. This is
+      checked after the order's own refusals and BEFORE the manager PIN, so no try is spent. A
+      `clientRefundId` replay needs no session. The same rule holds for a till payment with a
+      money method (`POST …/:id/payments`, all methods but UNPAID). See accountant reference §12.
+- **Document fields** (on `kopaTillOrders`):
+  - `discount = { type, value, amount, reason, source: manual|standing, profileId?,
+    approvedBy: { staffId, name } | null, by: { staffId, staffName }, at }`.
+  - `tip = { type, value, amount, by, at }`.
+  - `refunds[] = { refundId, amount, method, lines, reason, sessionId, approvedBy, by, at,
+    clientRefundId? }`, plus `refundedAmount`. `sessionId` = the till session the refund was
+    taken in (tracing). `at` is the time reserved on that session.
+  - On a refunded line: `refundedQty` and `refunded`.
+  - On a payment: `clientPaymentId?`, `sessionId` (ObjectId, or null for an UNPAID with no
+    session).
+  - On the order: `amountDue`.
+- **Money math** (`computeTotals` in till-orders.js, agorot integers).
+  - discount = percent of the subtotal (`round(subtotalC × value×100 / 10000)`, half-up) or
+    fixed, then capped at the subtotal.
+  - total = subtotal − discount, or 0 for a staff meal.
+  - tip = percent of total, or fixed.
+  - amountDue = total + tip. balance = amountDue − paidAmount.
+  - Every line change re-computes the discount and the tip. A fixed discount cannot push
+    the total below 0 after a line is cancelled.
+  - A discount, tip or line change that would make amountDue < paidAmount is 409
+    `BELOW_PAID`. An open order is never refunded.
+- **Paid.** An order is paid when the non-UNPAID payments reach `amountDue`, not `total`.
+  UNPAID records the whole `balance`, tip included.
+- **Manager PIN.** `verifyManagerPin` (customers reference 5g) is called with
+  `session: req.kopaSession` when the caller has a Kopa session. Otherwise it is called with
+  `callerStaffId: req.storeMembership.me._id`.
+  - No PIN → 403 `MANAGER_PIN_REQUIRED`, and no try is spent.
+  - Wrong PIN or a non-manager's PIN → 403 `MANAGER_PIN_INVALID`.
+  - Locked → 429 `PIN_LOCKED` with `Retry-After`.
+  - The PIN is checked after the cheap validation and after a pre-read of the order. The
+    write then re-validates everything.
+- **Standing discount without a PIN (a decision).** All of these must hold:
+  - the order's `customer.profileId` is a `kopaCustomerProfiles` doc;
+  - its `standingDiscount` has the same type and value as the request (compared in agorot);
+  - the profile phone equals the order's customer phone (`normalizePhone`).
+
+  The owner set that discount on the profile, so applying it unchanged is not a new
+  decision. Anything else needs the PIN. A PIN sent anyway is verified and recorded.
+  Residual risk: the cashier chooses which profile is on the order. That is why
+  `source: "standing"` and `profileId` are stored, so that reports can surface it.
+- **Refund amount.**
+  - `amount` wins when it is sent.
+  - Otherwise the amount is the lines' value at the order's discount ratio:
+    `round(Σ unitPriceC×qty × totalC / subtotalC)`.
+  - Σ refunds ≤ paidAmount (409 `REFUND_TOO_LARGE` or `NOTHING_REFUNDABLE`, with
+    `refundable`).
+  - A line qty above `qty − refundedQty` is 409 `REFUND_QTY_TOO_LARGE`. A cancelled line is
+    409 `LINE_CANCELLED`. A non-paid order is 409 `ORDER_NOT_PAID`.
+  - `status` stays `paid`. Lines are never removed or cancelled, so subtotal and total do
+    not move.
+- **Idempotency.**
+  - Every money write is CAS `{ _id, status, rev }` + `$inc: { rev: 1 }`, with 0 retries.
+    Of two concurrent writes, one wins and the other gets 409 `CONFLICT`.
+  - `clientPaymentId` / `clientRefundId` (uuid, compared lower-cased) are checked inside the
+    CAS read, so a replay writes nothing. A replay also works on a paid order.
+  - On a lost CAS, the order is re-read. If the twin request's entry is there, the loser
+    answers it with 200 `replay: true`.
+  - The same id with another method, amount or set of lines is 409
+    `CLIENT_PAYMENT_ID_REUSED` / `CLIENT_REFUND_ID_REUSED`.
+  - A replay needs no PIN. It writes nothing and returns only what a `KOPA_TILL` GET returns.
+  - `POST /:id/payments` now answers 201 for a new payment and 200 for a replay.
+- **Not built:** receipts or tax documents for till refunds and discounts (till receipts are off:
+  orders CORE invariant 30, phase 6), and any link from a till refund to a provider.
 
 ## 7. Data model (central `shoofi` unless noted)
 - `store {id:1}.credentials` — the platform payment creds (§1).
@@ -180,6 +285,11 @@ hangs the request (CORE invariant 11), so none of them answered.
 5. **Coins/coupons settle only AFTER payment success**; failures are logged CRITICAL for
    manual reconciliation, never rolled back against an irreversible capture.
 6. **Order dedup lock** (Redis `SET NX` + fallback + 30s window) prevents double charges.
+7. **Cancel money is settled once, and "nobody decided" is recorded as such** (CORE invariant
+   12, orders CORE invariant 27): `cancelMoneyDecision` ∈ keep/refund/undecided;
+   `paymentAuth.refundRequiredReason` reasons written on cancel are `captured_before_cancel`,
+   `release_refused_ccode_*`, `release_error` (release), `refund_*` (explicit refund) and
+   `cancel_no_decision` (an undecided settled single charge, written by `routes/order.js`).
 
 ## App — shoofi-app (customer) payment client
 - **Method resolution**: `helpers/get-supported-payment-methods.ts` → GET `payment-methods`;
@@ -211,6 +321,13 @@ hangs the request (CORE invariant 11), so none of them answered.
   `components/credit-card/HypTokenizeWebView.tsx`) — card entered in the hosted page, never
   in RN; result URL carrying `CCode` is intercepted (navigation blocked) and forwarded to
   `payments/hyp-process-token`. Saved cards via `stores/creditCards` (`/credit-cards` CRUD).
+  - **Managing saved cards** (shoofi-app PR #99): `screens/credit-cards` (route `credit-cards`) opens
+    from the profile row «بطاقات الدفع» (logged-in only) and is also rendered inside checkout's
+    card sheet (`components/CreditCardModal`, with `onClose`). Expiry is shown from `tokef`
+    (YYMM) via `helpers/credit-card-display.ts`; expired cards cannot be made default (UI-only:
+    an expired default that is already set is still preselected at checkout). Delete confirms
+    in an in-app sheet (`components/credit-card/DeleteCardSheet.tsx`). Adding a card from the
+    profile uses the same HYP hosted page (platform `hyp_enabled`, no store needed).
 - **Apple/Google Pay**: ZCredit WebCheckout session created **client-side** (`screens/checkout/
   index.tsx`, `data/zcredit-config.ts`) with `zcredit_api_key`; heavy dedup/retry guards;
   server verifies & captures. Google Pay routed through the ZCredit web-view (native button disabled).
@@ -226,6 +343,21 @@ hangs the request (CORE invariant 11), so none of them answered.
   response its effect has not superseded. Before this, a late, superseded auto-apply answer
   wrote the store directly, so an order went out at the discounted total with
   `appliedCoupon: null` (no couponUsages row; 8265-1164, GCP 5194-1334 on 2026-10-27).
+  **A coupon the total did not use is not sent either.** TotalPrice puts one flag on
+  `promotionsStore.setCheckoutSelection({ couponSuppressed })`; `use-checkout-submit.ts` sends
+  `appliedCoupon` only when it is false, and the twin split (`splitCouponForTwin`) gets `null`.
+  It is true in two cases: (1) a delivery coupon that lost to the store's delivery deal (orders
+  CORE invariant 13); (2) since shoofi-app#87, a delivery coupon (`helpers/delivery-price-coupon.ts`
+  `isDeliveryCoupon`: `type` `free_delivery` / `delivery_price` or `discountType: 'delivery'`) on a
+  pickup or drive-in order (`isDeliveryCouponOffForMethod`). Either way the card shows it as "not
+  used on this order" (`notUsedReason`; case 2 says «التوصيل غير مشمول في الاستلام»), the total takes
+  nothing off, and a one-time coupon is not spent on ₪0. In case 2 the app does not ask
+  `/api/coupons/apply` (a fixed-price coupon would come back `COUPON_NO_DISCOUNT` and be dropped);
+  it keeps the coupon with `discountAmount: 0`, and switching back to delivery re-quotes it with
+  the real fee. **Server gap, not closed:** creation does not drop a ₪0 `free_delivery` /
+  `discountType: 'delivery'` coupon on a non-delivery order (only the `delivery_price` type is
+  re-priced and dropped, orders CORE invariant 14), so an older bundle that still sends one gets a
+  ₪0 `couponUsages` row from `buildCouponUsageDocs` (`services/coupons/coupon-usage.js`).
   Checkout also clears a store coupon left from an earlier visit on mount. It declares what
   its bundle can render in `x-client-features` (`consts/shared.ts` `CLIENT_FEATURES`, sent by
   `utils/http-interceptor`); `delivery-price-coupon` unlocks fixed-delivery-price coupons.
