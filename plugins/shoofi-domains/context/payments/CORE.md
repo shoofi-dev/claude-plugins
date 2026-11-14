@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -204,6 +204,39 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    (idempotent: a compensation row with that `cancelDecisionKey` is reused) — one Shoofi-funded
    `COMP-<primary originalOrderId>[-n]` per twin decision; per-side calls still refuse twins.
    Invoices are untouched.
+
+## Kopa till money (phase 4d) — bookkeeping, NOT a charge
+shoofi-server `services/kopa/till-money.js` + `routes/kopa/till-money.js` (branch
+`feat/kopa-phase1`, 2026-11-12), and the totals in `services/kopa/till-orders.js`.
+Full rules: reference §6b. Orders CORE invariant 30 owns the till order itself.
+- **No money moves.** Discounts, tips, till payments and till refunds are records on a
+  `kopaTillOrders` document. No card is processed, and HYP and ZCredit are never called.
+  Nothing writes `orders`, `paymentAuth`, `creditCards` or any money-in collection. None of
+  invariants 1–12 applies, and none of them is touched. A till refund is the store handing
+  money back by its own means. It is NOT a provider refund and NOT the
+  `cancelMoneyDecision` / money-ledger path.
+- **Totals.** `total` = subtotal − discount.amount (0 for a staff meal). **The tip is not in
+  `total`.** `amountDue` = total + tip.amount, `balance` = amountDue − paidAmount, and the order
+  is `paid` when the payments reach `amountDue`. Discount and tip amounts are re-computed by
+  the server on every write, half-up to the agora. A discount is capped at the subtotal.
+- **Manager PIN** (`verifyManagerPin`, customers reference 5g) for a discount, removing one,
+  and every refund. One exception: a discount that matches the order's customer-profile
+  `standingDiscount` exactly (same type, same value) when the profile phone is the order's
+  phone. It is stored as `source: "standing"` with `approvedBy: null`.
+- **Idempotency.** Every write is CAS `findOneAndUpdate({ _id, status, rev })` and is never
+  retried, so of two concurrent writes one wins and the other gets 409. A payment's
+  `clientPaymentId` (uuid) and a refund's `clientRefundId` make a repeat answer the original
+  with 200 and `replay: true`. That holds when the order is already paid, and when two
+  identical requests race. The sum of refunds is at most `paidAmount`, and a refund never
+  deletes or cancels a line.
+- **No money without a shift** (shoofi-server@feat/kopa-phase5 407a0533, 2026-11-12). A new
+  till payment with a money method (all but UNPAID) and every new till refund need an open till
+  session. Otherwise 409 `NO_OPEN_SESSION` and nothing is written. A replay, UNPAID, a discount
+  and a tip need none. Each new entry carries `sessionId`. Rules and the close race: accountant
+  CORE "Kopa till sessions & reports", accountant reference §12.
+- The Z / X sessions and till reports (`services/kopa/till-sessions.js`, `till-reports.js`)
+  read `discount.amount`, `tip.amount` and `refunds[]` from the order. This doc does not
+  cover them.
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
