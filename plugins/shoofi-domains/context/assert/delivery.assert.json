@@ -45,12 +45,18 @@
         "services/courier-applications/applications.js",
         "services/courier-applications/applicant-auth.js",
         "services/courier-applications/banks.js",
+        "services/courier-applications/contract.js",
+        "services/courier-applications/document-versions.js",
+        "services/courier-applications/rate-limit.js",
         "routes/courier-documents.js",
         "services/courier-documents/documents.js"
       ],
       "symbols": {
-        "services/courier-applications/applications.js": ["approvalBlockers", "approve", "fromApplicationId", "isControlledByAdmin: false"],
-        "services/courier-applications/applicant-auth.js": ["applicantAuth", "x-applicant-key"],
+        "services/courier-applications/applications.js": ["approvalBlockers", "approve", "fromApplicationId", "isControlledByAdmin: false", "approvalProgress", "BAD_CITY", "BAD_CONTRACT_VERSION", "textSnapshot", "UPLOAD_LIMIT", "BANK_FIELDS"],
+        "services/courier-applications/applicant-auth.js": ["applicantAuth", "x-applicant-key", "findOneAndUpdate", "TOO_MANY", "isProduction"],
+        "services/courier-applications/contract.js": ["CONTRACT", "placeholder: true", "currentContract"],
+        "services/courier-applications/document-versions.js": ["writeVersionedDocument", "MAX_VERSIONS_PER_KIND", "deleteMany"],
+        "routes/courier-applications.js": ["/api/courier-applications/contract", "/api/courier-applications/me/work-areas", "UPLOAD_LIMIT"],
         "services/courier-documents/documents.js": ["listForDriver", "courierDocumentFiles", "fromApplicationId"],
         "routes/courier-documents.js": ["/api/courier-documents/mine", "/api/admin/drivers/:driverId/documents"],
         "services/delivery/availability.js": [
