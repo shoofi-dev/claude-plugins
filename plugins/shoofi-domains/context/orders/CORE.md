@@ -947,7 +947,12 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       World Cup points, coupon uses and store-deal uses (`returnLegExtras`, recorded on
       `degrade.returnedOnDegrade`, points as `worldCupPointsReversed`). **`cascadeCancel`** re-reads
       both legs after its cancels and reverses the World Cup points of every leg in a cancel
-      status (`reverseLegWorldCupPoints`), so a leg whose cancel failed keeps its points.
+      status (`reverseLegWorldCupPoints`), so a leg whose cancel failed keeps its points. Its coin
+      step (used refunded, earned removed) follows the same rule: only a leg whose re-read status
+      is a cancel status (4/5/7/8/9, `isCancelledStatus`). A leg whose cancel write failed stays
+      live and keeps its coins for its own later cancel, because refunding it would spend
+      `refundCoins`' once-per-order key on a live order. A leg already cancelled before the cascade
+      (e.g. driver-cancel `9`) is still refunded, once.
     - **Flow events** (`shoofi.orderFlowEvents`, the `trackOrderFlowEvent` writer, swallowed on
       failure): `twin_degrade`, `twin_undo_degrade`, `twin_cascade_cancel` on BOTH legs
       (metadata `groupId`, `side`, `role`, actor = the admin), `cancel_money_undecided`
@@ -967,7 +972,8 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       the 3 failed-undo groups' kept orders were never seen.
     - Tests (shoofi-server): `twin-cancel-safety.js`, `twin-admin-auth.js`,
       `order-cancel-undecided.js`, `order-cancel-settle-money.js`,
-      `order-cancel-money-before-status.js`, `hq-money-audit.js`, `money-cancel.js`.
+      `order-cancel-money-before-status.js`, `hq-money-audit.js`, `money-cancel.js`,
+      `twin-cancel-coins-only-cancelled-legs.js`, `twin-cancel-reverses-world-cup-points.js`.
 
 28. **THE CHARGE IS THE UNIT OF MONEY: ONE APPEND-ONLY LEDGER PER CHARGE, ONE SUMMARY, ONE
     DECISION** (shoofi-server `fix/twin-cancel-safety`, 2026-11-07; contract
@@ -1039,7 +1045,8 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `["accountant"]` (+ master). Errors: `{reason, message, code}`.
     - **Coins are refunded once per order** (`refundCoins`: `customerCoins.cancelRefundedOrderIds`
       in the same atomic update; legacy rows recognised by their notes) — the twin path refunded
-      the trigger leg twice (order route + cascade).
+      the trigger leg twice (order route + cascade). In a twin cascade, only for a leg that is
+      actually cancelled (invariant 27).
     - **World Cup points are reversed once per twin leg.** `reverseLegWorldCupPoints`
       (`services/twin-order/twin-group-service.js`) skips a leg whose wallet already holds a
       `reverse` transaction for that `orderId`. That is what keeps the order route's reversal of
@@ -1053,7 +1060,8 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       BOTH legs) — deduped by coupon code / compensation id, so a group so covered owes 0.
     - Tests (shoofi-server): `money-cancel.js` (ledger, every endpoint, roles, concurrency,
       re-cancel, cash twin, keep→refund on a partly used coupon, HYP success/refused/timeout/cap,
-      singles through the order pipeline, coins once), plus the invariant-27 tests.
+      singles through the order pipeline, coins once per leg with both legs carrying used and
+      earned coins), plus the invariant-27 tests.
 
 29. **KOPA'S ORDER READS USE THE STORE REPORT'S DAY ON `created`, SUM `orderPrice`, AND COUNT
     ONLY COMPLETED ORDERS AS SALES** (shoofi-server `routes/kopa/orders.js` +
