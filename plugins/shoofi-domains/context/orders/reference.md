@@ -576,6 +576,18 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
 - **Twin (customer side)**: `stores/twin-order` + `stores/twin-cart` (second-store cart);
   combined checkout calls `twin-order/{eligible-stores, quote, place, pay,
   digital-place-pending, digital-finalize}`. Secondary side `shippingPrice:0` (combination fee covers it).
+  - **Twin tracking card** (`screens/order/active/components/twin-active-order-header.tsx`,
+    used by the ActiveOrders tab and `screens/order/item`): "where is the food" on a DELIVERY
+    side comes from that leg's `bookDelivery.status` (`delivery/book/{bookId}` per side, polled
+    every 30 s only while the side is at `"3"`/`"11"`), never from `order.status`: `"11"` is the
+    store's own «handed over» button and nothing writes it on courier pickup. The per-side mini
+    label and the group status `getGroupStatus(primary, secondary, deliveries)` both follow the
+    single-order rule in `helpers/customer-order-status.ts`. Group "השליח בדרך אליך"
+    (`twin_status_en_route`) = any delivery side's courier at COLLECTED_FROM_RESTAURANT/DELIVERED;
+    a delivery side at `10`/`11` that no courier collected reads as `"3"`. A pickup side keeps the
+    store's `10`/`11` (shoofi-app#139, 2026-11-15). **The group status badge is not rendered
+    today** (commented out in the header's status strip since the twin card landed); the timer,
+    the ETA line and the per-side labels are what the customer sees.
 - **Tracking = POLLING every 30s** — **no websocket for customer order status** (WS is only
   used for store/menu refresh elsewhere). Detail: `screens/order/item`, timer `order-timer.tsx`
   keyed on status, ETA via `delivery/book/{bookId}`.
@@ -1155,7 +1167,8 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
 - **Cancel money (CORE invariant 28) — the admin side, shoofi-delivery-web#346:**
   - **A support cancel of one twin side leaves it `7`** (CANCELLED_BY_ADMIN), not `5`; the
     customer app's `twin-active-order-header.tsx` `getGroupStatus` checks the degraded pair before
-    "any side cancelled" (shoofi-app#96), else order history would read "ההזמנה בוטלה".
+    "any side cancelled" (shoofi-app#96), else the group status would read "ההזמנה בוטלה"
+    (that badge is not rendered today — see C1 "Twin tracking card").
   - **One cancel dialog** (`src/components/Modals/CancelMoneyDialog.tsx`, rules in
     `src/utils/cancel-dialog.ts`, calls in `src/apis/admin/money.ts`) for single orders and both
     twin cards: `money/cancel-preview` → scope choice (twin: this side / the other side by name /
