@@ -940,9 +940,20 @@ boundary and say so in the PR.
       `app-type` (invariant 28). `POST /api/store` needs nothing new: non-admin callers
       get `sanitizeStoreForPublic`, and the partner's echoed save is cut to `PARTNER_STORE_FIELDS`
       (shoofi-server #354).
-    - `GET /api/admin/categories/:page?` is still open. delivery-web
-      `src/apis/admin/category/get-categories.ts` (used by `StoreForm.tsx`) calls it with plain
-      `axios` and no token. Switch that to `axiosInstance` before gating it.
+    - `GET /api/admin/categories/:page?` is `CATALOG_ADMIN` (2026-11-11, HQ #710d32). delivery-web
+      `src/apis/admin/category/get-categories.ts` (`StoreForm.tsx`) moved from plain `axios` to
+      `axiosInstance` in the same change; ship the web no later than the server.
+    - **The catalog worklists** (2026-11-11, HQ #710d32). `routes/admin/menu-import-issues.js`
+      (all four routes; they had NO auth) and `GET /api/admin/catalog-lint/summary` are
+      `CATALOG_ADMIN`. `routes/admin/issues.js` reads + "run now" are `RAIL_READERS` (same list,
+      `DASHBOARD_ROLES`); `price-align` keeps `PRICE_EDIT_ROLES`. `POST /api/admin/catalog-lint/run`
+      is `LINT_RUNNERS` (master/admin/manager): no screen calls it, and with no `appName` it lints
+      every store. Do not narrow the rail or the importer's list to master/admin/manager: the
+      IssuesRail is mounted for every admin user (`layouts/Admin.js`) and turns a 403 into "0
+      issues", most of the team is `viewer`, and the importer's product writes are already
+      `PRODUCT_ADMIN`, so a narrower list silently loses a viewer's import record.
+      `auth.required` alone is NOT an admin gate: customer, partner and driver tokens share the
+      JWT secret and pass it. Tests: `test/integration/catalog-worklist-admin-auth.js`.
     - `test/integration/catalog-admin-auth.js` fails for any route under these prefixes with no
       decided audience, for a gated route without `auth.required` first, and for any public store
       list above whose body holds one of the four keys or their values. It also checks that twin

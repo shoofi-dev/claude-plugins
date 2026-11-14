@@ -799,9 +799,22 @@
           "desc": "doc CORE invariant 27: explore v1 strips accounting from every card, cache hit or fresh build"
         },
         {
-          "file": "test/integration/catalog-admin-auth.js",
-          "regex": "const NOT_DECIDED_HERE = new Set\\(\\[\"GET /api/admin/categories/:page\\?\"\\]\\);",
-          "desc": "doc CORE invariant 27: the one in-scope route still open, until delivery-web sends a token for it"
+          "file": [
+            "routes/category.js",
+            "test/integration/catalog-admin-auth.js"
+          ],
+          "regex": "router\\.get\\(\"/api/admin/categories/:page\\?\", \\.\\.\\.CATALOG_ADMIN,|const NOT_DECIDED_HERE = new Set\\(\\[\"GET /api/admin/categories/:page\\?\"\\]\\);",
+          "desc": "doc CORE invariant 27: GET /api/admin/categories is CATALOG_ADMIN (HQ #710d32; the NOT_DECIDED_HERE leg is the pre-merge code, drop it once fix/gate-catalog-admin-routes is on main)"
+        },
+        {
+          "file": "routes/admin/menu-import-issues.js",
+          "regex": "router\\.delete\\(\"/menu-import-issues/:id\", \\.\\.\\.CATALOG_ADMIN,|router\\.delete\\(\"/menu-import-issues/:id\", async",
+          "desc": "doc CORE invariant 27: the menu-import-issues worklist routes are CATALOG_ADMIN (HQ #710d32; the bare `async` leg is the pre-merge code, drop it once fix/gate-catalog-admin-routes is on main)"
+        },
+        {
+          "file": "routes/admin/catalog-lint.js",
+          "regex": "router\\.post\\(\"/catalog-lint/run\", \\.\\.\\.LINT_RUNNERS,|router\\.post\\(\"/catalog-lint/run\", auth\\.required,",
+          "desc": "doc CORE invariant 27: catalog-lint run (no appName = every store) is master/admin/manager (HQ #710d32; the auth.required leg is the pre-merge code, drop it once fix/gate-catalog-admin-routes is on main)"
         },
         {
           "file": "routes/product.js",
