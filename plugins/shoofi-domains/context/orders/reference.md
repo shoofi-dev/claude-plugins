@@ -20,7 +20,14 @@ Primary files: `routes/order.js` (~7k lines), `routes/twin-order.js`,
 `routes/order-origin-validator.js`, `routes/admin/order-monitoring.js`,
 `routes/admin/twin-order-config.js`, `services/twin-order/*`,
 `utils/order-stock.js` (stock semantics), `utils/crons/*order*`,
-`services/monitoring/centralized-flow-monitor.js`. Status constants: `consts/consts.js`.
+`services/monitoring/centralized-flow-monitor.js`, `routes/order-history.js` +
+`services/orders/order-history.js` (the partner's one-day history, CORE invariant 21),
+`routes/kopa/orders.js` + `services/kopa/orders.js` (Kopa's order reads, CORE invariant 29, C5),
+`routes/kopa/{reasons,tables,till-orders,kds,settings}.js` + `services/kopa/` same names (the
+Kopa till: in-store sales in `kopaTillOrders`, never `orders`; CORE invariant 30, C5).
+`routes/kopa/table-orders.js` + `services/kopa/table-orders.js` + `services/orders/order-source.js`
+(Kopa QR table orders: an `orders` doc with `source: "kopa-qr"`; CORE invariant 31, C5).
+Status constants: `consts/consts.js`.
 
 **⚠️ HIGH-RISK code (change via draft PR flagged HIGH-RISK; never merge):**
 - `POST /api/order/create` — the creation pipeline (`order.js`)
@@ -40,7 +47,8 @@ explicit "what could break" section in the PR body. Open it as a **draft**.
 - **Customers are ALWAYS central `shoofi`** — `getCustomerAppName()` ignores
   appName and returns `req.app.db['shoofi']` (`utils/app-name-helper.js`).
   So `customers` + `customers.orders[]` are central, orders are per-store.
-- Central `shoofi` also holds: `orderFlowEvents`, `twinOrderGroups`, `couponUsages`,
+- Central `shoofi` also holds: `orderFlowEvents`, `twinOrderGroups` (the `db.twinOrderGroups`
+  handle maps to it since 2026-11-06; before, to an empty `twin-order-groups`), `couponUsages`,
   `fraudChecks`, `deviceCustomers`, `ipCustomers`, `applePaySessions`,
   `hypPaySessions`, `pendingFeedbackNotifications`, `stores`, `store{id:1}` (platform creds).
 - `delivery-company` holds `bookDelivery` + twin config (`readConfig`).
@@ -95,6 +103,9 @@ the server's). Anything reading `order.readyMinutes` (e.g. `computeOrderDelays` 
 
 ## 3. Order creation pipeline (understand; do not edit without sign-off)
 `POST /api/order/create` (`order.js`) — ordered side effects:
+**saved-address guard** (only when `shoofi.store{id:1}.requireSavedDeliveryAddress === true`,
+default off: a DELIVERY order to an address that is not one of the customer's saved ones →
+400 `DELIVERY_ADDRESS_REQUIRED`; APPLEPAY / HYP exempt — customers CORE invariant 19) →
 lock (Redis `SET NX` + in-mem fallback + 30s dup check) → fraud checks → generate
 `originalOrderId`/`orderId` → image upload → decide initial status → validate coins
 (no debit) → price corrections, in this order: coupon entitlement (`enforceCouponEntitlement`:
@@ -105,7 +116,11 @@ and never rejects → build `orderDoc` → **insert into store `orders`** (autho
 `[shippingPriceCheck]` fired and **never awaited** (log-only; a DELIVERY fee below the area
 tariff → one warn line + `order.shippingPriceCheck`, CORE invariant 20) →
 **stock decrement if status≠"0"** → first-order attribution → Apple Pay session
-self-heal → fraud persistence → **push `customers.orders[]` snapshot (central)** →
+self-heal → fraud persistence → **push `customers.orders[]` snapshot (central)** (+ seed
+`addresses[]` for a customer with none — a real address only, with an `_id`:
+`addressToSaveFromOrder`, customers CORE invariant 19) →
+remember the confirmed delivery address (`rememberConfirmedAddress`, **fire-and-forget**,
+after the snapshot write that would clobber it — customers CORE invariant 19) →
 notify store owner (**a repeating alert, not one push**, **fired in the background and
 never awaited** — `fireStoreOwnerNotifications`, see §7) → flow event →
 (CC/HYP branch: charge → set `6`/`1`/`13`, stock,
@@ -141,9 +156,52 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   Not handled: `degradeToSingle` with `keepSide:'secondary'` moves the FULL primary fee onto the
   kept order (`$inc total`) while the primary's coupon usage stays. This was already true for
   every delivery coupon before this change.
-- **Dispatch**: longer-prep side dispatched first; second side revealed on first accept.
-- **Cancel/degrade**: `cascadeCancel` (both), `degradeToSingle` (keep one, record
-  `degrade.refundOwed`), `undoDegrade` (bails if refund cleared).
+- **Customer notes**: `commentToCourier` is ONE note for the shared courier and is written on
+  both legs. `commentToStore` is ONE NOTE PER STORE: `primary.commentToStore` goes on the primary
+  leg and `secondary.commentToStore` on the secondary. `buildSkeletonOrder` cleans each value,
+  and a leg never carries the peer's note (CORE invariant 25).
+- **Dispatch**: longer-prep side dispatched first (`pickupSequence` 1); the second side
+  (`pickupSequence` 2) is held back from its store's new-orders lists while the first-dispatch
+  order is LIVE and NOT YET ACCEPTED — one rule, `resolveTwinSecondaryVisibility`
+  (`utils/twin-order-visibility.js`), used by `GET order/admin/not-viewd`,
+  `GET order/admin/all/not-viewd` and `GET order/admin/my-stores/new-orders-count` (they
+  disagreed until 2026-11-10; a first store cancelled before accepting hid the second order
+  forever in the multi-store view and badge). Visible when this order is `twinGroup.degraded`
+  or already opened (`viewdAt`), the first-dispatch order is missing or cancelled/rejected
+  (4/5/7/8/9, string or number), the group is `degraded_to_single`/`cancelled`, or the first
+  order was accepted (`viewdAt`, any status after). Fail open. `twinPeerInfo` (the readyMinutes
+  cap) only for a live, accepted peer. The peer is looked up by `peerOrderId` pinned to
+  `twinGroup.groupId` (the short number repeats), falling back to the group id.
+  **The second store's persistent alert** (push + reminder cron) fires on the first store's accept
+  (`order/update/viewd`) — and, since 2026-11-10, also when the first store is DROPPED
+  (`degradeToSingle` → `releaseSecondStore`: kept order is pickupSequence 2, status 6/14, not
+  opened, no alert on record) with a `twin_second_store_released` flow event. An undo that puts
+  the first store back to "not accepted" re-hides an unopened kept order and records
+  `twin_second_store_rehidden`. The admin bundle (`twin-order/admin/group/:id/full`) and the
+  monitoring `twin.group` carry `secondStoreWaiting` + `secondStoreWaitingDetail {waitingStore,
+  blockingStore}` while the second order is hidden.
+- **Cancel/degrade** (CORE invariant 27): `cascadeCancel` cancels both legs, stamps
+  `cancelMoneyDecision: "undecided"` on each card leg it cancels and records NO refund amount
+  (no group money decision exists yet). `degradeToSingle` keeps one leg and records
+  `degrade.refundOwed` = the dropped leg's `total − shippingPrice` (before any shipping
+  transfer) + `combinationFee.customerPays`, and **0 unless that leg was card-captured** (cash,
+  never-paid, failed → `refundBreakdown.basis: "not_card_captured"`, no auto-refund attempt).
+  **The group's `paymentStatus` stays as it was — `both_captured` after a degrade**; the
+  refund's state is only `degrade.refund{Attempted,Completed,ReferenceNumber,Error}`. Groups
+  degraded before 2026-11-06 read `pending` (overwritten) and carry the old `orderPrice`-based
+  `refundOwed`. No automatic ZCredit reversal (`degradeAutoRefund` is not read); a degrade with no
+  decision owes `refundOwed` as `undecided` on the group's money ledger (CORE invariant 28), and
+  returns the dropped leg's coins / coupon uses / deal uses. `undoDegrade` is refused (route: 409
+  `{ message, reason }`, nothing written) by
+  `undoDegradeBlockReason`: `money_already_handled` — `degrade.refundAttempted ||
+  degrade.refundCompleted`, either order has `cancelCompensation`, or either order has a
+  `cancelMoneyDecision` with `cancelMoneyDecisionAt` after `degrade.triggeredAt` (a missing
+  timestamp counts as after), or the group's `moneyLedger` moved since the degrade (anything but
+  capture/release and the degrade's own undecided decide/owe); else `kept_side_cancelled` — the
+  kept order is in 4/5/7/8/9.
+  Before 2026-11-06 undo's group write went to `db.twinOrderGroups`, aliased to the empty
+  `twin-order-groups`, so it never restored a group. All three write `orderFlowEvents` on both
+  legs (`twin_cascade_cancel`, `twin_degrade`, `twin_undo_degrade`) with the admin as actor.
 - Never route twin peer transitions through `/api/order/update` — use the services (recursion).
 
 ## 5. Data model — the join map (memorize the snapshot trap)
@@ -164,6 +222,40 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   `find({ shippingPriceCheck: { $exists: true } })` lists the flagged ones. Diagnostic only:
   no reader, no index, money unchanged. A `book-delivery.order` snapshot taken before the `$set`
   lands does not carry it. CORE invariant 20.
+- **`orders.isFirstOrderAtStore`** (top level, boolean or ABSENT) = "the customer's first
+  order at this store", written once at insert by `/api/order/create` and both twin place
+  routes (`applyFirstOrderFlag`, `services/orders/first-order-at-store.js`), never rewritten.
+  Absent = unknown (failed lookup, or an order from before 2026-11-08), so a reader badges only
+  `=== true`. Index `customerId_idx` `{ customerId: 1 }`. Rules: CORE invariant 24.
+- **`orders.order.address`** (the INNER `order`, beside `items` / `commentToCourier`; there is no
+  top-level `orders.address`) = a snapshot of the **saved address** the customer delivered to. The
+  customer app sends the address object whole (`screens/checkout/index.tsx` `addressLocationRef` →
+  `getCartData` `address: order.address`, `stores/cart/index.ts`) and `/api/order/create` keeps it
+  through `order: { ...parsedBodey.order, … }`. Beside `street` / `streetNumber` / `city` /
+  `location` it carries the customer's own label `name` ("בית", "عمل"), the building details
+  `floorNumber` / `apartmentNumber` / `entrance`, and **`notes` = the courier landmark** (the
+  app's «סימן דרך לשליח», "white house next to the mosque"). All optional free text, often `""`.
+  - **`notes` is not `commentToCourier`.** `notes` is saved WITH the address and repeats on every
+    order sent there; `commentToCourier` is typed per order at checkout (support can edit it,
+    `routes/order-comment-to-courier.js`). Show them as two labelled things.
+  - **Only as complete as the saved address.** Before shoofi-server #534 (merged 2026-11-10)
+    adding an address (`controllers/customerAddressController.js` `buildAddress`) stored
+    `floorNumber` and `notes` but dropped `apartmentNumber` / `entrance`; editing it
+    (`updateAddress`) kept them. Since #534 add keeps both when sent, so only addresses added
+    earlier and never edited lack them. Customers domain (customers CORE).
+  - **Never rewritten for content.** Support's `update-address-to-current-location`
+    (`routes/customer.js`) moves `order.address.location` (+ `isCurrentLocation`, `updatedAt`,
+    `updatedBySupport`) and `order.geo_positioning`; `notes` and the building details stay.
+  - Copied whole into the `bookDelivery.order` snapshot at store accept (the booking's `order` is the
+    order document), and into `customers.orders[].address` at create.
+- **`orders.order.commentToStore`** (string or ABSENT) = the customer's note to the store, from
+  the cart page. Cleaned by `sanitizeCommentToStore` (`utils/comment-to-store.js`): strings only,
+  whitespace runs collapsed but a single line break kept, ≤ 200 chars, absent when empty. Kept on
+  every receipt method. On a twin, each leg has its own store's note. Written only at insert,
+  with no edit path, and not in `customers.orders[]`. Do not confuse it with
+  `orders.order.commentToCourier` (customer → courier, DELIVERY only, support-editable) or with
+  top-level `orders.note` (the store staff's own note, `/api/order/update` whitelist).
+  CORE invariant 25.
 - **`shoofi.customers.orders[]`** = a **write-once snapshot with NO status field.**
   `{ orderId(ObjectId→orders._id), appName, created, total, orderIdNumber(=orders.orderId),
   originalOrderId, ... }`. **NEVER infer status/completion/revenue from it** — join
@@ -181,8 +273,70 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   - **`order_viewed` `metadata.previousStatus` is always wrong** — `/update/viewd` reads it
     from the order re-fetched *after* its `$set`, so it equals the new status. Pre-accept
     status (normally `6`) is not recorded there; take it from the prior event.
-- **`delivery-company.bookDelivery`** keyed by `bookId` = order `orderId`; mirrors
-  `DELIVERY_STATUS` (`1` waiting_approve … `3` collected/pickup … `4` delivered).
+- **`delivery-company.bookDelivery`** (Mongo collection `book-delivery`) carries three order keys:
+  `bookId` = the order's short `orderId`, `originalBookId` = its full `originalOrderId`, and
+  `appName` = the store's DB name. It mirrors `DELIVERY_STATUS` (`1` waiting_approve … `3`
+  collected/pickup … `4` delivered). CORE invariants 22 (matching a delivery) and 23 (locating an
+  order's row: `deliveryRowFilterForOrder(order, appName)`, `utils/delivery-row.js`).
+  - **The short number is not unique, across stores or within one.** `orderId` is the first 4 +
+    last 4 digits of the 14-digit `originalOrderId` (`generatedOrderId`, `routes/order.js`; the
+    twin routes cut it the same way), roughly 5×10^7 values. Prod on 2026-11-08: 88 `bookId`s were
+    shared by 2+ stores out of 106,071 rows, the newest collision from 2026-11-07; and 12
+    (appName, orderId) pairs in `customers.orders[]` belonged to two different orders (GCP
+    "0880-8715", GCP "4587-1395", cacao "7660-8910", …). The full id had 0 collisions across
+    173,659 orders.
+  - **Who writes what.** Every booking writes `bookId: order.orderId`,
+    `originalBookId: order.originalOrderId` and `appName: storeData.appName || order.appName`
+    together: store accept `POST /api/order/update/viewd`, twin sides included, and
+    `POST /api/order/start-preparing`. `originalBookId` is on all 85,304
+    rows created since 2025-12-12. The 20,771 rows without it are all older; the newest is from
+    2025-12-12. The one duplicate `originalBookId` is a single vapego order booked twice (one row
+    `-3`), not a collision. `services/delivery/book-delivery.js` **invents a random
+    `originalBookId`** when the booking passed none, so a row having one does not prove it came
+    from an order. Delivery-only bookings use `String(idempotencyKey)`. 96 rows carry the
+    `appName` fallback `"shoofi-app"`. Every `created` is an offset string (106,076 of 106,076),
+    and a booking is always made after its order. Across the past 14 days' delivered rows, the
+    gap from order to booking ran from +5 s upward, and none was negative.
+  - **No index on `originalBookId`** (indexes: `bookId`, `{bookId, status, completedAt}`,
+    `created`, `order._id`, …). On 2026-11-08 an `$or` with an `originalBookId` branch scanned
+    104,734 docs (339 ms). Query on `bookId` and compare the full id in code. The order's own row
+    always shares its `bookId`, so it is always in that result.
+  - **Matched correctly:** `filterOutDeliveredOrders` (`utils/active-orders.js`, behind
+    `GET /api/order/customer-active-orders`).
+    - It reads delivered rows by `bookId ∈ …, appName ∈ …` (indexed) and projects `bookId`,
+      `appName`, `originalBookId` and `created`. It groups the rows by exact `appName|bookId`,
+      because the two `$in`s are a cross product.
+    - A row is the order's delivery (`isDeliveryOfOrder`) when `originalBookId ===
+      order.originalOrderId`.
+    - **Only if either side lacks the full id**, it accepts a row booked no more than
+      `BOOKING_BEFORE_ORDER_MARGIN_MINUTES` (10) before the order (`isBookedAfterOrder`). A row
+      whose `created` is missing or unreadable is not accepted. That rules out every older
+      same-store row, including all legacy rows without `originalBookId`.
+    - The endpoint passes the store DB it read each order from (`appNameOf`), falling back to
+      `order.appName`.
+    - Kept, never dropped: an order with no known store, and every order when the delivery DB
+      read throws.
+    - History: before the fix it matched on `bookId` alone. On 2026-11-08 GCP's live CASH order
+      1096-8335 never reached the customer's ActiveOrders screen or tab-bar bubble, because
+      burger-house had a delivered 1096-8335 from 2026-09-21. The customer ordered again. Fixed in
+      shoofi-dev/shoofi-server#513. Tests: `test/integration/customer-active-orders-per-store.js`.
+      The app half (the just-placed order shown before the poll, and an error state instead of
+      "no orders") is in C1 "Tracking".
+  - **Located with `deliveryRowFilterForOrder`** (CORE invariant 23, shoofi-server#514, merged
+    2026-11-08): `/api/order/update` cancel and ready-for-pickup (find, then write by `_id`),
+    `update-delay`, order-amend `syncDeliverySnapshot`, twin `cascadeCancel` / `degradeToSingle` /
+    `undoDegrade` (via `legDeliveryFilter`), twin `group/:groupId/full` and `assign-driver`,
+    support `update-address-to-current-location`, admin order-monitoring `computeOrderDelays`,
+    support-agent `find_order`. `routes/order-comment-to-courier.js` pairs `bookId` + `leg.appName`.
+  - **Delivery-side writes, located by `locateDeliveryRow`** (delivery CORE invariant 20,
+    2026-11-08): `POST /api/delivery/admin/cancel` (delivery-web sends `{deliveryId, bookId}`) and
+    `POST /api/delivery/update` → `updateDelivery`. A legacy shared `bookId` writes its single live
+    row or gets a 409.
+  - **Still keyed on `bookId` alone:** the reads `GET /api/delivery/book/:bookId`
+    (owner-scoped for a mobile token), `GET /api/delivery/order/:id`, `POST /api/delivery/orders/batch`
+    (no caller), the impersonation driver lookup in `routes/shoofi-admin-users.js`, and the
+    analytics `bookId: {$in}` joins (live-ops, churn-360, support-analytics). A bare `updateOne`
+    on a shared number hits whichever row Mongo returns first.
 - **`shoofi.twinOrderGroups`** links `orders.twinGroup` ↔ group `primary`/`secondary`.
 - **`orders.marketingTouch`** (optional, top level) =
   `{ kind, placement, itemId, campaignId?, linkType?, at: Date }`: the last marketing
@@ -414,11 +568,47 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
 - **Twin (customer side)**: `stores/twin-order` + `stores/twin-cart` (second-store cart);
   combined checkout calls `twin-order/{eligible-stores, quote, place, pay,
   digital-place-pending, digital-finalize}`. Secondary side `shippingPrice:0` (combination fee covers it).
-- **Tracking = POLLING every 30s** (`screens/order/active/index.tsx`) — **no websocket
-  for customer order status** (WS is only used for store/menu refresh elsewhere). Detail:
-  `screens/order/item`, timer `order-timer.tsx` keyed on status, ETA via `delivery/book/{bookId}`.
+- **Tracking = POLLING every 30s** — **no websocket for customer order status** (WS is only
+  used for store/menu refresh elsewhere). Detail: `screens/order/item`, timer `order-timer.tsx`
+  keyed on status, ETA via `delivery/book/{bookId}`.
+  - **One list, one poll** (`stores/orders/index.tsx`): `ordersStore.activeOrders` is what the
+    ActiveOrders tab (`screens/order/active/index.tsx`), the tab-bar order bubble
+    (`components/layout/footer-tabs/BottomTabBar.tsx`) and the For-you chips all render.
+    `subscribeActiveOrders` runs ONE `GET order/customer-active-orders` timer for every
+    subscriber. Extra refreshes: the tab bar on `ORDER_SUBMITTED` and on app-foreground, the
+    ActiveOrders tab on focus.
+  - **Stale-response guard:** each `refreshActiveOrders` takes a sequence number. A success is
+    applied only if it is newer than the last applied one (`activeOrdersAppliedSeq`); a failure
+    counts only when it is the latest request. Logout bumps the sequence, so a response in
+    flight from the old session is dropped.
+  - **A failed load is not "no orders":** the list already shown is kept and
+    `activeOrdersError` is set. With nothing to show, the tab renders an error and a retry button
+    (`components/order/orders-load-error`, `retryActiveOrders`). "No orders" appears only
+    after the server returned `[]`. A 200 that is not an array counts as a failure. Order history
+    (`screens/order/history/index.tsx`) works the same way, with its own sequence guard.
+  - **The just-placed order shows before the poll returns it** (`helpers/placed-order.ts`,
+    built after GCP 1096-8335 on 2026-11-08: three minutes of "no orders", then a duplicate
+    order). `use-checkout-submit` **stages** a local copy from the create response
+    (`{ message, orderId }`, where `orderId` is the Mongo `_id`; the response carries no
+    `originalOrderId` and no short number) and from the body it sent. It never stages a recorded
+    payment failure (`errorMessage`). `postChargeOrderActions` (`screens/checkout/index.tsx`)
+    **shows** it, right before `ORDER_SUBMITTED`. Staging and showing are separate because Apple
+    Pay creates the order at `"0"` before the sheet is paid. A twin checkout or an admin edit
+    discards the staged copy: a twin pair is drawn from both server docs. The copy is marked
+    `isPlacedLocally` and drawn by `placed-order-card.tsx`: store, "sent", payment method,
+    total and time. It shows no status, number or timer, and it does not open details.
+    - **Matched** to the server's copy on `_id`, or on `originalOrderId` when both carry it.
+      **Never on the short `orderId`** (CORE invariant 22).
+    - **Drop rule:** the copy is dropped for good the first time the server lists it. From then
+      on the server list alone decides, so a delivered or cancelled order that leaves the list
+      is not brought back. A copy the server never lists is dropped after
+      `PLACED_ORDER_TTL_MS` = 10 min (20 poll cycles), checked on every refresh, failed ones
+      included. A copy is never shown more than `STAGED_ORDER_MAX_AGE_MS` = 30 min after
+      staging. Logout or a different token clears it. It lives in memory only, so an app restart
+      drops it.
 - **Key files**: `stores/cart/index.ts` (payload builder + `order/create`),
-  `stores/orders/index.tsx`, `stores/twin-order/index.ts`,
+  `stores/orders/index.tsx` (the shared active-orders list), `helpers/placed-order.ts`,
+  `stores/twin-order/index.ts`,
   `hooks/checkout/use-checkout-submit.ts`, `screens/checkout/index.tsx`,
   `screens/order/{active,item,history}/*`, `consts/{api.js,shared.ts}`.
 - **Gotchas**: `order/create` is **multipart** (twin / Apple-Pay / HYP calls are JSON);
@@ -453,6 +643,25 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
     the first add). No order API changed; server `docs/ai-helper.md` records a local end-to-end
     check (the order landed in the dish's store with the chosen extras, shadow-pricing drift 0).
     The in-chat checkout card stays DEFERRED (CORE Known status, §10).
+
+- **Note to the store** (CORE invariant 25): the cart page's note box →
+  `order.commentToStore`, sent on every receipt method, trimmed, ≤ `COMMENT_TO_STORE_MAX_LENGTH`
+  (200), left out when blank. On `main` (2026-11-10) it is one string, `cartStore.storeNote`, and
+  `getCartData` sends it; twin checkout sends no store note. Branch
+  `feat/store-note-per-twin-store` (built, not merged) changes this:
+  - **Per store:** the note is kept in `cartStore.storeNotes: Record<appName, string>`. It lives
+    in memory only and is cleared by `resetCart` and `resetCartForNewStore`.
+  - **Single store:** `getCartData` sends the note for `order.storeData.appName`.
+  - **Twin:** both twin builders, `/twin-order/place` (`handleTwinCheckout`) and
+    `/twin-order/digital-place-pending`, take `primary.commentToStore` /
+    `secondary.commentToStore` from `cartStore.twinCommentToStoreFields(primaryAppName,
+    secondaryAppName)`. The notes are never put in `sidePayloadShared`; `commentToCourier`
+    stays shared.
+  - **Cart UI:** one box on a single-store cart (testID `cart-store-note-input`). A twin cart has
+    one box inside each store's section (`twin-cart-store-note-input-primary` / `-secondary`),
+    with a placeholder naming the store.
+  - **Tests:** `__tests__/stores/cart-store-notes.test.ts`,
+    `__tests__/screens/twin-checkout-store-notes.test.ts`, `__tests__/helpers/store-note.test.ts`.
 
 ## C2. shoofi-shoofir — the DRIVER app (React Native, MobX)
 Role: executes the **delivery leg**; drives `bookDelivery` status only — never the order's.
@@ -491,7 +700,11 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   store user without `all`, and before user details load), **`update/viewd` = ACCEPT** (→ `6→1`, future `14→1`,
   sends `readyMinutes` — not persisted, §2), `update` (forward/back status + note), `update-item-collected`,
   `start-preparing` / `update-start-preparing`, `update-delay`, `printed`,
-  `book-delivery`, `*-custom-delivery`, `addRefund`, `future-orders-ready`, `drive-in-arrival-confirm`.
+  `book-delivery`, `*-custom-delivery`, `future-orders-ready`, `drive-in-arrival-confirm`,
+  and `admin/history` (`getOrderHistory(date)`, the v3 history tab; on shoofi-partner
+  `feat/orders-board-v3`, not on `main` as of 2026-11-08).
+  (`addRefund` is gone: the app dialog was deleted under HQ #1a2f9e and the server route removed
+  in shoofi-server 29ed5252, 2026-11-03.)
 - **Transition rule**: ACCEPT goes through **`order/update/viewd`** (NOT `order/update`);
   all other forward/back transitions use `order/update` with an explicit `status` the
   client computes in `stores/orders/index.tsx`: forward `updateOrderStatus` (main ~259):
@@ -531,9 +744,17 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   one of its phone's memberships. Even mid-`switchStore` (store first, token second) it passes.
   `admin/my-stores/new-orders-count` (`utils/cross-store-alerts`) stays `auth.required`: it is
   token-scoped and ignores the header.
+  `admin/history` is the other way round: `auth.required` + `requireStoreMembership()` (the
+  store-analytics gate, `routes/order-history.js`), partner-only, and the `reports` role only
+  decides whether `totals` is filled. A store user without it gets the list and `totals: null`,
+  never a 403 (CORE invariant 21).
   **Any 401 signs the store out** (`utils/http-interceptor` → `OPEN_GENERAL_SERVER_ERROR_DIALOG`
   `isSignOut: true` → `resetAppState` + restart), so a partner-polled route must never 401 a
   logged-in terminal.
+- **"New customer" badge source** (CORE invariant 24): `order.isFirstOrderAtStore` arrives
+  on the whole documents of `admin/orders`, `admin/all/not-viewd` and `admin/not-viewd`. Badge
+  only on `=== true`; absent (old orders, a failed lookup) = no badge. The v3 history endpoint
+  (`admin/history`, shoofi-server#497, CORE invariant 21) projects its rows without it.
 - **Realtime**: WS `?appType=shoofi-partner`; handles `order_status_updated`,
   `unviewed_orders_updated`, `future_order_*` (NOT `menu_refresh`). The `print_order` /
   `print_not_printed` frames still arrive (the server sends `print_not_printed` when
@@ -561,7 +782,15 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     order came back on every sweep on every day.
   - **Business day**: the server picks the window with `getBusinessDayBoundaries` from
     wall-clock now. For "today" that is the current business day, including the overnight
-    tail. One known gap: on a store with normal (non-overnight) hours, an order whose
+    tail. ⚠️ **Known bug (not fixed, noted 2026-11-08 in shoofi-server `feat/partner-order-history`):**
+    the overnight branch tests the CURRENT clock time, not the date asked. When the weekday
+    before `ordersDate` has overnight hours and the request is made before that close + 90 min
+    (any date, e.g. 01:30 for a 01:00 close), it returns the business day BEFORE `ordersDate`
+    (start = its opening the evening before, end = its close on `ordersDate`). Right for "today"
+    just after midnight, which is what it was written for; wrong for any other date asked in
+    that window. A new day-scoped reader must use
+    `utils/store-service.js` `getBusinessDayBoundariesForDateRange` instead (as `admin/history`
+    and the payments screen do). One known gap: on a store with normal (non-overnight) hours, an order whose
     `orderDate` falls after midnight but before the next opening is outside the sweep. Its
     accept-time explicit print is unaffected.
   - **Driver result** (`helpers/printer/index.ts` `printImagesWithOutcome`): `"printed" |
@@ -591,6 +820,12 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     "printer-testPrint"` (and `error.outcome` since 2026-10-29). `customerId` there is the
     `shoofi.store-users` `_id` of the tablet's user. Then the store's
     `isPrinted:false, isViewd:true` orders, which are exactly what the sweep can return.
+    Since HQ #08a00a a failed copy is one row from its last try (`error.attempt`,
+    `error.attempts`; `error.stage: "printOrder"` replaces the old separate
+    `printer-printOrder` rows), so older data counts each failure twice (four times for a
+    job-building failure). Every partner client-error body also carries
+    `allErrorBody.appVersion` (`stores/error-handler/index.ts`): the server keeps the body,
+    not the `app-version` header.
 - **The loud new-order alarm has ONE source, and an id ledger decides whether it rings.**
   `schedulePushNotification` (`utils/notification/index.ts`, `sound: 'store.wav'`) *is* the
   alarm, and its only live callers are the two in `hooks/use-notifications.ts` — the 30s poll
@@ -625,6 +860,28 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   `/api/order/update/viewd`); `/api/order/create` emits no frame of that type. It lands on the
   same `fetchUnviewedOrdersCount`, which makes it easy to mistake for the creation trigger —
   it is not, and a fix reasoned from that frame will target the wrong path.
+- **Measuring how a new order reaches the tablet** (shoofi-partner `feat/order-alert-arrival-log`,
+  2026-11-14). The server records when it SENDS a store alert (`orderFlowEvents`
+  `notification_push_sent`; `websocket_sent` is logged `success` for every alert even when no socket
+  matched, so it says nothing about delivery) and when the store accepts (`order_viewed`) — nothing
+  in between. The partner app reports two events to `POST /api/app-logs/insert` → `shoofi.apps-logs`
+  (`app_type: "shoofi-partner"`, `userId` = the `store-users` `_id`; use the server's `created`, not
+  `properties.deviceAt`, for timing):
+  `partner_order_alert_received` for every `new_order_alert` / `order_reminder` that lands,
+  `properties.via: "push" | "socket"` (a remote push is told from the app's own local banners by a
+  non-null `notification.request.trigger`); and `partner_new_order_seen`, one per order the ledger
+  takes as new, `properties.via` = the path whose refresh found it — `push`, `socket`, `poll` (the
+  30s interval), `foreground`, `mount` or `refresh`. Join on `properties.orderNumber` (the human
+  `orderId`, which is the ledger key) to `orderFlowEvents` `order_created`. A seen event with
+  `via: "poll"` means push and socket both missed or lagged. The listener now calls the refresh
+  through `fetchUnviewedOrdersCountRef` (it is registered once and used to keep the first render's
+  closure). Classifiers: `utils/order-alert-arrival.ts`; sender: `utils/order-alert-arrival-log.ts`
+  — a plain `fetch`, never `axiosInstance`, which opens the no-internet dialog on any network error.
+  A backgrounded app runs no JS, so a push landing then logs nothing and the order shows up as
+  `via: "foreground"` when the tablet is reopened. As of 2026-11-14 the socket path does not deliver
+  store alerts at all (`utils/persistent-alerts.js` passes an ObjectId `recipientId` to a
+  string-keyed client map; the Redis fallback record loses `appType` after its 5-min TTL; the Redis
+  subscriber never subscribes), so expect no `via: "socket"` rows until that is fixed.
 - **Key files**: `stores/orders/index.tsx` (core + transition logic),
   `screens/admin/order/new-orders/list/index.v2.tsx` (ACCEPT + twin caps),
   `screens/admin/order/list/index.v2.tsx` (dashboard, transitions),
@@ -699,6 +956,62 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   "السجل", whose fetches pass `boundedDay` → `isOrderLaterSupport: false` (stores/orders
   `getOrders`/`getOrdersFromServer`, optional last argument) to keep the day's bound.
 
+- **Customer note to the store** (CORE invariant 25): `order.order.commentToStore` arrives on
+  the whole order documents the partner already reads (`admin/orders`, `admin/not-viewd`,
+  `admin/all/not-viewd`), with no server projection change. Branch `feat/customer-note-to-store`
+  (built in parallel, not on `main` as of 2026-11-10) shows it as «ملاحظة الزبون» on the order
+  screens and on both printed tickets: the regular printer and the Urovo native printer. It is
+  read-only. The partner's own `orders.note` (sent with `order/update`) is a different field.
+  One reader: `helpers/order-customer-note.ts` `getCustomerNote` (strings only — a non-string
+  must never reach a `<Text>`; it re-applies the server's `sanitizeCommentToStore` rules so old raw
+  values look the same; a THIRD copy of the 200 cap next to server + app — keep them in step),
+  rendered by `components/order-customer-note`: list v1/v2 (outside the collapsible part),
+  new-orders v1/v2 (above the items), item details and the school list. Tickets print a stacked
+  label + text box after the items, directly above the staff «ملاحظة:» line, `textAlign: "left"`
+  (the printed RIGHT edge under forced RTL; never a label/value row — the partner#41 clipping).
+  On the v3 redesign (`components/orders-v3/*`, the unmerged partner stack #45–#64 and the PRs
+  stacked on it) the same helper is read by `OrderCardV3` (board/list cards), `NewOrderViewV3`
+  (above the lines) and, from partner#80, `SchoolOrderCardV3` (the v3 school list).
+- **Table orders (Kopa table QR)** — branch `feat/table-order-label` (shoofi-partner, not on
+  `main` as of 2026-11-13). A diner scans a per-table QR code, orders from the store's Kopa web
+  page and pays cash at the table; the server route that writes it into the store's normal
+  `orders` is being built in parallel (NOT the till: till sales live in `kopaTillOrders`, C5).
+  The contract the partner reads: `source: "kopa-qr"`, `order.receipt_method: "TABLE"`,
+  `order.payment_method: "CASH"`, top-level `table: { id, label }` (label = the table number),
+  `customerId: null`, `customerDetails: { name (may be ""), phone: "" }`; `storeData` may be absent.
+  One reader: `helpers/order-table.ts` (`getOrderTableLabel` reads `table.label`, falling back to
+  `order.order.table.label`; strings/finite numbers only; returns null with no table, so
+  DELIVERY / TAKEAWAY / DRIVEIN render and print unchanged). Words are inline (طاولة / שולחן), not
+  served keys, and TABLE's receipt word uses them instead of `t("table")`.
+  Shown by `components/order-table-badge` («طاولة 7 · QR», wrapped in a U+202B embedding because the
+  controls Text renders `direction: "ltr"`): list v2 (chip in the collapsed header where the
+  phone goes, box in the drive-in slot of the expanded card) and new-orders v2 (box under the
+  payment | receipt line; the empty name/phone rows are skipped for table orders only). Both
+  tickets print a large «طاولة 7» + «QR» box in the drive-in slot. v1 screens, item details and the
+  v3 stack are not wired. The same PR fixed the 80mm ticket's unguarded
+  `invoiceOrder.storeData.name_he` (a Hebrew store crashed on an order without `storeData`).
+  The ticket icon `table` is NOT in `components/icon/selection.json`; react-icomoon renders null.
+
+### C3.x Cancelled-order alert and the owner-wording rules (v3, 2026-11-11)
+
+- **Cancelled-order alert** (`components/global/CancelledOrderAlertGlobal.tsx`,
+  `helpers/orders/cancel-alert.ts`): a full-screen «أُلغي طلب!» when an order this tablet saw
+  ACTIVE (1, 3, 2, 14, 15) on the previous read is now cancelled (4, 5, 7, 8, 9). A 20 s poll +
+  on foreground, reading with `getOrdersFromServer` (not `getOrders`, which overwrites the board's
+  list/counts). Not the socket: `order_status_updated` has no order id, a twin cascade writes the
+  other store's order with no frame, and two tablets on one login lose frames. The first read
+  only learns (a restart never replays the day). Note the partner's `canceledStatuses` is only
+  4/5 — 7 (support) is the common cancel. A driver "cancel" (`bookDelivery` −1) is not an order
+  cancel and never alerts.
+- **Who hands the store cash:** on a CASH DELIVERY the courier pays the store at pickup (the
+  customer pays the courier, delivery included) → «السائق سيدفع لك نقداً عند الاستلام» on screen,
+  «السائق يدفع للمحل نقداً» on the ticket; pickup / drive-in: the customer. The ticket's «سعر الطلب»
+  is the items (`orderPrice`); drive-in is its own row.
+- **«استلمت» labels only:** ready delivery (3) → 11 «استلمها السائق», ready pickup/drive-in (2) →
+  10 «استلمها الزبون»; the transitions are unchanged and only the store makes them.
+- **Delay:** the sheet offers +5/+10/+15/+20, says the customer is notified, and keeps the
+  one-delay rule (client-side; the server stores only the LAST `delayMinutes`).
+
 ## C4. shoofi-delivery-web — the ADMIN dashboard (React web)
 Role: oversight — list/monitor, manual intervention, fraud queue, **twin group admin**, config.
 - **API client**: axios (`src/utils/http-interceptor/index.ts`), **Bearer** token
@@ -723,8 +1036,54 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   and `admin/coins/customer/{id}/earned` (`src/apis/admin/customers/customer-details.ts`, the
   customer modal's coins tab). Nothing calls `admin/coins/expire`, `admin/coins/customer/{id}` or
   `admin/coins/store/{appName}/stats`.
-- **Refunds**: `order/addRefund` is **NOT** used here — admin refunds surface via twin
-  `degrade`/`cancel` (`refundOwed`/`refundBreakdown`) and `shoofiAdmin/compensations/*`.
+- **Refunds**: `order/addRefund` no longer exists (removed 2026-11-03). Money is decided per
+  CHARGE in the cancel dialog (`money/cancel`, keep/refund) and lives in the charge's
+  `moneyLedger` / `moneySummary` (CORE invariant 28). The old `twin-order/admin/cancel` route
+  records no amount on the group doc; its legs settle `undecided` through the ledger. Only a
+  degrade writes `degrade.refundOwed`/`refundBreakdown`. Compensations:
+  `shoofiAdmin/compensations/*`.
+- **Cancel money (CORE invariant 28) — the admin side, shoofi-delivery-web#346:**
+  - **A support cancel of one twin side leaves it `7`** (CANCELLED_BY_ADMIN), not `5`; the
+    customer app's `twin-active-order-header.tsx` `getGroupStatus` checks the degraded pair before
+    "any side cancelled" (shoofi-app#96), else order history would read "ההזמנה בוטלה".
+  - **One cancel dialog** (`src/components/Modals/CancelMoneyDialog.tsx`, rules in
+    `src/utils/cancel-dialog.ts`, calls in `src/apis/admin/money.ts`) for single orders and both
+    twin cards: `money/cancel-preview` → scope choice (twin: this side / the other side by name /
+    both, or only "remaining"), the server's amount + breakdown + coins/coupons returned, keep or
+    refund (asked only when money is at stake — otherwise it sends `decision: "none"`), then
+    `money/cancel`. **A 404 from cancel-preview
+    (a server without `/api/money`) falls back to the old dialog** (`isMoneyApiMissing`).
+  - **MoneyLine** (`src/components/MoneyLine.tsx`, `src/utils/money-summary.ts`) renders
+    `order.moneySummary` on every order card / twin card / live-ops row; a twin leg shows its
+    GROUP's line ("חלק מתשלום משולב"). No `moneySummary` → the legacy `charge-state.ts` badge.
+  - **"חייבים ללקוח"** (`src/views/admin/money/MoneyOwed.tsx`, `/admin/money-owed`,
+    `src/utils/money-owed.ts`): the owed queue (`money/owed`), record a portal refund
+    (`money/record-refund`), resolve an in-doubt HYP refund (`money/resolve-unknown`). Finance =
+    `MONEY_FINANCE_ROLES = ["master", "accountant"]` (`menu-access.ts`) — a NEW grant to
+    `accountant` (Sari, 2026-11-06). **"החלף קופון להחזר"** (`MoneyFinanceModals.tsx`
+    `ChangeDecisionModal` → `money/change-decision {to: "refund"}`) on a cancelled order / twin
+    card with a keep coupon, finance + master only.
+  - **Status dropdown** (`src/utils/cancel-money.ts` `statusChoicesFor` /
+    `statusChangeNeedsCancelDialog`): an order with money at stake no longer offers the
+    cancel/reject statuses there (they would be stamped `undecided` with nobody asked) — cancels go
+    through "בטל הזמנה" and its dialog; "בטל הזמנה" is hidden on status 5.
+  - **Undo guard** (`src/utils/twin-cancel.ts` `undoDegradeBlock`) mirrors the server's
+    `undoDegradeBlockReason` and also reads `group.moneySummary` (a coupon, a refund or a refund in
+    doubt since the degrade hides undo).
+  - Monitoring: `admin/order-monitoring/summary` carries `moneySummary` (+ `orderObjectId`,
+    `appName`) and `twin.group.moneySummary`; `analytics/deliveries` `storeOrder` carries
+    `moneySummary`.
+- **Twin admin auth**: every `twin-order/admin/*` action takes `TWIN_ADMIN_ROLES` (every
+  dashboard seat but `accountant`; support works on `viewer`), `group/:id/full` and
+  `GET admin/twin-order-config` any dashboard seat, `POST admin/twin-order-config` admin (+ master).
+- **Cancel money UI (shoofi-delivery-web#346)**: `src/utils/cancel-money.ts` — the status
+  dropdown hides the cancel/reject statuses on an order with money at stake (they would be
+  stamped `undecided` with nobody asked); those cancels go through "בטל הזמנה", which asks keep
+  or refund; "בטל הזמנה" is hidden on status 5. `src/utils/twin-cancel.ts` — `undoDegradeBlock`
+  mirrors the server's `undoDegradeBlockReason` (hides undo with `UNDO_BLOCK_TEXT`), and the
+  twin cancel/degrade confirms no longer promise an automatic refund or coupon.
+  `src/utils/charge-state.ts` — an `undecided` cancel (and a `cancel_no_decision` flag) gets
+  its own badge; an undecided cancelled twin leg names no per-leg amount.
 - **Twin admin**: full lifecycle control (degrade / undo / cancel / assign single|split)
   + the twin-order-config screen (`degradeAutoRefund`, timeouts, enable switch).
 - **State**: not centralized — component-local `useState`; MobX only for store open/close.
@@ -765,6 +1124,22 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   `db.orders.find({isSchoolProject:true}).sort({created:-1}).limit(20)`.
   `src/components/OrderMonitoring/OrderFlowDashboard.tsx`,
   `src/views/admin/settings/DeliverySettings.tsx`, `src/views/admin/fraud/FraudReview.tsx`.
+- **The delivery address on admin surfaces** (§5 `orders.order.address`): `CardOrder`'s location
+  modal ("⋯" → "הצג מיקום על המפה") renders `src/components/Cards/OrderAddressLines.tsx` — «שם
+  הכתובת» (`order.order.address.name`; until 2026-11-10 it read a top-level `order.address.name`
+  that never exists, so it never showed), «כתובת מלאה», then קומה / דירה / כניסה and «סימן דרך
+  לשליח» (`notes`). The card's "פרטי משלוח" block shows «סימן דרך לשליח» beside the editable
+  «הערות לשליח». The delivery board (`src/views/admin/analytics/DeliveryListAnalytics.tsx`) puts
+  it on its own labelled line («סימן דרך:») in the «הערות לשליח» cell. One reader for all of them:
+  `src/utils/order-address-details.ts` (trims, drops empty values, prefers the live order and
+  falls back to the `bookDelivery.order` snapshot). Nothing renders for an empty value.
+  ⚠️ The board reads it off `POST /api/analytics/deliveries`, whose `bookDelivery` projection
+  (`routes/analytics.js`) is a whitelist: the line stays empty unless it lists
+  `'order.order.address.notes'` — listed field by field with `floorNumber` / `apartmentNumber` /
+  `entrance` since shoofi-server `feat/address-note-apartment-entrance` (2026-11-10), pinned by
+  `test/integration/delivery-comment-to-courier-projection.js`; never the whole address. `CardOrder`
+  is unaffected: `order/admin/all-orders` and `analytics/order/:id` return the whole order, and
+  `delivery/order/:id` the whole booking (credentials redacted).
 - **⚠️ Cross-repo consistency flags (candidate bugs — human verdict):**
   1. **Status-enum divergence** — admin-web `src/consts/shared.ts` uses
      `FUTURE_ORDER_PENDING:"16"` and `PENDING_START_PREPARING:"14"`, but the server &
@@ -772,6 +1147,224 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
      or mis-transitions future orders. **Verify before trusting admin-side future-order logic.**
   2. **`admin/order/delete/{id}`** is called with **plain axios (no auth interceptor)** —
      confirm this is intended.
+
+- **Customer note to the store** (CORE invariant 25), branch `feat/admin-customer-note-to-store`
+  (built, not on `main` as of 2026-11-10):
+  - **Reader:** `src/components/Cards/OrderStoreNote.tsx` reads `order.order.commentToStore`.
+    `getCommentToStore` shows it only when it is a non-blank string, trimmed.
+  - **Where it shows:** `CardOrder` renders it read-only right under the items, above
+    «פרטי בית העסק», labelled «הערת הלקוח למסעדה», for any receipt method. Through that card it
+    also reaches `/admin/orders`, `OrderDetailModal` (so the analytics screens), the live-ops
+    order-details overlay and the twin card's per-side items.
+  - **Where it does not show, on purpose:** the live-ops board rows/cards and
+    `DeliveryListAnalytics`. Those are courier-dispatch views.
+  - **No edit path and no `bookDelivery` mirror.** It is not «הערות לשליח» (`commentToCourier`),
+    which is delivery-only and editable through `POST /api/order/comment-to-courier`.
+
+## C5. shoofi-kopa — the store till back-office (web)
+Kopa (repo `shoofi-kopa`) is the store's back-office web app. It calls the server like the
+partner app: a partner token, `app-type: shoofi-partner`, the store in `app-name`. Its order
+reads are three new read-only routes in shoofi-server `routes/kopa/orders.js` (logic in
+`services/kopa/orders.js`, tests `test/integration/kopa/orders.js`), built on
+`feat/kopa-phase1` (2026-11-11, not on `main` yet). Rules: CORE invariant 29.
+
+- **Gate (all three):** `KOPA_REPORTS` (`services/kopa/access.js`) = `auth.required` +
+  `requireStoreMembership()` + `requireStoreRole("reports", "all")` (an owner holding `all` without
+  `reports` passes; 38 of 406 prod docs, 2026-11-11). The store is
+  `req.storeMembership.appName`, never the raw header. No token → 401; a customer token → 403;
+  a member of another store → 403; a non-`isAdmin` doc or one whose `roles` has neither `reports` nor `all` →
+  403 `Insufficient role`. `storeUserHasRole` does not treat `all` as a superset, so
+  `KOPA_REPORTS` lists `all` explicitly. The store-analytics routes do not, and those 38 owners
+  still get 403 there. (Corrected 2026-11-11: this line used to say they get 403 here too.)
+- **`POST /api/kopa/orders`** — body `{ from, to, page?, limit?, receiptMethod?, paymentMethod?,
+  status?, productId? }`. `from`/`to` are real `YYYY-MM-DD` days, `from ≤ to`, at most 93 days
+  (both ends counted), else 400. `limit` defaults to 50 and is clamped to 200. `status` is a
+  status string, a bucket (`completed` | `cancelled` | `inProgress`) or an array of them, and
+  must be in the listed set. The filters must be plain strings: an object is a 400.
+  `productId` matches `order.items.item_id` or a combo component
+  (`order.items.comboSelections.productId`).
+  Response `{ message, from, to, window: {start, end}, orders, totalCount, page, limit, hasMore,
+  summary }`. The summary is over the whole filtered range:
+  `{ byPayment: { CASH, CREDITCARD, OTHER }, total, cancelled, inProgress: {count} }`.
+  Each bucket is `{count, amount}`. Rows are an allowlist: `_id, orderId, status, created,
+  orderDate, viewdAt, completedAt, cancelledAt, amount, orderPrice, originalOrderPrice, total,
+  shippingPrice, customerDetails{name, phone}, order{items[{item_id, nameAR, nameHE, qty, price,
+  selectedExtras, note, comboSelections?}], receipt_method, payment_method, commentToStore},
+  appliedCoupon{discountAmount}, usedCoins{amount, shekelValue}, promotions{items, delivery},
+  cancelReason, updatedByName, amendments[{at, byName, reason, previousTotal, newTotal, diff}],
+  twinGroupId`. It makes two reads. The first is every match, with a 5-field projection
+  (summary, count and the sort by the instant of `created`). The second is the page's
+  `_id`s only, with `ORDER_PROJECTION`.
+- **`GET /api/kopa/cancel-log?from=&to=`** — same range rules. Response `{ message, from, to,
+  window, rows, totalCount, truncated }`, newest first, capped at 2000 rows. The rows are:
+  - **order** rows: one per order in `CANCELLED_STATUSES` (`4,5,7,8,9`) in the window,
+    `price = orderPrice`, `priceBasis: "order_price"`.
+  - **item** rows: one per `amendments[].diff` entry with `change: "removed"`, on any listed
+    order in the window, `qty = diff.from`.
+
+  Every row carries `{ kind, orderId, _id, name, price, by, at, reason }`, plus `status`,
+  `byRole` (`support|store|customer|driver|system`) and `orderCreated` (and `itemId`, `qty`,
+  `priceBasis` on items). Where "who" comes from is CORE invariant 29.
+- **`GET /api/kopa/stories`** — `shoofi.stories` that are not archived, with `storeAppName`
+  = the store OR `link.appName` = the store. Prod 2026-11-11 had 154 stories: 141 with no
+  `link` (legacy, `target` only) and 0 whose `link.appName` differs from `storeAppName`. So the
+  scope is reliable: it is the owning store. Rows: `_id, storeAppName, isOwnStory, mediaType,
+  media{uri}, thumbnail{uri}, durationMs, caption{ar, he}, link, publishedAt, expiresAt,
+  isActive, state (draft|inactive|scheduled|expired|live), viewsCount`. Never `approval` (it
+  names admins), `marketingItemId` or `cityAreas`. The `stories` TTL index deletes a story a
+  day after `expiresAt`, so `expired` rows only last that long.
+
+### Kopa till: phases 3, 4 and 6 (CORE invariant 30)
+These routes write only Kopa collections (`services/kopa/store-data.js` `STORE`), never `orders`,
+`products` or `categories`. They are built on `feat/kopa-phase1` (2026-11-11, uncommitted) and
+are not yet mounted in `routes/kopa/index.js`. Gates are in `services/kopa/access.js`:
+- `KOPA_TILL` is `cashier | all | reports`.
+- `KOPA_OWNER` is `all`.
+- Both put the store and the acting staff member (`req.storeMembership.me`) on the request.
+
+Who acted is stored as `{ staffId, staffName }`. Errors are
+`{ message, code }` (plus `productIds` / `comboIssues` / `orderId` / `tableIds` where named). A
+`createIndex` is never awaited (`ensureIndexes`).
+
+#### Kopa phase 3: cancellation reasons (`routes/kopa/reasons.js`)
+- `GET /api/kopa/cancel-reasons?appliesTo=item|order&includeInactive=1` (`KOPA_TILL`): returns
+  `{ message, reasons }`, active only by default, sorted by `order`. `appliesTo=item` also lists
+  `both`.
+- `POST` (`KOPA_OWNER`): body `{ nameAR?, nameHE? (one required, ≤ 80), appliesTo = "both",
+  returnToStock = false, order = 0 (int 0-10000), active = true }`. Returns 201 `{ message,
+  reason }`. At most 200 per store.
+- `PATCH /:id` (`KOPA_OWNER`): partial. `DELETE /:id` (`KOPA_OWNER`): soft, `active: false`.
+  Both return `{ message, reason }` and 404 on an unknown id.
+
+#### Kopa phase 4: tables (`routes/kopa/tables.js`)
+- **Collections.** `kopaTables` holds `{ number (int 1-99999, unique per store), seats,
+  sectionId (string | null), visible, layout: { x, y, w, h, shape: square|circle|rect, rotation } }`.
+  `kopaTableSections` holds sections `{ nameAR, nameHE, order }` and ONE layout doc
+  `{ _id: "floorLayout", walls: [{ x1, y1, x2, y2 }], canvas: { orientation:
+  landscape|portrait } }`. Every section query excludes the layout doc.
+- `GET /api/kopa/tables` (`KOPA_TILL`): returns `{ message, tables, sections, layout: { walls,
+  canvas, updatedAt } }`. Every table is listed, hidden ones too. Each carries `status:
+  "free" | "occupied"` and `occupiedBy: { orderId, number, total, balance, createdAt } | null`
+  (an OPEN till order on it).
+- `POST /api/kopa/tables`, `PATCH` / `DELETE /api/kopa/tables/:id` (`KOPA_OWNER`).
+  - A duplicate number is 409 `TABLE_NUMBER_TAKEN`.
+  - PATCH merges a partial `layout` over the stored one.
+  - Hiding or deleting a table with an open order is 409 `TABLE_OCCUPIED`.
+  - Delete is a hard delete. A till order keeps its own `tableNumber`.
+- `PUT /api/kopa/tables/layout` (`KOPA_OWNER`): body `{ tables: [{ id, layout }], walls,
+  canvas: { orientation } }`.
+  - Validation is all-or-nothing: an unknown id is 400 with `tableIds`, and nothing is written.
+  - The positions are bulk-written, and the walls and canvas are upserted onto `floorLayout`.
+  - Returns the GET shape.
+- `GET` / `POST /api/kopa/table-sections`, `PATCH` / `DELETE /api/kopa/table-sections/:id`
+  (read `KOPA_TILL`, write `KOPA_OWNER`). Deleting a section a table uses is 409
+  `SECTION_IN_USE`.
+
+#### Kopa phase 4: till orders (`routes/kopa/till-orders.js`, all `KOPA_TILL`)
+- **Document (`kopaTillOrders`).**
+  - Header fields: `{ number (nextSeq "tillOrder", gapless), status: open|paid|cancelled,
+    receiptMethod: TABLE|TAKEAWAY|DELIVERY, tableId, tableNumber, customer: { name, phone,
+    profileId? } | null, staffId, staffName, waiterId, waiterName, isStaffMeal`.
+  - Lines and money: `items, subtotal, total, amountDue, payments, paidAmount, balance, unpaid,
+    unpaidAt, cancel, createdAt, updatedAt, closedAt, rev }`.
+  - Phase 4d adds `discount?`, `discountLog?`, `tip?`, `refunds?` and `refundedAmount?`, and
+    `refundedQty` / `refunded` on a line. They are written by `services/kopa/till-money.js`;
+    shapes and rules are in payments reference §6b.
+  - A line is `{ lineId, productId | null, nameAR, nameHE, qty (1-999), unitPrice, lineTotal,
+    selectedExtras, comboSelections?, note, kitchenIds, status: new|preparing|ready|served|cancelled,
+    statusTimes, addedAt, addedBy, cancel? }`.
+  - A payment is `{ paymentId, method, amount, tendered?, change?, clientPaymentId?, sessionId,
+    staffId, staffName, at }`. `sessionId` is the till session (shift) it was taken in.
+- `POST /api/kopa/till/orders`: body `{ receiptMethod, tableId?, customer?, waiterId?,
+  isStaffMeal?, items? }`. Returns 201 `{ message, order }`.
+  - TAKEAWAY and DELIVERY need `customer.name` + `phone`.
+  - TABLE needs a visible table with no open order. Otherwise 409 `TABLE_OCCUPIED` with
+    `orderId`.
+  - `waiterId` must be a `storeUsers` doc of this store.
+  - An item is `{ productId, qty, selectedExtras, comboSelections?, note }` or
+    `{ productId: null, nameAR, nameHE?, price, qty, note }`.
+- `GET /api/kopa/till/orders?status=&from=&to=&tableId=&unpaid=1&limit=` returns `{ message,
+  orders, totalCount }`, newest first.
+  - `from` / `to` are a `YYYY-MM-DD` Israel day or an ISO time, on `createdAt`, ≤ 93 days.
+  - `limit` defaults to 100, max 500.
+- `GET /api/kopa/till/orders/:id` returns `{ message, order }`, or 404.
+- `POST /:id/items` takes `{ items }`. `PATCH /:id/items/:lineId` takes `{ qty?, note? }` and
+  works only while the line is `new`, else 409 `LINE_NOT_EDITABLE`.
+  `POST /:id/items/:lineId/cancel` takes `{ reasonId }` (an item reason). Each returns
+  `{ message, order }`.
+- `POST /:id/cancel` takes `{ reasonId }` (an order reason). It is 409 `PAYMENT_RECORDED` once
+  any payment exists.
+- `POST /:id/move` takes `{ tableId }`. It works on TABLE orders only, to a free visible
+  table.
+- `POST /:id/payments` takes `{ method, amount, tendered?, clientPaymentId? }`.
+  - It returns 201 `{ message, order, payment, replay: false }`.
+  - A repeated `clientPaymentId` returns 200 with the original payment and `replay: true`.
+    This holds after the order is paid too. The same id with another method or amount is
+    409 `CLIENT_PAYMENT_ID_REUSED`.
+  - The order is paid when the payments reach `amountDue` (total + tip).
+
+  Refusals:
+  - 409 `OVERPAY` (amount > balance, tip included);
+  - 400 `TENDERED_TOO_LOW`;
+  - 409 `ALREADY_UNPAID`;
+  - 409 `CONFLICT` (another device wrote first);
+  - 409 `ORDER_NOT_OPEN`;
+  - 409 `NO_OPEN_SESSION` ("Start the shift before taking money"). A money method (all but
+    UNPAID) needs an open till session. This is checked after the order's own refusals; a replay
+    needs no session (shoofi-server@feat/kopa-phase5 407a0533; accountant reference §12).
+
+  `amount: 0` closes a zero-balance order that has live lines (a staff meal).
+
+#### Kopa phase 4: kitchen screen (`routes/kopa/kds.js`, `KOPA_TILL`)
+- `GET /api/kopa/kds?kitchenId=&receiptMethod=` returns `{ message, tickets: [{ orderId,
+  number, receiptMethod, tableId, tableNumber, customerName, isStaffMeal, createdAt,
+  waitingSince, lines: [{ lineId, productId, nameAR, nameHE, qty, selectedExtras,
+  comboSelections, note, kitchenIds, status, statusTimes, addedAt }] }], lineCount }`.
+  - Only lines of open orders that are not served or cancelled are shown.
+  - Tickets are sorted oldest waiting line first. No prices or payments are returned.
+  - `kitchenId` is matched lowercased. A line with no kitchen shows only with no `kitchenId`
+    (or `all`).
+- `PATCH /api/kopa/kds/:orderId/lines/:lineId` takes `{ status: preparing|ready|served }`. It
+  moves forward only, else 409 `NOT_FORWARD`. Returns `{ message, orderId, line }`.
+
+#### Kopa phase 6: store settings (`routes/kopa/settings.js`, `KOPA_OWNER`)
+- `GET /api/kopa/settings` returns `{ message, settings: { wifi: { ssid, password }, guestWifi,
+  gateway, externalIp, receipts: { enabled }, updatedAt, updatedBy } }`, with defaults when
+  nothing has been saved.
+- `PUT /api/kopa/settings` is a partial update of `{ wifi?, guestWifi?, gateway?, externalIp? }`.
+  - SSID ≤ 32 characters, password ≤ 63.
+  - `gateway` / `externalIp` take an IPv4 or IPv6 address, or `""`.
+  - Unknown keys are 400 `UNKNOWN_FIELD`.
+  - A `receipts` value other than the stored one is 400 `RECEIPTS_LOCKED`.
+
+### Kopa QR table orders (CORE invariant 31)
+`POST /api/kopa/public/table-orders/:store` is PUBLIC (no token); the table code `k` is the proof.
+- **Body:** `{ k, items: [{ productId (24 hex), qty 1..20, choices?: [{ extraId, optionId }] }] (1..30),
+  name? ≤ 40, note? ≤ 200, coords: { lat, lng, accuracy }, idempotencyKey 8..64 [A-Za-z0-9_-], lang?: "ar"|"he" }`.
+- **Reply:** `200 { message: "ok", order: { orderId, total, table: "<label>", items: [{ productId, nameAR, nameHE, qty, unitPrice, lineTotal }] } }`.
+  A refusal is `{ message, code, data? }` with `no-store`.
+- **Codes, in check order:**
+  1. 400 `INVALID_BODY`.
+  2. 404 `STORE_NOT_FOUND`: not in `shoofi.stores` (looked up before any store DB is opened),
+     or the Kopa switch `shoofi.kopaStores` is off.
+  3. 403 `TABLE_ORDERING_OFF`: the QR menu is not `enabled`, or `tableOrdering` is off.
+  4. 403 `INVALID_TABLE`.
+  5. The idempotency key:
+     - a known key returns the same order (200);
+     - 409 `IDEMPOTENCY_KEY_REUSED` when the key belongs to another table;
+     - 409 `ORDER_IN_PROGRESS` while the first attempt (under 30 s) is still inserting.
+  6. 409 `STORE_CLOSED` `{ reason: closed|busy|notice }`, by the app cart's rule.
+  7. 400 `LOCATION_REQUIRED` `{ reason: missing|inaccurate }` (`inaccurate` = accuracy over 200 m).
+  8. 409 `TABLE_ORDERING_UNAVAILABLE`: the store has no pin.
+  9. 403 `TOO_FAR`: more than 150 m away.
+  10. 429 `RATE_LIMITED` + `Retry-After`: 20 per IP per hour, then 6 per table per 10 min,
+      counted on every attempt that gets this far.
+  11. 409 `ITEM_UNAVAILABLE` `{ productIds }`.
+- **Idempotency:** `kopaQrOrderKeys` (store DB) holds `{ _id: key, orderObjectId, tableId, createdAt, purgeAt }`
+  (TTL 24 h). It is claimed with a `$setOnInsert` upsert before the insert.
+- **Partner side:** shoofi-partner#68 shows "Table N · QR" from `order.table.label`. Its amend
+  dialog will meet the new `blockedReason` `KOPA_QR_ORDER_NOT_AMENDABLE`.
+- **Client:** shoofi-kopa#12.
 
 ## Cross-repo invariants (the whole-domain view)
 - **Status source of truth = server** (store `orders.status`). Clients each keep their

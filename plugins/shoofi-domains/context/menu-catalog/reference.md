@@ -85,7 +85,8 @@ Accessors are defined in `services/database/DatabaseInitializationService.js`.
   to categories), legacy `categoryId`/`subCategoryId`/`order`, and
   `categoryOrders` (map `{ [categoryId]: index }`, the current ordering source).
 - **Availability/stock:** `isInStore`, `quantity`, `outOfStockByQuantity`,
-  `outOfStoreUntil` (timed reopen), `isHidden` (catalog visibility).
+  `outOfStoreUntil` (timed reopen — an offset date string, cleared only by the 07:00 cron; §5),
+  `isHidden` (catalog visibility).
 - **Options:** `extras` (embedded, see §4), `others` (JSON blob).
 - **Kind / combo (`docs/combo-deals.md`):** `productType` (`"combo"`; absent / `""` /
   `"regular"` are regular) and `combo: { sections[{ id, nameAR, nameHE, order, count,
@@ -102,6 +103,9 @@ Accessors are defined in `services/database/DatabaseInitializationService.js`.
 `nameAR`, `nameHE`, `order`, `img[]`, `supportedGeneralCategoryIds` (array of
 strings), `discountPercent` (**drives menu discounting**), `isSchoolProject`,
 `isCampaign`, `isHidden`, `descriptionAR/HE`.
+Writers: the admin store-category routes (`routes/store.js`) and, since Kopa phase 2, the Kopa
+category routes (§7k), which write the admin's create shape key for key and otherwise only a
+targeted `$set` of `nameAR`/`nameHE`/`img`/`isHidden` (+ `updatedAt`), or `order` on reorder.
 
 ### `general-categories` (`db.generalCategories`, top-level groups)
 `nameAR`, `nameHE`, `img`, `order`, `isSchoolProject`, `isHidden`. Enriched at
@@ -128,7 +132,8 @@ left out keeps its stored value; a nested object (`coinsSettings`, `accounting`)
   (`PUT /api/shoofiAdmin/stores/:storeId/billing-contacts`, forwards the admin's token).
 - **Partner** (`Token` + `app-type: shoofi-partner`, own store only): `PARTNER_STORE_FIELDS`, i.e.
   `isStoreClose isOpen isBusy openHours creditcard_support cash_support takeaway_support
-  delivery_support isOrderLaterSupport drive_in_support invoicePrintCount ramadanSettings`.
+  delivery_support isOrderLaterSupport drive_in_support invoicePrintCount ramadanSettings
+  prepTimeSuggestion`.
   The partner app posts `{ data: <its whole storeData> }` from `screens/admin/store-managment`
   `onSave` and the header open/close/busy toggles. That copy is `POST /api/store`'s answer:
   the stored keys minus `SENSITIVE_STORE_FIELDS`, plus `workingHours`, `isDeliveryOpen`,
@@ -137,8 +142,23 @@ left out keeps its stored value; a nested object (`coinsSettings`, `accounting`)
   nothing. With no `coinsSettings` stored it carries the app's `defaultCoinsSettings`
   (`enabled: false`); the coins toggle has been commented out of the screen since 2026-05-27.
 - `invoicePrintCount` missing or invalid in the request is written as `1`, for any caller.
+- `prepTimeSuggestion` — `{ enabled: boolean, defaultMinutes?: 10|15|20|25|30|35|40|45|60 }`, the
+  partner's v3 new-order screen switch (absent = on). Normalised for any caller by
+  `normalizePrepTimeSuggestion` (`services/catalog/prep-time-suggestion.js`): an off-slot
+  `defaultMinutes` and unknown keys are dropped; no boolean `enabled` = the key is not written.
 - `isStockManagment === true` in the write runs the stock backfill (§5), so only a dashboard save
   can run it.
+- `busyUntil` (ISO or null) and `prepExtra` (`{ minutes: 10|20, until: ISO }` or null) — timed busy
+  and extra prep time (CORE invariant 30), also in `PARTNER_STORE_FIELDS`. Normalised for any
+  caller by `normalizeTimedStatusWrite` (`services/catalog/store-timed-status.js`); `POST /api/store`
+  reads ended values as ended and, for customer-facing callers only, returns `minReady`/`maxReady`
+  raised by the active `prepExtra.minutes`. Ended values are cleared in the DB by the one-minute
+  `utils/crons/store-timed-status-cron.js`.
+- `closedUntil` (ISO or null, with `isStoreClose`) and `closedDays` (`["YYYY-MM-DD"]`) — special
+  hours (CORE invariant 31), also in `PARTNER_STORE_FIELDS`; `closedDaysApplied` (`"YYYY-MM-DD"`) is
+  written only by the cron. Same normaliser and cron; customers read only `isStoreClose` +
+  `closedUntil` (`POST /api/store`, and `store.closedUntil` on every store card). `holidayDates`
+  (and `/api/store/holiday/*`, removed 2026-11-08) is dead.
 
 ⚠️ **`hasGeneralCategories` lives in TWO documents and they drift.** `GET /api/menu`
 reads it from this per-store `store {id:1}` doc (`routes/menu.js`), but the admin
@@ -391,6 +411,33 @@ One list for every store, seeded once from the 2026-10-25 prod build (`scripts/s
 - `extras-catalog-runs`: `type: "sync"` (stats, `preview` on a dry run) and `type: "publish"`
   (`ok, hash, names, icons, url, trigger`). The last `ok` publish is the shrink guard's baseline.
 
+### Kopa collections — `kopaItemMeta`, `kopaCategoryMeta`, `kopaKitchens` (Kopa phase 3, §7l)
+Store DB, written and read ONLY by `/api/kopa/*` (`services/kopa/menu-meta.js`; names in
+`services/kopa/store-data.js` `STORE`). The customer menu, search, For you and the partner/admin
+apps never read them, and they never write `products`/`categories`.
+- `kopaItemMeta`: `{ _id: "<productId string>", productId, prepMinutes|null, instructions, isLabelPrint,
+  nameEN, descriptionEN, kitchenIds: [string], showInTill, createdAt, updatedAt, updatedBy }`.
+  The `_id` IS the product id string, so the upsert is unique with no index. Index `{ kitchenIds: 1 }`
+  (background, `ensureIndexes`).
+- `kopaCategoryMeta`: `{ _id: "<categoryId string>", categoryId, nameEN, showInTill, tillOnly,
+  createdAt, updatedAt, updatedBy }`.
+- `kopaKitchens`: `{ _id: ObjectId, nameAR, nameHE, nameEN, order, createdAt, updatedAt, updatedBy }`.
+  No printer fields (printing is out of scope).
+A deleted product or category leaves its meta row behind (product delete does not know about
+Kopa). Harmless: the till joins meta onto the menu, not the other way round.
+
+### Kopa QR menu — `kopaQrProductRules`, `kopaQrCategoryRules`, `kopaStoreSettings {_id:"qrMenu"}` (§7m)
+Store DB. The QR menu SHARES the app catalog (CORE invariant 34); these hold only what differs.
+They are written only by `/api/kopa/qr-menu/*` (`services/kopa/qr-menu.js`) and read only by those
+routes and the public `GET /api/kopa/public/qr-menu/:store`.
+- `kopaQrProductRules`: `{ _id: "<product id string>", qrOnly, hiddenOnQr, qrPrice: number|null, updatedAt, updatedBy }`.
+- `kopaQrCategoryRules`: `{ _id: "<category id string>", qrOnly, hiddenOnQr, updatedAt, updatedBy }`.
+- `kopaStoreSettings` `{ _id: "qrMenu", enabled, titleAR, titleHE, showPrices, showOrderInAppButton,
+  createdAt, updatedAt, updatedBy }`. The same collection holds phase 6's `{ _id: "settings" }`;
+  each API writes only its own `_id`.
+- A deleted product leaves its rule behind, and the rule is ignored. `kopaQrCategories` /
+  `kopaQrItems` (the first design) no longer exist; no store ever had data in them.
+
 ## 3. Category → product hierarchy & ordering
 Two levels: `general-categories` → `categories` (linked by
 `category.supportedGeneralCategoryIds`) → `products` (linked by
@@ -404,6 +451,15 @@ reorder routes write `{order}` per item with one `bulkWrite` on the `app-name` D
 clear both menu cache keys (`clearMenuCachesAfterReorder`; a failed clear is logged, never
 fails the save). Admin callers: delivery-web `StoreCategoriesList.tsx` /
 `GeneralCategoriesList.tsx` drag-and-drop, which renumbers every item 0..n-1.
+Kopa's `POST /api/kopa/categories/reorder` writes the same `{order}` bulkWrite (order = position in
+`ids`) and clears both keys (§7k).
+**`POST /api/admin/product/update/order`** (the partner's products-order screen; the only
+product-reorder route Kopa has, and only with a partner Token, §7k: phase 7a did not mount it for
+Kopa sessions) writes the LEGACY `order` = index for each `productsList[]._id`. It
+does not write `categoryOrders`, so it moves nothing in a category whose products carry
+`categoryOrders[categoryId]` (that wins, invariant 6). It clears only the `appName` cache key, not
+`_schoolProject` (invariant 2 drift, verified 2026-11-11; not fixed). `order-per-category`, which
+writes `categoryOrders`, is **[admin]** only.
 
 ## 4. Product options / extras / pricing
 Option icons are NOT stored on the product: the app looks each option's `nameAR`/`nameHE` up in
@@ -475,15 +531,33 @@ copy as a guard (`shoofi-app/helpers/extras-normalize.ts`). Any bulk tool writin
 a non-empty `options[].id`; `areaOptions[].id` is a fixed vocabulary and is out of that script's
 scope.
 
-⚠️ **`freeCount` is honoured twice — `freeCount: N` gives away up to 2N toppings.** The
-client stamps `isFree: true` on the first N toppings it sees selected and sends that on the
-selection; `calculateExtrasPrice` then skips the charge for an `isFree` topping **without
-decrementing its own `remainingFreeCount`** (the decrement sits inside `if (!isFree)`), so the
-counter gives away N more. The three pricers agree with each other, so the shadow-pricing
-drift alarm stays silent and the customer is charged exactly what they were shown — this is a
-store-revenue leak, not a client/server disagreement. Not yet fixed: it is a shared change
-across `shoofi-server`, `shoofi-app` and `shoofi-partner` and needs its own PR. **Any bulk
-tool writing extras should emit `freeCount: 0`** until it is.
+**Free pizza toppings — `freeCount: N` gives away at most N toppings per group.** A group
+header's `freeCount` is ONE allowance shared by every `pizza-topping` extra under that header
+(stores often model each topping as its own extra under one header). Before pricing,
+`freePizzaToppings(extras, selections)` decides the free set per group, with one running count
+that never goes below 0:
+1. toppings the client flagged `isFree: true` claim slots first;
+2. unflagged toppings take whatever slots remain, in menu order;
+3. everything else is charged its area price (else `topping.price`, the area-0 fall-through
+   above) — including a flagged topping once the allowance is spent, so flagging cannot buy
+   extra free toppings.
+
+A topping with no price spends no slot; an extra with no `groupId`, or a group with no header,
+has no allowance. The same function, same semantics, lives in three pricers that must stay in
+lockstep: `shoofi-server/utils/order-pricing.js` (shadow-prices order creation, prices the
+amend flow for real), `shoofi-app/stores/extras/index.ts` and `shoofi-partner/stores/extras/index.ts`.
+A fourth, read-only copy, `freeToppingKeys` in `shoofi-server/services/kopa/products.js`, decides
+which toppings the Kopa extras stats count as free (§7j). A parity test against
+`calculateExtrasPrice` pins it (CORE invariant 32).
+In a group with a header, the customer app also **re-stamps** every topping's `isFree` on each change
+(`components/extras-controls/ExtrasSection.tsx`, the `PizzaToppingGroup` `onChange`): the first
+`freeCount` picked toppings in menu order are flagged, the rest unflagged — the same rule the
+"free" badges use — so after a deselect/reselect the topping showing "+₪" is the one charged.
+History: until shoofi-server #479 / shoofi-partner #46 / shoofi-app #87 (2026-11) a flagged
+topping was free without spending a slot (the decrement sat inside `if (!isFree)`), so
+`freeCount: N` gave away up to 2N; all three pricers agreed, so the shadow drift alarm stayed
+silent. Prod estimate 2026-11-07: only anwar-alqods sold such products, ₪6 undercharged over 3
+orders (lower bound).
 
 **By-weight products** carry `product.soldByWeight: true` (whitelisted on create/update/
 create-from-mock, projected by every menu `$project`). The flag chooses the client UI (per-kg
@@ -561,6 +635,38 @@ only re-enables products that were `outOfStockByQuantity`, never un-hides manual
 disables). Enabling stock management takes the whole catalog out of stock until
 real quantities are entered. Details: `docs/stock-management.md`.
 
+**Timed "off until…" — `outOfStoreUntil`** (a manual switch, separate from the stock invariant):
+- **Written** by `POST /api/admin/product/update/isInStore` and `…/isInStore/byCategory`
+  (`routes/product.js`): `isInStore: true` → `outOfStoreUntil: null`; `isInStore: false` with
+  `outOfStoreUntil` in the body → stored as `moment(body.outOfStoreUntil).utcOffset(getUTCOffset()).format()`
+  (an offset string, e.g. `2026-11-09T06:59:00+02:00`, not a BSON date); `isInStore: false`
+  without one → `null` (off until someone switches it back on).
+- **Cleared ONLY by the 07:00 cron** — `restoreTemporaryOutOfStoreProducts`
+  (`utils/crons/products-in-store-update.js`, `cron.schedule('0 7 * * *', …, { timezone:
+  "Asia/Jerusalem" })`, Redis lock `cron:restore-temporary-out-of-store-products`, started from
+  `app.js` only under `NODE_ENV=production` + `ENABLE_CRONS=true`). Per store it finds
+  `isInStore: false` products whose `outOfStoreUntil` (date, or a string `$convert`ed to one)
+  is `<= now`, `$set: { isInStore: true }` + `$unset: { outOfStoreUntil }`, then emits
+  `products_bulk_updated` (partner) and `menu_refresh` (customers).
+- **No read-time check anywhere** — not the menu, not `utils/order-stock.js`, not the pricer. A
+  product whose time passed at 15:00 stays off until the next 07:00 run; a time set for after
+  07:00 waits a full extra day. That is why the partner's "until the morning" sends one minute
+  before the next 07:00 Asia/Jerusalem.
+- **Who sees it:** `GET /api/menu` projects `outOfStoreUntil` for `shoofi-partner` /
+  `shoofi-admin` only (`...(isAdminApp ? { outOfStoreUntil: 1 } : {})` in the products `$lookup`
+  `$project`), so the partner stock screen can say when the product comes back. The customer
+  menu, `POST /api/menu/refresh` and the menu cache never carry it. The store-analytics
+  "unavailable" reasons read it from their own projections.
+- *Observed gap, not fixed:* the cron clears only `menuCache.clearStore(appName)`, not the
+  `_schoolProject` key (CORE invariant 2), so a school-project menu can show the product off for
+  up to the 5-minute TTL after the restore.
+
+**Sold-out extras — `store.outOfStockExtras`** is ONE store-wide list of option `nameAR`s on the
+per-store `store` doc (`GET`/`POST` in `routes/store.js`, surfaced as `outOfStockExtras` in the
+menu response). There is **no per-product switch**: marking `"حمص"` sold out greys it out in
+every product of that store that has an option with that exact `nameAR`, and cannot sell it out
+in one product only (§4 for the exact-match rule).
+
 ## 6. Caching — the easiest thing to get wrong
 `utils/menu-cache.js` = `MenuCache` singleton (Redis or in-memory Map, 5-min TTL,
 keys `menu:${storeId}`). Menu cache is **customer-only** — `shoofi-partner` /
@@ -610,7 +716,7 @@ Adding the next feature: append its token to the list, add its strip, keep the s
 the cache read.
 
 ## 7. Key endpoints (quick reference)
-- `GET  /api/menu` — **the** customer menu fetch (assembly + discount + optional general-categories + combo snapshots). **Source of truth.** Combos reach a customer only with `x-client-features: combo` (§6b).
+- `GET  /api/menu` — **the** customer menu fetch (assembly + discount + optional general-categories + combo snapshots). **Source of truth.** Combos reach a customer only with `x-client-features: combo` (§6b). `shoofi-partner` / `shoofi-admin` bypass the cache, see hidden products/categories, and alone get `outOfStoreUntil` on each product (§5).
 - `POST /api/menu/search` — cross-store product/store search (regex on `nameAR/nameHE`, geo via `delivery-company.cities`). See `docs/menu-search.md`.
 - `GET  /api/menu/mock` — template/mock store menu (dedup vs current store); never offers a combo.
 - `POST /api/menu/clear-cache[/:storeId]`, `GET /api/menu/cache-stats`
@@ -630,6 +736,7 @@ the cache read.
 - `GET /api/shoofiAdmin/explore/categories-with-stores-v2` and v1 **[public]** — the home, store cards through `toPublicStore` (no `accounting`); `/api/shoofiAdmin/explore/{clear-cache, clear-cache-keys, cache-stats, debug-area}` **[admin]**
 - `GET /api/store/get/:appName` **[admin]** — the whole per-store `store` document, payment credentials included (it had no auth). Admin web only; the server reads `db.store` directly instead of calling it.
 - `POST /api/store/update` — save the per-store `store` document (`$set` per key). Its own gate, not `CATALOG_ADMIN`: `auth.required` + `storeUpdateGate` — any dashboard role, any key; a partner token for its own `app-name` only, cut to `PARTNER_STORE_FIELDS`; customer/driver 403, no token 401. Answers `200 { message: "Successfully saved" }` either way (§2 `store`, CORE invariant 28).
+- `POST /api/store/out-of-stock-extras` **[admin|own store]** (`PRODUCT_ADMIN_OR_OWN_STORE`, no auth before 2026-11-08) — the store-wide sold-out options list (`store{id:1}.outOfStockExtras`, option `nameAR`s, exact match). Body `{ name: "<option nameAR>", outOfStock: true|false }` → `$addToSet` / `$pull` (atomic, `name` stored untrimmed), reply `200 { message, outOfStockExtras: <stored list after the write> }`, `404` when the store DB has no `store{id:1}`. Legacy body `{ outOfStockExtras: [...] }` → `$set` as sent, reply echoes it (installed partner builds; last writer wins between two tablets). `400` for both forms in one body, a non-array list, a missing/blank `name` or a non-boolean `outOfStock`. Both forms clear both menu cache keys and send `menu_refresh` (`action: extras_stock_updated`) to customers and `extras_stock_updated` to the store's partner admins. `GET /api/store/out-of-stock-extras` stays public (the same list the menu response carries).
 - Public store lists through `toPublicStore` (no `accounting`/`hyp`/`credentials`/`fraudConfig`): explore v1/v2, `POST /api/shoofiAdmin/available-stores` (store + each `deliveryCompanies[].company`), `POST /api/menu/search`, `POST /api/twin-order/eligible-stores`, `POST /api/for-you/suggest` cards.
 - `GET /api/admin/categories/:page?` — **no auth** still (delivery-web `get-categories.ts` sends no token). The legacy expressCart `GET /category/:cat/:pageNum?` is removed (2026-10-30).
 - `POST /api/admin/menu-import-issues` — record one import run's issues (whole run, one call)
@@ -662,6 +769,18 @@ the cache read.
   `POST /api/admin/extras-catalog/publish { dryRun? }` (`{ published, reason: unchanged|shrunk|dry_run }`).
 - Dish taxonomy / labels admin (`routes/admin/dish-taxonomy.js`; every route `auth.required` + `checkAdminRole(["master","admin","manager"])`):
   `GET /api/admin/dish-taxonomy` (seeds on first use), `POST /api/admin/dish-taxonomy/:key/approve` (→ active; its proposing labels get the type + `fromApprovedProposal`, `applied` at confidence ≥ 0.5 else `review`; admin labels untouched), `POST /api/admin/dish-taxonomy/:key/reject` (proposed only), `PATCH /api/admin/dish-taxonomy/:key`, `GET /api/admin/product-labels/review[?appName=]`, `POST /api/admin/product-labels/resolve { appName, productId, dishType }` (→ `status: "admin"`; `dishType` active or null), `GET /api/admin/product-labels/runs`, `POST /api/admin/product-labels/run [{ maxProducts, stores[] }]` — `startProductLabelsJob` (same `cron:product-labels` lock and locked index rebuild as the cron) answers as soon as it knows: `202 { started: true }` (running in the background), `409` a run already holds the lock, `503` no `ANTHROPIC_API_KEY`.
+- `GET /api/kopa/products/stats?from=&to=` and `GET /api/kopa/extras/stats?from=&to=`. These are
+  read-only product and extras sales by exact business day, for the Kopa back-office
+  (`routes/kopa/products.js`). The gate is `KOPA_REPORTS`: no token is `401`; a customer, another
+  store's staff or staff without `reports` is `403`. Bad dates are `400`. Shapes and rules: §7j.
+- Kopa phase 2, `KOPA_OWNER`: `POST /api/kopa/categories`, `PATCH /api/kopa/categories/:id`,
+  `POST /api/kopa/categories/reorder`, `GET|POST /api/kopa/promotions`, `PATCH /api/kopa/promotions/:id`,
+  `POST /api/kopa/promotions/:id/active` (§7k).
+- Kopa phase 7a, `KOPA_OWNER` + `sameStoreAsGate`: `POST /api/kopa/products/{insert,update,is-in-store,
+  is-hidden,delete}`, the admin product write handlers mounted again (§7k).
+- Kopa phase 3: `GET /api/kopa/meta`, `GET /api/kopa/kitchens` (`KOPA_TILL`);
+  `PUT /api/kopa/meta/items/:productId`, `PUT /api/kopa/meta/categories/:categoryId`,
+  `POST /api/kopa/kitchens`, `PATCH|DELETE /api/kopa/kitchens/:id` (`KOPA_OWNER`) (§7l).
 
 ## 7b. Nightly catalog lint — the cron and the app event contract
 `utils/crons/catalog-lint-cron.js` — `30 4 * * *` Asia/Jerusalem, registered in `app.js` inside
@@ -1140,6 +1259,295 @@ Full detail: shoofi-server `docs/extras-icons.md`.
   map, except `xl`. The size "XL" (90 options) now wins over the energy drink "xl" (5 options).
 - Tests: `test/integration/extras-icons.js` (app parity, rule, seed vote, map, publish guard, decide,
   sync/dry run, save hook never blocks, admin auth).
+
+## 7j. Kopa product and extras statistics (CORE invariant 32)
+These are for Kopa, the store's till back-office web app (repo `shoofi-kopa`). It calls like the
+partner app: a partner token, `app-type: shoofi-partner`, the store in `app-name`. Code:
+`routes/kopa/products.js` (thin) and `services/kopa/products.js`; tests:
+`test/integration/kopa/products.js`. **Read-only.** No writes and no menu cache.
+- **Gate:** `...KOPA_REPORTS` (`services/kopa/access.js`) = `auth.required` +
+  `requireStoreMembership()` + `requireStoreRole("reports", "all")`. No token → `401`. A customer token,
+  another store's staff, or staff with neither `reports` nor `all` → `403`. A legacy `isAdmin` doc with no `roles`
+  array passes (utils/store-membership.js). The store is `req.storeMembership.appName` →
+  `getOrInitializeDb`. Without it the handler answers `403` (fail closed).
+- **Dates:** `?from=YYYY-MM-DD&to=YYYY-MM-DD` are the store's business days, inclusive, both
+  required and strict. `from <= to`, at most 366 days; otherwise `400 { message }`. The order window
+  is `storeReportBounds(from, to, db.store.findOne({}))`
+  (`services/compensations/report-window.js`). That is the store report's and the partner sales
+  screen's window: openHours-snapped, with the transition-month rule. `created` is an offset string,
+  compared `$gte start, $lte end`. The response echoes `window: { start, end }`.
+- **A sale** is `aggregateSoldItems`' (CORE invariant 32): completed statuses, school-project
+  excluded, `qty`/`price` through the same `$convert` (bad qty → 1, bad price → 0). Revenue is
+  `price × qty`, where `price` is the final unit price with extras and the category discount in it.
+- **Splits:** `byPayment: { CASH, CREDITCARD, OTHER }` and `byReceiptMethod: { DELIVERY, TAKEAWAY,
+  DRIVEIN, TABLE, OTHER }`, every key always present. Apple Pay and Google Pay are stored as
+  `CREDITCARD`. A missing or unknown value goes to `OTHER`, so the splits always add up. Receipt
+  values pass through `receiptMethodOf` (trimmed, upper-cased). Sums run in integer agorot, so
+  every split adds up to its total to the agora. Per-item revenue can differ from
+  `aggregateSoldItems`' single `round2` by at most one agora per payment × receipt cell.
+- **`GET /api/kopa/products/stats`** → `data: { appName, from, to, window, products[], categories[],
+  totals }`.
+  - Each product is `{ itemId, nameAR, nameHE, inCatalog, categoryIds, categoryId, quantity,
+    revenue, byPayment, byReceiptMethod }`.
+  - The `$group` key is item × `payment_method` × `receipt_method`, folded by `String(item_id)`, so
+    an ObjectId and a string id join.
+  - Products load with `toObjectIds` and are keyed by `String(_id)` (the string-vs-ObjectId trap,
+    store-analytics product-performance header).
+  - The current names win. A sold id with no product (hard-deleted) is `inCatalog: false` and keeps
+    its revenue and its order-line name. Lines with no `item_id` are one `__unidentified__` row.
+  - **Category rollup:** one category per product, its first on the menu. Among its
+    `supportedCategoryIds` that exist (string vs `String(_id)`), visible ones beat hidden ones, then
+    `compareGeneralCategories` decides: lowest numeric `order`, missing `order` last, then the
+    string `_id`. All memberships stay in `categoryIds`; `categoryId` is the one chosen.
+  - `categories[]` is `{ categoryId, nameAR, nameHE, isHidden, productCount, quantity, revenue,
+    byPayment, byReceiptMethod }`. It lists every visible non-school category, zeros included, plus
+    any other category a product landed in. A `categoryId: null` bucket appears for deleted,
+    orphaned or unidentified products. The category totals equal `totals`.
+  - `totals` is `{ products, quantity, revenue, byPayment, byReceiptMethod }`.
+- **`GET /api/kopa/extras/stats`** → `data: { appName, from, to, window, options[], unresolved,
+  totals }`.
+  - The same order match, streamed with a narrow projection. Only lines with a non-empty selection
+    are kept.
+  - The products of those lines and of their `comboSelections[].productId` load in ONE
+    `find({_id:{$in: toObjectIds}})`, projected `{ extras: 1 }`. Selections resolve against the
+    product's **current** `extras` (no history is stored).
+  - Uses are multiplied by the line qty. Revenue is the option's catalogue `price` × uses: the list
+    price today, before any category discount, so it is an estimate of what the extras earned.
+  - Rules by type:
+    - `single`: an option id. The legacy `["id"]` shape is read too.
+    - `multi`: an array of ids. A lone scalar is read as one id.
+    - `counter`: a number. Uses are the value, and the revenue is `extra.price × value`.
+    - `weight`: a number. One use, plus `amount` (Σ value × qty) and `unit`. Revenue is 0, because
+      the weight is how much of the product was bought; its money is in the product stats.
+    - `pizza-topping` `{ [toppingId]: { areaId, isFree } }`: one use per topping, plus
+      `byArea: { full, half1, half2, other }`. It is priced like `pizzaToppingPrice` (an area priced
+      0 falls through to the topping price, §4).
+  - **Free toppings:** the group's `freeCount` allowance is decided by the current server rule (flagged
+    first, at most N per group, §4). A free topping counts in `uses` and in `freeUses` with no
+    revenue. Orders from before shoofi-server #479 may have given up to 2N free; those are counted
+    by today's rule, which overstates their topping revenue slightly (the 2026-11-07 estimate: ₪6 over 3 orders, a lower bound).
+  - **Combos:** each `comboSelections[]` entry resolves against the COMPONENT product's extras, and
+    combo-level extras against the combo itself.
+  - **Merge key** `type|group|option`, each part trimmed. The group is the extra's `nameAR`, else
+    `nameHE`, else its group header's name (most members of a headed group have an empty name),
+    else the id. The option is `nameAR`, else `nameHE`, else the id. This is the Kopa menu page's
+    `deriveExtras` key, plus the header fallback.
+  - Each option row is `{ key, type, groupAR, groupHE, nameAR, nameHE, uses, revenue, byPayment,
+    byReceiptMethod, freeUses, productCount, outOfStock, byArea?, amount?, unit? }`.
+  - `outOfStock` is the current state, not history: `"all" | "some" | "none"`, by the exact,
+    untrimmed `nameAR` against `store.outOfStockExtras`, as the app greys options. `"some"` means
+    variants merged by the trimmed key differ by a space and only some are sold out. It is `null` for
+    counter and weight.
+  - **Unresolved, never dropped:** `unresolved: { lines, uses, byReason: { productDeleted,
+    extraRemoved, optionRemoved, unreadable } }`. `unreadable` covers a value whose shape its type
+    cannot hold, an unknown type, or a header id. Each unresolved id counts once × qty; a bare value
+    counts once. An empty value (`null`, `""`, `[]`, `{}`, `0`) is no selection at all.
+  - `totals` is `{ lines, freeUses, uses, revenue, byPayment, byReceiptMethod }`, over resolved
+    options only.
+
+## 7k. Kopa phase 2 — category writes; phase 7a — product writes (CORE invariant 33)
+Code: `routes/kopa/menu-write.js` (thin), `services/kopa/menu-write.js`; tests
+`test/integration/kopa/menu-write.js`. Every route is `...KOPA_OWNER` (`services/kopa/access.js`:
+`auth.required` + `requireStoreMembership()` + `requireStoreRole("all")`); the store is
+`req.storeMembership.appName` → `getOrInitializeDb`. Responses `{ message: "ok", data }`.
+- **`POST /api/kopa/categories`** — JSON `{ nameAR, nameHE, order?, img? }` or multipart with ONE
+  image file in `img`. Writes the admin `POST /api/store-category/add` document, same keys in the
+  same order: `{ nameAR, nameHE, order, img, supportedGeneralCategoryIds: [], discountPercent: 0,
+  createdAt, isSchoolProject: false, isCampaign: false }` (the test runs the admin route on the same
+  fake DB and compares). Names trimmed, 1–200 chars. `order` omitted → last `order` + 1 (the admin
+  defaults to 0). Any other field (a flag, `isHidden`, `discountPercent`) → `400`. → `data` = the doc
+  with `_id`. Note: `supportedGeneralCategoryIds: []` means no general-category tile, so in a
+  `hasGeneralCategories` store the new category needs the admin to place it.
+- **`PATCH /api/kopa/categories/:id`** — any of `nameAR`, `nameHE`, `img`, `isHidden` (JSON booleans or
+  multipart `"true"`/`"false"`); `$set` of exactly the fields sent + `updatedAt`. Anything else
+  (`discountPercent`, `isCampaign`, `isSchoolProject`, `order`, `supportedGeneralCategoryIds`, …) →
+  `400`, nothing written. An id not in THIS store's `categories` → `404` (a 24-hex id is an ObjectId,
+  another short string is matched as is, a 24-char non-hex id is a 404, never the admin `getId`
+  throw). → `data` = the category after the write. This is the safe alternative to the admin update
+  route (Known status: it zeroes the discount and clears no cache), which is left as it is.
+- **`POST /api/kopa/categories/reorder`** — `{ ids: [categoryId, …] }` (1–500, no repeats). Every id
+  must be this store's (`404 { data: { missing } }`, nothing written); then `order` = position via
+  one `bulkWrite`, the admin update-order shape. Categories not listed keep their `order`, so send
+  the full list. → `data: { ids, updated }`.
+- **Images.** JSON `img` is `[]` or `[{ uri }]` with `uri` under `<appName>/` (no `..`, ≤ 5). A file in
+  multipart `img` (1 file, `image/*`, ≤ 10 MB) is uploaded with `routes/product.js` `uploadFile(files,
+  req, "<appName>/store-categories")`, the admin's exact call (key `<appName>/<appName>/store-categories/…`).
+  Text is validated before the upload, so a refused request uploads nothing. File + JSON `img` → `400`.
+- **Side effects:** every write clears BOTH menu cache keys; create and update also run
+  `syncCampaignCategoryForStore` as the admin add/update do (a no-op in practice: Kopa never sets a
+  campaign trigger). Both swallowed and logged. No websocket event (the admin category routes send none).
+- **Promotions** (the store's own deals, CORE invariant 18). `routes/promotion.js` exports its own
+  `sanitizePromotion` and `validatePromotion` (= its private `validate`) for this; Kopa requires them
+  and never builds a promotion itself. Never copy them: a field the admin form gains must reach Kopa
+  through the same function.
+  - `GET /api/kopa/promotions` → `data: { promotions, types }`: the admin list (`find({})`, newest
+    `createdAt` first) plus `ALL_PROMOTION_TYPES`.
+  - `POST /api/kopa/promotions` — the admin form body. Doc = `sanitizePromotion(body)` + `createdAt`,
+    `updatedAt`, `createdBy` (= `req.auth.id`, the partner token's storeUsers id), the admin create's
+    keys in the same order (the test runs `POST /api/admin/promotions` on the same fake DB and compares).
+    `validatePromotion` errors → `400 { message, errors }` with the admin's messages. → `data` = doc + `_id`.
+  - `PATCH /api/kopa/promotions/:id` — any form fields; the doc is `sanitizePromotion({ ...stored,
+    ...body })` + `updatedAt`, `updatedBy`, `$set` over the stored doc (top-level overlay: `config` and
+    `scope` replace as whole objects). With the full form it writes exactly what
+    `POST /api/admin/promotions/:id` writes (tested); with some fields, only those change, because
+    re-sanitising a stored doc is idempotent. Empty or non-object body → `400`.
+  - `POST /api/kopa/promotions/:id/active` — `{ isActive: <JSON boolean> }` (anything else `400`); the
+    same re-sanitise with only `isActive` changed, as the admin's "post the doc back" update does.
+  - Ids go through the admin's `getPromotionById` on the proven store's DB: another store's id or a
+    malformed one → `404`, nothing written.
+  - Side effects equal the admin's: both cache keys, then `syncCampaignCategoryForStore`, swallowed.
+    No promotion delete from Kopa (switch it off instead). Scope ids are not checked against the
+    store's products/categories, as in the admin.
+- **Products: Kopa phase 7a mounts the admin handlers themselves** (`routes/kopa/products-write.js`;
+  tests `test/integration/kopa/products-write.js`). Why: the admin routes are
+  `PRODUCT_ADMIN_OR_OWN_STORE`, which starts with `auth.required` (partner/admin JWT only), so a Kopa
+  session (`Authorization: Kopa <token>`) never passes them, and `routes/auth.js` must not learn Kopa
+  tokens. `routes/product.js` names and exports the five handlers as `module.exports.handlers =
+  { insert, update, isInStore, isHidden, delete }` plus `productImageUpload` (= `upload.array("img")`
+  on the same multer instance); the admin routes register the same chain as before (their inline
+  `upload.array("img")` is kept, so the invariant-26 asserts still match).
+
+  | Kopa route | Same handler as |
+  |---|---|
+  | `POST /api/kopa/products/insert` (multipart) | `POST /api/admin/product/insert` |
+  | `POST /api/kopa/products/update` (multipart) | `POST /api/admin/product/update` |
+  | `POST /api/kopa/products/is-in-store` | `POST /api/admin/product/update/isInStore` |
+  | `POST /api/kopa/products/is-hidden` | `POST /api/admin/product/update/isHidden` |
+  | `POST /api/kopa/products/delete` | `POST /api/admin/product/delete` |
+
+  - **Chain:** `...KOPA_OWNER`, then `sameStoreAsGate`, then (insert/update) `productImageUpload`, then
+    the handler. The upload runs after the gate, as on the admin routes.
+  - **The store is the `app-name` header**, because the shared handlers read it (they read nothing
+    else the admin gate sets: `req.adminUser` / `req.productCaller` are unused). `sameStoreAsGate`
+    answers 403 unless `req.storeMembership.appName === app-name` AND `req.storeMembership.me.appName`
+    (the staff doc the role was read from) is that store. The second check matters:
+    `requireStoreRole` reads the roles of the token's OWN storeUsers doc while membership is by
+    phone, so with `KOPA_OWNER` alone an owner of store X who is only a cashier of store Y passes
+    with X's partner Token and `app-name: Y` (pinned by a test; this gap remains in every other
+    `KOPA_*` route used with a partner Token). Kopa sessions are always bound to the store's own
+    doc, so the check never refuses one.
+  - **Who:** an `all` staff member of the store, by Kopa session or a partner Token minted on that
+    store's doc. No token `401`; customer, cashier, another store's owner `403`. Admin dashboard
+    tokens are not accepted (no storeUsers doc).
+  - **Same result, tested:** the admin route and the Kopa route, called by the same owner on the same
+    fake DB with the same body, write the same document (same keys, same order), clear the same
+    cache keys (both), push the same websocket messages and answer the same body.
+  - Not mounted for Kopa: `update/order`, `update/quantity`, `update/isInStore/byCategory`,
+    `update/activeTastes`, `images/upload`. Those stay partner-Token only.
+  - The admin routes themselves stay as they were: no role, so a cashier's partner Token can still
+    write products through `/api/admin/product/*`.
+  - Bodies (the same for both mounts; `/api/kopa/products/<x>` takes exactly what the admin route takes):
+  - `POST /api/admin/product/insert`, **multipart** (every value a string): `nameAR`, `nameHE`,
+    `supportedCategoryIds` (JSON array of category id strings, required non-empty), `price` (JSON
+    number string), `descriptionAR/HE`, `notInStoreDescriptionAR/HE`, `isInStore` (`"false"` → false,
+    anything else true), `quantity`, `extras` (JSON string), `others` (JSON string), `soldByWeight`,
+    `hasDiscount` + `discountQuantity`/`discountPrice`, `barcodeId` (3–100, else generated), `barcode`,
+    `productType`/`combo` (JSON) for a combo; image: ONE file in `img`, or `img` as a JSON string of
+    `[{ uri }]`, or `imageUrl` (downloaded server-side). → `200 { message, productId, lintIssues? }`;
+    `400` `CATALOG_INVALID` / `COMBO_INVALID` / "At least one category is required".
+  - `POST /api/admin/product/update`, **multipart**: `productId` + only the fields to change (omit =
+    keep, invariant 8; a blank price must be omitted, never sent as 0). Image: a file in `img` or
+    `imageUrl`; update does NOT read a JSON `img`. → `200 { message: "Successfully saved", product,
+    lintIssues? }`; `400 "Failed to update product"` when the id is unknown. JSON bodies break here:
+    `extras`/`supportedCategoryIds`/`price` go through `JSON.parse`, so they must be strings.
+  - `POST /api/admin/product/update/isInStore`, JSON `{ productId, isInStore: <boolean>,
+    outOfStoreUntil? }` (ISO; only with `false`; `true` clears it). The raw value is `$set`, so send a
+    real boolean.
+  - `POST /api/admin/product/update/isHidden`, JSON `{ productId, isHidden: <boolean> }` (raw `$set`; a
+    string `"true"` would not hide, the menu matches `$ne: true`).
+  - `POST /api/admin/product/update/order`, JSON `{ productsList: [{ _id }, …] }` (order = index; see §3
+    for what it does NOT do). Partner Token only: no Kopa mount, so a Kopa session cannot reorder products.
+  - `POST /api/admin/product/delete`, JSON `{ productsIdsList: [id, …] }` → `200`, or `409
+    PRODUCT_REFERENCED_BY_COMBO`. A thrown error answers `200 { message: <error> }`, so check `message`.
+  - **`POST /api/admin/images/upload` cannot set a product image.** It uploads into the `birthday`
+    folder, inserts `images` docs `{ data: { uri }, type: "birthday", subType }` and returns only
+    `{ message }`, no URI. Send product images through insert/update `img` instead.
+  - All of these clear both cache keys except `update/order` (main key only). The Kopa mounts clear
+    exactly what their admin twins clear (same handler).
+
+## 7l. Kopa phase 3 — till-only menu details (CORE invariant 33)
+Code: `routes/kopa/menu-meta.js`, `services/kopa/menu-meta.js`; tests `test/integration/kopa/menu-meta.js`.
+JSON only. Writes only the three Kopa collections (§2), never `products`/`categories`, clears no
+menu cache key (the customer menu cannot change). Every id is checked against THIS store's DB.
+- **`GET /api/kopa/meta`** (`KOPA_TILL` = `cashier` | `all`; not `reports`, services/kopa/access.js) → `data: { items: { [productId]:
+  meta }, categories: { [categoryId]: meta }, kitchens: [...] }` (meta without `_id`; kitchens by
+  `order`, then `_id`).
+- **`PUT /api/kopa/meta/items/:productId`** (`KOPA_OWNER`) — `{ prepMinutes, instructions, isLabelPrint,
+  nameEN, descriptionEN, kitchenIds, showInTill }`. PUT REPLACES: an omitted field returns to its
+  default (`null`, `""`, `false`, `[]`, `showInTill: true`). Strict types: `prepMinutes` integer 0–600
+  or null; booleans are JSON booleans; texts ≤ 200 (names) / 1000 (instructions) / 2000 (description);
+  `kitchenIds` ≤ 20 unique 24-hex ids, stored lower-case strings. Unknown key → `400`. Product not in
+  this store → `404`. A kitchen id not in this store's `kopaKitchens` → `400 { code:
+  "KITCHEN_NOT_FOUND", data: { kitchenIds } }`, nothing written. → `data` = the stored meta.
+- **`PUT /api/kopa/meta/categories/:categoryId`** (`KOPA_OWNER`) — `{ nameEN, showInTill, tillOnly }`,
+  same replace/strict rules; category not in this store → `404`. `tillOnly` / `showInTill` affect the
+  till only: they do NOT hide anything from the customer menu (per-channel visibility is out of scope;
+  the QR menu's QR-only items use `isHidden` + a Kopa rule, §7m).
+- **Kitchens:** `GET /api/kopa/kitchens` (`KOPA_TILL`) → `data: [...]`; `POST` (`KOPA_OWNER`) `{ nameAR,
+  nameHE, nameEN?, order? }` (both names required; `order` omitted → last + 1; ≤ 50 per store);
+  `PATCH /:id` any of those four (at least one); `DELETE /:id` → `409 { code: "KITCHEN_IN_USE", data:
+  { productIds } }` while any item meta lists it, else `200`. Another store's kitchen id → `404`.
+- **Indexes never gate a write:** `ensureIndexes` (background, one shared build per db handle,
+  retried on failure) is called but not awaited; a test with a rejecting `createIndex` proxy proves
+  every write still lands.
+
+## 7m. Kopa — the QR menu shares the app menu (CORE invariant 34)
+Code: `routes/kopa/qr-menu.js` (owner), `routes/kopa/qr-menu-public.js` (no auth),
+`services/kopa/qr-menu.js`, `services/kopa/qr-menu-cache.js`. Tests:
+`test/integration/kopa/qr-menu.js`, `qr-menu-public.js`. Server doc: `docs/kopa.md` "Phase 8".
+- **Reads** (`readStoreCatalog`, in parallel): every `categories` row (`nameAR/HE, img, order,
+  isHidden, isSchoolProject, discountPercent`), every `products` row (names, descriptions, `price,
+  img, order, categoryOrders, isInStore, isHidden, supportedCategoryIds, extras, productType`), both
+  rule collections, `kopaItemMeta` / `kopaCategoryMeta` (English), and `store{id:1}.outOfStockExtras`.
+- **Shown** (`qrShowsCategory` / `qrShowsProduct` / `buildQrMenu`):
+  - Categories: not school (`isSchoolProject` missing or `false`), not `hiddenOnQr`, and
+    `isHidden != true` or `qrOnly`; dropped when empty.
+  - Products: not `hiddenOnQr`, `isHidden != true` or `qrOnly`, priced > 0, listed under EVERY
+    shown category in `supportedCategoryIds`.
+  - Sort: categories by `compareGeneralCategories`; items by
+    `categoryOrders[cid] ?? order ?? 999999`, ties on `_id`.
+- **Item fields:**
+  - `available = isInStore === true`.
+  - Price (`qrPriceOf`): `qrPrice > 0 ? qrPrice : price`, then `applyProductDiscount` with
+    `buildCategoryDiscountMap` over the SHOWN categories (invariant 3).
+  - `optionsNoteAR/HE`: the first non-header `single` with ≥ 2 options NOT in `outOfStockExtras`
+    (exact `nameAR`), ≤ 6 names, ≤ 200 chars, "" for combos.
+- **Owner** (`KOPA_OWNER`):
+  - `GET /catalog` returns `{ settings, categories[{ id, nameAR, nameHE, hiddenInApp, rule,
+    shownOnQr }], products[{ id, nameAR, nameHE, img, categoryIds, hiddenInApp, available,
+    appPrice, shownPrice, rule, shownOnQr }] }`. `appPrice` uses the app-visible categories'
+    discounts.
+  - `PUT /products/:id { qrOnly?, hiddenOnQr?, qrPrice? }` and `PUT /categories/:id { qrOnly?,
+    hiddenOnQr? }`:
+    - booleans are strict; `qrPrice` is > 0 with ≤ 2 decimals, or `null`;
+    - unknown keys are 400, and both flags at once is 400;
+    - setting one flag clears the other;
+    - `qrOnly` while visible in the app is 409; a school category is 404;
+    - an unknown / malformed id is 404.
+  - `GET/PUT /settings`.
+  - Every successful write invalidates the public cache.
+- **Public:**
+  - Checks, in order: the slug regex, then `shoofi.stores.findOne({ appName })` before any store
+    DB, then the `qrMenu` doc must be `enabled`. Every miss is `404 { message: "Menu not found" }`,
+    `no-store`.
+  - 200 = `{ store: { appName, nameAR, nameHE, logo }, settings: { titleAR, titleHE, showPrices,
+    showOrderInAppButton }, categories: [{ id, nameAR, nameHE, nameEN, img, items: [{ id, nameAR,
+    nameHE, nameEN, descriptionAR, descriptionHE, descriptionEN, price?, img, available,
+    optionsNoteAR, optionsNoteHE }] }], table }`.
+  - Cache: in memory per store, 20 s (`Cache-Control: public, max-age=20`). A known disabled store
+    is cached as a miss, and a generation guard runs on invalidation.
+- **Table ordering** (`tableOrdering` on; route in orders reference C5): `buildQrMenu` adds
+  `orderable` (structurally orderable AND in stock) and, for products with choices,
+  `choices: [{ extraId, nameAR, nameHE, options: [{ optionId, nameAR, nameHE, price }] }]`
+  (`tableChoicesOf`).
+  - Every `single` group is required: exactly one option that is not in `outOfStockExtras`. If
+    none is left, the product is not orderable.
+  - `multi` / `counter` / `pizza-topping` are optional in the app and not offered at the table.
+  - Not orderable: combos, `soldByWeight`, any `weight` extra, unknown types, options with a
+    missing or duplicate id, a price that isn't a number ≥ 0.
+  - Option prices are hidden when `showPrices` is off. The view-only payload (ordering off) is
+    unchanged.
+- **No menu cache key is cleared by any of this** (`products` / `categories` are never written).
 
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":

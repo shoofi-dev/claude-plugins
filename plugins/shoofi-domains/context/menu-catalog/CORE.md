@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@feat/kopa-qr-shared-menu / 2026-11-13 (invariant 34 + reference §7m: the QR menu SHARES the app menu - kopaQrProductRules / kopaQrCategoryRules, qrOnly needs isHidden, qrPrice on the base price with the category discount, 20 s public cache); shoofi-server@feat/kopa-phase8 (invariant 34 + reference §7m — Kopa phase 8 QR menu: its own catalog kopaQrCategories/kopaQrItems, copied once, public read; uncommitted worktree) / 2026-11-13; shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@feat/kopa-phase1 (invariant 33 — Kopa phase 2 category writes + phase 3 till-only meta, /api/kopa/{categories,meta,kitchens}; uncommitted worktree) / 2026-11-11; shoofi-server@feat/kopa-phase1 (invariant 32 — Kopa product and extras stats, /api/kopa/{products,extras}/stats; uncommitted worktree on origin/main cf25d5c2) / 2026-11-11; shoofi-app@design/round-2 67d4533 (invariant 29 — where the app draws option icons; the app files are committed) / 2026-11-08; shoofi-server@feat/store-closed-until (invariant 31 — special hours closedUntil / closedDays on isStoreClose, the same cron; invariant 28 partner fields; /api/store/holiday/* removed) / 2026-11-08; shoofi-server@feat/timed-busy-prep-extra (invariant 30 — timed busy busyUntil, extra prep time prepExtra, the expiry cron; invariant 28 partner fields) / 2026-11-07; shoofi-server@feat/prep-time-suggestion-field (invariant 28 — prepTimeSuggestion, a partner store field) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 — outOfStoreUntil, the 07:00 restore, store-wide outOfStockExtras) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -10,10 +10,18 @@ reference: ./reference.md   # data model, endpoint tables, flows, options/extras
 Products, categories, menu assembly, options/extras, availability & stock, catalog i18n.
 
 ## Scope
+Kopa's menu slice: `routes/kopa/products.js` + `services/kopa/products.js` (invariant 32),
+`routes/kopa/menu-write.js` + `services/kopa/menu-write.js`, `routes/kopa/menu-meta.js` +
+`services/kopa/menu-meta.js` and `routes/kopa/products-write.js` (invariant 33); the QR menu
+`routes/kopa/qr-menu.js`, `routes/kopa/qr-menu-public.js`, `services/kopa/qr-menu.js`,
+`services/kopa/qr-menu-cache.js` (invariant 34); the gates are `services/kopa/access.js`.
 Server: `routes/menu.js`, `routes/product.js` (and its gate `services/catalog/product-access.js`), `routes/category.js`, the catalog slice of
 `routes/store.js` (the category gate `services/catalog/category-access.js`, the public store card
 `services/catalog/public-store.js` — invariant 27, and who may save the store document,
-`services/catalog/store-update-access.js` — invariant 28), `routes/translations.js`,
+`services/catalog/store-update-access.js` — invariant 28; timed busy and extra prep time,
+`services/catalog/store-timed-status.js` + `utils/crons/store-timed-status-cron.js` — invariant 30,
+and special hours on the same two files — invariant 31),
+`routes/translations.js`,
 `services/translations/owned-translations.js` (rows
 written by code — invariant 24), `routes/global-search.js`, `utils/menu-cache.js`,
 `utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`,
@@ -37,8 +45,8 @@ extras catalog and the option icons map (invariant 29) — `utils/extras-icons/`
 `services/catalog/extras-catalog.js`, `services/catalog/extras-icons-sync.js`,
 `utils/crons/extras-icons-sync-cron.js`, `routes/admin/extras-catalog.js`,
 `scripts/seed-extras-catalog.js` (app: `utils/extras-icons.ts`,
-`components/extras-controls/ExtraOptionIcon.tsx` — on shoofi-app branch `feat/extras-icons`, not
-on `main` as of 2026-10-30), and what the
+`components/extras-controls/ExtraOptionIcon.tsx`, drawn by `CheckboxGroup`, `RadioGroup`,
+`Counter` and `PizzaToppingGroup` — committed on shoofi-app `design/round-2`, PR #87), and what the
 AI helper's taste profile does to suggestions — `services/ordering-intelligence/avoid.js`, the
 profile hooks and chat-ordering modes in `suggest.js` / `suggest-service.js`,
 `utils/extras-required.js`, and `GET /api/ai-helper/cuisines` (`routes/ai-helper.js` →
@@ -73,6 +81,13 @@ boundary and say so in the PR.
    `{ isInStore:false, outOfStockByQuantity:true }`. **Human-confirmed: applies to ALL products,
    no exceptions.** Decrement only on order confirmation; restore only re-enables products that
    were `outOfStockByQuantity` (never un-hides a manual disable).
+   **Timed "off until…"** (`outOfStoreUntil`) is a separate, manual switch, and only the 07:00
+   Asia/Jerusalem cron turns it back on (`restoreTemporaryOutOfStoreProducts`,
+   `utils/crons/products-in-store-update.js`): nothing checks it at read time, so a product whose
+   time has passed stays off until the next 07:00 run. `GET /api/menu` projects it for
+   `shoofi-partner` / `shoofi-admin` only (never the customer menu or its cache).
+   **Sold-out extras** (`store.outOfStockExtras`) are store-wide by option `nameAR` — there is no
+   per-product switch. Detail: reference §5.
 5. **`supportedCategoryIds` are STRINGS**, compared via `{$toString:'$_id'}`. Don't switch to
    ObjectId comparison without a data migration.
 6. **Product ordering** comes from `categoryOrders[categoryId]`, falling back to legacy `order`.
@@ -862,6 +877,14 @@ boundary and say so in the PR.
       cleared before. Six still clear only the regular key, not `_schoolProject`, which breaks
       invariant 2 and predates the gate: `update/activeTastes`, `update/order`,
       `update/order-per-category`, `bulk-reorder`, `reset-order/:categoryId`, `migrate-orders`.
+    - **`POST /api/store/out-of-stock-extras`** (`routes/store.js`, the sold-out options list)
+      takes `PRODUCT_ADMIN_OR_OWN_STORE` too. It had no auth until 2026-11-08. Its only caller is
+      shoofi-partner `stores/menu` `updateOutOfStockExtras` (`Token`). Two bodies
+      (`services/catalog/out-of-stock-extras.js`): the whole list
+      `{ outOfStockExtras: [...] }`, which installed partner builds send and is `$set` as sent
+      (last writer wins between tablets), or one option `{ name: "<nameAR>", outOfStock: bool }`,
+      which does `$addToSet` / `$pull` so concurrent toggles all land. Both clear both cache keys.
+      Tests: `test/integration/out-of-stock-extras-auth.js`. Detail: reference §7.
 
 27. **CATEGORY AND EXPLORE ADMIN ROUTES ARE DASHBOARD-ONLY. THE HOME'S READS STAY PUBLIC, AND NO
     PUBLIC STORE LIST SENDS A STORE'S SECRETS** (`services/catalog/category-access.js`, `services/catalog/public-store.js`,
@@ -939,11 +962,12 @@ boundary and say so in the PR.
       tokens get 403, and no token gets 401. The own-store check is a copy of `ownStoreGate` in
       `services/catalog/product-access.js` (shoofi-server #346); fold the two together once both
       have merged.
-    - **What a partner writes:** only `PARTNER_STORE_FIELDS`: `isStoreClose`, `isOpen`, `isBusy`,
+    - **What a partner writes:** only `PARTNER_STORE_FIELDS`: `isStoreClose`, `isOpen`, `isBusy`, `busyUntil`, `prepExtra` (invariant 30),
+      `closedUntil`, `closedDays` (invariant 31; `closedDaysApplied` is the cron's, never a client's),
       `openHours`, `creditcard_support`, `cash_support`, `takeaway_support`,
       `delivery_support`, `isOrderLaterSupport`, `drive_in_support`, `invoicePrintCount`,
-      `ramadanSettings`. Those are exactly the controls of the partner app's store-management
-      screen and header (`screens/admin/store-managment`, `components/layout/header`). The
+      `ramadanSettings`, `prepTimeSuggestion`. Those are exactly the controls of the partner app's
+      store-management screen and header (`screens/admin/store-managment`, `components/layout/header`). The
       app posts its WHOLE copy of `POST /api/store` on every save, wrapped as `{ data }`. Each
       key outside the list is left out of the write, so it keeps its stored value; nothing the
       owner can edit is lost. **Add a key only when a partner screen edits it, never because the
@@ -960,6 +984,17 @@ boundary and say so in the PR.
       so a store without one keeps none after a partner save. A dropped key whose value differs
       from the stored one is logged as
       `store update: partner write left out fields the partner app cannot edit`.
+    - **`prepTimeSuggestion`** (added 2026-11-07, shoofi-partner #47): the switch for the v3
+      new-order screen's pre-selected prep time (the last time picked on that device today, else
+      `defaultMinutes`; it never accepts by itself). The partner reads
+      `storeData.prepTimeSuggestion` from `POST /api/store` (it passes `sanitizeStoreForPublic`,
+      no allowlist) and treats anything but `enabled === false` as ON, so a store without the key
+      has it on. `POST /api/store/update` stores it as `{ enabled: boolean, defaultMinutes?: slot }`
+      for EVERY caller via `normalizePrepTimeSuggestion` (`services/catalog/prep-time-suggestion.js`,
+      `PREP_TIME_SLOTS` = 10 15 20 25 30 35 40 45 60, the partner's slots): a `defaultMinutes` off
+      the slots and any other key are left out; a value without a boolean `enabled` is not written
+      at all (the stored one stays, logged `store update: invalid prepTimeSuggestion not written`).
+      No admin-web control; the admin form re-posts the loaded document, so it keeps the value.
     - **Status change** compares only keys the request writes (`writes(key)`), because a partner
       write never carries `business_visible` and the rest. The explore cache is cleared and the
       closed/busy SMS sent only for a real change.
@@ -981,6 +1016,12 @@ boundary and say so in the PR.
     and §7i). The customer app reads `extras-icons/v1/map.json` from the `shoofi-spaces` CDN and
     looks each option up by `extraIconKey(nameAR, nameHE)`. Nothing about icons is in the menu
     response or the menu cache, so invariant 2 does not apply.
+    - **Where the app draws it.** A 24pt picture directly before the option's name (from the
+      right: indicator, picture, name, price at the far end) in checkbox, radio, counter and
+      pizza-topping rows. A "without" option (`|w`) is the same picture faded with a red strike.
+      No match draws nothing, except in a group where another option has a picture: then an
+      empty 24pt slot keeps the names in one column. The lookup is by the Arabic name; a
+      `he:` key is used only when the option has no Arabic name at all.
     - **The key is a byte-for-byte contract.** `utils/extras-icons/normalize.js` must equal
       shoofi-app `utils/extras-icons.ts` (strip harakat/tatweel, fold أإآٱ→ا ى→ي ة→ه, strip
       Hebrew points, keep only 0-9 A-Z a-z ء–ي ٠–٩ א–ת %, collapse spaces, lower-case; Arabic
@@ -1012,6 +1053,199 @@ boundary and say so in the PR.
       and on top of `ENABLE_CRONS` it runs only when `shoofi.store {id:1}.isExtrasIconsSyncEnabled
       === true`. `extrasIconsSyncDryRun === true` makes it a dry run that calls the model but writes
       only its run record. Both fields are server-only, not in `SHOOFI_CONFIG_PUBLIC_FIELDS`.
+
+30. **A TIMED BUSY ENDS BY ITSELF; EXTRA PREP TIME KEEPS THE STORE OPEN AND RAISES ONLY WHAT
+    CUSTOMERS SEE** (`services/catalog/store-timed-status.js`, `utils/crons/store-timed-status-cron.js`,
+    `docs/store-timed-status.md`; added 2026-11-07 for the partner's v3 header status sheet,
+    shoofi-partner `helpers/store/store-status.ts`). Two fields on `<appName>.store {id:1}`, both in
+    `PARTNER_STORE_FIELDS` (invariant 28):
+    - **`busyUntil`** — ISO string, stored as UTC `toISOString()`, or null. With `isBusy: true` the
+      pause ends at that instant; null/absent is the old busy, until switched off. Busy still means
+      **no ordering now** (the customer app treats it like closed). The partner offers 30 min, 1 h
+      and "until back".
+    - **`prepExtra`** — `{ minutes: 10 | 20, until: ISO }` or null (`PREP_EXTRA_MINUTES`). While
+      `until` is ahead the store stays open, `POST /api/store` raises `minReady`/`maxReady` by
+      `minutes` for customer-facing callers, and the partner's v3 new-order screen adds them to its
+      suggested prep time (`suggestPrepMinutes` `busyExtra`, `activePrepExtra`).
+    - **Writes** (`POST /api/store/update`, EVERY caller — partner and the admin StoreData form both
+      post their whole copy): `normalizeTimedStatusWrite` runs after `currentStore` is read and
+      before the status-change check. `busyUntil` must be null or an ISO date-time at most 24 h
+      ahead, `prepExtra.until` in (now, now + 4 h], each +5 min clock skew (`CLOCK_SKEW_MS`); junk is
+      **not written** (stored value stays, `warn` "store update: timed status value not written as
+      sent"). A `busyUntil` already past in a write that carries `isBusy: true` is a stale copy of an
+      ended pause and becomes `isBusy: false, busyUntil: null` (`info`), so an echo never switches
+      busy back on; an ended `prepExtra` is not written. `isBusy` written as anything but true also
+      writes `busyUntil: null` when one exists; a future `busyUntil` on a store not busy after the
+      write is not written. No key is added to a store that never had one.
+    - **Reads** (`POST /api/store`): `effectiveTimedStatus` for every caller (an ended pause reads
+      `isBusy: false, busyUntil: null`, ended/malformed `prepExtra` reads null), then
+      `withPrepExtraReadyRange` ONLY when the caller is not a verified admin and not
+      `app-type: shoofi-partner` (`isCustomerFacing`). **Never raise the range for the admin or the
+      partner:** both post their copy back, and a raised `minReady`/`maxReady` written back would stay
+      raised for good. (The admin form loads `GET /api/store/get/:appName`, raw.) Every ready range
+      the customer app shows reads `storeData.minReady/maxReady` (+ the delivery area's
+      `minETA/maxETA`), and the order snapshot's `storeData.maxReady` drives the order timer, so the
+      raised range needs no app change. **Not covered:** twin orders compute `twinPrepRange` in
+      `routes/twin-order.js` from the raw store docs (orders domain), without the extra minutes.
+    - **Expiry is a cron, not a read check in every reader.** `isBusy` is read raw by explore
+      ranking (and its cache), twin eligibility, For you `open-stores.js`, the public coupon page,
+      the store-status report and `RestaurantAvailabilityService`. The cron clears the stored flag
+      so all of them stay right: every minute (`* * * * *`, lock `cron:store-timed-status`, TTL 55 s,
+      `ENABLE_CRONS`), each `shoofi.stores` entry → `timedStatusExpiry`: an ended pause →
+      `isBusy: false, busyUntil: null`; a `busyUntil` on a store not busy → null; ended/malformed
+      `prepExtra` → null. The `$set` filters on the values it read (`busyUntil`, `prepExtra.minutes`,
+      `prepExtra.until` — dotted, because whole-subdocument equality is field-order-sensitive), so
+      an owner who extended the pause in between wins. Per changed store: a `store-update-history`
+      row (`source: "store-timed-status-cron"`, stamped at `busyUntil` so `busy-time.js` closes the
+      interval at the real end), `clearExploreCacheForStore` when busy ended, `store_refresh` to
+      customers and `store_updated` to the store's partner tablets (both refetch `POST /api/store`).
+      Side effects are swallowed and logged. Worst case for raw readers: ~1 minute after
+      `busyUntil`, plus the home's v2 explore cache TTL (5 min), which `clearExploreCacheForStore`
+      does not reach — the same as any status change.
+
+31. **A PLANNED CLOSURE IS THE MANUAL-CLOSE SWITCH, FLIPPED BY THE CRON; CUSTOMERS SEE ONLY
+    `isStoreClose` + `closedUntil`** (`services/catalog/store-timed-status.js`,
+    `utils/crons/store-timed-status-cron.js`, `docs/store-timed-status.md` "Special hours"; added
+    2026-11-08, partner redesign item 14: "closed until a time" and "closed on these dates", not
+    different hours on a date). Fields on `<appName>.store {id:1}`:
+    - **`closedUntil`** — ISO (UTC) or null; meaningful only with `isStoreClose: true`, the closure
+      ends at that instant; null/absent = closed until reopened (the old behaviour). Partner field.
+    - **`closedDays`** — `["YYYY-MM-DD"]`, Israel business dates; unique, sorted, today..+365, ≤ 60.
+      Partner field.
+    - **`closedDaysApplied`** — `"YYYY-MM-DD"`, the latest planned date the cron applied (a
+      high-water mark). **Server-owned: removed from every write**, stripped from every non-admin
+      read.
+    - **Why `isStoreClose`:** every open-now reader already honours it (`POST /api/store` `isOpen`,
+      `RestaurantAvailabilityService`, `public-coupon.js`, the support agent's `find-store`, the
+      admin-issues competitor check, the open reminder). Do not add a parallel "closed" flag that
+      each of them would have to learn.
+    - **Writes** (`normalizeClosureWrite`, inside `normalizeTimedStatusWrite`, every caller): the
+      busyUntil rules with `isStoreClose` (≤ 60 days ahead +5 min skew; an echo of the stored value
+      is kept at any distance; reopening writes `closedUntil: null`; a future end on a store not
+      closed is not written). A past `closedUntil` with `isStoreClose: true` is a stale copy and
+      becomes open — **unless the store is closed now under a newer setting**, then the write
+      changes neither field. `closedDays`: any malformed date, > +365 or > 60 dates → not written;
+      dates before the store's current business day are dropped (`info`).
+    - **Reads:** `effectiveTimedStatus` reads a closure past `closedUntil` as open and the computed
+      `isOpen` uses `isClosedNow`. `withoutClosurePlan`: customers get no `closedDays`, the partner
+      gets them, only the admin gets `closedDaysApplied`. Store cards
+      (`getAvailableStores` → explore v1/v2 `storesMap`, `available-stores`, twin eligible stores,
+      For you open stores) carry `store.closedUntil` = `activeClosedUntil` (end of a closure in
+      force, else null). Explore v2 caches cards 5 min: a past `closedUntil` there means "no end".
+    - **The cron** (same sweep and lock as invariant 30, after busy/prep, `closureTransition`):
+      reopen at `closedUntil`; a planned day is **due** when it is the store's current business day
+      or, once that day's hours have ended, the next one, and is after `closedDaysApplied`. Due +
+      open → `isStoreClose: true, closedUntil: reopenAfter(...)` (the next opening by the hours that
+      is not itself planned, in that date's own UTC offset); due + closed with an earlier end →
+      extended; due + closed with no end or a later one → unchanged; always
+      `closedDaysApplied: <latest due>`. Past planned dates are `$pull`ed. The `$set` filters on
+      `isStoreClose`, `closedUntil`, `closedDaysApplied` and the due day in `closedDays`. Side
+      effects for reopen/close/extend only: history row (`isStatusChanging`), explore clear,
+      `store_refresh` + `store_updated`. **No SMS** (the manual route's "store closed" text is not
+      sent for a plan). An owner who reopens is not closed again that day (high-water mark).
+    - **Business day:** `currentBusinessDay` = `getBusinessDateKey` (`utils/store-service.js`, from
+      the queried instant and the store's own hours, closed gaps snapped) — NOT `routes/order.js`
+      `getBusinessDayBoundaries`, which picks the overnight branch from the wall clock — plus a
+      guard: while the day before's window is still open, it is still the day before (the snapped
+      key alone calls 00:30 "today" when today is off by the hours after an overnight night).
+      Malformed hours → `utils/business-day.js` `businessDayKey` (07:00). Pinned by
+      `test/integration/store-closed-until.js`.
+    - **`holidayDates` is dead.** `POST /api/store/holiday/add|delete` had no auth, no reader and
+      no client caller ever; removed 2026-11-08. Never revive them for planned days.
+32. **KOPA'S PRODUCT AND EXTRAS STATS COUNT A SALE EXACTLY AS `aggregateSoldItems` DOES, AND PRICE
+    A FREE TOPPING EXACTLY AS THE SERVER PRICER DOES** (`services/kopa/products.js`,
+    `routes/kopa/products.js`; reference §7j; added 2026-11-11 for the Kopa back-office).
+    `GET /api/kopa/products/stats` and `GET /api/kopa/extras/stats` repeat
+    `services/store-analytics/product-performance.js` `aggregateSoldItems`' `$match`
+    (COMPLETED_STATUSES, the window, `isSchoolProject: { $ne: true }`), `$unwind` and `$convert`
+    rules for `qty`/`price`, because those are not exported. The extras pass copies
+    `utils/order-pricing.js` `freePizzaToppings` (not exported, orders domain). Two tests in
+    `test/integration/kopa/products.js` pin both copies: the captured pipelines must be equal, and a
+    line's extras revenue must equal `calculateExtrasPrice`. **Change the sale definition or the
+    free-topping rule, and change the Kopa copy in the same PR**, or that test goes red. Both routes
+    are read-only, gated by `KOPA_REPORTS` (`services/kopa/access.js`), and read the store from
+    `req.storeMembership.appName`, never from the header.
+33. **KOPA WRITES THE MENU ONLY THE WAY THE ADMIN ALREADY DOES, AND KEEPS ITS OWN STATE OUT OF THE
+    MENU** (added 2026-11-11; reference §7k, §7l). The apps must see nothing new from a Kopa write.
+    All routes read the store from `req.storeMembership.appName` (the gate's proof), and check every
+    id against THAT store's DB (404 otherwise).
+    - **Kopa phase 2 — categories** (`routes/kopa/menu-write.js`, `services/kopa/menu-write.js`;
+      `KOPA_OWNER`). `POST /api/kopa/categories` writes the admin `store-category/add` document key for
+      key, flags at the admin defaults (`discountPercent: 0`, `isCampaign`/`isSchoolProject: false`,
+      `supportedGeneralCategoryIds: []`). `PATCH /api/kopa/categories/:id` `$set`s ONLY the sent fields
+      among `nameAR`/`nameHE`/`img`/`isHidden` (+ `updatedAt`); any other field is a 400. That is the
+      targeted write the Known status asks for; the admin update route stays as it is.
+      `POST /api/kopa/categories/reorder { ids }` writes `order` = position. Every write clears BOTH
+      cache keys (invariant 2); create/update also run `syncCampaignCategoryForStore` like the admin.
+      **Promotions from Kopa** (`/api/kopa/promotions`, `PATCH
+      /:id`, `POST /:id/active`) build every doc with the admin's own `sanitizePromotion` +
+      `validatePromotion`, exported by `routes/promotion.js` for this. Never copy them. Updates
+      re-sanitise the stored doc with the sent fields over it. The clears and campaign sync are the
+      admin's (invariant 18).
+    - **Kopa phase 7a — products** (`routes/kopa/products-write.js`; reference §7k).
+      `POST /api/kopa/products/{insert,update,is-in-store,is-hidden,delete}` mount the admin routes'
+      OWN handlers (`require("../product").handlers`, plus `productImageUpload` before insert/update)
+      behind `KOPA_OWNER` + `sameStoreAsGate`, because a Kopa session cannot pass `auth.required`.
+      Never copy a product handler for Kopa: a change to the admin write must reach Kopa through the
+      same function. These handlers read `app-name` (the one exception to the line above);
+      `sameStoreAsGate` 403s unless it equals `req.storeMembership.appName` AND the role doc
+      (`req.storeMembership.me`) is that store's, so another store's owner who is only a cashier here
+      cannot write with their own store's partner Token. `update/order` and `update/quantity` have
+      no Kopa mount.
+    - **Kopa phase 3 — till-only details** (`routes/kopa/menu-meta.js`, `services/kopa/menu-meta.js`).
+      `kopaItemMeta` / `kopaCategoryMeta` / `kopaKitchens` (store DB) hold prep time, kitchen
+      instructions, English names, kitchen routing and till visibility. Nothing writes
+      `products`/`categories` and nothing in the customer menu reads these, so no cache clear. Meta is
+      keyed by the product/category id STRING as `_id` (unique by construction); `kitchenIds` must be
+      kitchens of the store; a kitchen in use cannot be deleted (409). `tillOnly`/`showInTill` do NOT
+      hide anything from customers. Indexes come from `ensureIndexes` and are never awaited before a
+      write (pinned with a failing-`createIndex` proxy).
+    - **Not built, because they change customer-app behaviour:** the extras `required` / `freeCount`
+      fixes, deal days/hours in the app, a shared ingredient library in the product schema, and
+      per-channel visibility in the customer menu (the QR menu, invariant 34, gets its QR-only items
+      from `isHidden` + a Kopa rule instead, so the customer menu is untouched).
+
+34. **THE QR MENU SHARES THE APP MENU; IT ONLY ADDS QR RULES, AND NEVER WRITES `products` /
+    `categories`** (Kopa, product decision 2026-11-13. It replaced the first separate-catalog design
+    before any store used it. See reference §7m and server `docs/kopa.md` "Phase 8".)
+    - **What it reads:** the view-only table menu at `<store>.kopa.shoofi.app/qr-menu` is built LIVE
+      from the store's `categories` / `products`. Names, images, order and stock are shared: `isInStore`,
+      which `outOfStoreUntil` drives, and `outOfStockExtras` by option `nameAR`.
+    - **What differs**, in `kopaQrProductRules` / `kopaQrCategoryRules` (store DB, `_id` = the
+      product / category id string):
+      - `qrOnly`: shown on the QR while HIDDEN in the app. It can only be set while `isHidden: true`,
+        else 409 `PRODUCT_VISIBLE_IN_APP` / `CATEGORY_VISIBLE_IN_APP`. That is why the customer
+        menu, search, For you and the chat need no change: they already drop hidden items
+        (invariant 11).
+      - `hiddenOnQr`.
+      - `qrPrice` (products only): replaces the BASE `price`; extras keep the app's prices. The
+        category discount still applies (invariant 3). It must be > 0 (invariant 8).
+    - **What the QR shows** (`buildQrMenu`, pure):
+      - Categories: not school, not `hiddenOnQr`, and app-visible or `qrOnly`.
+      - Products: not `hiddenOnQr`, app-visible or `qrOnly`, price > 0, in EVERY shown category of
+        `supportedCategoryIds`, in the app's order.
+    - **`products` / `categories` are only READ.** No menu cache key is cleared (the customer menu
+      cannot change), and the customer app never reads the rule collections. Pinned by a spy in
+      `test/integration/kopa/qr-menu.js` that throws on any write to either collection.
+    - **The public read** (`GET /api/kopa/public/qr-menu/:store`, no auth):
+      - It looks `:store` up in `shoofi.stores` BEFORE opening any store DB, and answers one
+        identical 404 for every miss.
+      - It returns an allowlist (`buildPublicMenu`): ids are product / category ids. Never the app
+        price, the rules, staff or timestamps.
+      - It is cached 20 s per store in memory, and every owner write invalidates it
+        (`qr-menu-cache.js`). An app-side change shows within 20 s.
+    - **Table ordering** (Kopa table orders, orders CORE invariant 31):
+      - When the store's `tableOrdering` is on, public items also carry `orderable` and `choices`
+        (`tableChoicesOf`).
+      - Every `single` group is a required choice of one in-stock option. `multi`, `counter` and
+        `pizza-topping` are not offered at the table.
+      - Combos, by-weight products, `weight` extras, unknown extra types and malformed options
+        make a product not orderable.
+      - A line is priced `qrPriceOf` + the option prices (not discounted).
+    - **Known risks:**
+      - The partner app can un-hide a QR-only product, which puts it in the customer app.
+      - Order creation accepts hidden ids (orders domain).
+      - The zero-price cron hides a product priced 0.
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
@@ -1053,6 +1287,8 @@ against production (`shoofi.stores`, 255 docs; ~59k products across ~165 store D
 - **FACT:** `POST /api/store-category/update/:id` overwrites `order`, `discountPercent`,
   `isSchoolProject` and `isCampaign` from the body and clears **no** menu cache — a names-only
   call zeroes the discount. Write category names with a targeted `$set`.
+  (Verified still true 2026-11-11. Kopa's `PATCH /api/kopa/categories/:id` is that targeted
+  `$set`, invariant 33.)
 - **FACT:** `maxCount: 0` on a `multi` means "no limit" to the app (`max && …`), but both admin
   editors default it to 1 and refuse `<= 0`, so the lint reports `< 1` as `MAX_COUNT_INVALID`
   (warning, not repaired).

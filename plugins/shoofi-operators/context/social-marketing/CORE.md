@@ -88,9 +88,14 @@ draft should assume a per-town account exists.
 - **Approvers: `["admin", "master", "manager"]`** (decision 2026-09-21) — the same tier as
   `AI_TASK_ROLES` in `shoofi-server/services/ai-tasks/constants.js`, not the narrower
   `BRIDGE_DASHBOARD_ROLES`.
-- **This operator never publishes and never holds the Meta token.** Approval is what reaches
-  Meta. Since 2026-10-01 that path exists in `shoofi-server` and the token lives only in that
-  server's env (`META_PAGE_ACCESS_TOKEN`, `META_PAGE_ID`, `META_IG_USER_ID`):
+- **This operator never publishes and never holds a Meta token.** Approval is what reaches
+  Meta. Since 2026-10-01 that path exists in `shoofi-server`. Shoofi's OWN page token lives only
+  in that server's env (`META_PAGE_ACCESS_TOKEN`, `META_PAGE_ID`, `META_IG_USER_ID`). STORES'
+  pages (Shoofi Studio, 2026-11-13) are a separate thing: each store's page token is kept
+  encrypted in `shoofi.storeSocialConnections`, connected through the owner's link
+  (`<store>.kopa.shoofi.app/connect`, server `docs/store-social-connections.md`). This operator
+  writes for Shoofi's own account only; it never posts to, or drafts as, a store's page.
+  Shoofi's own page:
   - a human presses **אשר לפרסום** on a post with a chosen caption → `POST
     /api/admin/social-posts/:id/approve` snapshots the caption + rendered image onto a
     `shoofi.socialPublications` row and the post becomes `approved`;
