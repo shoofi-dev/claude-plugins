@@ -718,6 +718,15 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `{ _id: row._id }`, so the row whose driver is notified is the row that changed:
       `/api/order/update` cancel (`4`/`7`/`8` → delivery `-3`) and ready-for-pickup (`3` →
       `isReadyForPickup`), `/api/order/update-delay`, and order-amend `syncDeliverySnapshot`.
+    - **The order cancel never overwrites a finished row.** The `/api/order/update` cancel
+      writes through `orderCancelDeliveryRowFilter(row)` (`utils/delivery-row.js`):
+      `{ _id, status: { $nin: ["4",4,"-1",-1,"-2",-2,"-3",-3] } }`, or `null` for a row that is
+      already delivered or cancelled. The status clause sits in the write itself, so a courier
+      completing between read and write still wins; the flow event and driver push fire only
+      when it matched. Before it, cancelling a DELIVERED order (`7`, a refund) turned the
+      courier's `4` into `-3` and dropped him from the company driver report: prod 2026-11-12,
+      34 mirror events with `previousStatus: 4` (2025-09-25 → 2026-11-10), 33 rows still `-3`.
+      A `delivery_cancelled_by_admin` event is the delivery-side admin cancel, not this mirror.
     - **Twin legs** are two orders with their own `originalOrderId` and their own row, so the
       same filter works per leg. The group document stores only each leg's SHORT number, so
       `services/twin-order/twin-group-service.js` resolves a leg through `legDeliveryFilter`
