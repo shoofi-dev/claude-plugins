@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@fix/HIGH-RISK-block-cancelled-to-active + shoofi-delivery-web@fix/HIGH-RISK-block-cancelled-to-active / 2026-11-07 (invariant 2: cancelled never leaves the cancelled bucket, viewd refuses 5, courier cancel covers 5/9); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (invariants 2, 9; reference §2, C3); shoofi-partner@fix/owner-walkthrough / 2026-11-11 (invariant 17: printer per tablet, print failures shown; cancel alert); shoofi-partner@fix/partner-print-failure-log-once-notice / 2026-11-08 (invariant 17: one error row per failed copy; the pop-up was dropped before merge); shoofi-partner@fix/owner-walkthrough + feat/school-orders-v3 / 2026-11-14 (reference C3 customer note: v3 readers OrderCardV3, NewOrderViewV3, SchoolOrderCardV3); shoofi-partner@feat/order-alert-arrival-log / 2026-11-14 (reference C3 "Measuring how a new order reaches the tablet": apps-logs partner_order_alert_received / partner_new_order_seen; listener pin accepts the ref call); shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/HIGH-RISK-block-cancelled-to-active + shoofi-app@81871038 (read only) / 2026-11-14 (invariant 32: coins only when they lowered the price, only by a confirmed order, refund only what was redeemed; invariant 28 cross-ref); shoofi-server@fix/HIGH-RISK-block-cancelled-to-active + shoofi-delivery-web@fix/HIGH-RISK-block-cancelled-to-active / 2026-11-07 (invariant 2: cancelled never leaves the cancelled bucket, viewd refuses 5, courier cancel covers 5/9); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (invariants 2, 9; reference §2, C3); shoofi-partner@fix/owner-walkthrough / 2026-11-11 (invariant 17: printer per tablet, print failures shown; cancel alert); shoofi-partner@fix/partner-print-failure-log-once-notice / 2026-11-08 (invariant 17: one error row per failed copy; the pop-up was dropped before merge); shoofi-partner@fix/owner-walkthrough + feat/school-orders-v3 / 2026-11-14 (reference C3 customer note: v3 readers OrderCardV3, NewOrderViewV3, SchoolOrderCardV3); shoofi-partner@feat/order-alert-arrival-log / 2026-11-14 (reference C3 "Measuring how a new order reaches the tablet": apps-logs partner_order_alert_received / partner_new_order_seen; listener pin accepts the ref call); shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -1085,7 +1085,8 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `["accountant"]` (+ master). Errors: `{reason, message, code}`.
     - **Coins are refunded once per order** (`refundCoins`: `customerCoins.cancelRefundedOrderIds`
       in the same atomic update; legacy rows recognised by their notes) — the twin path refunded
-      the trigger leg twice (order route + cascade).
+      the trigger leg twice (order route + cascade). And only what the order actually redeemed
+      (invariant 32).
     - **Backfill**: `scripts/money-backfill.js`, DRY-RUN by default; `--apply` only with Sari's OK.
       Coupons already issued against a twin group count as ONE `compensate` entry each
       (`collectTwinCompensations`): compensation rows naming a leg / the group, and a manual twin
@@ -1260,6 +1261,51 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       20, claude-plugins#369). **Deploy order: #583 must be live before the first `kopa-qr` order
       is written.** Nothing is written while a store's `tableOrdering` is off (the default).
     - Tests: shoofi-server `test/integration/kopa/table-orders.js` (20).
+
+32. **COINS ARE SPENT ONLY WHEN THEY LOWERED THE PRICE, ONLY BY A CONFIRMED ORDER, AND A CANCEL
+    GIVES BACK ONLY WHAT WAS TAKEN** (shoofi-server `services/coins/order-coins.js`,
+    `services/coins/coins-service.js`; HQ #d20f42, 2026-11-14).
+    - **Why:** `/api/order/create` charges the client's `total` (invariant 11). The customer app
+      keeps the coins discount twice — `components/total-price` state (subtracted from the total
+      it sends) and `coinsStore` (sent as `usedCoins`) — and they can disagree: a cart found to
+      hold a campaign product zeroes the first, not the second. The order then arrived with
+      `usedCoins` and an un-reduced total, and the coins were redeemed after payment anyway.
+      Prod read-only dry run 2026-11-14 (`scripts/coins-redeemed-not-deducted.js`): **76** of
+      18,347 orders with `usedCoins` have `total` = the no-coins price; **64** of them had the
+      coins debited and never returned (₪199), still happening (14 in November).
+    - **Creation drops, never reprices.** Right after `validateCoinsRedemption`, on the RAW body
+      (before the coupon/promotion/fixed-price corrections add to `total`),
+      `coinsDiscountInOrderBody(parsedBodey, shekelValue)` rebuilds the client formula
+      (`calculateTotal`). Only when `total` equals the no-coins price AND the coins would have
+      moved it is `usedCoins` set to `null` (so nothing downstream redeems: create, ZCredit,
+      HYP token/wallet, Apple Pay finalize all read it) and `order.coinsEntitlement =
+      {dropped, shekelValue, reason: "total-not-reduced", clientTotal, expectedWithCoins, at}`
+      is stored (absent otherwise). A total matching neither figure is left alone. The total is
+      **never lowered**: with Apple Pay / HYP the card is charged before this route, the
+      customer saw the un-reduced total, and coins are store-funded. Lowering it instead is an
+      owner decision, not built.
+    - **Only a confirmed order redeems.** `mayRedeemCoinsForStatus` refuses `0` and `4/5/7/8/9`
+      (`NO_REDEEM_STATUSES`); `redeemCoinsOnPaymentSuccess(orderNumber, status)` and
+      `finalizeApplePayOrder` ask it. Every current call site was already post-confirmation;
+      the 60 status-`0` orders with a redeem and no refund (₪474) are all 2026-02..04, from
+      the old pre-payment redeem — a data question, not a live path. Twin redeems
+      (`commitTwinCoinsPerSide`, `applyCaptureSuccess`) are post-capture / cash-at-6 and
+      untouched; twin side totals are built from `coinsStore` itself, so they cannot carry the
+      mismatch (0 twin rows in the dry run).
+    - **`redeemCoins` is once per order**: `customerCoins.redeemedOrderIds` in the same atomic
+      debit (`$ne` filter + `$addToSet`), legacy `redeem` rows recognised. The v3 driver answers
+      `{value: null}` on no match — read as a failure now (the old `!result` called a lost race
+      a success).
+    - **`refundCoins` returns `min(usedCoins.amount, redeemed − already refunded)` for the
+      order**, never `usedCoins` blindly — a cancel of an order that never redeemed would have
+      minted coins (latent: the dry run found only the 4 cancel → cancel double refunds, 40
+      coins, from before 2026-11-06). ⚠️ **Redeem rows before ~2026-05 are keyed by `originalOrderId`**
+      (`"0117-424938-5723"`), later ones by `orderId`; callers pass both
+      (`order/update` cancel, twin `returnLegExtras` and `cascadeCancel`). A wallet query on
+      `orderId` alone reports old redeems as missing. Still once per order (invariant 28).
+    - Tests: `test/integration/coins-redeem-only-when-reduced.js` (rule, status, create route
+      end to end incl. status `0`, redeem once / lost race, refund cap / legacy key / amend
+      partial / once). `money-cancel.js`'s world now carries the redeem it later refunds.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

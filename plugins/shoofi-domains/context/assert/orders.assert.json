@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@fix/HIGH-RISK-block-cancelled-to-active + shoofi-delivery-web@fix/HIGH-RISK-block-cancelled-to-active / 2026-11-07 (CORE invariant 2: cancelled never leaves the cancelled bucket, viewd refuses 5, courier cancel covers 5/9); shoofi-partner@feat/new-order-alarm-loop / 2026-11-07 (ref C3: the new-order alarm repeats until accepted); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (CORE invariants 2, 9; reference §2, C3); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (CORE invariant 31, Kopa QR table orders); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (CORE invariants 27-28); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-block-cancelled-to-active + shoofi-app@81871038 (read only) / 2026-11-14 (CORE invariant 32: coins only when they lowered the price, only by a confirmed order, refund only what was redeemed); shoofi-server@fix/HIGH-RISK-block-cancelled-to-active + shoofi-delivery-web@fix/HIGH-RISK-block-cancelled-to-active / 2026-11-07 (CORE invariant 2: cancelled never leaves the cancelled bucket, viewd refuses 5, courier cancel covers 5/9); shoofi-partner@feat/new-order-alarm-loop / 2026-11-07 (ref C3: the new-order alarm repeats until accepted); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (CORE invariants 2, 9; reference §2, C3); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (CORE invariant 31, Kopa QR table orders); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (CORE invariants 27-28); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -67,7 +67,10 @@
         "routes/kopa/table-orders.js",
         "services/kopa/table-orders.js",
         "services/orders/order-source.js",
-        "test/integration/order-update-cancelled-cannot-reactivate.js"
+        "test/integration/order-update-cancelled-cannot-reactivate.js",
+        "services/coins/order-coins.js",
+        "test/integration/coins-redeem-only-when-reduced.js",
+        "scripts/coins-redeemed-not-deducted.js"
       ],
       "symbols": {
         "services/kopa/table-orders.js": ["createTableOrder", "priceItems", "storeOpenState", "checkLocation", "buildTableOrderDoc"],
@@ -272,6 +275,36 @@
           "file": "routes/order.js",
           "regex": "if \\(isCancelStatus\\(existingOrder\\.status\\)\\) \\{[\\s\\S]{0,900}?error: \"ORDER_CANCELLED\"",
           "desc": "CORE invariant 2: store-accept (update/viewd) refuses all of 4/5/7/8/9, String()-normalised, with error ORDER_CANCELLED"
+        },
+        {
+          "file": "services/coins/order-coins.js",
+          "regex": "const coinsMoveThePrice = Math\\.abs\\(expectedWithCoins - expectedWithoutCoins\\) >= CENT;\\s*const totalIsTheNoCoinsPrice = Math\\.abs\\(clientTotal - expectedWithoutCoins\\) < CENT;\\s*return \\{\\s*reflected: !\\(coinsMoveThePrice && totalIsTheNoCoinsPrice\\),",
+          "desc": "CORE invariant 32: coins are dropped only on POSITIVE evidence - the client total equals the no-coins price and the coins would have moved it; a total matching neither is left alone"
+        },
+        {
+          "file": "services/coins/order-coins.js",
+          "regex": "const NO_REDEEM_STATUSES = \\[\"0\", \"4\", \"5\", \"7\", \"8\", \"9\"\\];",
+          "desc": "CORE invariant 32: an unconfirmed (0) or cancelled/rejected order never redeems coins"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const inTotal = coinsDiscountInOrderBody\\(parsedBodey, validationResult\\.shekelValue\\);\\s*if \\(inTotal\\.reflected\\) \\{\\s*usedCoinsData = \\{[\\s\\S]{0,600}?reason: \"total-not-reduced\"",
+          "desc": "CORE invariant 32: /api/order/create keeps usedCoins only when the raw client total took them off; otherwise usedCoins is null (never redeemed) and coinsEntitlement says why"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const redeemCoinsOnPaymentSuccess = async \\(orderNumber, orderStatus\\) => \\{\\s*if \\(!usedCoinsData \\|\\| !usedCoinsData\\.amount\\) return;[\\s\\S]{0,400}?if \\(!mayRedeemCoinsForStatus\\(orderStatus\\)\\) \\{",
+          "desc": "CORE invariant 32: every create-path redeem passes the order's status and is refused for 0 / cancelled"
+        },
+        {
+          "file": "services/coins/coins-service.js",
+          "regex": "redeemedOrderIds: \\{ \\$ne: redeemKey \\}\\s*\\},\\s*\\{\\s*\\$addToSet: \\{ redeemedOrderIds: redeemKey \\},",
+          "desc": "CORE invariant 32: redeemCoins is once per order (customerCoins.redeemedOrderIds in the same atomic debit)"
+        },
+        {
+          "file": "services/coins/coins-service.js",
+          "regex": "netRedeemedForOrder\\(existing, \\[orderId, originalOrderId\\]\\)",
+          "desc": "CORE invariant 32: a cancel refunds only what the order actually redeemed (net of earlier refunds), under orderId OR the pre-2026-05 originalOrderId key"
         },
         {
           "file": "routes/order.js",
