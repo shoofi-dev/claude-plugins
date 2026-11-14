@@ -138,8 +138,13 @@ role check, and no client calls any of them.
 | `POST /api/admin/invoices/process-all` | master, admin | queues every `invoiceStatus:"pending"` order in the **`app-name` header's** DB (one store, `shoofi` when absent) |
 | `POST /api/admin/invoices/webhook` `{docId, secret}` | master, admin | fetches now, falls back to the queue. Also needs `secret === INVOICE_WEBHOOK_SECRET`, which is not in `.env.production` (the DO app spec was not checked). No provider calls it. |
 
-The queue keeps the whole `req` and reads only `req.app.db` and the `app-name` header from
-it. It makes no HTTP call that carries request headers. `retry` puts `docId` into the Gmail
+The queue keeps the whole `req` and reads only `req.app.db` from it. Every caller passes the
+store `appName` explicitly (`saveInvoice(docId, req, appName)`, `queueInvoiceForProcessing`,
+`triggerInvoiceProcessing`); the `app-name` header is only a fallback. The ZCredit Apple Pay
+callback carries no header, so the old header default wrote "completed" to `shoofi.orders`
+and left the store's order `pending` (HQ #18d1ff). The background and manual success
+writes set `ccPaymentRefData.url` with `completed`, and match `docId` as a string or a
+number (`docIdFilter`). It makes no HTTP call that carries request headers. `retry` puts `docId` into the Gmail
 query (`subject:<docId>`) and the public Spaces key (`invoices/doc-<docId>.pdf`) unvalidated.
 Until 2026-10-30, `pending`, `retry` and `process-all` carried lib/auth `restrict`, which
 hangs the request (CORE invariant 11), so none of them answered.
