@@ -855,6 +855,9 @@ Driver profile via `delivery/company/employee/{driverId}`.
 change. Token in `localStorage['@storage_userToken']` + `adminUser`, sent as
 **`Authorization: Bearer`** (note: Bearer here, `Token` in the RN apps). A 401 triggers the
 **refresh-token flow** in the interceptor (guarded against loops) → retry, else logout+redirect.
+It posts `{ token }` (the expired access token; login never issues a refresh token), and it
+reads `refreshResponse.data.token` from an already-unwrapped body, so in practice every 401
+ends in logout — refresh has never actually worked from the admin web.
 Roles/permissions: `contexts/AdminAuthContext`, `ProtectedRoute`, `RoleBasedAccess`,
 `RestrictedRoleGuard` (e.g. `accountant` limited to invoice screens).
 **`/api/analytics/*` is admin-token only** (shoofi-server `utils/analytics-access.js`,
@@ -936,8 +939,15 @@ Do not "fix" them opportunistically; they are scheduled work, not bugs to discov
    `cash-restrict` and the `/api/shoofiAdmin/store*` routes (§C4) already are.
 5. **Mass-assignment** — `POST /api/customer/update`  spreads `req.body` into `$set`,
    so `token`/`roles`/`isBlocked` could be overwritten by a caller.
-6. **`jwt.decode` without verification** — `admin/users/refresh-token`  and
-   `customer-feedback`  read unverified payloads. Never trust those for authorization.
+6. **`jwt.decode` without verification** — `customer-feedback` reads an unverified
+   payload. Never trust it for authorization. `admin/users/refresh-token` no longer does
+   (HQ #717841): `findAdminForRefresh` in `utils/admin-auth-service.js` verifies HS256 only,
+   requires `type: 'access'` (customer/partner/driver tokens share the secret but carry no
+   `type`), ignores expiry but refuses an `iat` older than
+   `REFRESH_MAX_ACCESS_TOKEN_AGE_SECONDS` (3 days), prefers a body `refreshToken` that must
+   equal the stored one, and requires the admin to still hold `roles`. Every failure is one
+   401. While item 1's literal `'secret'` stands, a token signed with it still verifies —
+   the signature check only becomes a real barrier once that secret is rotated.
 7. **~4-year customer token expiry** (`auth-service.js`) — mitigated by stored-token equality
    (logout works), but very long-lived.
 8. **NOT a bug (verified) — push-token registration routes on `app-type`, not `app-name`.**
