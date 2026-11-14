@@ -40,8 +40,7 @@
         "lib/delivery/helpers.js",
         "services/delivery/admin-access.js",
         "services/delivery/response-redaction.js",
-        "services/delivery/availability.js",
-        "services/delivery/driver-decline.js"
+        "services/delivery/availability.js"
       ],
       "symbols": {
         "services/delivery/availability.js": [
@@ -86,8 +85,7 @@
           "currentPickupInstantOf",
           "scoreBreakdown",
           "createPendingDelivery",
-          "appliedCoupon",
-          "excludeDriverIds"
+          "appliedCoupon"
         ],
         "services/delivery/driver-load.js": [
           "ACTIVE_ORDER_STATUSES",
@@ -129,11 +127,6 @@
           "/api/delivery/delivery-only/book",
           "/api/delivery/delivery-only/list",
           "isDeliveryOnly"
-        ],
-        "services/delivery/driver-decline.js": [
-          "declineDelivery",
-          "DECLINABLE_STATUSES",
-          "declinedDriverIds"
         ]
       },
       "patterns": [
@@ -751,8 +744,68 @@
         },
         {
           "file": "routes/delivery/orders.js",
-          "regex": "/api/delivery/driver/order/decline\", \\.\\.\\.driverSelfAction",
-          "desc": "the driver's decline re-queues the booking (CORE invariant 21) and is gated like the rest of the driver loop"
+          "regex": "(?:\"/api/delivery/driver/order/decline\", \\.\\.\\.driverSelfAction|(?<![\\s\\S])(?![\\s\\S]*order/decline))",
+          "desc": "CORE invariant 21: the driver's decline is a route of the driver loop, gated by driverSelfAction - valid-before leg: the file does not mention the decline at all (shoofi-server main before feat/driver-decline-reassign); drop it once that has merged"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "(?:if \\(result\\.code === \"INVALID_REASON_CODE\"\\) \\{\\s*return res\\.status\\(400\\)[\\s\\S]{0,400}?code: result\\.code,|(?<![\\s\\S])(?![\\s\\S]*order/decline))",
+          "desc": "CORE invariant 21: an unknown reasonCode is a 400, a refused decline (NOT_DECLINABLE / PEER_COLLECTED) a 409 carrying the code - valid-before leg: the file does not mention the decline at all (shoofi-server main before feat/driver-decline-reassign); drop it once that has merged"
+        },
+        {
+          "file": [
+            "services/delivery/driver-decline.js",
+            "routes/delivery/orders.js"
+          ],
+          "regex": "(?:const DECLINABLE_STATUSES = \\[\\s*DELIVERY_STATUS\\.WAITING_FOR_APPROVE,\\s*DELIVERY_STATUS\\.APPROVED,\\s*DELIVERY_STATUS\\.WAITING_IN_STORE,\\s*\\];|(?<![\\s\\S])(?![\\s\\S]*driver-decline))",
+          "desc": "CORE invariant 21: a courier may decline only before pickup (1, 2, 5) - valid-before leg: the file does not mention the decline at all (shoofi-server main before feat/driver-decline-reassign); drop it once that has merged"
+        },
+        {
+          "file": [
+            "services/delivery/driver-decline.js",
+            "routes/delivery/orders.js"
+          ],
+          "regex": "(?:const DECLINE_REASON_CODES = \\[\"far\", \"too_big\", \"shift_ending\", \"other\"\\];|(?<![\\s\\S])(?![\\s\\S]*driver-decline))",
+          "desc": "CORE invariant 21: the reasonCode enum - valid-before leg: the file does not mention the decline at all (shoofi-server main before feat/driver-decline-reassign); drop it once that has merged"
+        },
+        {
+          "file": [
+            "services/delivery/driver-decline.js",
+            "routes/delivery/orders.js"
+          ],
+          "regex": "(?:const PER_COURIER_FIELDS = \\[\\s*\"approvedAt\",\\s*\"activeOrderCount\",\\s*\"assignmentMetadata\",\\s*\"reassignedAt\",\\s*\"reassignedBy\",\\s*\"reassignmentMetadata\",\\s*\\];|(?<![\\s\\S])(?![\\s\\S]*driver-decline))",
+          "desc": "CORE invariant 21: the first courier's stamps cleared on decline - valid-before leg: the file does not mention the decline at all (shoofi-server main before feat/driver-decline-reassign); drop it once that has merged"
+        },
+        {
+          "file": [
+            "services/delivery/driver-decline.js",
+            "routes/delivery/orders.js"
+          ],
+          "regex": "(?:if \\(peer && isPastPickup\\(peer\\)\\) \\{\\s*return \\{ ok: false, code: \"PEER_COLLECTED\"|(?<![\\s\\S])(?![\\s\\S]*driver-decline))",
+          "desc": "CORE invariant 21: a single-mode twin whose peer is past pickup is refused with PEER_COLLECTED - valid-before leg: the file does not mention the decline at all (shoofi-server main before feat/driver-decline-reassign); drop it once that has merged"
+        },
+        {
+          "file": [
+            "services/delivery/driver-decline.js",
+            "routes/delivery/orders.js"
+          ],
+          "regex": "(?:status: DELIVERY_STATUS\\.WAITING_FOR_APPROVE,\\s*isPendingAssignment: true,\\s*driver: null,\\s*company: null,[\\s\\S]{0,800}?\\$addToSet: \\{ declinedDriverIds: driverOid \\},\\s*\\$push: \\{ declines: entry \\},|(?<![\\s\\S])(?![\\s\\S]*driver-decline))",
+          "desc": "CORE invariants 12 + 21: the decline re-mints the claim token with status 1, no driver, and records the courier on declinedDriverIds / declines[] - valid-before leg: the file does not mention the decline at all (shoofi-server main before feat/driver-decline-reassign); drop it once that has merged"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "(?:allDrivers = allDrivers\\.filter\\(d => !excluded\\.has\\(String\\(d\\._id\\)\\)\\);|(?<![\\s\\S])(?![\\s\\S]*declinedDriverIds))",
+          "desc": "CORE invariant 21: findScoredDrivers drops excludeDriverIds before the capacity fallback - valid-before leg: the file does not mention the decline at all (shoofi-server main before feat/driver-decline-reassign); drop it once that has merged"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "(?:excludeDriverIds: \\[\\s*\\.\\.\\.\\(delivery\\.declinedDriverIds \\|\\| \\[\\]\\),\\s*\\.\\.\\.\\(peerDelivery\\?\\.declinedDriverIds \\|\\| \\[\\]\\),\\s*\\]|(?<![\\s\\S])(?![\\s\\S]*declinedDriverIds))",
+          "desc": "CORE invariant 21: the scheduler excludes the booking's and its twin peer's declinedDriverIds - valid-before leg: the file does not mention the decline at all (shoofi-server main before feat/driver-decline-reassign); drop it once that has merged"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "(?:peerDelivery\\.driver &&\\s*!peerDriverDeclinedHere|(?<![\\s\\S])(?![\\s\\S]*declinedDriverIds))",
+          "desc": "CORE invariants 5 + 21: the single-mode peer-copy never copies a courier on this booking's declinedDriverIds - valid-before leg: the file does not mention the decline at all (shoofi-server main before feat/driver-decline-reassign); drop it once that has merged"
         }
       ]
     },

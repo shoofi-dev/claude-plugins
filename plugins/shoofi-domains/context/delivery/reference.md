@@ -49,7 +49,9 @@ request is refused with a 409 and no write.
 `1` WAITING_FOR_APPROVE → `2` APPROVED → `3` COLLECTED_FROM_RESTAURANT (pickup) →
 `4` DELIVERED; `5` WAITING_IN_STORE; cancels `-1` by-driver, `-2` by-store, `-3` by-admin.
 Transitions: driver `approve`/`start`/`complete`/`cancel`/`waiting-in-store`
-(`routes/delivery/orders.js`); admin `assign`/`reassign`/`cancel` + generic
+(`routes/delivery/orders.js`), and driver `decline`, which is not a forward step but a re-queue
+back to `1` + `isPendingAssignment` (CORE invariant 21; 409 `NOT_DECLINABLE` / `PEER_COLLECTED`,
+400 `INVALID_REASON_CODE`); admin `assign`/`reassign`/`cancel` + generic
 `order/status/update` (`admin.js`, admin-web only, CORE invariant 19); store cancel `-2`
 (`store/order/cancel`, the delivery's own store or a dashboard role). Every transition writes a
 `centralizedFlowMonitor` event. (⚠️ status-value inconsistencies exist — see §10.)
@@ -332,7 +334,10 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   expectedDeliveryAt, area(embedded), company(embedded), driver(embedded), bookId,
   originalBookId, appName, customerLocation, order(snapshot), twinGroupId,
   twinPickupSequence, twinAssignmentMode, twinPeer, twinDegraded, *DelayNotified*,
-  assignedAt, completedAt(Date), isReadyForPickup, readyForPickupAt}`.
+  assignedAt, completedAt(Date), isReadyForPickup, readyForPickupAt, declinedDriverIds
+  [ObjectId], declines[{driverId, reason, reasonCode, fromStatus, assignedAt, approvedAt,
+  assignmentMethod, reassignedAt, at}], declinedAt}`. The decline fields are written only by
+  `declineDelivery` (CORE invariant 21).
   ⚠️ Fields that are not what they look like (CORE invariant 11): `readyForPickupAt` exists
   only if a driver was already assigned when the store pressed ready — the full store-ready
   source is `shoofi.orderFlowEvents` `status_change` status `"3"`. `company.storeName` and
@@ -385,7 +390,8 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
 AsyncStorage offline-retry queue. **Availability/active**: `delivery/driver/availability`
 + `.../update-active-status`. **Shifts**: `services/driverShiftService.ts` → `/driver-shift-manager/*`.
 **Assignment**: arrives via push/WS (not polling); lifecycle actions POST `delivery/driver/order/*`
-(`approve`/`waiting-in-store`/`start`/`complete`/`cancel`, from `screens/delivery-driver/index.tsx`
+(`approve`/`waiting-in-store`/`start`/`complete`/`cancel`, and `decline` with `reason` and/or
+`reasonCode`, whose UI is the courier redesign's separate shoofir PR, from `screens/delivery-driver/index.tsx`
 and `notifications.tsx`) with `driverId = userDetails.customerId`. The server takes the driver from
 the token: a different body `driverId` is a 403, and a delivery not assigned to it is a 404 (CORE
 invariant 19). The order list is `POST delivery/list {customerId}` (own id; a company admin of an
