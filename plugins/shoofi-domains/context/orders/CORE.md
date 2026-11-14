@@ -1256,12 +1256,15 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       last 30s, and then created the order anyway. It blocked nothing and switched off the only
       real double-submit guard. Never release the lock on a branch that continues.
     - **The server never sends `DUPLICATE_ORDER`.** shoofi-app `use-checkout-submit.ts` handles it
-      as a generic error dialog. Whether a recent order should block is an open owner decision.
-      Data for 30 days to 2026-11-14: 403 same-customer, same-store pairs within 30s. 369 (92%) of
+      as a generic error dialog. **Decided (owner, 2026-11-14, option C): the check stays
+      log-only and must not become a 409.** Data for 30 days to 2026-11-14: 403 same-customer, same-store pairs within 30s. 369 (92%) of
       them were a retry after an uncharged status `"0"` attempt, and 0 had both orders alive. So
       a blanket 30s block would mostly refuse declined-card retries.
     - Real duplicates are resubmits outside 30s. The idempotency key (`parsedBodey.idempotencyKey`)
-      is the guard for those, and only wallet checkouts send one.
+      is the guard for those, and only wallet checkouts send one (cash and card to follow in a
+      shoofi-app ticket). There is no index on `idempotencyKey` in any store DB, but none is
+      needed: the replay lookup `{ idempotencyKey, customerId }` uses `customerId_idx`, which
+      every store DB has.
     - Test: `test/integration/order-recent-order-check-keeps-lock.js`.
 
 ## Where an order that never happened lives
