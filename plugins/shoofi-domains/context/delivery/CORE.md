@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -120,6 +120,26 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
   `exec-dashboard/delivery-metrics.js`) and add the two fees as their own settlement lines.
 - The store's list is filtered **server-side**: default = active work queue (`1,2,3,5`),
   عرض الكل = no status filter at all (not a date toggle), newest 200, `appName`-scoped.
+- **On the store's card the STATUS decides the state, never `isPendingAssignment`:** rows from
+  before Sept 2026 and rows support marked delivered/cancelled can still carry
+  `isPendingAssignment: true` on status 4 or a cancel (v1 `screens/delivery-only/list` checks the
+  flag first and labels them «بانتظار تعيين سائق»). The partner v3 screen (shoofi-partner
+  `helpers/deliveries/bookings.ts`, behind `DELIVERIES_V3`) maps 1 → waiting (flag / no driver =
+  searching, driver set = offered, not accepted), 2 / 5 / 3 → on the way (to the store / at the
+  store / collected), 4 → delivered, -1/-2/-3 → cancelled. No status change is **pushed** to the
+  tablet; the v3 screen polls every 20 s while open — the **active** query only (status index,
+  ~15 docs on prod). **Never poll `isAll: true`:** no index covers `{appName, isDeliveryOnly}`, so
+  it reads the whole `book-delivery` collection (106,782 docs, ~234 ms, 2026-11-11) for a store's
+  dozen rows; the screen reloads it only when the active set changes. `pickupTime` is a bare
+  `"HH:mm"`, meaningless on a row from another day.
+
+## The dropoff note is TWO fields — the driver card shows both
+`order.order.address.notes` = the **landmark** the customer saved ON THE ADDRESS («علامة مميزة
+للسائق»); `order.order.commentToCourier` = free text typed **at checkout**. The shoofir cards show the
+first in a blue «علامة مميزة:» banner (plus a floor / apartment / entrance line) under the address, and
+the second in the amber «ملاحظات للمندوب» banner — never merge them. Both are **snapshots from
+booking time**: editing the saved address later changes nothing on a placed order. Detail:
+reference C1; the saved-address side is `customers` CORE invariant 20.
 
 ## Invariants — never weaken
 1. **`DELIVERY_STATUS` is authoritative in `consts/consts.js`**: `1` waiting-approve → `2`
@@ -509,8 +529,9 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
       `/delivery-order` page calls it, and partner books through `routes/order.js` in process.
       `update`, `create-customer`, `employe-list` and `employe-payments` are
       `...deliveryDashboardAdmin`; their callers are legacy admin-web pages. shoofir's
-      order-details also posts `update`, but without the `bookId` the service keys on, so it has
-      never matched a row (0 `delivery_status_update` events, ever). **Nothing calls the loop over
+      order-details also posts `update` with `{_id, status}`. The gate 403s it, and
+      `updateDelivery` would refuse it anyway (a body with `_id`, invariant 20). No call to the
+      route has ever succeeded: 0 `delivery_status_update` events since 2025-07-24. **Nothing calls the loop over
       HTTP from the server.** Order creation, twin orders, the assignment scheduler and the crons
       call `services/delivery/*` in process. Keep it that way, or forward a token.
     - **No `/api/delivery` response carries a session token or a company's payment keys.**
@@ -525,23 +546,59 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
       ungated.** They are pinned as `NOT_YET_GATED` in
       `test/integration/delivery-driver-loop-admin-auth.js`, so the list can only shrink.
 
-20. **`bookId` is a short display number, not an identity — locate an order's row by
-    `originalBookId`.** `bookId` = the order's `orderId` = first4+last4 of `originalOrderId`, so it
-    repeats: 88 bookIds in prod `book-delivery` belong to two or more stores (2026-11-08), and
-    the same store reuses a short number too. `originalBookId` (= `order.originalOrderId`) is on
-    every row created since 2025-12-12 and never collided. The order side locates "this order's
-    row" only through `deliveryRowFilterForOrder` (`utils/delivery-row.js`, orders CORE invariant
-    23): `{originalBookId, bookId}`, or `{bookId, appName}` for a legacy order, never `bookId`
-    alone. The same rule applies on this side, and two **writes** here still break it, because
-    their caller sends nothing else: `POST /api/delivery/admin/cancel` (delivery-web
-    `CardOrder.tsx` → `{bookId, cancelReason, cancelledBy}`) and `POST /api/delivery/update` →
-    `updateDelivery` in `services/delivery/book-delivery.js` (`findOne`+`updateOne` by `bookId`).
-    Fixing them is a server + delivery-web change: send the order's `originalOrderId` (or the
-    row's `_id`) and key on that. Reads with the same weakness:
-    `GET /api/delivery/book/:bookId` (a mobile caller only sees its own rows; a dashboard caller
-    gets the newest of any store's) and `POST /api/delivery/orders/batch` (no caller). The
-    custom-delivery cancel (`/api/order/update-custom-delivery` → `updateDelivery`) is safe: its
-    `bookId` is the row's own `_id` string.
+20. **`bookId` is a short display number, not an identity. Locate an order's row by
+    `originalBookId`, or the row by its `_id`.** `bookId` = the order's `orderId` = first4+last4
+    of `originalOrderId`, so it repeats. On 2026-11-08, prod `book-delivery` held 108 bookIds on
+    more than one row (225 rows): 88 shared by two or more stores and 20 reused inside one store.
+    The largest group had 8 rows. `originalBookId` (= `order.originalOrderId`) is on every row
+    created since 2025-12-12. It has one duplicate, a double-booking of a single vapego order
+    (rows `-3` and `4`). The order side locates "this order's row" only through
+    `deliveryRowFilterForOrder` (`utils/delivery-row.js`, orders CORE invariant 23):
+    `{originalBookId, bookId}`, or `{bookId, appName}` for a legacy order, never `bookId` alone.
+    - **The delivery-side writes use `locateDeliveryRow`**
+      (`services/delivery/delivery-row-locator.js`). These are `POST /api/delivery/admin/cancel`
+      and `POST /api/delivery/update` → `updateDelivery` (`services/delivery/book-delivery.js`).
+      The first identifier present wins:
+      1. `deliveryId`, the row `_id`, 24-hex; `bookId`/`originalBookId` sent with it are ANDed in;
+      2. `originalBookId` + `bookId`, both required (no index on `originalBookId`; the short
+         number can't be derived on delivery-only rows, whose `originalBookId` is
+         `"<ms>-<random>"`);
+      3. legacy `bookId`, plus `appName` when sent.
+    - **Selection is `pickDeliveryRow`.** One match → that row, so a unique legacy bookId behaves
+      exactly as before. Several matches → the single **live** row (status `1/2/3/5`, or
+      `isPendingAssignment`). Several matches with zero or 2+ live → **refused**, a 409 with no
+      write. Every multi-row match is logged at `warn` with the candidates. Then the write goes
+      by `{_id: row._id}`.
+    - **Why the live row.** On 2026-11-08 no bookId had two live rows, and no live row was older
+      than two days. Both routes are dashboard-only (`deliveryDashboardAdmin`), so there is no
+      driver or company to narrow by.
+    - **Why it had to change.** The old `findOne({bookId})` returned the **oldest** row; 402 of
+      402 logged admin cancels match that model. It misfired twice. On 2026-09-03 (`4966-9966`)
+      an admin cancelling GCP's live courier cancelled tortilla's delivered row, then got 18
+      "already cancelled" 400s while GCP's courier kept driving. The same happened on 2026-09-23
+      (`6497-5590`, cremerie-de-leclair's delivered row, vapego's courier). Those two delivered
+      rows still read `-3` in prod.
+    - **Replay.** 30 days of rows (8,485) were replayed as legacy `{bookId}` requests while live.
+      The old rule picked right on 8,472 and the new one on 8,485, with 0 regressions and 0
+      refusals.
+    - **Callers.** delivery-web `CancelDeliveryModal` sends `{deliveryId, bookId}`
+      (`buildCancelDeliveryData` in `apis/admin/delivery/cancel-delivery.ts`; the card's
+      `deliveryOrder` comes from `GET delivery/order/:order._id`, which is the exact row).
+      `/api/delivery/update` has no working client. The legacy `/delivery-list` page echoes the
+      whole row, and the mobile legacy screens send `{_id, status}`; those get a dashboard-gate
+      403 first. `updateDelivery` refuses any body that carries `_id` (400 `row_id_in_body`). It
+      never wrote one: Mongo rejects `$set` of `_id`, and there have been 0
+      `delivery_status_update` flow events since 2025-07-24. It never `$set`s the identifier keys
+      either, and on a miss it returns `{ok:false}` instead of throwing. The custom-delivery
+      cancel (`/api/order/update-custom-delivery`) passes the store-db row's `_id` string as
+      `bookId`, and prod has 0 such rows, so it gets `not_found`.
+    - **Reads with the same weakness:** `GET /api/delivery/book/:bookId`, where a mobile caller
+      only sees its own rows and a dashboard caller gets the newest of any store's, and
+      `POST /api/delivery/orders/batch`, which has no caller.
+    - Tests: `test/integration/delivery-row-delivery-side.js`. A decoy from another store and
+      an older same-store decoy are inserted first. On the old code 12 of 16 fail; the 4 that
+      pass are the pure-module and unique-bookId compatibility pins.
+
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**

@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (CORE invariant 31, Kopa QR table orders); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (CORE invariants 27-28); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -52,19 +52,36 @@
         "routes/coins.js",
         "test/integration/coins-admin-auth.js",
         "utils/active-orders.js",
-        "test/integration/customer-active-orders-per-store.js"
+        "test/integration/customer-active-orders-per-store.js",
+        "services/orders/cancel-money.js",
+        "services/database/DatabaseInitializationService.js",
+        "test/integration/twin-cancel-safety.js",
+        "test/integration/twin-admin-auth.js",
+        "test/integration/order-cancel-undecided.js",
+        "services/money/ledger.js",
+        "services/money/money-store.js",
+        "services/money/money-cancel.js",
+        "routes/money.js",
+        "scripts/money-backfill.js",
+        "test/integration/money-cancel.js",
+        "routes/kopa/table-orders.js",
+        "services/kopa/table-orders.js",
+        "services/orders/order-source.js"
       ],
       "symbols": {
+        "services/kopa/table-orders.js": ["createTableOrder", "priceItems", "storeOpenState", "checkLocation", "buildTableOrderDoc"],
+        "services/orders/order-source.js": ["isKopaQrOrder"],
         "routes/order.js": [
           "processCreditCardPayment",
           "processHypTokenPayment",
           "finalizeApplePayOrder",
           "verifiedAppName"
         ],
-        "services/twin-order/twin-group-service.js": [
-          "cascadeCancel",
-          "degradeToSingle"
-        ],
+        "services/twin-order/twin-group-service.js": ["cascadeCancel", "degradeToSingle", "undoDegrade", "undoDegradeBlockReason", "computeDegradeRefund"],
+        "services/money/ledger.js": ["summarize", "checkInvariant", "totals", "ledgerMovedSince"],
+        "services/money/money-store.js": ["appendEntries", "claimCharge", "ensureCaptureEntry", "twinCapturedAtCapture"],
+        "services/money/money-cancel.js": ["settleCancelledMoney", "attemptHypTwinRefund", "recordSingleCancel", "settleTwinAfterLegCancel"],
+        "services/orders/cancel-money.js": ["hasCancelMoneyAtStake", "cancelMoneyStamp", "cancelSettlementSkipReason"],
         "utils/order-stock.js": [
           "decrementOrderStock",
           "restoreOrderStock",
@@ -549,8 +566,8 @@
         {"file": ["services/orders/order-history.js", "app.js"], "regex": "(?:created: \\{ \\$gte: dateRange\\.start, \\$lte: dateRange\\.end \\},\\s*supersededBySessionId: \\{ \\$exists: false \\},|app\\.use\\(\"/\", orderRecharge\\);\\napp\\.use\\(\"/\", admin\\);)", "desc": "CORE invariant 21: partner/summary's created string-range query; superseded Apple Pay placeholders excluded - valid-before leg is app.js on main before the code PR (orderRecharge straight to admin, no orderHistory mount); drop app.js from this file list once shoofi-server feat/partner-order-history has merged"},
         {"file": ["services/orders/order-history.js", "app.js"], "regex": "(?:const driveInOf = \\(o\\) => o\\.driveInPrice \\|\\| o\\.driveInPricing\\?\\.price \\|\\| 0;\\nconst orderAmount = \\(order\\) => \\(order\\.orderPrice \\|\\| 0\\) \\+ driveInOf\\(order\\);|app\\.use\\(\"/\", orderRecharge\\);\\napp\\.use\\(\"/\", admin\\);)", "desc": "CORE invariant 21: amount = orderPrice + drive-in, the summaries.js chain, never total - valid-before leg is app.js on main before the code PR (orderRecharge straight to admin, no orderHistory mount); drop app.js from this file list once shoofi-server feat/partner-order-history has merged"},
         {"file": ["services/orders/order-history.js", "app.js"], "regex": "(?:const \\{ COMPLETED_STATUSES, CANCELLED_STATUSES \\} = require\\(\"\\.\\./\\.\\./utils/customer-orders\"\\);|app\\.use\\(\"/\", orderRecharge\\);\\napp\\.use\\(\"/\", admin\\);)", "desc": "CORE invariant 21: sales/cancelled totals use the shared status sets, never retyped - valid-before leg is app.js on main before the code PR (orderRecharge straight to admin, no orderHistory mount); drop app.js from this file list once shoofi-server feat/partner-order-history has merged"},
-        {"file": ["test/integration/order-history.js", "app.js"], "regex": "(?:tie-out: totals\\.sales equals partner/summary totalRevenue and its count for the same day|app\\.use\\(\"/\", orderRecharge\\);\\napp\\.use\\(\"/\", admin\\);)", "desc": "CORE invariant 21: the test that runs both real routers on one fixture day - valid-before leg is app.js on main before the code PR (orderRecharge straight to admin, no orderHistory mount); drop app.js from this file list once shoofi-server feat/partner-order-history has merged"},
-        {"file": "routes/payments/summaries.js", "regex": "const driveInOf = \\(o\\) => o\\.driveInPrice \\|\\| o\\.driveInPricing\\?\\.price \\|\\| 0;\\n\\s*const totalRevenue = orders\\.reduce\\(\\(sum, order\\) => sum \\+ \\(order\\.orderPrice \\|\\| 0\\) \\+ driveInOf\\(order\\), 0\\);", "desc": "CORE invariant 21: the tie-out's other side, partner/summary's totalRevenue (orderPrice + drive-in over COMPLETED statuses). Change it and admin/history totals.sales must change with it"},
+        {"file": ["test/integration/order-history.js", "app.js"], "regex": "(?:tie-out(?: \\(\\$\\{label\\}\\))?: totals\\.sales equals partner/summary totalRevenue and its count for the same day|app\\.use\\(\"/\", orderRecharge\\);\\napp\\.use\\(\"/\", admin\\);)", "desc": "CORE invariant 21: the test that runs both real routers on one fixture day - valid-before leg is app.js on main before the code PR (orderRecharge straight to admin, no orderHistory mount); drop app.js from this file list once shoofi-server feat/partner-order-history has merged"},
+        {"file": ["services/payments/partner-summary-legacy.js", "services/payments/partner-summary.js", "routes/payments/summaries.js"], "regex": "(?:totalRevenue: f\\.totalIncomes \\|\\| 0,|const driveInOf = \\(o\\) => o\\.driveInPrice \\|\\| o\\.driveInPricing\\?\\.price \\|\\| 0;\\n\\s*const totalRevenue = orders\\.reduce\\(\\(sum, order\\) => sum \\+ \\(order\\.orderPrice \\|\\| 0\\) \\+ driveInOf\\(order\\), 0\\);)", "desc": "CORE invariant 21: the tie-out's other side, partner/summary's totalRevenue - without `figures` the legacy Σ(orderPrice + drive-in) (services/payments/partner-summary-legacy.js, main's handler verbatim), with `figures: \"report\"` the store report's totalIncomes (= orderPrice + drive-in over COMPLETED card/cash orders). Change either and admin/history totals.sales must follow - valid-before leg is routes/payments/summaries.js on main before shoofi-server fix/partner-summary-figures; drop it once that PR has merged"},
         {"file": "utils/active-orders.js", "regex": "bookId: \\{ \\$in: bookIds \\},\\s*appName: \\{ \\$in: appNames \\},", "desc": "CORE invariant 22: the delivered lookup pairs bookId with appName (bookId is store-local; 88 shared numbers in prod 2026-11-08)"},
         {"file": "utils/active-orders.js", "regex": "\\.project\\(\\{ bookId: 1, appName: 1, originalBookId: 1, created: 1 \\}\\)", "desc": "CORE invariant 22: the delivered read stays on the indexed bookId+appName and brings back the full id and booking time (originalBookId has no index)"},
         {"file": "utils/active-orders.js", "regex": "if \\(delivery\\.originalBookId && order\\.originalOrderId\\) \\{\\s*return String\\(delivery\\.originalBookId\\) === String\\(order\\.originalOrderId\\);\\s*\\}\\s*return isBookedAfterOrder\\(delivery, order\\);", "desc": "CORE invariant 22: a delivery is the order's when originalBookId === originalOrderId; the store+short-number fallback applies only when one side lacks the full id, and only to a row booked after the order"},
@@ -564,7 +581,54 @@
         {"file": "routes/order-amend.js", "regex": "(?:const deliveryFilter = deliveryRowFilterForOrder\\(order, appName\\);\\s*if \\(!deliveryFilter\\) return;\\s*const booking = await deliveryDB\\.bookDelivery\\.findOne\\(deliveryFilter\\);[\\s\\S]*?await deliveryDB\\.bookDelivery\\.updateOne\\(\\{ _id: booking\\._id \\}, \\{ \\$set: snapshot \\}\\);|await deliveryDB\\.bookDelivery\\.updateOne\\(\\{ bookId: order\\.orderId \\}, \\{ \\$set: snapshot \\}\\);)", "desc": "CORE invariant 23: syncDeliverySnapshot locates the row through the helper and overwrites only that row, by _id - valid-before leg is the old bookId-only snapshot write on main before the code PR; drop it once shoofi-server fix/delivery-row-by-original-order-id has merged"},
         {"file": "services/twin-order/twin-group-service.js", "regex": "(?:async function legDeliveryFilter\\(appDb, \\{ appName, orderObjectId, orderId \\}\\) \\{[\\s\\S]*?return deliveryRowFilterForOrder\\(order \\|\\| \\{ orderId \\}, appName\\);|const bookIds = \\[group\\.primary\\?\\.orderId, group\\.secondary\\?\\.orderId\\]\\.filter\\(Boolean\\);)", "desc": "CORE invariant 23: a twin leg's row is resolved from the leg's order (originalOrderId), else short number + the leg's store (cascadeCancel, degradeToSingle, undoDegrade) - valid-before leg is cascadeCancel's old bookIds loop on main before the code PR; drop it once shoofi-server fix/delivery-row-by-original-order-id has merged"},
         {"file": "routes/twin-order.js", "regex": "(?:const deliveryFilter = deliveryRowFilterForOrder\\(order, sideAppName\\);|doc = await deliveryDB\\.bookDelivery\\.findOne\\(\\{ bookId: order\\.orderId \\}\\);)", "desc": "CORE invariant 23: twin assign-driver no longer falls back to a bookId-only lookup before writing a driver onto the row - valid-before leg is the old bookId-only fallback on main before the code PR; drop it once shoofi-server fix/delivery-row-by-original-order-id has merged"},
-        {"file": ["test/integration/delivery-row-by-original-order-id.js", "routes/order-amend.js"], "regex": "(?:no order-side path finds or writes a delivery row by bookId alone|await deliveryDB\\.bookDelivery\\.updateOne\\(\\{ bookId: order\\.orderId \\}, \\{ \\$set: snapshot \\}\\);)", "desc": "CORE invariant 23: the tests (decoys inserted first; legacy fallback; twin legs; a source pin on the order-side files) - valid-before leg is order-amend's old bookId-only snapshot write (and routes/order-amend.js from this file list) on main before the code PR; drop it once shoofi-server fix/delivery-row-by-original-order-id has merged"}
+        {"file": ["test/integration/delivery-row-by-original-order-id.js", "routes/order-amend.js"], "regex": "(?:no order-side path finds or writes a delivery row by bookId alone|await deliveryDB\\.bookDelivery\\.updateOne\\(\\{ bookId: order\\.orderId \\}, \\{ \\$set: snapshot \\}\\);)", "desc": "CORE invariant 23: the tests (decoys inserted first; legacy fallback; twin legs; a source pin on the order-side files) - valid-before leg is order-amend's old bookId-only snapshot write (and routes/order-amend.js from this file list) on main before the code PR; drop it once shoofi-server fix/delivery-row-by-original-order-id has merged"},
+        {"file": ["services/orders/first-order-at-store.js", "routes/order.js"], "regex": "(?:const NON_COUNTING_STATUSES = \\[\"0\", \"4\", \"5\", \"7\", \"8\", \"9\"\\];|error: fixedPriceErr\\?\\.message,\\n        \\}\\);\\n      \\}\\n    \\}\\n\\n    const orderDoc = \\{)", "desc": "CORE invariant 24: an earlier order counts unless it is an uncharged \"0\" or cancelled/rejected (4 5 7 8 9) - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once shoofi-server#508 has merged"},
+        {"file": ["services/orders/first-order-at-store.js", "routes/order.js"], "regex": "(?:supersededBySessionId: \\{ \\$exists: false \\},\\n    \\$or: \\[\\n      \\{ status: \\{ \\$nin: NON_COUNTING_STATUSES \\} \\},[\\s\\S]{0,120}\\{ status: \"0\", \"ccPaymentRefData\\.status\": \"success\" \\},|error: fixedPriceErr\\?\\.message,\\n        \\}\\);\\n      \\}\\n    \\}\\n\\n    const orderDoc = \\{)", "desc": "CORE invariant 24: superseded Apple Pay placeholders never count; the charged orphan (\"0\" + ccPaymentRefData.status success, the chargeLanded rule) does - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once shoofi-server#508 has merged"},
+        {"file": ["services/orders/first-order-at-store.js", "routes/order.js"], "regex": "(?:const FIRST_ORDER_AT_STORE_FIELD = \"isFirstOrderAtStore\";|error: fixedPriceErr\\?\\.message,\\n        \\}\\);\\n      \\}\\n    \\}\\n\\n    const orderDoc = \\{)", "desc": "CORE invariant 24 / reference §5: the field name the partner badge reads - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once shoofi-server#508 has merged"},
+        {"file": ["services/orders/first-order-at-store.js", "routes/order.js"], "regex": "(?:delete orderDoc\\[FIRST_ORDER_AT_STORE_FIELD\\];\\n  if \\(value === true \\|\\| value === false\\) \\{|error: fixedPriceErr\\?\\.message,\\n        \\}\\);\\n      \\}\\n    \\}\\n\\n    const orderDoc = \\{)", "desc": "CORE invariant 24: applyFirstOrderFlag always removes a client-sent value first and writes only a boolean (undecided = absent) - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once shoofi-server#508 has merged"},
+        {"file": "routes/order.js", "regex": "(?:applyFirstOrderFlag\\(orderDoc, isFirstOrderAtStore\\);\\n    if\\(parsedBodey\\.order\\.receipt_method === \"DRIVEIN\"\\) \\{|error: fixedPriceErr\\?\\.message,\\n        \\}\\);\\n      \\}\\n    \\}\\n\\n    const orderDoc = \\{)", "desc": "CORE invariant 24: /api/order/create applies the flag AFTER the orderDoc build (which spreads ...parsedBodey), before the insert - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once shoofi-server#508 has merged"},
+        {"file": "routes/twin-order.js", "regex": "(?:resolveIsFirstOrderAtStore\\(secondaryDB, customerId, \\{ appName: body\\.secondaryAppName, path: 'twin-order/place' \\}\\)|const marketingTouch = sanitizeMarketingTouch\\(body\\.marketingTouch\\);\\n\\n    // Build \\+ insert primary)", "desc": "CORE invariant 24: twin /place judges the secondary leg in the SECONDARY store's db - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once shoofi-server#508 has merged"},
+        {"file": "routes/twin-order.js", "regex": "(?:resolveIsFirstOrderAtStore\\(secondaryDB, customerId, \\{ appName: body\\.secondaryAppName, path: 'twin-order/digital-place-pending' \\}\\)|const marketingTouch = sanitizeMarketingTouch\\(body\\.marketingTouch\\);\\n\\n    // Build \\+ insert primary)", "desc": "CORE invariant 24: twin /digital-place-pending judges the secondary leg in the SECONDARY store's db - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once shoofi-server#508 has merged"},
+        {"file": "services/database/DatabaseInitializationService.js", "regex": "(?:db\\.orders\\.createIndex\\(\\{ customerId: 1 \\}, \\{ name: 'customerId_idx', background: true \\}\\)\\.catch\\(\\(\\) => \\{\\}\\);|db\\.orders\\.createIndex\\(\\{ status: 1, created: 1 \\}, \\{ background: true \\}\\)\\.catch\\(\\(\\) => \\{\\}\\);\\n    // Covers the held-authorization sweep)", "desc": "CORE invariant 24: the customerId_idx index is created at boot, fire-and-forget (never awaited before an insert) - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once shoofi-server#508 has merged"},
+        {"file": ["test/integration/first-order-at-store.js", "routes/order.js"], "regex": "(?:every orders\\.insertOne in production code is preceded by applyFirstOrderFlag on the same doc|error: fixedPriceErr\\?\\.message,\\n        \\}\\);\\n      \\}\\n    \\}\\n\\n    const orderDoc = \\{)", "desc": "CORE invariant 24: the test that fails on a new order inserter without applyFirstOrderFlag - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once shoofi-server#508 has merged"},
+        {"file": ["utils/comment-to-store.js", "routes/order.js"], "regex": "(?:const COMMENT_TO_STORE_MAX_LENGTH = 200;|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25: the customer's note to the store is capped at 200 chars (mirrors the app's COMMENT_TO_STORE_MAX_LENGTH) - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"},
+        {"file": ["utils/comment-to-store.js", "routes/order.js"], "regex": "(?:const sanitizeCommentToStore = \\(value\\) => \\{\\n  if \\(typeof value !== \\\"string\\\"\\) return undefined;[\\s\\S]{0,400}?return cleaned\\.length > 0 \\? cleaned : undefined;|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25: sanitizeCommentToStore drops non-strings (never stringified) and returns undefined (no key) when empty - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"},
+        {"file": ["utils/comment-to-store.js", "routes/order.js"], "regex": "(?:\\.replace\\(/\\\\r\\\\n\\?/g, \\\"\\\\n\\\"\\)[\\s\\S]{0,120}?\\.replace\\(/\\[\\^\\\\S\\\\n\\]\\+/g, \\\" \\\"\\)[\\s\\S]{0,120}?\\.replace\\(/ \\?\\\\n\\[\\\\n \\]\\*/g, \\\"\\\\n\\\"\\)|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25: CRLF -> LF, space/tab runs -> one space, line-break runs -> one line break (a single line break is kept) - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"},
+        {"file": "routes/order.js", "regex": "(?:const commentToStore = sanitizeCommentToStore\\(parsedBodey\\.order\\?\\.commentToStore\\);\\n    if \\(parsedBodey\\.order\\) \\{\\n      delete parsedBodey\\.order\\.commentToCourier;\\n      delete parsedBodey\\.order\\.commentToStore;|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25: /api/order/create cleans the note with no receipt-method gate and deletes the raw value before the ...parsedBodey.order spread - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"},
+        {"file": "routes/order.js", "regex": "(?:\\.\\.\\.\\(commentToCourier \\? \\{ commentToCourier \\} : \\{\\}\\),\\n(?:\\s*//.*\\n)*\\s*\\.\\.\\.\\(commentToStore \\? \\{ commentToStore \\} : \\{\\}\\),\\n      \\},|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25: only the cleaned note is re-added, inside the nested order object, and only when non-empty - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"},
+        {"file": "routes/twin-order.js", "regex": "(?:commentToStore, // string \\| undefined[\\s\\S]{0,2500}?const storeComment = sanitizeCommentToStore\\(commentToStore\\);[\\s\\S]{0,4000}?\\.\\.\\.\\(storeComment \\? \\{ commentToStore: storeComment \\} : \\{\\}\\),|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25 / reference §4: buildSkeletonOrder takes commentToStore, cleans it itself and writes it on that leg's order only when non-empty - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the alternation in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"},
+        {"file": "routes/twin-order.js", "regex": "(?:commentToCourier: body\\.primary\\?\\.commentToCourier,\\n      commentToStore: body\\.primary\\?\\.commentToStore,[\\s\\S]*commentToCourier: body\\.primary\\?\\.commentToCourier,\\n      commentToStore: body\\.primary\\?\\.commentToStore,|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25: one note per store - both primary buildSkeletonOrder call sites (/place + /digital-place-pending) pass body.primary?.commentToStore beside that side's commentToCourier - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the alternation in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"},
+        {"file": "routes/twin-order.js", "regex": "(?:commentToCourier: body\\.secondary\\?\\.commentToCourier,\\n      commentToStore: body\\.secondary\\?\\.commentToStore,[\\s\\S]*commentToCourier: body\\.secondary\\?\\.commentToCourier,\\n      commentToStore: body\\.secondary\\?\\.commentToStore,|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25: one note per store - both secondary buildSkeletonOrder call sites (/place + /digital-place-pending) pass body.secondary?.commentToStore beside that side's commentToCourier - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the alternation in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"},
+        {"file": ["test/integration/comment-to-store.js", "routes/order.js"], "regex": "(?:twin: every buildSkeletonOrder call site passes its own side's commentToStore|\\} = require\\('\\.\\./utils/comment-to-courier'\\);\\nconst \\{ sanitizeMarketingTouch \\} = require\\('\\.\\./utils/marketing-touch'\\);)", "desc": "CORE invariant 25: the test that fails when a twin call site passes no note or the peer's note - valid-before leg is the shoofi-server main text this PR changes (main before the code PR, and only then); drop it, and the routes/order.js entry in the file list, once the shoofi-server fix/HIGH-RISK-comment-to-store PR has merged"},
+        {"file": "services/database/DatabaseInitializationService.js", "regex": "db\\.twinOrderGroups = db\\.collection\\('twinOrderGroups'\\);", "desc": "CORE invariant 27: the db.twinOrderGroups handle is the real collection (it was the empty twin-order-groups, so undo never restored a group)"},
+        {"file": "services/twin-order/twin-group-service.js", "regex": "if \\(degrade\\.refundAttempted \\|\\| degrade\\.refundCompleted\\) return 'money_already_handled';", "desc": "CORE invariant 27 / ref §4: undo refused once a degrade refund was attempted or completed"},
+        {"file": "services/twin-order/twin-group-service.js", "regex": "if \\(decidedAt === null \\|\\| degradedAt === null \\|\\| decidedAt > degradedAt\\) return 'money_already_handled';", "desc": "CORE invariant 27: a cancelMoneyDecision after the degrade (missing timestamp = after) blocks undo - mirrored by shoofi-delivery-web undoDegradeBlock"},
+        {"file": "services/twin-order/twin-group-service.js", "regex": "if \\(keptOrder && isCancelledStatus\\(keptOrder\\.status\\)\\) return 'kept_side_cancelled';", "desc": "CORE invariant 27: undo refused when the kept leg is cancelled/rejected"},
+        {"file": "services/twin-order/twin-group-service.js", "regex": "if \\(!isCardCapturedLeg\\(droppedOrderBefore\\)\\) \\{\\s*return \\{\\s*refundOwed: 0,", "desc": "CORE invariant 27: degrade refundOwed is 0 unless the dropped leg was card-captured"},
+        {"file": "services/twin-order/twin-group-service.js", "regex": "\\(Number\\(droppedOrderBefore\\.total\\) \\|\\| 0\\) - \\(Number\\(droppedOrderBefore\\.shippingPrice\\) \\|\\| 0\\)", "desc": "CORE invariant 27: refundOwed is the dropped leg's total minus shipping (what was paid), not orderPrice"},
+        {"file": "services/orders/cancel-money.js", "regex": "UNDECIDED: \\\"undecided\\\",", "desc": "CORE invariant 27 / payments CORE 12: the undecided cancel money decision"},
+        {"file": "services/orders/cancel-money.js", "regex": "if \\(isCancelledStatus\\(order\\.status\\)\\) return \\\"already_cancelled\\\";", "desc": "CORE invariant 27: money settles only on live -> cancelled"},
+        {"file": "routes/order.js", "regex": "\\\"paymentAuth\\.refundRequiredReason\\\": \\\"cancel_no_decision\\\",", "desc": "CORE invariant 27 / payments CORE 12: an undecided settled single charge is flagged cancel_no_decision"},
+        {"file": "routes/order.js", "regex": "const stamp = cancelMoney\\.cancelMoneyStamp\\(currentOrder, updateobj\\);", "desc": "CORE invariant 27: the stamp is what was decided (keep/refund/undecided/none), not the REFUND the settle step ran"},
+        {"file": "routes/twin-order.js", "regex": "const TWIN_ADMIN_ROLES = \\['master', 'admin', 'manager', 'senior', 'operator', 'viewer', 'editor'\\];", "desc": "CORE invariant 27: twin admin actions keep every operating seat (support = viewer), not accountant"},
+        {"file": "routes/twin-order.js", "regex": "router\\.post\\('/api/twin-order/admin/undo-degrade', \\.\\.\\.TWIN_ADMIN,", "desc": "CORE invariant 27: undo-degrade carries the admin role gate"},
+        {"file": "routes/admin/twin-order-config.js", "regex": "const CONFIG_WRITE = \\[auth\\.required, checkAdminRole\\(\\['admin'\\]\\)\\];", "desc": "CORE invariant 27: twin config write is admin (+ master)"},
+        {"file": "services/money/ledger.js", "regex": "if \\(t\\.refunded \\+ t\\.compensated \\+ t\\.owedOpen > t\\.captured \\+ EPS\\) \\{", "desc": "CORE invariant 28: refunded + compensated + owed <= captured, checked before every ledger write"},
+        {"file": "services/money/money-store.js", "regex": "\\{ \\.\\.\\.ctx\\.filter, moneyLedgerVersion: version === 0 \\? \\{ \\$in: \\[0, null\\] \\} : version \\}", "desc": "CORE invariant 28: ledger writes are versioned (a lost race re-reads and retries)"},
+        {"file": "services/money/money-store.js", "regex": "\\{ moneyClaim: \\{ \\$exists: false \\} \\}, \\{ moneyClaim: null \\}, \\{ \\\"moneyClaim\\.at\\\": \\{ \\$lt: stale \\} \\}", "desc": "CORE invariant 28: one money action per charge (409 charge_busy)"},
+        {"file": "services/money/money-cancel.js", "regex": "if \\(config\\.hypAutoRefund !== true\\) return \\{ attempted: false, reason: \\\"flag_off\\\" \\};", "desc": "CORE invariant 28 / payments CORE 12: HYP twin auto refund only behind hypAutoRefund"},
+        {"file": "services/money/money-cancel.js", "regex": "if \\(t\\.unknownOpen\\.length > 0\\) return \\{ attempted: false, reason: \\\"refund_in_doubt\\\" \\};", "desc": "CORE invariant 28: never retried while a refund is in doubt"},
+        {"file": "routes/money.js", "regex": "const MONEY_FINANCE_ROLES = \\[\\\"accountant\\\"\\];", "desc": "CORE invariant 28: finance routes = accountant (+ master)"},
+        {"file": "services/coins/coins-service.js", "regex": "cancelRefundedOrderIds: \\{ \\$ne: refundKey \\}", "desc": "CORE invariant 28: coins are refunded once per order"},
+        {"file": "routes/admin/twin-order-config.js", "regex": "hypAutoRefund: false,", "desc": "CORE invariant 28: hypAutoRefund defaults off"},
+        {"file": "routes/order.js", "regex": "module\\.exports\\.handleOrderUpdate = handleOrderUpdate;", "desc": "CORE invariant 28: /api/money/cancel runs the same order-update pipeline for singles"},
+        {"file": "services/orders/order-source.js", "regex": "const KOPA_QR_SOURCE = \"kopa-qr\"", "desc": "CORE invariant 31: a Kopa QR table order is source \"kopa-qr\" (the literal settlement keys on, shoofi-server#583)"},
+        {"file": "services/orders/order-source.js", "regex": "SERVER_ONLY_ORDER_FIELDS = Object\\.freeze\\(\\[\"source\", \"table\", \"kopaQr\"\\]\\)", "desc": "CORE invariant 31: the fields only the table-order route may write"},
+        {"file": "routes/order.js", "regex": "for \\(const field of SERVER_ONLY_ORDER_FIELDS\\) delete parsedBodey\\[field\\];", "desc": "CORE invariant 31: /api/order/create drops a posted source / table / kopaQr before the ...parsedBodey spread"},
+        {"file": "routes/order.js", "regex": "if \\(isKopaQrOrder\\(order\\)\\) \\{\\s*finalOrders\\.push\\(order\\);", "desc": "CORE invariant 31: admin/not-viewd keeps a customer-less kopa-qr order (any other order whose customer is not found is still skipped)"},
+        {"file": "routes/order-amend.js", "regex": "KOPA_QR: \"KOPA_QR_ORDER_NOT_AMENDABLE\"", "desc": "CORE invariant 31: amend refuses a kopa-qr order (it would reprice at app prices)"},
+        {"file": "services/kopa/table-orders.js", "regex": "source: KOPA_QR_SOURCE,\\s*table: \\{ id: table\\.tableId, label: table\\.label \\},\\s*customerId: null,", "desc": "CORE invariant 31: source, a top-level table { id, label } and no customer"},
+        {"file": "services/kopa/table-orders.js", "regex": "routes\\.fireStoreOwnerNotifications\\(orderDoc, req, appName\\); // never awaited", "desc": "CORE invariants 6 + 31: the table order's store-owner alert is not awaited"}
       ]
     },
     "shoofi-app": {
@@ -576,7 +640,14 @@
         "hooks/checkout/use-checkout-validate.ts",
         "screens/cart/cart.tsx",
         "helpers/for-you-attribution.ts",
-        "services/marketing-events.ts"
+        "services/marketing-events.ts",
+        "stores/orders/index.tsx",
+        "helpers/placed-order.ts",
+        "helpers/active-orders-labels.ts",
+        "components/order/orders-load-error/index.tsx",
+        "screens/order/active/components/placed-order-card.tsx",
+        "screens/order/history/index.tsx",
+        "hooks/checkout/use-checkout-submit.ts"
       ],
       "patterns": [
         {"file": "stores/cart/index.ts", "regex": "const marketingTouch = await prepareMarketingForOrder\\(\\);", "desc": "CORE invariant 15/16: submitOrder sends the queued taps (<=1.5s, never throws) before reading the touch for the body"},
@@ -675,6 +746,41 @@
           "file": "screens/checkout/index.tsx",
           "regex": "shippingPrice: shippingMethod === SHIPPING_METHODS\\.shipping \\? availableDrivers\\?\\.area\\?\\.price \\|\\| 0 : 0,",
           "desc": "reference C1 / CORE invariant 20: the app posts shippingPrice = the quoted area's tariff, ₪0 when the quote has no area (the paused-area ₪0 bug the server's [shippingPriceCheck] watches for)"
+        },
+        {
+          "file": "helpers/placed-order.ts",
+          "regex": "export const PLACED_ORDER_TTL_MS = 10 \\* 60 \\* 1000;",
+          "desc": "CORE invariant 26: a just-placed copy the server never lists is dropped after 10 min"
+        },
+        {
+          "file": "helpers/placed-order.ts",
+          "regex": "idOf\\(o\\?\\._id\\) === placed\\._id",
+          "desc": "CORE invariants 24 + 22: the local copy is matched to the server's on _id (or originalOrderId), never on the short orderId"
+        },
+        {
+          "file": "stores/orders/index.tsx",
+          "regex": "if \\(seq <= this\\.activeOrdersAppliedSeq\\) return;",
+          "desc": "CORE invariant 26: stale-response guard, an older poll answer never overwrites a newer one"
+        },
+        {
+          "file": "stores/orders/index.tsx",
+          "regex": "this\\.activeOrdersError = true;",
+          "desc": "CORE invariant 26: a failed load is an error state, not an empty list"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "ordersStore\\.showStagedPlacedOrder\\(\\);",
+          "desc": "CORE invariant 26: the staged copy is shown at confirmation (postChargeOrderActions), never at create"
+        },
+        {
+          "file": "hooks/checkout/use-checkout-submit.ts",
+          "regex": "if \\(errorMessage\\) return;",
+          "desc": "CORE invariant 26: a recorded payment failure is never staged as a placed order"
+        },
+        {
+          "file": "helpers/active-orders-labels.ts",
+          "regex": "\"orders-load-retry\"",
+          "desc": "CORE invariant 26: own retry key, because prod's retry translation reads OK"
         }
       ]
     },
@@ -688,6 +794,7 @@
         "App.tsx",
         "helpers/printer/print.ts",
         "helpers/printer/index.ts",
+        "helpers/printer/printer-selection.ts",
         "utils/print-outcome.ts",
         "utils/print-attempts.ts",
         "utils/print-queue.ts",
@@ -713,14 +820,17 @@
           "outcomeCountsAsPrinted",
           "shouldReportPrintFailure"
         ],
-        "utils/print-failure-notice.ts": [
-          "printFailureNoticeGate"
-        ],
         "utils/print-attempts.ts": [
           "autoPrintSweepStatuses",
           "ordersUnderPrintAttemptCap",
           "recordUnprintedAttempt",
           "clearPrintAttempts"
+        ],
+        "helpers/printer/printer-selection.ts": [
+          "hasPrinterAddress",
+          "printsWithoutPaper",
+          "storePrintsWithoutPaper",
+          "printerConfigIsStale"
         ],
         "utils/print-queue.ts": [
           "captureAlignedToQueue"
@@ -752,8 +862,8 @@
         },
         {
           "file": "hooks/use-notifications.ts",
-          "regex": "addNotificationReceivedListener\\([\\s\\S]{0,80}?fetchUnviewedOrdersCount\\(\\)",
-          "desc": "STABILITY PIN, not a regression detector - green both before and after shoofi-partner#22, which did not introduce it. Every notification the device receives while the app runs (including the server's store.wav creation push) runs the badge refresh. This is the ONLY reason that path sees a new order ~30s before the poll, which is the whole premise of the two assertions above and of the C3 warning; drop this wiring and the doc's explanation stops being true"
+          "regex": "addNotificationReceivedListener\\((?:[\\s\\S]{0,80}?fetchUnviewedOrdersCount\\(\\)|[\\s\\S]{0,700}?fetchUnviewedOrdersCountRef\\.current\\(refreshViaForNotification\\(notification\\)\\))",
+          "desc": "STABILITY PIN, not a regression detector - green both before and after shoofi-partner#22, which did not introduce it. Every notification the device receives while the app runs (including the server's store.wav creation push) runs the badge refresh. This is the ONLY reason that path sees a new order ~30s before the poll, which is the whole premise of the two assertions above and of the C3 warning; drop this wiring and the doc's explanation stops being true. Accepts both the direct call and, since the alert-arrival measurement (shoofi-partner feat/order-alert-arrival-log), the call through fetchUnviewedOrdersCountRef with the path that triggered it"
         },
         {
           "file": "helpers/printer/print.ts",
@@ -794,6 +904,21 @@
           "file": "utils/print-outcome.ts",
           "regex": "export const SEND_DATA_TIMEOUT_CEILING_MS = 60000;",
           "desc": "doc reference C3 Auto-print: 60s ceiling (the print lock is held for the whole wait)"
+        },
+        {
+          "file": "App.tsx",
+          "regex": "const printerTarget = printerTargetForStore\\(storeDataStore\\.storeData\\);",
+          "desc": "doc CORE invariant 17: initPrinter takes the store's own address or the non-dialable placeholder, never a fallback printer (HQ #7121e1, #719822)"
+        },
+        {
+          "file": "helpers/printer/printer-selection.ts",
+          "regex": "export const NON_CONNECTING_TARGET_PLACEHOLDER = \"NO_PRINTER\";",
+          "desc": "doc CORE invariant 17: the no-address placeholder is not a dialable address (it used to be olamhayam's real printer MAC)"
+        },
+        {
+          "file": "helpers/printer/print.ts",
+          "regex": "if \\(printsWithoutPaper\\(printerConfig, isDisablePrinter\\)\\) \\{",
+          "desc": "doc CORE invariant 17: no printer address answers printed before any connect, the same as isDisablePrinter"
         },
         {
           "file": "utils/print-attempts.ts",
