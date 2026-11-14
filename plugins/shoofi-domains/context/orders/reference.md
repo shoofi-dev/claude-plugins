@@ -741,10 +741,17 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   currentStatus}`** and nothing is written. A repeat of a tap that already landed gets `200
   {unchanged: true}`. The partner interceptor reacts only to 401, so a screen that does not
   catch the 409 shows nothing. It should refresh the card from `currentStatus`.
+  The v3 board does (shoofi-partner#86): `isStatusAlreadyChanged` (HTTP 409) in
+  `screens/admin/order/list/index.v3.tsx` `updateOrderStatus` reloads the board instead of
+  restoring the stale card. The same PR puts the one-tap «handed over» on the COLLAPSED ready
+  card (`showsCollapsedHandoverButton`: status `2`/`3`; a drive-in only once
+  `driveInArrival.arrivedAt` is set, because at `10` the customer's «I've arrived» button
+  disappears). Nothing but the store moves a delivery order to `11`.
 - **Order rules helper** (on main since the v3 rules landed): `helpers/orders/order-rules.ts`,
   pinned by `helpers/orders/__tests__/order-rules.test.ts`. `updateOrderStatus` /
   `updateOrderToPrevStatus` call `nextStatusFor` / `prevStatusFor` from it. It also exports
-  `showsCollapsedNextButton` / `showsExpandedNextButton` / `showsBackToPreparing` /
+  `showsCollapsedNextButton` / `showsCollapsedHandoverButton` / `isStatusAlreadyChanged` /
+  `showsExpandedNextButton` / `showsBackToPreparing` /
   `showsDelayButton` / `showsAmendButton` / `showsCompensationButton`, `tabStatusList` /
   `tabCount` / `visibleTabs`, `isReadyTooEarly` (the `readyOrderUpdateStatusMinMinutes`
   guard), `prepTimeSlots` (the twin second-store window, below), `canAccept`,
