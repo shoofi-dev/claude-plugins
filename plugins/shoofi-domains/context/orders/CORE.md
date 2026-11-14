@@ -944,7 +944,10 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       REJECTED only for the store side (timeout sweeper / store reject) — partner reports, HQ and
       store metrics read 5 as "the store rejected". The customer app's twin header checks
       "degraded" before "cancelled" (shoofi-app#96). **`degradeToSingle`** returns the dropped leg's coins,
-      coupon uses and store-deal uses (`returnLegExtras`, recorded on `degrade.returnedOnDegrade`).
+      World Cup points, coupon uses and store-deal uses (`returnLegExtras`, recorded on
+      `degrade.returnedOnDegrade`, points as `worldCupPointsReversed`). **`cascadeCancel`** re-reads
+      both legs after its cancels and reverses the World Cup points of every leg in a cancel
+      status (`reverseLegWorldCupPoints`), so a leg whose cancel failed keeps its points.
     - **Flow events** (`shoofi.orderFlowEvents`, the `trackOrderFlowEvent` writer, swallowed on
       failure): `twin_degrade`, `twin_undo_degrade`, `twin_cascade_cancel` on BOTH legs
       (metadata `groupId`, `side`, `role`, actor = the admin), `cancel_money_undecided`
@@ -1037,6 +1040,11 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **Coins are refunded once per order** (`refundCoins`: `customerCoins.cancelRefundedOrderIds`
       in the same atomic update; legacy rows recognised by their notes) — the twin path refunded
       the trigger leg twice (order route + cascade).
+    - **World Cup points are reversed once per twin leg.** `reverseLegWorldCupPoints`
+      (`services/twin-order/twin-group-service.js`) skips a leg whose wallet already holds a
+      `reverse` transaction for that `orderId`. That is what keeps the order route's reversal of
+      the trigger leg from being repeated by the cascade. The check runs before the write, so it is
+      not atomic: only `reversePoints`' own guard (shoofi-server#592) covers two concurrent cancels.
     - **Backfill**: `scripts/money-backfill.js`, DRY-RUN by default; `--apply` only with Sari's OK.
       Coupons already issued against a twin group count as ONE `compensate` entry each
       (`collectTwinCompensations`): compensation rows naming a leg / the group, and a manual twin
