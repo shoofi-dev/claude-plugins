@@ -696,8 +696,19 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
 - **DEAD CONFIG:** `ShiftService.isBookingWindowOpen` is hard `return true`, so
   `bookingWindow.opensDayOfWeek` / `opensForWeekOffset` do nothing, and
   `bookingClosesHoursBefore` is stored and admin-editable but read by **no server code**.
-  Real gating today is `cityAreas.bookingDisabledWeeks`. There is also no waiting-list
-  promotion anywhere — `waitingList` is only pushed, pulled and displayed.
+  Real gating today is `cityAreas.bookingDisabledWeeks`.
+- **The waiting list OFFERS freed seats; it never books.** `utils/crons/shift-waiting-list-cron.js`
+  (every minute, Redis lock `cron:shift-waiting-list`, only under `ENABLE_CRONS`) runs
+  `services/driver-shift/waiting-list-offers.js` `runWaitingListPass`: for each shift not yet
+  started with free seats (`maxDrivers` − booked − seats already held), the first `waiting` entries
+  by `addedAt` become `offered` with `offerExpiresAt` = +10 min and get a push
+  (`type: "shift_waiting_list_offer"`); an offer that ran out becomes `missed` (off the list for
+  this shift; joining again adds a fresh entry) and the seat goes to the next one. Blocked couriers
+  are skipped. Each write is conditional on the entry's status, so two instances offer once.
+  `POST /shifts/book` refuses (`HELD_FOR_WAITING_LIST`) a seat held for somebody else
+  (`bookableSeatsFor`), and booking still `$pull`s the courier's entry. `isOnWaitingList` counts
+  `waiting` and `offered`. It looks at the shift, not at what freed the seat, so a courier
+  cancelling, an admin removing one or raising `maxDrivers` are all covered.
 
 ## Recipe — change assignment or coverage
 1. State which of **pickup-zone / dropoff-geometry / `supportedCities` / `supportedAreas` /
