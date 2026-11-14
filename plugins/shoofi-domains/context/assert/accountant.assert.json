@@ -273,6 +273,11 @@
           "desc": "the admin coupon create is gated — it had no auth at all before 2026-10-28"
         },
         {
+          "file": "services/hq/money-audit/checks-orders.js",
+          "regex": "id: \"twin-document-missing\",\\s+area: AREA,\\s+severity: \"leak\"|id: \"twin-captured-leg-cancelled\"",
+          "desc": "CORE invariant 20 (HQ #b3c58d): a twin leg without its customer document reaches Needs you only via this leak check. Second leg = pre-fix main; narrow to the first once shoofi-server fix/HIGH-RISK-twin-charge-always-manual-invoices is on main"
+        },
+        {
           "file": "routes/payments/admin-reports.js",
           "regex": "totalForTransfer\\s*=\\s*creditCardRevenue",
           "desc": "CORE money formula: transfer is credit-card revenue minus outcomes"

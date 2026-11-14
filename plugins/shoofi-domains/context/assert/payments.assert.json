@@ -229,6 +229,11 @@
           "desc": "twin capture routes HYP-tokenized cards to the HYP soft charge, not ZCredit"
         },
         {
+          "file": "services/twin-order/twin-payment-service.js",
+          "regex": "const TWIN_MANUAL_INVOICES = true|isManualInvoicingEnabled\\(appDb, primaryStore\\)",
+          "desc": "every twin charge is manually invoiced regardless of the flag (CORE invariant 9, HQ #b3c58d). Second leg is the pre-fix line; narrow to the first leg once shoofi-server fix/HIGH-RISK-twin-charge-always-manual-invoices is on main"
+        },
+        {
           "file": "routes/twin-order.js",
           "regex": "api/twin-order/pay",
           "desc": "the twin charge entrypoint that bypasses routes/order.js entirely"
