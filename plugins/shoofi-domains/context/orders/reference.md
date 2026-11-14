@@ -862,15 +862,22 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     and `appName`. A JS timer would not work: iOS suspends JS in the background, and the app
     has no background task. A repeating trigger would not work either: iOS rejects repeating
     intervals under 60s.
-  - **Per-tablet settings** (Wolt's device settings; `utils/new-order-alarm-prefs.ts`, UI at
-    the end of ادارة المحل, "التنبيهات على هذا الجهاز"). Stored on the DEVICE (AsyncStorage
+  - **Per-tablet settings** (Wolt's device settings; `utils/new-order-alarm-prefs.ts`, UI in
+    ادارة المحل, "التنبيهات على هذا الجهاز": at the end of the v1 screen, and in v3 a card under
+    «الطباعة», `components/store-settings-v3/AlarmSettingsV3.tsx`). Stored on the DEVICE (AsyncStorage
     `@new_order_alarm_prefs`), not the store. `repeat` (default on): off means the series
     never runs (`alarmRepeatEnabled` = store alerts on AND repeat) and switching it off clears
     a scheduled series; the first alert of a new order and the server's reminders still come.
-    `sound`: one of `store.wav`, `storelate.wav`, `deliverysound.wav`, `buffalosound.wav`
-    (all bundled in app.json `expo-notifications.sounds`), used by the series and by the
-    first local alert (`schedulePushNotification`). iOS only: Android plays the `default`
-    channel's sound.
+    `sound`: one of `ALARM_SOUNDS` — `store.wav` (first, the default) and seven picked
+    2026-11-14 (`order-phone-ring`, `-electric-bell`, `-service-bell`, `-delivery-tune`,
+    `-digital-alert`, `-doorbell`, `-beeps` `.wav`: one 5–6.5 s phrase each, level-matched).
+    A saved sound no longer in the list falls back to `store.wav`. Each must be bundled in
+    BOTH app.json `expo-notifications.sounds` and `ios/ShoofiPartners` + the Xcode project's
+    Resources (the iOS project is committed), so a new sound needs a native build, not OTA.
+    Used by the series and by the first local alert (`schedulePushNotification`). The ▶
+    preview is a local notification under one id (`ALARM_PREVIEW_ID`), removed before the
+    next preview and when the screen closes, so a new ▶ stops the one playing. iOS only:
+    Android plays the `default` channel's sound.
   - **Numbers** (`ALARM_SETTINGS`, `utils/new-order-alarm.ts`). Every time comes from one
     deterministic grid per cycle (`alarmCycleGrid`):
     1. **While the server's reminder window runs**, one local ring a minute at **:30
@@ -1033,6 +1040,10 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   - **Bell count.** `stores/new-orders-badge` holds the header bell's unviewed count.
     `useNotifications` publishes it (`hooks/use-notifications.ts`), and the v3 list reads it
     there. Mounting that hook a second time would double the polling and the new-order alarm.
+    In v3 the bell itself is hidden on the screens that already show the waiting orders —
+    the new-order screen, the orders board and the dashboard (`helpers/orders/header-bell.ts`,
+    `BELL_HIDDEN_ROUTES_V3`) — and stays everywhere else: after «لاحقاً» the takeover is
+    hidden until the next order, so the bell is the way back while the alarm rings.
 - **Gotcha**: no explicit REJECT endpoint, and **no reachable cancel/reject in the live
   partner screens**. Neither v2 screen writes `4` or `5` itself; the only `4` the store can
   compute is the `10→4` arm above. The list tabs are `1`, `2` (+`3`), `10` (+`11`), `14` and `15`
