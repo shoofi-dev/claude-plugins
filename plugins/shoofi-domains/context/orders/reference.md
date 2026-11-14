@@ -830,6 +830,28 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   `/api/order/update/viewd`); `/api/order/create` emits no frame of that type. It lands on the
   same `fetchUnviewedOrdersCount`, which makes it easy to mistake for the creation trigger —
   it is not, and a fix reasoned from that frame will target the wrong path.
+- **Measuring how a new order reaches the tablet** (shoofi-partner `feat/order-alert-arrival-log`,
+  2026-11-14). The server records when it SENDS a store alert (`orderFlowEvents`
+  `notification_push_sent`; `websocket_sent` is logged `success` for every alert even when no socket
+  matched, so it says nothing about delivery) and when the store accepts (`order_viewed`) — nothing
+  in between. The partner app reports two events to `POST /api/app-logs/insert` → `shoofi.apps-logs`
+  (`app_type: "shoofi-partner"`, `userId` = the `store-users` `_id`; use the server's `created`, not
+  `properties.deviceAt`, for timing):
+  `partner_order_alert_received` for every `new_order_alert` / `order_reminder` that lands,
+  `properties.via: "push" | "socket"` (a remote push is told from the app's own local banners by a
+  non-null `notification.request.trigger`); and `partner_new_order_seen`, one per order the ledger
+  takes as new, `properties.via` = the path whose refresh found it — `push`, `socket`, `poll` (the
+  30s interval), `foreground`, `mount` or `refresh`. Join on `properties.orderNumber` (the human
+  `orderId`, which is the ledger key) to `orderFlowEvents` `order_created`. A seen event with
+  `via: "poll"` means push and socket both missed or lagged. The listener now calls the refresh
+  through `fetchUnviewedOrdersCountRef` (it is registered once and used to keep the first render's
+  closure). Classifiers: `utils/order-alert-arrival.ts`; sender: `utils/order-alert-arrival-log.ts`
+  — a plain `fetch`, never `axiosInstance`, which opens the no-internet dialog on any network error.
+  A backgrounded app runs no JS, so a push landing then logs nothing and the order shows up as
+  `via: "foreground"` when the tablet is reopened. As of 2026-11-14 the socket path does not deliver
+  store alerts at all (`utils/persistent-alerts.js` passes an ObjectId `recipientId` to a
+  string-keyed client map; the Redis fallback record loses `appType` after its 5-min TTL; the Redis
+  subscriber never subscribes), so expect no `via: "socket"` rows until that is fixed.
 - **Key files**: `stores/orders/index.tsx` (core + transition logic),
   `screens/admin/order/new-orders/list/index.tsx` (ACCEPT + twin caps),
   `screens/admin/order/list/index.tsx` (dashboard, transitions), `hooks/{use-websocket,use-notifications}.ts`, `App.tsx`.
