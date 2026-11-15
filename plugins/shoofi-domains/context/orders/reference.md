@@ -1008,14 +1008,26 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     `EXPO_PUBLIC_PARTNER_ORDERS_V3=1`. When on, v3 wins over v2 in `MainStackNavigator.tsx`.
     `HEADER_V3` restyles only the shared header.
   - **Rules** come from `helpers/orders/order-rules.ts` (above).
-  - **Money** is in `helpers/orders/order-money.ts`, and the two formulas differ on purpose:
-    - `orderMoneySummary` is the list's. It is built on `getPartnerPaymentSummary`, the
-      same math as the v2 list.
-    - `newOrderMoneySummary` is the new-order screen's own v2 inline formula, lifted
-      unchanged. It subtracts coins from a card order's bottom line too, takes the
-      `full_discount` coupon row from `appliedCoupon.breakdown`, and decides "full coupon"
-      without the drive-in price.
-    - Unifying the two is a money decision (accountant), not a layout one.
+  - **Money** is in `helpers/orders/order-money.ts` (branch `fix/order-money-settlement`; main
+    still has the two old formulas, `getPartnerPaymentSummary` for the list and the new-order
+    screen's own inline one, until it merges).
+    - **One formula.** `storeMoney(order)` is a per-order port of the settlement engine
+      (`services/payments/store-sales.js` + `lib/payments/calc.js`), before commission / VAT.
+      Card: Shoofi pays `P + D − C − S`. Cash: cash in hand `P + D − I − C`, and the monthly
+      account adds `H − S_delivery` (P items, D drive-in, C coins = the STORE's cost, I the
+      coupon's items part, S the store's coupon/deal share, H Shoofi's coupon credit). It shows
+      what the store SHOULD get: the engine double-charges the store's items share on a cash
+      order (accountant review 2026-11-11), the screen does not copy that.
+    - **What the store sees** is `storeView(storeMoney(order))`, the same lines on the
+      new-order screen, the order card (`components/orders-v3/MoneyBlock.tsx`) and the printed
+      ticket (`components/order-invoice` `SettlementMoney`, flag `ORDER_MONEY_SETTLEMENT`).
+      Product decision 2026-11-15: «المنتجات» · [«من السيارة»] · [«كوينز»] · [«خصم حملة»] ·
+      «شوفي ستدفع لك» (or «يُخصم منك بالحساب الشهري» when negative), then one box «السائق /
+      الزبون يدفع لك نقداً ₪X», or «لا تحصّل شيئاً» with NO amount.
+    - **No delivery lines, no card / coupon names, no breakdown toggle.** «خصم حملة» is
+      everything the store funds (its items deal, its share of a coupon, its share of a
+      free-delivery coupon/deal) and never says who funds it. The lines add up: products +
+      drive-in − coins − campaign = Shoofi + cash (tested on 56 real prod orders).
   - **Order lines** are built by `helpers/orders/order-lines.ts` `buildOrderLines`. A line
     whose product is not in the menu is KEPT, with its own `nameAR`/`nameHE`, flagged
     `missingFromMenu` and sorted last. Its options cannot be decoded without the product's
