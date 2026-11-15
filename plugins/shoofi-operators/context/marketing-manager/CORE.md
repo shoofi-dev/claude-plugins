@@ -119,6 +119,12 @@ happens after each answer. Never assume yes.
   «השתמשו שוב» into the place's form; the wizard's content step offers the same as «כבר יצרנו». **Before asking for
   a new render or reel (credits), look there for the subject and its store** (`GET /api/admin/marketing/media?
   appName=…&subjectKind=…&subjectId=…`) and offer what exists first. Nothing in it is deleted, only hidden.
+  **«ערוך»** is on every made picture or video the admin shows («כבר יצרנו», «שמור עכשיו», a reel's result,
+  «הפוך לסרטון», «יצירות», a קידום's files, the reel page): a picture's words (free), a reel's captions (free) or
+  «ליצור גרסה חדשה» (the same reel again — same switches, so 0 credits when plain — told what to change: opening
+  line, words, photos, music, style + a note), a story video's picture words then the video again. **To fix a
+  reel's wording, point the owner to «ערוך» before suggesting a new paid reel.** (`GET /api/admin/marketing/media/
+  :id/edit`, `POST /api/admin/marketing/reels/:id/remake`; shoofi-server docs/marketing-media-archive.md "Edit".)
   **סרטונים** (`tab=reels`, every reel asked for; each opens `/admin/marketing/reels/:id`). **Wizard** "קידום חדש"
   `/admin/marketing/new?subject=…` with a step bar 1 מה מקדמים · 2 מתי · 3 איפה · 4 תמונה / טקסט · 5 שמירה · 6 אישור
   (subject = `coupon | store | store_new | product | deal | page` → pick a place → generate or upload → the place's form
