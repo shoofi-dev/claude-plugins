@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/shift-book-atomic / 2026-11-15 (CORE 'Taking a seat is atomic', claimSeat); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -780,6 +780,19 @@
           "file": "routes/driver-shift-manager.js",
           "regex": "overrideWaitingListHold",
           "desc": "admin assign takes a held seat only with the explicit override"
+        },
+        {
+          "file": [
+            "services/driver-shift/seat-claim.js",
+            "routes/driver-shift-manager.js"
+          ],
+          "regex": "(?:\\$expr: seatStillFreeExpr\\(now, \\{ exceptDriverId: driverId, countHolds: !ignoreHolds \\}\\)|\\$push: \\{ bookedDrivers: booking \\},\\s*\\$pull: \\{ waitingList: \\{ driverId: driverId\\.toString\\(\\) \\} \\},\\s*\\$set: \\{\\s*status: newStatus)",
+          "desc": "CORE 'Taking a seat is atomic': claimSeat's findOneAndUpdate filter re-checks booked + offers held for others < maxDrivers at write time - valid-before leg is the old unconditional $push in /shifts/book on shoofi-server feat/shift-waiting-list-offers; drop it once shoofi-server fix/shift-book-atomic has merged"
+        },
+        {
+          "file": "routes/driver-shift-manager.js",
+          "regex": "(?:claimSeat\\(deliveryDb, \\{ shiftId: shift\\._id, booking[\\s\\S]*?const claim = await claimSeat\\(deliveryDb, \\{\\s*shiftId: shiftDoc\\._id,[\\s\\S]*?ignoreHolds: overrideHold,|\\$push: \\{ bookedDrivers: booking \\},\\s*\\$pull: \\{ waitingList: \\{ driverId: driverId\\.toString\\(\\) \\} \\},\\s*\\$set: \\{\\s*status: newStatus)",
+          "desc": "CORE 'Taking a seat is atomic': /shifts/book and admin assign-driver both take the seat through claimSeat; the override passes ignoreHolds - valid-before leg is the old unconditional $push on shoofi-server feat/shift-waiting-list-offers; drop it once shoofi-server fix/shift-book-atomic has merged"
         }
       ]
     },

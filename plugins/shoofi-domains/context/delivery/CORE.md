@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@fix/shift-book-atomic / 2026-11-15 (shift seat claim is atomic: claimSeat, Known status shift bullets); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -724,6 +724,25 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
     (`bookableSeatsFor`), and booking still `$pull`s the courier's entry. Without a `shiftId` it
     picks, among the courier's own regions, the one holding his offer (`holdsOffer`), then one with
     a seat he may take, then the first.
+  - **Taking a seat is atomic** (`services/driver-shift/seat-claim.js` `claimSeat`, used by
+    `/shifts/book` and `POST /admin/shifts/:id/assign-driver`). The route's read-time checks only
+    pick the answer; the seat is taken by a `findOneAndUpdate` whose filter re-checks, on the
+    document at write time: not cancelled, the driver not already `booked`, and
+    `seatStillFreeExpr(now, { exceptDriverId })` — booked + live offers held for OTHER couriers
+    < `maxDrivers`. It is the same expression the offer write uses, so a booking and an offer can
+    never both take the last seat, two couriers racing for it get one seat between them, and a
+    double-tap books once. The `$push`, the `$pull` of his waiting entry and `updatedAt` are one
+    update; `status: 'full'` is set after, by a second update guarded on the count. A refused write
+    re-reads the shift only to pick the answer (`refusalReason`: `full` / `held` /
+    `already_booked` / `cancelled` / `not_found`), with the same status codes and messages as the
+    read-time checks. The admin override (`overrideWaitingListHold`) passes
+    `countHolds: false` — it may take a HELD seat, never one that does not exist; admin assign
+    keeps accepting a cancelled shift (`allowCancelled`), as it always did. Seats are per shift
+    document = per **region** (`cityAreaId`); there are no per-town seat buckets in the code.
+    Still read-then-write (not seat claims through `claimSeat`): `reassign-driver` (a swap, two
+    updates), the Excel imports, and `ShiftService`'s permanent-driver auto-booking at generation;
+    and `checkBookingConflict` across two *different* overlapping shifts is a read, so one courier
+    booking two overlapping regions' shifts at the same instant can still get both.
   - **Leaving**: `POST /shifts/leave-waiting-list` matches `waiting` OR `offered`
     (`ACTIVE_WAITING_STATUSES`), pulls his entry from every region's copy of the slot, and when he
     gave back a held seat runs the pass at once for that shift, so the next courier is offered it
