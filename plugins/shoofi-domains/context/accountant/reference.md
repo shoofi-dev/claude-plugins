@@ -1,6 +1,6 @@
 # Accountant / Settlement / Payouts — Domain Context
 
-> last-verified §7a (the one bank list, stored NAME or CODE, exact match after normalising, unknown values flagged in the MASAV Excel; server getBankNumber copies still wrong, invoice text only): shoofi-delivery-web@fix/bank-codes-export + shoofi-shoofir@fix/bank-codes / 2026-11-14; §4 Kopa QR table orders (CORE invariant 20: split off the sales row, `tableOrders*` only, every reader listed): shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13; §4 (partner/summary + daily-orders validate their period first, 400 INVALID_PERIOD; reportPeriod guards its day loop): shoofi-server@fix/partner-summary-date-validation / 2026-11-12; §12 (Kopa till sessions, Z/X, drawer, till reports, receipts built-but-off; till money separate from settlement): shoofi-server@feat/kopa-phase1 / 2026-11-12; §12 "No money without a shift" (session gate, money leases, window end): shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12; §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
+> last-verified §7a server invoice bank line (utils/bank-codes.js, the same 12-bank list and exact matching; utils/hyp.js + utils/greeninvoice.js import getBankNumber from it): shoofi-server@fix/HIGH-RISK-invoice-bank-list / 2026-11-15; §7a (the one bank list, stored NAME or CODE, exact match after normalising, unknown values flagged in the MASAV Excel): shoofi-delivery-web@fix/bank-codes-export + shoofi-shoofir@fix/bank-codes / 2026-11-14; §4 Kopa QR table orders (CORE invariant 20: split off the sales row, `tableOrders*` only, every reader listed): shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13; §4 (partner/summary + daily-orders validate their period first, 400 INVALID_PERIOD; reportPeriod guards its day loop): shoofi-server@fix/partner-summary-date-validation / 2026-11-12; §12 (Kopa till sessions, Z/X, drawer, till reports, receipts built-but-off; till money separate from settlement): shoofi-server@feat/kopa-phase1 / 2026-11-12; §12 "No money without a shift" (session gate, money leases, window end): shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12; §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
 
 > **Who you are:** the agent that owns **money OUT + the books** — computing what stores
 > and delivery companies/drivers are owed, issuing tax invoices, and generating bank
@@ -421,13 +421,14 @@ summary(5)/closing(9); amounts → agorot (`Math.round(amount*100)`); Hebrew nam
 `accounting.bankAccount` (via the Excel). **There is no automated report→MASAV linkage in code** —
 a human bridges it. Payout amount = store `balance` / driver `netTotal`.
 
-### 7a. Bank codes — one list, exact match (shoofi-delivery-web#382, shoofi-shoofir#35)
-*Pending merge of those two PRs; until then main still has the four substring copies below.*
+### 7a. Bank codes — one list, exact match (shoofi-delivery-web#382, shoofi-shoofir#35, shoofi-server#615)
+*Pending merge of those three PRs; until then main still has the substring copies below.*
 - **The single list is `shoofi-delivery-web/src/utils/israeli-banks.ts`** (12 Bank of Israel
   codes: 4 יהב, 9 הדואר, 10 לאומי, 11 דיסקונט, 12 הפועלים, 14 אוצר החייל, 17 מרכנתיל,
   18 וואן זירו, 20 מזרחי טפחות, 31 הבנק הבינלאומי, 46 מסד, 54 ירושלים). The courier app's picker
   (`shoofi-shoofir/utils/israeli-banks.ts`, used by `screens/delivery-driver/profile.tsx`) carries
-  the same 12; keep the two identical. Never copy the list into a screen.
+  the same 12, and so does the server's `utils/bank-codes.js` (invoice text, below); keep the three
+  identical. Never copy the list into a screen.
 - **`accounting.bankAccount.bank` may be a NAME or a CODE.** The admin forms (store accounting,
   delivery company) save the name; the courier app's picker saves the code.
 - **Matching is exact after normalising, never a substring** (`findBank` / `bankCodeFor`):
@@ -443,11 +444,18 @@ a human bridges it. Payout amount = store `balance` / driver `netTotal`.
   "קוד בנק לא ברשימה: 13". Both admin bank forms and the courier profile ask for the bank to be
   picked again for a legacy or unknown value. The legacy `generate-stores-summaries.tsx` statement
   prints the stored value for people, not a code.
-- **The server copies are still wrong** — `getBankNumber` in `shoofi-server` `utils/hyp.js` and
-  `utils/greeninvoice.js` (guarded invoicing files) still carry 13/31/52 under the old names and a
-  substring fallback ("הבינלאומי" → 10), and return null for a stored code. They only fill the
-  `bank_name` of the bank-transfer payment line on invoice documents (document text); no money
-  moves on them. Fixing them is a separate PR that needs the owner's review.
+- **The server's invoice bank line uses the same list** — `shoofi-server` `utils/bank-codes.js`
+  (`getBankNumber`, `findBank`, `normalizeBankName`, the 12 rows and the legacy wrong names, ported
+  line for line from the web's `israeli-banks.ts`). `utils/hyp.js` and `utils/greeninvoice.js`
+  (guarded) only import `getBankNumber` from it; their own copies (13/31/52 under the old names, no
+  First International row, null for a stored code, a substring fallback that sent "הבינלאומי", a
+  blank or "בנק" alone to 10) are gone. It fills only the `bank_name` (EZcount) / `bankName`
+  (GreenInvoice) of the `payment_type: 4` line on invoice documents — document text; no amount,
+  balance or MASAV file reads it. A stored code now prints (it printed nothing); an unknown or
+  legacy value still prints no bank, as an unknown name did before. On 2026-11-15 one prod record
+  changed the other way: store `alnajah-library` stores "מרכנתיל 17", which the substring match read
+  as 17 and the exact match leaves unknown (re-pick it in the form). Tests:
+  `test/integration/invoice-bank-codes.js`.
 
 ## 7b. Hashavshevet export (movein.dat) — `services/accountant-export/`, `utils/hashavshevet-movein.js`
 `GET /api/payments/admin/accountant/movein?month=YYYY-MM&tab=stores|drivers[&docs=k1,k2]` (route in
