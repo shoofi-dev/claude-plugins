@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@feat/courier-applications 664471ff / 2026-11-15 (invariant 22: one approval per phone across requests, courier-approval-locks); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -604,7 +604,8 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
     hand.** `routes/courier-applications.js` + `services/courier-applications/` (README there).
     Collections in `delivery-company`: `courier-applications`, `courier-application-files` (document
     BYTES, served only through an admin token — never the public-read CDN: ID cards and bank
-    letters), `applicant-otps`, `applicant-rate-limits` (per-IP counters, TTL on `purgeAt`). The
+    letters), `applicant-otps`, `applicant-rate-limits` (per-IP counters, TTL on `purgeAt`),
+    `courier-approval-locks` (one approval per phone, below). The
     applicant has no account: a hashed 4-digit code (10 min, 5 tries, 5 sends/hour; a phone that
     is already a driver gets `ALREADY_DRIVER`) buys a request KEY (`x-applicant-phone` +
     `x-applicant-key`) that opens only that phone's request — it is NOT
@@ -656,8 +657,22 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
     (`role: "driver"`, `isDriver: true`, `isActive: false`, `storeAssignmentMode: "all"`,
     `vehicleInfo.type`), both with `fromApplicationId`. Claimed via status `approving`
     (`approvingAt`, `approvingFrom`) only while the request still has the status, bank fields and
-    verified documents the reviewer saw, so a double click makes one driver; the phone is checked
-    again after the claim. **Idempotent**: the ids go on the request (`approvalProgress: {mode,
+    verified documents the reviewer saw, so a double click makes one driver.
+    **One approval per phone ACROSS requests**: the claim is per request, so two different
+    requests of one phone (an old one reopened + a new one) approved in the same second would
+    each pass "no driver has this phone" (a read, then an insert) and create a driver each. A
+    unique index on `customers.phone` cannot close it — prod phones are not uniform and hold
+    duplicates (see "Driver identity on the wire"), so it cannot be built. Instead approval,
+    after its claim, inserts `{_id: <phone digits, +972 folded to 05>}` into
+    `delivery-company.courier-approval-locks` (`services/courier-applications/phone-lock.js`),
+    re-reads the phone's driver UNDER the lock, creates, and deletes the lock on every way out.
+    The phone is the `_id`, so the guarantee needs no index build (no write waits on one) and old
+    driver data can never conflict; the `purgeAt` TTL index only sweeps a lock a crash left. The
+    loser's request returns to its status with 409 `PHONE_APPROVAL_IN_PROGRESS`
+    (`otherApplicationId`, `otherNumber`), or `PHONE_EXISTS` once the first one finished. A dead
+    lock (holder no longer `approving`, older than 5 minutes, or this request's own) is taken over
+    by matching the exact lock read. Never replace it with a check-then-insert on the phone.
+    **Idempotent**: the ids go on the request (`approvalProgress: {mode,
     companyId, driverId}`) before the records are inserted with those `_id`s, and a request stuck
     in `approving` > 5 minutes (a crash) can be approved again, reusing what was created. A caught
     failure removes a company with no driver behind it and restores the status.
