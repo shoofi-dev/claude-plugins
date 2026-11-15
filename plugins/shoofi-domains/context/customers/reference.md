@@ -975,12 +975,13 @@ Do not "fix" them opportunistically; they are scheduled work, not bugs to discov
     (`deleteAccount` → `aiHelperStore.clear()`). Since the customer `_id` survives deletion
     (CORE invariant 8), a login after deletion finds the old profile again. Handling it touches
     `routes/customer.js` — its own HIGH-RISK draft PR, not a drive-by.
-11. **KNOWN — not fixed yet (2026-11-14):** the OTP provider error logs print the whole axios
-    error, request body (the code) and provider auth header included. The anchors are
-    `utils/sms.js` `sendSMS` `.catch` (`"SMS catch"`, `'Error sending sms:'`) and the two
-    `'WhatsApp API error for … customer:'` logs in `POST /api/customer/create`. It predates
-    the OTP channel choice and is not part of shoofi-server#541. It needs its own HIGH-RISK PR.
-    Full note in CORE Known status.
+11. **KNOWN — fix pending in shoofi-server#613 + shoofi-shoofir#48 (2026-11-14):** the OTP
+    provider error logs print the whole axios error, request body (the code) and provider auth
+    header included. The anchors are `utils/sms.js` `sendSMS` `.catch` (`"SMS catch"`,
+    `'Error sending sms:'`), the two `'WhatsApp API error for … customer:'` logs in
+    `POST /api/customer/create`, and the driver `screens/verify-code` `onVerifyCode` `.catch`. It
+    predates the OTP channel choice and is not part of shoofi-server#541. Full note in CORE Known
+    status.
 
 ## 8. Definition of done
 Inherit `_shared-guardrails.md` §7. For identity specifically: **never log OTPs/tokens/secrets**;

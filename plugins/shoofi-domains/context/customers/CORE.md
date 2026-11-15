@@ -1095,14 +1095,18 @@ All of these are **known and accepted for now**. They are scheduled work, not di
   WhatsApp. The courier's way out is the code screen's "send by SMS" link after the
   countdown. **Whether the server should fall back to SMS is a product decision pending Sari**:
   don't add the fallback unasked, and don't describe the choice as having one.
-- **KNOWN — not fixed yet (found 2026-11-14 in the OTP-channel review, separate from it):** the
-  OTP provider error paths log the whole axios error, and that error carries the request: the
-  body with the **code**, plus the provider's auth header. The anchors are the `.catch` in
-  `utils/sms.js` `sendSMS` (`"SMS catch"` and `'Error sending sms:'`) and the two
-  `'WhatsApp API error for existing customer:'` / `'... new customer:'` `console.error`s in
-  `POST /api/customer/create`. This breaks invariant 6, but it predates the channel choice and
-  is not part of shoofi-server#541. The fix is its own HIGH-RISK PR (log `err.message` /
-  status only). Don't copy the pattern into new code.
+- **KNOWN — fix pending in shoofi-dev/shoofi-server#613 + shoofi-dev/shoofi-shoofir#48 (found
+  2026-11-14 in the OTP-channel review, separate from it):** the OTP provider error paths log the
+  whole axios error, and that error carries the request: the body with the **code**, plus the
+  provider's auth header. The anchors are the `.catch` in `utils/sms.js` `sendSMS` (`"SMS catch"`
+  and `'Error sending sms:'`), the two `'WhatsApp API error for existing customer:'` /
+  `'... new customer:'` `console.error`s in `POST /api/customer/create`, and on the driver app
+  the `onVerifyCode` `.catch` in `screens/verify-code` (`console.log(error)`, the typed code).
+  The fix logs `safeProviderError(err, { secrets })` (`utils/safe-provider-error.js`: message /
+  code / status / provider text, scrubbed of the code and any Basic/Bearer/Token credential) on
+  the server and `safeLogError(error)` (`utils/safe-log-error.ts`: message / status / url without
+  its query) in the driver app. Until both merge this breaks invariant 6. Don't copy the pattern:
+  log a provider error through `safeProviderError`, never the error object.
 - **KNOWN:** `search-customer` projects `token` + `authCode` and has no auth.
   Verified still true on 2026-10-30. The reply carries the pending OTP itself as
   `status.authCode`, and `isLoggedIn` is derived from the token. The token itself is not in
