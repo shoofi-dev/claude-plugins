@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@feat/courier-applications 664471ff / 2026-11-15 (invariant 22: one approval per phone across requests, courier-approval-locks); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@feat/courier-document-read 6301cf24 / 2026-11-15 (invariant 22: reading a document to pre-fill the form, documentChecks); shoofi-server@feat/courier-applications 664471ff / 2026-11-15 (invariant 22: one approval per phone across requests, courier-approval-locks); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -636,6 +636,28 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
     and retried, so parallel uploads lose nothing). An applicant gets 30 uploads per request
     (`uploadCount`), then 429 `UPLOAD_LIMIT` before multer buffers anything; back-office uploads
     are never refused. 8 MB, one file per request.
+    **Reading a document to pre-fill the form** (`services/courier-applications/document-read.js`):
+    `POST /api/courier-applications/me/documents/:kind/read` (applicant headers, `draft`/`info`)
+    sends the CURRENT file of the kind to Claude (`MODELS.documents` = Opus 5.5, `effort: "low"`,
+    maxTokens 4000, a strict JSON schema per kind as `output_config.format`; a PDF goes as a
+    document block, both force the API backend) and answers `{ok: true, kind, reading}`,
+    `reading = {fileId, at, ok, fields, isExpectedDocument, readable, code?}`. It is a
+    SUGGESTION: it never writes `form`; the courier confirms and saves through `PUT /me` as
+    before. A refusal, an unparsable reply or no API key is `reading.ok: false` with 200, never a
+    500 (the app lets the courier type). The model transcribes, code decides: a valid Israeli
+    IBAN (mod-97) overrides bank/branch/account (zeros stripped); the bank code goes through
+    `banks.js` and an unknown bank is an EMPTY code, never a guess; numbers are digits only; the
+    ID check digit is the shoofir `isValidIsraeliId` algorithm. **Cache**: stored on
+    `documents.<kind>.reading`, keyed by `fileId`, so a file is never sent twice (a new upload
+    replaces the slot and drops its reading); a call is claimed atomically with a per-file
+    `readingLock` and one of 20 model calls per request (`readCount`, then 429 `READ_LIMIT`), and
+    the result is written only while the slot still holds that file. 404 `NO_DOCUMENT` when
+    nothing is uploaded. **Checks**: `forApplicant`/`forAdmin` carry `documentChecks: [{code,
+    kinds}]` from the usable readings — `BUSINESS_NOT_APPLICANT`, `BANK_NOT_APPLICANT`,
+    `ID_NUMBER_INVALID`, and `UNDER_18` for the admin view only; names compared as a normalised
+    Hebrew token set. **⚠️ Privacy**: ID and bank documents — never log a field value, the bytes
+    or the model's output (the service logs `{kind, ok, ms, code}`; usage-log `meta` is `{kind}`),
+    and never read a real person's documents in a test.
     **Bank details are re-verified**: changing `bankCode` / `branch` / `accountNumber` (applicant
     in `info`, or the admin form) after the bank document was reviewed puts
     `documents.bank.status` back to `pending` with a history note, because approval copies those
