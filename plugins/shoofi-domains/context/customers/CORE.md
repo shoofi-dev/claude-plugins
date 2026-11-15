@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/creative-design-lab / 2026-11-12 (invariant 16: the design lab and 👍/👎 feedback); shoofi-server@feat/creative-engine / 2026-11-12 (invariant 16: the creative engine and «הפוך לסרטון»); shoofi-server@feat/story-media-per-language + shoofi-delivery-web@feat/story-media-per-language + shoofi-app@feat/story-media-per-language / 2026-11-12 (invariant 11: a story's media per language - mediaAR / mediaHE, one mediaType, the legacy media is a copy of the Arabic file, the app picks the reader's language file and prints no caption over it; invariant 16: a story render goes to the shared slot, a two-language reel to the language slots); shoofi-server@fix/current-location-addresses + shoofi-app@fix/current-location-flow / 2026-11-10 (invariant 19: no saved address is a current-location pin - guard, confirm, default endpoint, support's fix, cleanup rules; scripts applied 2026-11-10; the app's pin is session-only for everyone); shoofi-server@fix/address-scripts-real-confirmed-city-conflict / 2026-11-10 (invariant 19: backfill confirms real addresses only, dedupe skips a city-text conflict); shoofi-server@feat/address-note-apartment-entrance / 2026-11-10 (invariant 20: saved-address notes / floor / apartment / entrance / street number cleaned on add and update, add keeps apartment + entrance, the note snapshots onto order.order.address.notes); shoofi-server@feat/confirmed-delivery-address / 2026-11-07 (invariant 19: the confirmed delivery address, the requireSavedDeliveryAddress guard, the first-address push saves only real addresses, the address cleanup / backfill / dedupe scripts); shoofi-delivery-web@feat/one-editor-for-places + shoofi-server@feat/coupon-by-id / 2026-11-07 (invariant 16: add/edit a place through the wizard step, ?stepContent= on edit); shoofi-server@feat/marketing-suggestions + shoofi-delivery-web@feat/marketing-suggestions / 2026-11-07 (invariant 11: «הצעות» GET /api/admin/marketing/suggestions); shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/creation-sets / 2026-11-14 (invariants 16 + 17: creation sets - one «צור N יצירות» = one director plan, a draft per place through each place's own writer, the item's own approve; pickModel and targetForLink moved to services, unchanged); shoofi-server@feat/kopa-store-enabled / 2026-11-13 (invariant 22: Kopa per-store switch - shoofi.kopaStores, gate first on /api/kopa, same store name as each route, 403 KOPA_NOT_ENABLED / QR 404, fail closed; cacao ON); shoofi-server@feat/kopa-phase6 eb6ae840 / 2026-11-12 (reference 5h: Kopa customer profiles never read shoofi.customers - no by-phone name hint, no centralCustomerId); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 21 + reference 5g/5h: Kopa phase 4a own sessions and PINs - 6-digit code, 15 failed verifies per phone+store per 24h, 20 requests per IP per hour, verifyManagerPin always limited, never writing storeUsers; phase 6 per-store customer profiles, central record read-only); shoofi-server@feat/kopa-phase1 / 2026-11-11 (scope + reference 5f: Kopa read-only customers and staff routes, gates, spend definition, no-token staff projection); shoofi-server@fix/current-location-addresses + shoofi-app@fix/current-location-flow / 2026-11-10 (invariant 19: no saved address is a current-location pin - guard, confirm, default endpoint, support's fix, cleanup rules; scripts applied 2026-11-10; the app's pin is session-only for everyone); shoofi-server@fix/address-scripts-real-confirmed-city-conflict / 2026-11-10 (invariant 19: backfill confirms real addresses only, dedupe skips a city-text conflict); shoofi-server@feat/address-note-apartment-entrance / 2026-11-10 (invariant 20: saved-address notes / floor / apartment / entrance / street number cleaned on add and update, add keeps apartment + entrance, the note snapshots onto order.order.address.notes); shoofi-server@feat/confirmed-delivery-address / 2026-11-07 (invariant 19: the confirmed delivery address, the requireSavedDeliveryAddress guard, the first-address push saves only real addresses, the address cleanup / backfill / dedupe scripts); shoofi-delivery-web@feat/one-editor-for-places + shoofi-server@feat/coupon-by-id / 2026-11-07 (invariant 16: add/edit a place through the wizard step, ?stepContent= on edit); shoofi-server@feat/marketing-suggestions + shoofi-delivery-web@feat/marketing-suggestions / 2026-11-07 (invariant 11: «הצעות» GET /api/admin/marketing/suggestions); shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -34,6 +34,15 @@ push-audience}.js`, invariant 13). Measuring lift FROM that record is `orders`' 
 order facts); the record itself, and its exactness, is yours.
 **Not yours:** order history content (`orders`), coins/rewards (growth), driver coverage
 fields (`delivery`) — you own the identity record they hang off.
+Also yours: the **Kopa** (store till back-office) customers and staff reads
+(`routes/kopa/customers.js`, `services/kopa/customers.js`) — reference §5f. Read-only, partner
+token, `KOPA_REPORTS` / `KOPA_OWNER` gates from `services/kopa/access.js`. A store's customer is
+built from its completed, non-school `orders` (invariant 5), and the staff list is an explicit
+projection of `storeUsers` that never carries `token` / `authCode`.
+Also yours: **Kopa staff sessions and PINs** (`routes/kopa/auth.js`, `services/kopa/{auth,pins}.js`,
+the `kopaSession()` step in `services/kopa/access.js`) — reference §5g, invariant 21 — and the
+**per-store customer profiles** (`routes/kopa/customer-profiles.js`,
+`services/kopa/customer-profiles.js`, store DB `kopaCustomerProfiles`) — reference §5h.
 Also yours: the school-project enrollment (`services/customer/school-project-enrollment.js`)
 and the Google-Form registration sync (`services/school-registrations/`) — reference §4.
 **School registrations never auto-create schools or classes, never guess a class section, and
@@ -620,7 +629,8 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       (default, 130 credits), GPT Image 2 (the ChatGPT model, resold by Artlist — no OpenAI key,
       150), Seedream 5 (100); all Artlist, all through the bridge. Claude draws nothing. The other
       two are offered only while a bridge heartbeats `render-models`; asking for one otherwise
-      is 409 `model_unavailable`. The bridge reports the group it drew with; the render records
+      is 409 `model_unavailable` (`pickModel`, the one rule the generate route and the creation sets
+      call). The bridge reports the group it drew with; the render records
       `renderedModel` (absent = Nano Banana 2) and logs that model's credits.
     - **Renders reuse the bridge's social loop** (the claim also carries `modelGroupId`,
       `settings`, `maxReferences`; the bridge runs `RENDER_CONCURRENCY` = 2 at once, so a
@@ -724,6 +734,18 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
         time then means now (`lateAsNowFor`), an override's is refused.
       - `/revert` = every published channel (a sent push stays). `DELETE` only with no
         channels left (`HAS_CHANNELS`). Audited `*_marketing_item*`.
+      - **Creation sets** (shoofi-server `feat/creation-sets`, 2026-11-14;
+        `services/marketing/creation-sets.js`, `routes/marketing-creation-sets.js`, owner tier,
+        audited `*_marketing_creation_set`): one «צור N יצירות» makes every place with ONE director
+        plan and keeps the work in `shoofi.marketingCreationSets` (NO TTL). Its save creates ONE
+        item (timing = the set's, asked once) and one DRAFT per ready place through the place's
+        OWN writer with `marketingItemId` — `services/marketing/channel-writers.js`
+        (`createBanner` / `createStory` / `createNote`, the same functions the ads / stories / notes
+        add routes call), the campaign controller's `createCampaign`, social.js `createSocial` —
+        so the states are exactly the forms'. Link = the subject; areas = the store's areas, else
+        everyone. Saving again updates the same item and draft docs (a published one is left
+        alone); `approve: true` is the item's own approve (`item-approve.js approveItemNow`, also
+        behind `POST …/items/:id/approve`). Never fork a place's validation into the set.
     - **Create = draft**, whoever creates it. A new push is `status: "draft"` even if the form
       said send-now, so nothing is sent on create any more. Editing a published item saves
       directly (as a coupon does after approval). A push `in_progress`/`completed` can't be
@@ -991,6 +1013,43 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
     editing a saved address never changes an order already placed. What the courier/partner
     screens do with that order field is `orders` / `delivery`'s.
     Pinned by shoofi-server `test/integration/customer-address-fields.js`.
+21. **Kopa sessions never write `storeUsers.token`** (nor anything else on `storeUsers`;
+    shoofi-server `feat/kopa-phase1`, phase 4a, 2026-11-11). A Kopa login is `POST
+    /api/kopa/auth/request-code` + `verify`, which issues an opaque token stored only as its
+    sha256 in `shoofi.kopaSessions`, several per staff member. It must never go through
+    `customer/create` / `validateAuthCode` / `switch-store`: those rewrite the stored token and,
+    by invariant 2, sign the same phone out of the partner tablet. Every `storeUsers` access in
+    `services/kopa/{auth,pins}.js` is a `findOne` / `find`. The Kopa gate (`kopaSession()` in
+    `services/kopa/access.js`) only handles `Authorization: Kopa …`; a `Token …` header falls
+    through to `auth.required` untouched, so the partner token keeps working on every
+    `/api/kopa/*` route. Membership and roles are still re-read from `storeUsers` per request,
+    and a session is valid only for its own `appName` (403 otherwise). Do not make the Kopa token
+    a JWT on the shared secret, and do not log or return the code, token, `tokenHash` or PIN.
+    Reference §5g. Pinned by shoofi-server `test/integration/kopa/{auth,pins}.js` (guarded
+    `storeUsers` fake that refuses every write).
+22. **Kopa serves only stores switched ON** (shoofi-server `feat/kopa-store-enabled`,
+    2026-11-13).
+    - **Where it runs:** `routes/kopa/index.js` mounts `requireKopaStoreEnabled`
+      (`services/kopa/enabled.js`) at `/api/kopa` BEFORE every router, so it runs before the
+      login, the session gate and any store DB.
+    - **What counts as ON:** only a document `{ _id: <appName>, enabled: true }` in
+      `shoofi.kopaStores` (`CENTRAL.STORES`). Anything else is OFF.
+    - **What an OFF store gets:** `403 { code: "KOPA_NOT_ENABLED" }`. The public QR menu answers
+      its usual 404 instead. The answer is the same for a store that doesn't exist.
+    - **Which name is checked:** the one the route itself uses.
+      - Login: `body.appName || app-name`.
+      - Public QR menu: the `:store` path segment.
+      - Every other route: `app-name`.
+      - `/auth/logout` is never checked.
+    - **Cache and errors:** the answer is cached 30 s per store; a DB error fails closed (503).
+    - **Turning a store on or off:** the admin web's "קופה" checkbox on the store page calls
+      `GET/PUT /api/admin/kopa/stores/:appName` (`routes/kopa/admin-stores.js`, `auth.required` +
+      `checkAdminRole(["admin"])`, master too). PUT takes `{ enabled: boolean }`, records
+      `updatedBy` and drops this instance's cache; the route is not under `/api/kopa`. The other
+      way is `scripts/kopa-store-enable.js` (a dry run without `--apply`). The first store ON is
+      `cacao` (2026-11-13).
+    - **Never** read this switch outside `/api/kopa/*`, and never turn a store on by
+      default. Pinned by shoofi-server `test/integration/kopa/{store-enabled,admin-stores}.js`.
 
 ## Known status (human-confirmed — do NOT act without an explicit task)
 All of these are **known and accepted for now**. They are scheduled work, not discoveries:

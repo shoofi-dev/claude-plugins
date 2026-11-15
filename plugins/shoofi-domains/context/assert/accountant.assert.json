@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData in-process, OPT-IN via body figures: \"report\"; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's per-store body in services/payments/store-sales.js; ref §1/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13 (CORE invariant 20: Kopa QR table orders - the classifier, the sales-row split, the details-only report keys, overview / exec readers filtered; invariant 17 legacy pin gains the table-orders leg); shoofi-server@fix/partner-summary-date-validation / 2026-11-12 (invariant 17 partner/summary + daily-orders validate their period before any read, 400 INVALID_PERIOD; shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa section + reference 12: no money without a shift - a money payment / refund needs an open till session (409 NO_OPEN_SESSION), money leases on the session doc, the close waits for them and ends the window past lastMoneyAt, openedAt never before the last Z, sessionId for tracing); shoofi-server@feat/kopa-phase1 / 2026-11-12 (CORE section + reference 12: Kopa till sessions & reports, phase 5 - till money separate from settlement, one open session via a fixed-_id lock, gapless Z on the shared close, the expected-cash formula, the drawer counted via drawerMovementIds, receipts built but off and refusing createInvoiceOnBehalf); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData in-process, OPT-IN via body figures: \"report\"; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's per-store body in services/payments/store-sales.js; ref §1/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -48,7 +48,18 @@
         "services/invoicing/tax-consent.js",
         "services/invoicing/tax-consent-reminders.js",
         "routes/tax-consent.js",
-        "utils/crons/tax-consent-reminder-cron.js"
+        "utils/crons/tax-consent-reminder-cron.js",
+        "services/kopa/till-sessions.js",
+        "services/kopa/till-session-gate.js",
+        "services/kopa/till-reports.js",
+        "services/kopa/receipts.js",
+        "routes/kopa/till-sessions.js",
+        "routes/kopa/till-reports.js",
+        "routes/kopa/receipts.js",
+        "test/integration/kopa/till-sessions.js",
+        "test/integration/kopa/till-orders.js",
+        "test/integration/kopa/till-reports.js",
+        "test/integration/kopa/receipts.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -244,7 +255,11 @@
           "selectReminders",
           "reminderStageFor",
           "runTaxConsentReminders"
-        ]
+        ],
+        "services/kopa/till-sessions.js": ["OPEN_LOCK_ID", "Z_COUNTER = \"zReport\"", "closeSession", "computeSessionTotals", "autoCloseStaleSessions", "startKopaTillAutoClose", "KOPA_TILL_AUTOCLOSE", "addDrawerMovement", "verifyManagerPin", "correctOpeningFloat", "CLAIM_STALE_MS", "LOCK_ORPHAN_MS"],
+        "services/kopa/till-session-gate.js": ["reserveTillMoney", "releaseTillMoney", "waitForMoneyWrites", "windowEndOf", "assertOpenSession", "NO_OPEN_SESSION = \"NO_OPEN_SESSION\"", "LEASE_MS", "ignoredMoneyLeases"],
+        "services/kopa/till-reports.js": ["tipsReport", "discountsReport", "staffSalesReport", "refundsReport", "primaryCategoryOf", "countedMovements"],
+        "services/kopa/receipts.js": ["buildReceiptPayload", "issueReceipt", "RECEIPTS_DISABLED", "EZCOUNT_NOT_CONNECTED", "ADAPTER_UNFIT", "ALREADY_CLAIMED", "isVatExempt", "withoutVAT"]
       },
       "patterns": [
         {
@@ -1334,6 +1349,28 @@
         },
         {
           "file": [
+            "routes/payments/summaries.js"
+          ],
+          "regex": "(?:assertPartnerPeriod\\(req\\.body\\);[\\s\\S]*?assertPartnerDay\\(date\\);|router\\.post\\(\"/api/payments/partner/summary\", \\.\\.\\.partnerEarningsAccess,)",
+          "desc": "CORE invariant 17: partner/summary and partner/daily-orders validate the period / date before any read (400 INVALID_PERIOD) - valid-before leg is routes/payments/summaries.js on main before shoofi-server fix/partner-summary-date-validation; drop it once that PR has merged"
+        },
+        {
+          "file": [
+            "services/payments/partner-period.js",
+            "routes/payments/summaries.js"
+          ],
+          "regex": "(?:const INVALID_PERIOD = \"INVALID_PERIOD\";[\\s\\S]*?const MAX_PERIOD_DAYS = 366;[\\s\\S]*?const PERIODS = Object\\.freeze\\(\\[\"day\", \"yesterday\", \"week\", \"month\", \"last30\"\\]\\);|router\\.post\\(\"/api/payments/partner/summary\", \\.\\.\\.partnerEarningsAccess,)",
+          "desc": "CORE invariant 17: the partner period rules - code INVALID_PERIOD, at most 366 days, the known periods - valid-before leg as above"
+        },
+        {
+          "file": [
+            "services/payments/partner-summary.js"
+          ],
+          "regex": "(?:if \\(!s\\.isValid\\(\\) \\|\\| !e\\.isValid\\(\\)\\) throw periodError\\([\\s\\S]*?if \\(e\\.diff\\(s, \"days\"\\) \\+ 1 > MAX_PERIOD_DAYS\\) throw periodError\\([\\s\\S]*?for \\(const d = s\\.clone\\(\\); !d\\.isAfter\\(e, \"day\"\\); d\\.add\\(1, \"day\"\\)\\)|for \\(const d = s\\.clone\\(\\); !d\\.isAfter\\(e, \"day\"\\); d\\.add\\(1, \"day\"\\)\\))",
+          "desc": "CORE invariant 17: reportPeriod refuses an invalid moment or a > 366-day window BEFORE its day loop (an invalid moment never ends it) - valid-before leg is the bare loop on main before shoofi-server fix/partner-summary-date-validation; drop it once that PR has merged"
+        },
+        {
+          "file": [
             "services/payments/store-report-reads.js",
             "routes/shoofi-admin.js"
           ],
@@ -1368,8 +1405,44 @@
             "services/payments/partner-summary-legacy.js",
             "routes/payments/summaries.js"
           ],
-          "regex": "const driveInOf = \\(o\\) => o\\.driveInPrice \\|\\| o\\.driveInPricing\\?\\.price \\|\\| 0;\\n\\s*const totalRevenue = orders\\.reduce\\(\\(sum, order\\) => sum \\+ \\(order\\.orderPrice \\|\\| 0\\) \\+ driveInOf\\(order\\), 0\\);\\n\\s*const totalCommission = calculateCommission\\(totalRevenue\\);",
-          "desc": "CORE invariant 17: the LEGACY partner/summary is main's handler verbatim - gross totalRevenue (orderPrice + drive-in) and the flat-15% totalCommission, kept ON PURPOSE for installed builds; never 'fix' it, delete the module once no build calls without figures: \"report\" - valid-before leg is routes/payments/summaries.js on main (the same lines) before shoofi-server fix/partner-summary-figures"
+          "regex": "(?:const driveInOf = \\(o\\) => o\\.driveInPrice \\|\\| o\\.driveInPricing\\?\\.price \\|\\| 0;\\n\\s*const totalRevenue = orders\\.reduce\\(\\(sum, order\\) => sum \\+ \\(order\\.orderPrice \\|\\| 0\\) \\+ driveInOf\\(order\\), 0\\);\\n\\s*// Kopa table orders are commission-free: out of the flat-15% base, still in the revenue\\.\\n\\s*const \\{ appOrders, tableOrders \\} = splitTableOrders\\(orders\\);[\\s\\S]*?const totalCommission = calculateCommission\\(commissionRevenue\\);|const driveInOf = \\(o\\) => o\\.driveInPrice \\|\\| o\\.driveInPricing\\?\\.price \\|\\| 0;\\n\\s*const totalRevenue = orders\\.reduce\\(\\(sum, order\\) => sum \\+ \\(order\\.orderPrice \\|\\| 0\\) \\+ driveInOf\\(order\\), 0\\);\\n\\s*const totalCommission = calculateCommission\\(totalRevenue\\);)",
+          "desc": "CORE invariant 17: the LEGACY partner/summary is main's handler verbatim - gross totalRevenue (orderPrice + drive-in) and the flat-15% totalCommission, kept ON PURPOSE for installed builds; never 'fix' it, delete the module once no build calls without figures: \"report\" - valid-before leg is routes/payments/summaries.js on main (the same lines) before shoofi-server fix/partner-summary-figures + ONE addition (CORE invariant 20, 2026-11-13): Kopa QR table orders stay in the gross revenue but leave the flat-15% base (commissionRevenue) - the second leg is main before shoofi-server fix/HIGH-RISK-table-orders-no-commission; drop it once that PR has merged"
+        },
+        {
+          "file": [
+            "utils/table-orders.js",
+            "services/payments/store-sales.js"
+          ],
+          "regex": "(?:const TABLE_ORDER_SOURCE = \\\"kopa-qr\\\";\\n\\n/\\*\\* Is this `orders` document a Kopa QR table order\\? \\*/\\nconst isTableOrder = \\(order\\) => !!order && order\\.source === TABLE_ORDER_SOURCE;|async function buildStoreSalesRow\\(\\{ store, appName, orders, usagesByOrderId, findCoupon, log = false \\}\\) \\{)",
+          "desc": "CORE invariant 20: a Kopa table order is source \"kopa-qr\" and nothing else (never receipt_method TABLE) - valid-before leg is store-sales.js on main before shoofi-server fix/HIGH-RISK-table-orders-no-commission; drop it once that PR has merged"
+        },
+        {
+          "file": [
+            "services/payments/store-sales.js"
+          ],
+          "regex": "(?:const \\{ appOrders: orders, tableOrders \\} = splitTableOrders\\(windowOrders\\);[\\s\\S]*?\\.\\.\\.\\(tableOrders\\.length > 0 \\? tableOrdersTotals\\(tableOrders\\) : \\{\\}\\),|async function buildStoreSalesRow\\(\\{ store, appName, orders, usagesByOrderId, findCoupon, log = false \\}\\) \\{)",
+          "desc": "CORE invariant 20: the sales row splits table orders off BEFORE any figure and returns tableOrdersCount / tableOrdersRevenue only when there is one - valid-before leg as above"
+        },
+        {
+          "file": [
+            "routes/payments/admin-reports.js"
+          ],
+          "regex": "(?:\\.\\.\\.\\(\\(paymentData\\?\\.tableOrdersCount \\|\\| 0\\) > 0\\n\\s*\\? \\{ tableOrdersCount: paymentData\\.tableOrdersCount, tableOrdersRevenue: paymentData\\.tableOrdersRevenue \\|\\| 0 \\}\\n\\s*: \\{\\}\\),|totalOrders: paymentData\\?\\.totalOrders \\|\\| 0,\\n\\s*commissionPercent,)",
+          "desc": "CORE invariant 20: the report carries table orders in its details block only (never a total), and only when the period has one - valid-before leg as above"
+        },
+        {
+          "file": [
+            "routes/payments/admin.js"
+          ],
+          "regex": "(?:created: \\{ \\$gte: dateRange\\.start, \\$lte: dateRange\\.end \\},\\n(?:\\s*//[^\\n]*\\n)*\\s*\\.\\.\\.notTableOrderFilter\\(\\)\\n\\s*\\}|router\\.post\\(\\\"/api/payments/admin/overview\\\", async \\(req, res\\) => \\{)",
+          "desc": "CORE invariant 20: /admin/overview and the legacy /stores-export leave table orders out at the query - valid-before leg as above"
+        },
+        {
+          "file": [
+            "services/exec-dashboard/orders-metrics.js"
+          ],
+          "regex": "(?:\\.find\\(\\{ created: \\{ \\$gte: startStr, \\$lt: endStr \\}, \\.\\.\\.notTableOrderFilter\\(\\) \\}, \\{ projection: ORDER_PROJECTION \\}\\)|\\.find\\(\\{ created: \\{ \\$gte: startStr, \\$lt: endStr \\} \\}, \\{ projection: ORDER_PROJECTION \\}\\))",
+          "desc": "CORE invariant 20: the exec dashboard leaves table orders out of platform turnover at the query - valid-before leg as above"
         },
         {
           "file": [
@@ -1378,6 +1451,61 @@
           ],
           "regex": "(?:no `figures`: partner/summary answers what main's handler answered, field for field|router\\.post\\(\"/api/payments/partner/summary\", \\.\\.\\.partnerEarningsAccess,)",
           "desc": "CORE invariant 17: the test pinning the no-flag answers (and stores-export-new + generateStoreReportData without sources) byte-for-byte to a golden file captured from main's own handlers - valid-before leg is main before shoofi-server fix/partner-summary-figures; drop it once that PR has merged"
+        },
+        {
+          "file": "services/kopa/till-sessions.js",
+          "regex": "const expectedC = floatC \\+ payC\\.CASH - refundC\\.CASH \\+ cashInC - cashOutC;",
+          "desc": "CORE (Kopa phase 5): expected cash = opening float + cash payments - cash refunds + drawer in - drawer out"
+        },
+        {
+          "file": "services/kopa/till-sessions.js",
+          "regex": "\\{ _id, status: \"open\" \\},\\s*\\{ \\$set: \\{ status: \"closing\"",
+          "desc": "CORE (Kopa phase 5): the close claim is conditional on status open, so one caller wins and one Z number is taken"
+        },
+        {
+          "file": "services/kopa/till-sessions.js",
+          "regex": "insertOne\\(\\{ _id: OPEN_LOCK_ID, sessionId: _id, at: now \\}\\)",
+          "desc": "CORE (Kopa phase 5): one open session per store via a fixed-_id lock doc"
+        },
+        {
+          "file": "services/kopa/till-session-gate.js",
+          "regex": "\\{ _id: s\\._id, status: \"open\" \\},\\s*\\{ \\$push: \\{ moneyLeases: \\{ token, at: new Date\\(\\) \\} \\}, \\$max: \\{ lastMoneyAt: at \\} \\}",
+          "desc": "CORE (Kopa no money without a shift): a money write reserves a lease on the session only while it is open, and raises lastMoneyAt"
+        },
+        {
+          "file": "services/kopa/till-session-gate.js",
+          "regex": "const at = now < opened \\? opened : now;",
+          "desc": "CORE (Kopa no money without a shift): a till payment / refund is never timed before its session's openedAt"
+        },
+        {
+          "file": "services/kopa/till-sessions.js",
+          "regex": "const ignored = await waitForMoneyWrites\\(db, _id\\);\\s*closingAt = windowEndOf\\(claimed\\);",
+          "desc": "CORE (Kopa no money without a shift): the close waits for the money leases, then ends the window past lastMoneyAt"
+        },
+        {
+          "file": "services/kopa/till-sessions.js",
+          "regex": "const openedAt = lastEnd && lastEnd > now \\? lastEnd : now;",
+          "desc": "CORE (Kopa no money without a shift): a session never opens before the last Z's closedAt, so windows never overlap"
+        },
+        {
+          "file": "services/kopa/till-orders.js",
+          "regex": "reserveTillMoney\\(db, \\{ required: method !== \"UNPAID\"",
+          "desc": "CORE (Kopa no money without a shift): every till payment method but UNPAID needs an open session"
+        },
+        {
+          "file": "services/kopa/till-money.js",
+          "regex": "await assertOpenSession\\(ctx\\.db\\);\\s*const approvedBy = await approveByManager\\(ctx, body\\.managerPin\\);",
+          "desc": "CORE (Kopa no money without a shift): a till refund needs an open session, checked before the manager PIN"
+        },
+        {
+          "file": "services/kopa/receipts.js",
+          "regex": "if \\(invoiceFn === hyp\\.createInvoiceOnBehalf\\) \\{",
+          "desc": "CORE (Kopa phase 5): till receipts refuse the settlement adapter (Shoofi as customer, payment_type 4)"
+        },
+        {
+          "file": "services/kopa/receipts.js",
+          "regex": "s\\.receipts\\.enabled === true",
+          "desc": "CORE (Kopa phase 5): till receipts are off unless the store flag is exactly true"
         }
       ]
     },
