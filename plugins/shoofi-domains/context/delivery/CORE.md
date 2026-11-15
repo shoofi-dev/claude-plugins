@@ -676,6 +676,17 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
     companyId, driverId}`) before the records are inserted with those `_id`s, and a request stuck
     in `approving` > 5 minutes (a crash) can be approved again, reusing what was created. A caught
     failure removes a company with no driver behind it and restores the status.
+    **A courier's documents afterwards** (`routes/courier-documents.js`,
+    `services/courier-documents/`): the courier reads their own, read-only
+    (`GET /api/courier-documents/mine`, shoofir token): the request's documents and contract via
+    `fromApplicationId`, plus any the back office added. The back office adds a document to ANY
+    driver (`POST /api/admin/drivers/:driverId/documents/:kind`, any dashboard role); it is stored
+    `verified`, wins over the request's one of the same kind, and its bytes are in
+    `courier-document-files` — private like the request's, never the CDN. The driver's row
+    (unique `driverId`) is created with an UPSERT, so two first uploads at once land on one row
+    (a find-then-insert gave the second a duplicate-key 500); each kind keeps 3 files with older
+    bytes deleted, through the requests' `document-versions.js`. The courier's contract carries
+    `lang` / `hash` / `text` (the signed snapshot) when the request stored them.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
