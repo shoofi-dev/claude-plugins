@@ -658,6 +658,14 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
     Hebrew token set. **⚠️ Privacy**: ID and bank documents — never log a field value, the bytes
     or the model's output (the service logs `{kind, ok, ms, code}`; usage-log `meta` is `{kind}`),
     and never read a real person's documents in a test.
+    **The courier app** (shoofi-shoofir `screens/courier-apply`, feat/courier-apply-docs-first)
+    asks for the three documents FIRST (camera, gallery, or a PDF via `expo-document-picker` —
+    native, hidden in older builds), reads each one after its upload, and opens "check your
+    details" pre-filled (`prefillFromReadings`: a fresh read overwrites that document's fields,
+    a reopen fills only empty ones); `GET /me` does NOT carry the readings, so on reopen the app
+    calls the read endpoint again (cached, no model call). `documentChecks` show there with a
+    WhatsApp link to `driversSupportPhone`; "no business file yet" opens a WhatsApp chat instead
+    of the upload.
     **Bank details are re-verified**: changing `bankCode` / `branch` / `accountNumber` (applicant
     in `info`, or the admin form) after the bank document was reviewed puts
     `documents.bank.status` back to `pending` with a history note, because approval copies those
