@@ -1021,13 +1021,19 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     - **What the store sees** is `storeView(storeMoney(order))`, the same lines on the
       new-order screen, the order card (`components/orders-v3/MoneyBlock.tsx`) and the printed
       ticket (`components/order-invoice` `SettlementMoney`, flag `ORDER_MONEY_SETTLEMENT`).
-      Product decision 2026-11-15: «المنتجات» · [«من السيارة»] · [«كوينز»] · [«خصم حملة»] ·
-      «شوفي ستدفع لك» (or «يُخصم منك بالحساب الشهري» when negative), then one box «السائق /
-      الزبون يدفع لك نقداً ₪X», or «لا تحصّل شيئاً» with NO amount.
+      Product decision 2026-11-15: «المنتجات» · [«توصيل للسيارة»] · [«كوينز»] · [«خصم حملة»] ·
+      «شوفي ستدفع لك», then one box «السائق / الزبون يدفع لك نقداً ₪X», or «لا تحصّل شيئاً»
+      with NO amount.
     - **No delivery lines, no card / coupon names, no breakdown toggle.** «خصم حملة» is
-      everything the store funds (its items deal, its share of a coupon, its share of a
-      free-delivery coupon/deal) and never says who funds it. The lines add up: products +
-      drive-in − coins − campaign = Shoofi + cash (tested on 56 real prod orders).
+      everything the store funds (its items deal, its share of a coupon and, on CARD only, its
+      share of a free-delivery coupon/deal) and never says who funds it.
+    - **Cash + a free-delivery coupon/deal the store shares shows nothing for that share**
+      (product, option أ, 2026-11-15): the courier hands over the full cash and `S_delivery` is
+      deducted on the monthly account only. The cash «شوفي ستدفع لك» is `H`, never negative, so
+      «يُخصم منك بالحساب الشهري» never shows on cash. Before this the same ₪ showed twice
+      («خصم حملة» AND «يُخصم منك», 2463-1101). The lines add up: products + drive-in − coins −
+      campaign = Shoofi + cash (49 real prod cases), and the cash box equals the driver app's
+      «السائق يدفع للمتجر».
   - **Order lines** are built by `helpers/orders/order-lines.ts` `buildOrderLines`. A line
     whose product is not in the menu is KEPT, with its own `nameAR`/`nameHE`, flagged
     `missingFromMenu` and sorted last. Its options cannot be decoded without the product's
