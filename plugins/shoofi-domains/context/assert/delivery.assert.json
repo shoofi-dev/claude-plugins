@@ -45,6 +45,7 @@
         "services/courier-applications/applications.js",
         "services/courier-applications/applicant-auth.js",
         "services/courier-applications/banks.js",
+        "services/courier-applications/document-read.js",
         "services/courier-applications/contract.js",
         "services/courier-applications/document-versions.js",
         "services/courier-applications/rate-limit.js",
@@ -53,6 +54,7 @@
       "symbols": {
         "services/courier-applications/applications.js": ["approvalBlockers", "approve", "fromApplicationId", "isControlledByAdmin: false", "approvalProgress", "acquirePhoneLock", "releasePhoneLock", "BAD_CITY", "BAD_CONTRACT_VERSION", "textSnapshot", "UPLOAD_LIMIT", "BANK_FIELDS"],
         "services/courier-applications/applicant-auth.js": ["applicantAuth", "x-applicant-key", "findOneAndUpdate", "TOO_MANY", "isProduction"],
+        "services/courier-applications/document-read.js": ["readApplicationDocument", "documentChecks", "isValidIsraeliId", "parseIsraeliIban", "MODELS.documents", "READ_LIMIT", "readingLock", "UNDER_18", "BUSINESS_NOT_APPLICANT", "BANK_NOT_APPLICANT", "ID_NUMBER_INVALID"],
         "services/courier-applications/phone-lock.js": ["phoneLockKey", "acquirePhoneLock", "releasePhoneLock", "courierApprovalLocks", "PHONE_APPROVAL_IN_PROGRESS", "APPROVING_STALE_MS"],
         "services/courier-applications/contract.js": ["CONTRACT", "placeholder: true", "currentContract"],
         "services/courier-applications/document-versions.js": ["writeVersionedDocument", "MAX_VERSIONS_PER_KIND", "deleteMany"],

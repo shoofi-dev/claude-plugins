@@ -453,7 +453,7 @@ boundary and say so in the PR.
    `test/integration/for-you-ai-chat.js` fails otherwise): an unpriced call logs `costUsd: null`, and
    the chat's budget counts such a row at `UNPRICED_BUDGET_PRICE` (twice the dearest known price) —
    never as $0, or a model upgrade would switch the cap off. Features with their own budget or
-   quality gate have their own `MODELS` key (`chat`, `labels`, `marketing`, `support`); moving `best` must not
+   quality gate have their own `MODELS` key (`chat`, `labels`, `marketing`, `support`, `documents`); moving `best` must not
    move them. The chat's message is stored with digits masked.
    - `MODELS.marketing` = `claude-opus-5-5` (2026-10-30, the marketing wizard's generator; customers
      CORE invariant 16): features `marketing copy` and `marketing image brief`, `effort: "low"`, no
@@ -468,6 +468,16 @@ boundary and say so in the PR.
      API backend only, logged through the same `recordUsage` — a tool loop is still one priced row per
      model call. A server-side refusal fallback can serve a call on another model; the row logs the
      model that actually answered (`res.model`).
+   - `MODELS.documents` = `claude-opus-5-5` (2026-11-15, reading a courier applicant's ID card,
+     business certificate and bank letter to pre-fill the sign-up form — delivery CORE invariant 22):
+     feature `courier-document-read`, `effort: "low"`, maxTokens 4000, no `temperature`, `meta` =
+     `{kind}` ONLY (identity and bank documents: no field value, byte or model output is ever
+     logged). It added two options to `complete()`: an `images` entry with `mediaType:
+     "application/pdf"` is sent as a **document** block (anything else stays an image block, media
+     before the text), and **`format`** (a JSON schema) goes out as `output_config.format =
+     {type: "json_schema", schema}`, merged with `effort`. Media and a `format` both force the
+     `api` backend — the bridge queue carries a prompt string only. A caller passing neither sends
+     exactly what it did before.
    - **Not every row is a Claude call.** A finished marketing render is logged as feature
      `marketing image render`, `model: "artlist:<id>"` (`nano-banana-2` 130 credits, `gpt-image-2`
      150, `seedream-5` 100 — customers CORE invariant 16), `backend: "artlist"`, `costUsd: 0`

@@ -401,6 +401,9 @@
           "apiMaxRetries",
           "marketing: \"claude-opus-5-5\"",
           "support: \"claude-opus-5-5\"",
+          "documents: \"claude-opus-5-5\"",
+          "json_schema",
+          "application/pdf",
           "async function converse("
         ],
         "services/for-you-quality/reviewer.js": [
