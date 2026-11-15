@@ -1243,6 +1243,22 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       20, claude-plugins#369). **Deploy order: #583 must be live before the first `kopa-qr` order
       is written.** Nothing is written while a store's `tableOrdering` is off (the default).
     - Tests: shoofi-server `test/integration/kopa/table-orders.js` (20).
+32. **THE ORDER CREATION LOCK USES REDIS WHENEVER THE CLIENT IS `ready`; THE CLIENT IS NEVER
+    DROPPED ON AN ERROR** (shoofi-server `services/orders/order-creation-lock.js`, branch
+    `fix/HIGH-RISK-order-lock-redis-reconnect`, HQ #71145e, 2026-11-15). `/api/order/create`
+    takes `order_lock:<appName>:<customerId>` (`SET NX EX 10`) before anything else; a held lock
+    is 429 `ORDER_IN_PROGRESS`. The per-process `orderCreationLocks` map is only the fallback
+    while Redis is not `ready`, and it does NOT stop a double submit that reaches two instances.
+    - Until this fix the ioredis `'error'` handler in `routes/order.js` set `redisClient = null`
+      and nothing restored it: one transient error put that instance on the memory lock for the
+      rest of its life. ioredis reconnects by itself; `getReadyRedis()` checks `status`.
+    - **Release goes to the backend that took the lock** (`lock.backend`), whatever Redis's
+      status is at release, and **once** (`lock.released`) — a second `DEL` can remove a newer
+      request's key. Every release site, `performFraudChecks` included (`releaseOrderLock`),
+      goes through `orderCreationLock.release`.
+    - Not fixed by it (still open): the 30 s duplicate check only logs and then releases the
+      lock; `DEL` is not owner-checked; the 10 s TTL is shorter than the 128 s create stall.
+    - Tests: shoofi-server `test/integration/order-creation-lock-redis-reconnect.js`.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

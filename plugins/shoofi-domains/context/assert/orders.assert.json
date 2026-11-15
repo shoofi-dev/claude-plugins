@@ -173,6 +173,11 @@
       },
       "patterns": [
         {
+          "file": ["services/orders/order-creation-lock.js", "routes/order.js"],
+          "regex": "if \\(redisClient\\.status === \"ready\"\\) return redisClient;|console\\.warn\\('Redis connection error for order duplication prevention:'",
+          "desc": "CORE invariant 32: the order creation lock uses Redis whenever the client is ready (getReadyRedis). The second leg is main's pre-fix handler in routes/order.js and expires when fix/HIGH-RISK-order-lock-redis-reconnect merges; drop it and the routes/order.js path then"
+        },
+        {
           "file": "routes/order.js",
           "regex": "if \\(req\\.body\\.isNotPrinted\\) \\{\\s*filterBy\\.isPrinted = false;",
           "desc": "doc reference C3 Auto-print: isNotPrinted only adds isPrinted:false. The date window is built only `if (ordersDate)`, so a sweep that sends no date has no window at all; the partner sweep must send ordersDate"
