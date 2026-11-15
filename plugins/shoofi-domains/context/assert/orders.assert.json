@@ -647,7 +647,8 @@
         "components/order/orders-load-error/index.tsx",
         "screens/order/active/components/placed-order-card.tsx",
         "screens/order/history/index.tsx",
-        "hooks/checkout/use-checkout-submit.ts"
+        "hooks/checkout/use-checkout-submit.ts",
+        "helpers/checkout-validation-reason.ts"
       ],
       "patterns": [
         {"file": "stores/cart/index.ts", "regex": "const marketingTouch = await prepareMarketingForOrder\\(\\);", "desc": "CORE invariant 15/16: submitOrder sends the queued taps (<=1.5s, never throws) before reading the touch for the body"},
@@ -656,6 +657,16 @@
           "file": "hooks/checkout/use-checkout-validate.ts",
           "regex": "checkout_validation_failed",
           "desc": "checkouts blocked client-side never reach the server as an order (CORE: where an order that never happened lives)"
+        },
+        {
+          "file": "hooks/checkout/use-checkout-validate.ts",
+          "regex": "store_app_name: storeStatus\\.appName",
+          "desc": "shipping/payment validation failures carry the cart's store (CORE: where an order that never happened lives)"
+        },
+        {
+          "file": "helpers/checkout-validation-reason.ts",
+          "regex": "\"store_not_supported\"",
+          "desc": "checkout_validation_failed reason separates an unfinished form (missing) from a store refusal (CORE: where an order that never happened lives)"
         },
         {
           "file": "screens/checkout/index.tsx",
