@@ -1031,8 +1031,9 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       its capture) is described by `moneySummary.state` + `heldAmount`, from `orderHoldState`
       (`money-store.js`) over `paymentAuth`: `authorized` → `held`, amount `authorizedAmount ||
       total`; `release_failed` (HYP refused CancelTrans, payments CORE invariant 12) →
-      `release_failed`, amount `refundRequiredAmount ?? authorizedAmount ?? total` (the legacy
-      badge's order); a released `cancelled` → `released`, 0. `summarize` keeps `heldAmount` for
+      `release_failed`, amount `authorizedAmount ?? refundRequiredAmount ?? total` (what is frozen
+      on the card — `refundRequiredAmount` is the order total, smaller than the hold under auth
+      headroom or an amend); a released `cancelled` → `released`, 0. `summarize` keeps `heldAmount` for
       `held` and `release_failed` only, and any `capture` entry overrides it all to `captured`
       / 0. **`heldAmount` is display only:** it is not in `totals`, the invariant, `owedAmount`,
       `remainingAmount` or the owed index, and no server reader (cancel preview, `/api/money/*`,

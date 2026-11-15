@@ -190,7 +190,7 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    `release_refused_ccode_920`, `refundRequiredAmount` = the order total) was never captured:
    the money is frozen on the card until `paymentAuth.expiresAt`, nothing is owed, and support
    must NOT credit it. Its `moneySummary` is `state: "release_failed"` with `heldAmount` =
-   `refundRequiredAmount ?? authorizedAmount ?? total` (display only — owed stays 0; orders
+   `authorizedAmount ?? refundRequiredAmount ?? total` (display only — owed stays 0; orders
    CORE invariant 28). Before shoofi-server `fix/release-failed-held-amount` (2026-11-15) that
    amount was stored as 0; the admin `MoneyLine` falls back to `paymentAuth` for those.
    **Since 2026-11-07 every cancel is also recorded in the charge's money ledger** (orders CORE

@@ -1181,7 +1181,7 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
     `release_failed` reads "התפיסה ₪N לא שוחררה · לא לזכות ידנית" (amber): N is
     `moneySummary.heldAmount`, else — a summary stored before shoofi-server
     `fix/release-failed-held-amount` carries 0 — the order's `paymentAuth`
-    (`releaseFailedHeldAmount`: refundRequiredAmount, authorizedAmount, total). The order is
+    (`releaseFailedHeldAmount`: authorizedAmount, refundRequiredAmount, total). The order is
     passed only when the summary is the order's own (not a twin group's), so the monitoring
     screen, which has the summary alone, names no amount rather than ₪0.
   - **"חייבים ללקוח"** (`src/views/admin/money/MoneyOwed.tsx`, `/admin/money-owed`,
