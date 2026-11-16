@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@feat/courier-task-info-routes / 2026-11-16 (courier task info + problem reports, reference §5b; delivery/list hides status "1" from drivers, ungated driver routes, driver/stats zeros, reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -18,7 +18,9 @@ Server: `routes/delivery.js` + `routes/delivery/*`, `routes/geo.js`,
 Clients: driver app (shoofir), admin delivery + **area control panel** (delivery-web),
 partner booking trigger + **delivery-only booking screens**.
 Also yours: `services/delivery/delivery-only.js` and the three
-`/api/delivery/delivery-only/*` routes in `routes/delivery/orders.js`.
+`/api/delivery/delivery-only/*` routes in `routes/delivery/orders.js`; the courier-redesign
+routes in `routes/delivery/{driver-task-info,driver-issues}.js` +
+`services/delivery/{courier-task-info,courier-issues}.js` (reference §5b; summary below).
 **Not yours:** driver **payouts** = `accountant`; order lifecycle = `orders` (you're the callee
 at the booking handoff — never edit `routes/order.js`).
 
@@ -140,6 +142,25 @@ first in a blue «علامة مميزة:» banner (plus a floor / apartment / en
 the second in the amber «ملاحظات للمندوب» banner — never merge them. Both are **snapshots from
 booking time**: editing the saved address later changes nothing on a placed order. Detail:
 reference C1; the saved-address side is `customers` CORE invariant 20.
+
+## Courier task info + problem reports (Nov 2026)
+Seven additive routes for the redesigned courier app (reference §5b,
+`shoofi-server/docs/courier-task-routes.md`): `GET driver/order/:id/store-status`,
+`POST driver/order/issue`, `GET driver/order/:id/issues`, `GET driver/me/stats`,
+`GET driver/me/active-time` (all `driverSelfAction`: identity = the token, another courier's
+delivery = 404) and `GET admin/issues` + `POST admin/issues/:id/status` (`deliveryDashboardAdmin`).
+- Reports live in the new **`delivery-company.delivery-issues`** (hyphenated; `db.deliveryIssues`)
+  and **never change the delivery** — no status, no reassignment, no money. The admin bell
+  (`delivery_issue`) and the flow event are each wrapped (invariant 6).
+- Every figure is read through an existing shared helper, never re-derived: lateness =
+  `late-delivery.js` keyed on `accountableDriverId`; minutes = `computeDayLive`; earnings =
+  `effectiveDeliveryFee` (`lib/payments/calc.js`, imported read-only — payouts stay
+  `accountant`'s). Change one of those and the courier's profile moves with the admin's screens.
+- `me/stats.declines` is `null`, not 0, until the decline feature that writes
+  `bookDelivery.declines[]` (`services/delivery/driver-decline.js`) is in the tree (invariant 11's
+  lesson: confirm a writer before reading a field).
+- The older driver routes they replace for the app are left as they were: `driver/stats` answers
+  zeros for everyone and a dozen driver routes have no auth — both flagged, reference C1 / §10.7.
 
 ## Invariants — never weaken
 1. **`DELIVERY_STATUS` is authoritative in `consts/consts.js`**: `1` waiting-approve → `2`
