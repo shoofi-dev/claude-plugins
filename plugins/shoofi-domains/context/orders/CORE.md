@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (invariants 2, 9; reference §2, C3); shoofi-partner@fix/owner-walkthrough / 2026-11-11 (invariant 17: printer per tablet, print failures shown; cancel alert); shoofi-partner@fix/partner-print-failure-log-once-notice / 2026-11-08 (invariant 17: one error row per failed copy; the pop-up was dropped before merge); shoofi-partner@fix/owner-walkthrough + feat/school-orders-v3 / 2026-11-14 (reference C3 customer note: v3 readers OrderCardV3, NewOrderViewV3, SchoolOrderCardV3); shoofi-partner@feat/order-alert-arrival-log / 2026-11-14 (reference C3 "Measuring how a new order reaches the tablet": apps-logs partner_order_alert_received / partner_new_order_seen; listener pin accepts the ref call); shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/HIGH-RISK-shipping-price-check-over-and-enforce-flag / 2026-11-14 (invariant 20: over-quotes flagged with direction, an admin alert per flagged order, the delivery-deal exemption removed, the enforceShippingPrice flag + 409 SHIPPING_PRICE_CHANGED; reference §3, §5); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (invariants 2, 9; reference §2, C3); shoofi-partner@fix/owner-walkthrough / 2026-11-11 (invariant 17: printer per tablet, print failures shown; cancel alert); shoofi-partner@fix/partner-print-failure-log-once-notice / 2026-11-08 (invariant 17: one error row per failed copy; the pop-up was dropped before merge); shoofi-partner@fix/owner-walkthrough + feat/school-orders-v3 / 2026-11-14 (reference C3 customer note: v3 readers OrderCardV3, NewOrderViewV3, SchoolOrderCardV3); shoofi-partner@feat/order-alert-arrival-log / 2026-11-14 (reference C3 "Measuring how a new order reaches the tablet": apps-logs partner_order_alert_received / partner_new_order_seen; listener pin accepts the ref call); shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -589,9 +589,11 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `/api/admin/*` route in `routes/coins.js`, 401/403 matrix, every dashboard role on seven
       routes, master-only on expire, the audit entry, refused writes write nothing).
 
-20. **`shippingPrice` IS OBSERVED, NEVER ENFORCED: A DELIVERY FEE BELOW THE AREA TARIFF IS LOGGED
-    `[shippingPriceCheck]` AND FLAGGED, NOTHING ELSE** (`services/orders/shipping-price-check.js`,
-    shoofi-server#407). The app posts `shippingPrice = availableDrivers.area.price || 0`
+20. **`shippingPrice` IS OBSERVED AND ALERTED; ENFORCEMENT IS A PLATFORM FLAG, OFF BY DEFAULT. A
+    DELIVERY FEE BELOW OR ABOVE THE AREA TARIFF IS LOGGED `[shippingPriceCheck]`, FLAGGED AND
+    ALERTED; IT IS NEVER REWRITTEN** (`services/orders/shipping-price-check.js`, shoofi-server#407;
+    over / alert / flag: HQ #e61c54, branch `fix/HIGH-RISK-shipping-price-check-over-and-enforce-flag`).
+    Silently overwriting the fee with the tariff was considered and REJECTED by the CTO. The app posts `shippingPrice = availableDrivers.area.price || 0`
     (`shoofi-app screens/checkout/index.tsx`), so a quote with no `area` posts ₪0. Scheduled
     orders into a staff-PAUSED area did exactly that: 5 known orders, June to October 2026, where
     the customer paid no fee and the courier was paid ₪0 (fresh-cafe 9637-4325, flora-boutique
@@ -604,7 +606,8 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       throws or never answers leaves the order and its response untouched (invariant 6). Twin
       `/place` / `/digital-place-pending` do not call it.
     - **Comparison:** the posted `Number(shippingPrice) || 0` against the area's `price`, with
-      ₪0.01 tolerance. Only a fee BELOW the tariff is flagged. `shippingPrice` is already the
+      ₪0.01 tolerance, in BOTH directions: below → `direction: "under"`, above → `direction:
+      "over"` (only "under" was flagged before HQ #e61c54). `shippingPrice` is already the
       PRE-discount fee: a coupon rides on `discountAmount`, a store delivery deal on `total`
       (invariants 13, 14). So there is no separate pre-discount field to read, and none is needed.
     - **Area:** the store point comes from the store's own `store {id:1}.location`, never from the
@@ -617,13 +620,22 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **Exempt (no lookup, no flag):** receipt method ≠ `DELIVERY`; `isDeliveryOnly`; twin
       (`twinGroup.groupId`, or a booking's `twinGroupId`); an `appliedCoupon.coupon` with
       `type: 'delivery_price'`, `discountType: 'full_discount'`, `isFreeDelivery`, or
-      `isDeliveryCoupon` (`discountType: 'delivery'` / `type: 'free_delivery'`); `promotions.delivery`.
+      `isDeliveryCoupon` (`discountType: 'delivery'` / `type: 'free_delivery'`).
       These are belt and braces: current bundles never lower `shippingPrice` for them.
+      **A store delivery deal (`promotions.delivery`) is NOT exempt** (it was until HQ #e61c54):
+      verified 2026-11-14 that no app bundle ever netted the deal into the fee (promotions shipped
+      in shoofi-app 51a4241 writing it to `total` only), the customer app is the only client of
+      `/api/order/create`, and the server's promotions block never lowers `shippingPrice`.
     - **Output:** one `logger.warn` line, `"[shippingPriceCheck] submitted delivery fee is below
-      the area tariff"`, with `appName, orderId, orderObjectId, status, paymentMethod,
-      paymentProvider, timing (now|future|ramadan-iftar), isFutureOrder, submitted, expected,
-      areaId, paused`. On a mismatch ONLY, it also does `$set order.shippingPriceCheck =
-      { expected, submitted, areaId, paused, checkedAt }`, so `$exists` means flagged. A failure
+      the area tariff"` (or `"… above the area tariff"`), with `appName, orderId, orderObjectId,
+      status, paymentMethod, paymentProvider, timing (now|future|ramadan-iftar), isFutureOrder,
+      direction, submitted, expected, areaId, paused`. On a mismatch ONLY, it also does `$set
+      order.shippingPriceCheck = { direction, expected, submitted, areaId, paused, checkedAt }`,
+      so `$exists` means flagged (rows flagged before 2026-11-14 have no `direction`; all are
+      "under"), and raises ONE admin-dashboard notification per flagged order through the team's
+      existing ops-alert channel, `adminNotificationService.createAndBroadcast` (`type:
+      "shipping_price_mismatch"`, `data: { orderId, orderNumber, appName, direction, submitted,
+      expected, areaId, paused, paymentProvider }`; the admin web's bell). A failure
       logs `"[shippingPriceCheck] check failed — order unaffected"`. The field is a named `$set`
       after the insert, so like `marketingTouch` (invariant 15) it survives every payment path.
       A `book-delivery.order` snapshot taken before it lands does not carry it. It is not in
@@ -650,12 +662,29 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       - Of the October exempt rows below the booking-time tariff, 269 were twin and 42
         delivery-only. Only 2 were coupon orders, and both were relocations. Coupons do not
         lower `shippingPrice` in practice.
-    - **Turning it into enforcement is a product decision**, not a follow-up. With Apple Pay /
-      HYP the money is already taken when the order reaches the route, which is the same reason
-      every other creation check corrects and never rejects.
+      The dry run above measured "under" only; how often "over" fires (and so how many alerts a
+      day) was not measured before the HQ #e61c54 change.
+    - **Enforcement (the CTO's decision, HQ #e61c54) — behind `shoofi.store {id:1}.enforceShippingPrice
+      === true`, OFF by default** (strict `true`, the `requireSavedDeliveryAddress` convention;
+      `isShippingPriceEnforced`). When on, `/api/order/create` calls `enforceShippingPrice` after the
+      idempotency replay and BEFORE the lock, the insert and every charge, and a mismatch answers
+      `409 { err: "SHIPPING_PRICE_CHANGED", expectedShippingPrice }` (`shippingPriceChangedBody`)
+      with nothing written. Only for providers the server charges after the insert
+      (`SERVER_CHARGED_PROVIDERS`: CASH, CREDITCARD, HYP_TOKEN, HYP_APPLEPAY, HYP_GOOGLEPAY; a
+      cash order naming no provider counts as CASH), read after the route's own provider
+      corrections. **Never APPLEPAY or HYP**: their money moved before the route, so a 409 would
+      be a charge with no order — they are still checked after the insert. Same exemptions and the
+      same area lookup (`checkShippingPrice`, which reuses `resolveExpectedShippingPrice`). Fails
+      OPEN: exempt, unresolved area, a lookup error, or a lookup slower than `ENFORCE_TIMEOUT_MS`
+      (3 s) goes through as with the flag off. It refuses; it never corrects the fee. Turn it on
+      only once an app version that handles the 409 is what customers run (in progress in shoofi-app
+      as `helpers/shipping-price-changed.ts`, not on main as of 2026-11-14) — an older bundle shows a
+      generic error.
     - Tests: `test/integration/order-shipping-price-check.js`. It covers each exemption, active
-      and paused areas, unresolved cases, a throwing lookup, a lookup that never answers (the
-      create response is not held), and a failed flag write.
+      and paused areas, both directions, the alert, unresolved cases, a throwing lookup, a lookup
+      that never answers (the create response is not held), a failed flag write, and the flag:
+      off (created as before), on + CASH (409, no insert), on + APPLEPAY (not refused), on +
+      unresolved / throwing lookup (not refused), the string `"true"` (off).
 
 21. **PARTNER ORDER HISTORY IS THE PAYMENTS SCREEN'S DAY, AND ITS SALES TOTAL TIES OUT TO
     `partner/summary`** (`POST /api/order/admin/history`, `routes/order-history.js` +

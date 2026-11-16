@@ -113,8 +113,10 @@ ownership + partial-use balance only) → store promotions + the delivery deal-v
 conflict (`enforcePromotions`, `resolveDeliveryConflict`) → **fixed-delivery-price coupon
 recompute** (`enforceDeliveryPriceCoupon`, CORE invariant 14). Each one corrects `total`
 and never rejects → build `orderDoc` → **insert into store `orders`** (authoritative) →
-`[shippingPriceCheck]` fired and **never awaited** (log-only; a DELIVERY fee below the area
-tariff → one warn line + `order.shippingPriceCheck`, CORE invariant 20) →
+`[shippingPriceCheck]` fired and **never awaited** (a DELIVERY fee below or above the area
+tariff → one warn line + `order.shippingPriceCheck` + one admin notification, CORE invariant 20;
+the optional pre-insert 409 `SHIPPING_PRICE_CHANGED` runs earlier, before the lock, only when
+`shoofi.store {id:1}.enforceShippingPrice === true`) →
 **stock decrement if status≠"0"** → first-order attribution → Apple Pay session
 self-heal → fraud persistence → **push `customers.orders[]` snapshot (central)** (+ seed
 `addresses[]` for a customer with none — a real address only, with an `_id`:
@@ -216,9 +218,10 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   server-side; `surcharge`, `extrasPrice` and the names are ticket snapshots. `comboIssues`
   is never persisted on an item (amend strips it); creation keeps them under
   `serverPricing.comboIssues`. CORE invariants 11–12.
-- **`orders.shippingPriceCheck`** = `{ expected, submitted, areaId, paused, checkedAt }`,
-  `$set` after the insert ONLY when a DELIVERY order's posted `shippingPrice` is below its
-  area's tariff (paused areas included). Absent on every other order, so
+- **`orders.shippingPriceCheck`** = `{ direction: "under"|"over", expected, submitted, areaId,
+  paused, checkedAt }`, `$set` after the insert ONLY when a DELIVERY order's posted
+  `shippingPrice` is not its area's tariff (paused areas included). Rows written before
+  2026-11-14 have no `direction` and are all "under". Absent on every other order, so
   `find({ shippingPriceCheck: { $exists: true } })` lists the flagged ones. Diagnostic only:
   no reader, no index, money unchanged. A `book-delivery.order` snapshot taken before the `$set`
   lands does not carry it. CORE invariant 20.
