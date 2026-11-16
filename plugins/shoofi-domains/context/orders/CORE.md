@@ -650,6 +650,20 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       - Of the October exempt rows below the booking-time tariff, 269 were twin and 42
         delivery-only. Only 2 were coupon orders, and both were relocations. Coupons do not
         lower `shippingPrice` in practice.
+    - **The app's quote is ONE shared slot, and a ₪20-for-₪38 flag can be another store's
+      tariff.** `shoofiAdminStore.availableDrivers` (`shoofi-app stores/shoofi-admin/index.tsx`)
+      is written by every screen that quotes. Menus quote the BROWSED store, and checkout quotes
+      the CART's store. GCP 8706-1776 (2026-11, `shippingPriceCheck {expected 38, submitted 20}`)
+      opened the twin picker from checkout. nshnosh's menu quoted ₪20 into the slot, and
+      checkout posted that ₪20 on return. Its skip compared only `customerLocation`, so it never
+      asked which store the quote belonged to. Since shoofi-app
+      `fix/HIGH-RISK-requote-delivery-fee-new-address`, checkout and `total-price` trust the slot
+      only through `hasQuoteFor(customer, store)`, matched against the cart store's point.
+      Checkout re-quotes every time it regains focus. Every address pick, list or new, goes
+      through `components/address/requote-delivery.ts`, which quotes the cart's store and awaits
+      the result. A failed fetch no longer counts as a quote for the new point. Menus still
+      overwrite the slot, so the total checkout shows while it sits in the background can be
+      another store's fee. This is a candidate cause for the unexplained June flags above.
     - **Turning it into enforcement is a product decision**, not a follow-up. With Apple Pay /
       HYP the money is already taken when the order reaches the route, which is the same reason
       every other creation check corrects and never rejects.
