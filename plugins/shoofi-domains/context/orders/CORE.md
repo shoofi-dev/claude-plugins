@@ -1300,6 +1300,33 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Test: shoofi-app `__tests__/components/total-price-coins-single-writer.test.tsx` (8).
       Emulator before/after: shoofi-app `.maestro/coins-items-limit/`.
 
+33. **THE ORDER-CREATE LOCK BELONGS TO THE REQUEST THAT TOOK IT. ONLY THAT REQUEST RELEASES IT,
+    BY COMPARE-AND-DELETE. THE 30s "RECENT ORDER" CHECK OBSERVES AND NEVER BLOCKS** (shoofi-server
+    `routes/order.js` `/api/order/create`, `utils/owned-lock.js`,
+    `services/orders/recent-order-check.js`; branch `fix/HIGH-RISK-order-create-lock-owner-token`,
+    HQ #ea4fae, folds HQ #82e96b).
+    - The key is `order_lock:<appName>:<customerId>`. Its value is a random owner token, with
+      `ORDER_CREATE_LOCK_TTL_MS` = 120s (the app waits 120s for this call, and ZCredit calls
+      have no timeout). The in-memory fallback `orderCreationLocks` uses **the same key** and
+      the same `{ token, expiresAt }` contract. A second request while it is held gets 429
+      `ORDER_IN_PROGRESS`.
+    - Release happens only in `releaseOrderCreationLock()`: in the route's `finally`, or on a
+      throw before the main `try`. It is a Lua compare-and-delete, never a plain `del`.
+      Before this change the value was `Date.now()` with `EX 10`, and every release was an
+      unconditional `del`. A request that outlived 10s deleted a resubmit's fresh lock, so a
+      third submit went through unlocked. The 30s check and `performFraudChecks` also released
+      it early.
+    - **The server never sends `DUPLICATE_ORDER`.** Decided by the owner (2026-11-14, option
+      C): the 30s check stays log-only (`[recentOrderCheck] recent order within 30s,
+      continuing`) and must not become a 409. In 30 days, 92% of same-customer, same-store
+      pairs within 30s were retries after an uncharged status `"0"` attempt. Resubmits outside
+      30s are guarded by `idempotencyKey`, which only the wallet checkout sends today.
+    - Cost: a release that fails on a Redis error, or a sync throw between the lock and the
+      main `try`, holds the customer for up to 120s, where it used to be 10s.
+    - Tests: `test/integration/owned-lock.js`,
+      `test/integration/order-recent-order-check-keeps-lock.js` (A's TTL lapses, B locks, A
+      finishes, so B's key survives and C gets 429).
+
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
 `shoofi-app/stores/cart/index.ts` and nothing about it reaches the server until submit, so
