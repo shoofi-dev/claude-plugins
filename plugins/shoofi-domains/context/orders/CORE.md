@@ -1300,6 +1300,25 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Test: shoofi-app `__tests__/components/total-price-coins-single-writer.test.tsx` (8).
       Emulator before/after: shoofi-app `.maestro/coins-items-limit/`.
 
+33. **A DELIVERY ORDER IS SENT ONLY WITH A TOTAL THAT WAS PRICED WITH THE FEE IT POSTS.**
+    HQ #b75027. The posted `total` comes from `TotalPriceCMP`, but `shippingPrice` is read from
+    `availableDrivers.area.price` at tap time: two sources. Before the fix the fee was copied
+    into state by one effect while the total effect priced in the same pass with the old fee,
+    so for a render after a pickup→delivery switch (or after the quote landed) send was enabled
+    with `total` = items − coins and `shippingPrice` = 20. 10 of 16,946 delivery orders,
+    2026-10-14..28 (8149-1031, 8432-9702, 3672-6606, 1531-3468, six without coins).
+    - **App:** `components/total-price/index.tsx` derives `deliveryPrice` in render and emits
+      `onTotalPricing({ total, shippingMethod, deliveryPrice })` with each total; checkout sends
+      only when `helpers/checkout-total-pricing.ts` `isCheckoutTotalReady` holds (same total,
+      same method, same fee, no quote in flight). A refused tap logs
+      `checkout_send_blocked_total_not_ready` in `apps-logs`. `handleCheckout` itself is NOT
+      gated: it also runs after a completed ZCredit wallet payment.
+    - **The server never enforces the total.** `serverPricing` (shadow) and
+      `[shippingPriceCheck]` only observe; the client `total` is saved and charged. Find these
+      after the fact by `serverPricing.totalDrift == shippingPrice` with `driftDetected: true`.
+    - Drive-in (`drive_in_price`) still goes through state with the same one-render lag.
+    - Test: shoofi-app `__tests__/components/total-price-delivery-fee-in-total.test.tsx`.
+
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
 `shoofi-app/stores/cart/index.ts` and nothing about it reaches the server until submit, so
