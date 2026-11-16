@@ -49,7 +49,20 @@ cropped to the panel's shape (Kling v3 Pro from a 4:5 crop → 1288x1608).
 
 - **theme** — `green` (ink #17320F, end card dark), `lime` (light paper, lime end card), `dark`
   (#121212), `beige` (paper #EDE3D6 for top-down food). Keys: `ink lime paper endBg endInk glow`.
-- **opening line** — a question («جوعان؟»), the number, or «جديد».
+- **opening line** — a question, the number, or «جديد». The question fits **what the store sells**
+  (the prompt's "The store" line — its `kind` from the store's style profile), never a stock line:
+
+  | kind | question (AR / HE) |
+  |---|---|
+  | food | «جوعان؟» / «רעבים?» |
+  | sweets | «بدك إشي حلو؟» / «בא לך משהו מתוק?» |
+  | drinks | «وقت القهوة؟» / «זמן לקפה?» |
+  | bakery | «طازة من الفرن» / «טרי מהתנור» |
+  | grocery, flowers, gifts, toys, other | about what it sells — no hunger, no meal words |
+
+  The examples here are burger and pasta stores, so their `hook` is «جوعان؟» — never copy it to a
+  store that does not sell meals. When the prompt says the kind is not known, read the menu, decide
+  it, and write it in `manifest.json` as `"storeKind"`.
 - **music mood** — from the Artlist catalog (search_music), chosen per post.
 - **Shadi** — optional in every style: a 3 s insert you switch on (`shadi` is the one built on him).
 

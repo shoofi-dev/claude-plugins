@@ -164,7 +164,11 @@ job: `lastRunAt`, `lastOkAt`, `lastError`, `intervalMs`), `boot:server` (the API
 - the bridge's Claude login down (`ai-bridges.claudeAuth.loggedIn: false`) is first too: no agent
   runs and the bridge claims nothing until the owner logs in again (`claude auth login` as the
   `shoofi` user); the failed runs retry by themselves once it is back — do not ticket them;
-- a job failing or late: one bullet each, with its code owner (the file name says which domain);
+- a job failing or late: one bullet each, with its code owner (the file name says which domain).
+  "Late" is judged from the job's cron expression (`services/hq/cron-interval.js`), never from
+  `intervalMs`: every container beats the same job, so that learned gap collapses (hourly jobs
+  showed 25 min) — do not reason from it. An id whose line number moved (`app.js:891` vs
+  `app.js:895`, same expression) is the same job before an edit, not a stopped one;
 - a job silent for days may be retired code — say so, do not alarm.
 
 ### The autopilot (the same tab, shoofi-server `docs/hq.md` *Autopilot*)
