@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/driver-route-hardening / 2026-11-16 (CORE invariant 19: the driver-own record routes gated, driver/stats id shapes; reference C1: status 1 hidden from a driver's list, NoteModal path undefined); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -544,6 +544,46 @@
           "file": "services/delivery/admin-access.js",
           "regex": "return \\{ appName: String\\(user\\.appName\\) \\}",
           "desc": "a partner token's deliveries are those whose appName is its storeUsers.appName, read from the token's own record (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "router\\.post\\(\"/api/delivery/driver/stats\", (?:\\.\\.\\.driverSelfBody, )?async",
+          "desc": "driver/stats takes only the signed-in driver (shoofir getStats); the body driverId is overwritten with the token's (CORE invariant 19). TRANSITIONAL: the optional / second form is the pre-change text - drop it once shoofi-server fix/driver-route-hardening is on main"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "router\\.post\\(\"/api/delivery/driver/order/note\", (?:\\.\\.\\.driverSelfBody, )?async",
+          "desc": "a driver writes a note only as himself, on a delivery he holds (CORE invariant 19). TRANSITIONAL: the optional / second form is the pre-change text - drop it once shoofi-server fix/driver-route-hardening is on main"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "router\\.delete\\(\"/api/delivery/driver/order/note/:orderId/:driverId\", (?:\\.\\.\\.driverSelfPath, )?async",
+          "desc": "the note delete names the driver in the PATH, so the gate refuses a path id that is not the token's rather than overwriting it (CORE invariant 19). TRANSITIONAL: the optional / second form is the pre-change text - drop it once shoofi-server fix/driver-route-hardening is on main"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "router\\.post\\(\"/api/delivery/driver/order/note/comment\", (?:\\.\\.\\.deliveryDashboardAdmin, )?async",
+          "desc": "support's reply to a driver note comes from the admin web (DriverNoteModal) only (CORE invariant 19). TRANSITIONAL: the optional / second form is the pre-change text - drop it once shoofi-server fix/driver-route-hardening is on main"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "router\\.post\\(\"/api/delivery/notifications/create\", (?:\\.\\.\\.deliveryDashboardAdmin, )?async",
+          "desc": "pushing a driver arbitrary text has no client caller; it is admin-web only, never open (CORE invariant 19). TRANSITIONAL: the optional / second form is the pre-change text - drop it once shoofi-server fix/driver-route-hardening is on main"
+        },
+        {
+          "file": "routes/delivery/company.js",
+          "regex": "router\\.get\\(\"/api/delivery/company/employee/:id\", (?:\\.\\.\\.driverProfileAccess, )?async",
+          "desc": "the driver profile read is the driver's own (shoofir getProfile) or any for a dashboard role (admin-web employee form) (CORE invariant 19). TRANSITIONAL: the optional / second form is the pre-change text - drop it once shoofi-server fix/driver-route-hardening is on main"
+        },
+        {
+          "file": "services/delivery/admin-access.js",
+          "regex": "String\\(req\\.params\\[param\\]\\) === String\\(tokenId\\)|const driverListAccess = \\[auth\\.required",
+          "desc": "driverSelfInParam: a path id must BE the shoofir token's id - a path cannot be overwritten like a body field (CORE invariant 19). TRANSITIONAL: the optional / second form is the pre-change text - drop it once shoofi-server fix/driver-route-hardening is on main"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "\"driver\\._id\": (?:\\{ \\$in: driverIds \\}|driverId,)",
+          "desc": "driver/stats matches driver._id in both shapes; a bare string id against the ObjectId on every booking answered all zeros (CORE invariant 19). TRANSITIONAL: the optional / second form is the pre-change text - drop it once shoofi-server fix/driver-route-hardening is on main"
         },
         {
           "file": "services/delivery/admin-access.js",
