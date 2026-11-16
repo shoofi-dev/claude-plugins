@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-partner@feat/new-order-alarm-loop / 2026-11-07 (ref C3: the new-order alarm repeats until accepted); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (CORE invariants 2, 9; reference §2, C3); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (CORE invariant 31, Kopa QR table orders); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (CORE invariants 27-28); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-block-cancelled-to-active + shoofi-app@81871038 (read only) / 2026-11-14 (CORE invariant 32: coins only when they lowered the price, only by a confirmed order, refund only what was redeemed); shoofi-server@fix/HIGH-RISK-block-cancelled-to-active + shoofi-delivery-web@fix/HIGH-RISK-block-cancelled-to-active / 2026-11-07 (CORE invariant 2: cancelled never leaves the cancelled bucket, viewd refuses 5, courier cancel covers 5/9); shoofi-partner@feat/new-order-alarm-loop / 2026-11-07 (ref C3: the new-order alarm repeats until accepted); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (CORE invariants 2, 9; reference §2, C3); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (CORE invariant 31, Kopa QR table orders); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (CORE invariants 27-28); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -66,7 +66,11 @@
         "test/integration/money-cancel.js",
         "routes/kopa/table-orders.js",
         "services/kopa/table-orders.js",
-        "services/orders/order-source.js"
+        "services/orders/order-source.js",
+        "test/integration/order-update-cancelled-cannot-reactivate.js",
+        "services/coins/order-coins.js",
+        "test/integration/coins-redeem-only-when-reduced.js",
+        "scripts/coins-redeemed-not-deducted.js"
       ],
       "symbols": {
         "services/kopa/table-orders.js": ["createTableOrder", "priceItems", "storeOpenState", "checkLocation", "buildTableOrderDoc"],
@@ -246,6 +250,66 @@
           "file": "routes/order.js",
           "regex": "/api/order/update/viewd",
           "desc": "store-accept endpoint (6->1 transition)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(isCancelledToActiveTransition\\(oldStatus, updateobj\\?\\.status\\)\\) \\{\\s*return res\\.status\\(400\\)\\.json\\(\\{[\\s\\S]{0,120}?code: \"CANCELLED_ORDER_CANNOT_REACTIVATE\"[\\s\\S]*?settleCancelledOrderMoney\\(\\{",
+          "desc": "CORE invariant 2: order/update refuses cancelled (4/5/7/8/9) -> any non-cancel status with 400 CANCELLED_ORDER_CANNOT_REACTIVATE, BEFORE the cancel-money settlement and the status write"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(isCancelledToActiveTransition\\(oldStatus, updateobj\\?\\.status\\)\\) \\{[\\s\\S]{0,600}?if \\(updateobj\\?\\.status === ORDER_STATUS\\.PENDING && oldStatus !== ORDER_STATUS\\.FRAUD_REVIEW\\)",
+          "desc": "CORE invariant 2: the cancelled-order guard runs BEFORE the '6 only from 13' rule, so 7 -> 13 -> 6 cannot launder a cancelled order"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const isCancelStatus = \\(status\\) =>\\s*status !== undefined && status !== null && CANCEL_STATUSES\\.includes\\(String\\(status\\)\\);",
+          "desc": "CORE invariant 2: isCancelStatus String()-normalises over CANCEL_STATUSES (numeric statuses exist in prod)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const isCancelledToActiveTransition = \\(fromStatus, toStatus\\) =>\\s*isCancelStatus\\(fromStatus\\) &&\\s*toStatus !== undefined &&\\s*toStatus !== null &&\\s*!isCancelStatus\\(toStatus\\);",
+          "desc": "CORE invariant 2: cancelled -> ANY non-cancel status is refused (1/2/3, 6, 13, 10-12, 14/15, 0); only cancel -> cancel passes"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(isCancelStatus\\(existingOrder\\.status\\)\\) \\{[\\s\\S]{0,900}?error: \"ORDER_CANCELLED\"",
+          "desc": "CORE invariant 2: store-accept (update/viewd) refuses all of 4/5/7/8/9, String()-normalised, with error ORDER_CANCELLED"
+        },
+        {
+          "file": "services/coins/order-coins.js",
+          "regex": "const coinsMoveThePrice = Math\\.abs\\(expectedWithCoins - expectedWithoutCoins\\) >= CENT;\\s*const totalIsTheNoCoinsPrice = Math\\.abs\\(clientTotal - expectedWithoutCoins\\) < CENT;\\s*return \\{\\s*reflected: !\\(coinsMoveThePrice && totalIsTheNoCoinsPrice\\),",
+          "desc": "CORE invariant 32: coins are dropped only on POSITIVE evidence - the client total equals the no-coins price and the coins would have moved it; a total matching neither is left alone"
+        },
+        {
+          "file": "services/coins/order-coins.js",
+          "regex": "const NO_REDEEM_STATUSES = \\[\"0\", \"4\", \"5\", \"7\", \"8\", \"9\"\\];",
+          "desc": "CORE invariant 32: an unconfirmed (0) or cancelled/rejected order never redeems coins"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const inTotal = coinsDiscountInOrderBody\\(parsedBodey, validationResult\\.shekelValue\\);\\s*if \\(inTotal\\.reflected\\) \\{\\s*usedCoinsData = \\{[\\s\\S]{0,600}?reason: \"total-not-reduced\"",
+          "desc": "CORE invariant 32: /api/order/create keeps usedCoins only when the raw client total took them off; otherwise usedCoins is null (never redeemed) and coinsEntitlement says why"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "const redeemCoinsOnPaymentSuccess = async \\(orderNumber, orderStatus\\) => \\{\\s*if \\(!usedCoinsData \\|\\| !usedCoinsData\\.amount\\) return;[\\s\\S]{0,400}?if \\(!mayRedeemCoinsForStatus\\(orderStatus\\)\\) \\{",
+          "desc": "CORE invariant 32: every create-path redeem passes the order's status and is refused for 0 / cancelled"
+        },
+        {
+          "file": "services/coins/coins-service.js",
+          "regex": "redeemedOrderIds: \\{ \\$ne: redeemKey \\}\\s*\\},\\s*\\{\\s*\\$addToSet: \\{ redeemedOrderIds: redeemKey \\},",
+          "desc": "CORE invariant 32: redeemCoins is once per order (customerCoins.redeemedOrderIds in the same atomic debit)"
+        },
+        {
+          "file": "services/coins/coins-service.js",
+          "regex": "netRedeemedForOrder\\(existing, \\[orderId, originalOrderId\\]\\)",
+          "desc": "CORE invariant 32: a cancel refunds only what the order actually redeemed (net of earlier refunds), under orderId OR the pre-2026-05 originalOrderId key"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(isCancelStatus\\(updateobj\\?\\.status\\) && order\\.order\\.receipt_method === \"DELIVERY\"\\)[\\s\\S]{0,1200}?String\\(deliveryRecord\\.status\\) !== DELIVERY_STATUS\\.CANCELLED_BY_ADMIN",
+          "desc": "CORE invariant 2: order/update cancels the bookDelivery for every cancel code (incl. 5 and 9) and skips one already at -3"
         },
         {
           "file": "routes/order.js",
@@ -577,7 +641,7 @@
         {"file": ["utils/delivery-row.js", "routes/order-amend.js"], "regex": "(?:if \\(order\\.originalOrderId\\) \\{\\s*const filter = \\{ originalBookId: String\\(order\\.originalOrderId\\) \\};\\s*if \\(orderId\\) filter\\.bookId = orderId;\\s*return filter;\\s*\\}|await deliveryDB\\.bookDelivery\\.updateOne\\(\\{ bookId: order\\.orderId \\}, \\{ \\$set: snapshot \\}\\);)", "desc": "CORE invariant 23: an order with originalOrderId is located by originalBookId (bookId only narrows, for the index), no appName on this branch - valid-before leg is order-amend's old bookId-only snapshot write (and routes/order-amend.js from this file list) on main before the code PR; drop it once shoofi-server fix/delivery-row-by-original-order-id has merged"},
         {"file": ["utils/delivery-row.js", "routes/order-amend.js"], "regex": "(?:if \\(orderId && store\\) \\{\\s*return \\{ bookId: orderId, appName: String\\(store\\) \\};\\s*\\}\\s*return null;|await deliveryDB\\.bookDelivery\\.updateOne\\(\\{ bookId: order\\.orderId \\}, \\{ \\$set: snapshot \\}\\);)", "desc": "CORE invariant 23: a legacy order falls back to bookId + appName; with neither key the helper returns null - never a bookId-only filter - valid-before leg is order-amend's old bookId-only snapshot write (and routes/order-amend.js from this file list) on main before the code PR; drop it once shoofi-server fix/delivery-row-by-original-order-id has merged"},
         {"file": "routes/order.js", "regex": "(?:const deliveryFilter = deliveryRowFilterForOrder\\(order, appName\\);\\s*const deliveryRecord = deliveryFilter\\s*\\? await deliveryDB\\.bookDelivery\\.findOne\\(deliveryFilter\\)\\s*: null;\\s*if \\(deliveryRecord && deliveryRecord\\.driver\\?\\._id\\) \\{[^{}]*?await deliveryDB\\.bookDelivery\\.updateOne\\(\\s*\\{ _id: deliveryRecord\\._id \\},\\s*\\{\\s*\\$set: \\{\\s*isReadyForPickup: true,|await deliveryDB\\.bookDelivery\\.updateOne\\(\\s*\\{ bookId: order\\.orderId \\},\\s*\\{\\s*\\$set: \\{\\s*isReadyForPickup: true,)", "desc": "CORE invariant 23: /api/order/update ready-for-pickup finds the row through the helper and writes the row it read, by _id - valid-before leg is the old bookId-keyed isReadyForPickup write on main before the code PR; drop it once shoofi-server fix/delivery-row-by-original-order-id has merged"},
-        {"file": "routes/order.js", "regex": "(?:if \\(deliveryRecord\\) \\{[^{}]*?await deliveryDB\\.bookDelivery\\.updateOne\\(\\s*\\{ _id: deliveryRecord\\._id \\},\\s*\\{\\s*\\$set: \\{\\s*status: DELIVERY_STATUS\\.CANCELLED_BY_ADMIN,|await deliveryDB\\.bookDelivery\\.updateOne\\(\\s*\\{ bookId: order\\.orderId \\},\\s*\\{\\s*\\$set: \\{\\s*status: DELIVERY_STATUS\\.CANCELLED_BY_ADMIN,)", "desc": "CORE invariant 23: /api/order/update cancel writes -3 on the row it read (by _id), so the driver notified is the one cancelled - valid-before leg is the old bookId-keyed cancel write on main before the code PR; drop it once shoofi-server fix/delivery-row-by-original-order-id has merged"},
+        {"file": "routes/order.js", "regex": "(?:if \\(deliveryRecord(?: && String\\(deliveryRecord\\.status\\) !== DELIVERY_STATUS\\.CANCELLED_BY_ADMIN)?\\) \\{[^{}]*?await deliveryDB\\.bookDelivery\\.updateOne\\(\\s*\\{ _id: deliveryRecord\\._id \\},\\s*\\{\\s*\\$set: \\{\\s*status: DELIVERY_STATUS\\.CANCELLED_BY_ADMIN,|await deliveryDB\\.bookDelivery\\.updateOne\\(\\s*\\{ bookId: order\\.orderId \\},\\s*\\{\\s*\\$set: \\{\\s*status: DELIVERY_STATUS\\.CANCELLED_BY_ADMIN,)", "desc": "CORE invariant 23: /api/order/update cancel writes -3 on the row it read (by _id), so the driver notified is the one cancelled - valid-before leg is the old bookId-keyed cancel write on main before the code PR; drop it once shoofi-server fix/delivery-row-by-original-order-id has merged"},
         {"file": "routes/order-amend.js", "regex": "(?:const deliveryFilter = deliveryRowFilterForOrder\\(order, appName\\);\\s*if \\(!deliveryFilter\\) return;\\s*const booking = await deliveryDB\\.bookDelivery\\.findOne\\(deliveryFilter\\);[\\s\\S]*?await deliveryDB\\.bookDelivery\\.updateOne\\(\\{ _id: booking\\._id \\}, \\{ \\$set: snapshot \\}\\);|await deliveryDB\\.bookDelivery\\.updateOne\\(\\{ bookId: order\\.orderId \\}, \\{ \\$set: snapshot \\}\\);)", "desc": "CORE invariant 23: syncDeliverySnapshot locates the row through the helper and overwrites only that row, by _id - valid-before leg is the old bookId-only snapshot write on main before the code PR; drop it once shoofi-server fix/delivery-row-by-original-order-id has merged"},
         {"file": "services/twin-order/twin-group-service.js", "regex": "(?:async function legDeliveryFilter\\(appDb, \\{ appName, orderObjectId, orderId \\}\\) \\{[\\s\\S]*?return deliveryRowFilterForOrder\\(order \\|\\| \\{ orderId \\}, appName\\);|const bookIds = \\[group\\.primary\\?\\.orderId, group\\.secondary\\?\\.orderId\\]\\.filter\\(Boolean\\);)", "desc": "CORE invariant 23: a twin leg's row is resolved from the leg's order (originalOrderId), else short number + the leg's store (cascadeCancel, degradeToSingle, undoDegrade) - valid-before leg is cascadeCancel's old bookIds loop on main before the code PR; drop it once shoofi-server fix/delivery-row-by-original-order-id has merged"},
         {"file": "routes/twin-order.js", "regex": "(?:const deliveryFilter = deliveryRowFilterForOrder\\(order, sideAppName\\);|doc = await deliveryDB\\.bookDelivery\\.findOne\\(\\{ bookId: order\\.orderId \\}\\);)", "desc": "CORE invariant 23: twin assign-driver no longer falls back to a bookId-only lookup before writing a driver onto the row - valid-before leg is the old bookId-only fallback on main before the code PR; drop it once shoofi-server fix/delivery-row-by-original-order-id has merged"},
@@ -1031,6 +1095,29 @@
         {"file": "utils/http-interceptor/index.ts", "regex": "config\\.headers\\[\"Authorization\"\\] = \"Token \" \\+ token;[\\s\\S]{0,600}?config\\.headers\\[\"app-type\"\\] = \"shoofi-partner\";", "desc": "ref C3: partner requests send Token auth + app-type shoofi-partner (what storeMemberGate keys on)"},
         {"file": "utils/http-interceptor/index.ts", "regex": "if \\(error\\?\\.message\\?\\.includes\\(\"401\"\\)\\) \\{\\s*DeviceEventEmitter\\.emit\\(`OPEN_GENERAL_SERVER_ERROR_DIALOG`, \\{\\s*show: true,\\s*isSignOut: true,", "desc": "CORE invariant 18: any 401 signs the store out (resetAppState + restart) - a partner-polled route must never 401 a logged-in terminal"},
         {"file": "stores/orders/index.tsx", "regex": "const storeDB = await AsyncStorage\\.getItem\\(\"@storage_storeDB\"\\);\\s*return axiosInstance\\s*\\.get\\(api, \\{\\s*headers: \\{\\s*\"app-name\": storeDB,", "desc": "CORE invariant 18: the feed's app-name is @storage_storeDB (the token's store or a membership) - what storeMemberGate accepts"}
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/components/Cards/order-actions/status-options.ts",
+        "src/components/Cards/order-actions/__tests__/status-options.test.ts"
+      ],
+      "patterns": [
+        {
+          "file": "src/components/Cards/order-actions/useOrderActions.tsx",
+          "regex": "statusOptionsFor\\(order\\.status\\)\\.map\\(",
+          "desc": "CORE invariant 2: the order card's status modal lists statusOptionsFor(order.status), which offers a cancelled/rejected order only cancel codes"
+        },
+        {
+          "file": "src/components/Cards/order-actions/status-options.ts",
+          "regex": "if \\(!isCancelledOrRejected\\(currentStatus\\)\\) return all;\\s*return all\\.filter\\(\\(\\[value\\]\\) => isCancelledOrRejected\\(value\\)\\);",
+          "desc": "CORE invariant 2: a cancelled/rejected order is offered ONLY cancel codes (not 1/2/3, not 6, not 13)"
+        },
+        {
+          "file": "src/components/Cards/order-actions/OrderActionsMenu.tsx",
+          "regex": "export const CANCELED_STATUSES = CANCELLED_OR_REJECTED_STATUSES;[\\s\\S]*\\{!isCancelledOrRejected\\(order\\.status\\) && \\(",
+          "desc": "CORE invariant 2: the 'cancel order' gate uses the same 4/5/7/8/9 list (REJECTED included), String()-normalised"
+        }
       ]
     }
   }
