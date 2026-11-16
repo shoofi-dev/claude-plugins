@@ -1244,6 +1244,29 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       is written.** Nothing is written while a store's `tableOrdering` is off (the default).
     - Tests: shoofi-server `test/integration/kopa/table-orders.js` (20).
 
+32. **THE ORDER-CREATE LOCK IS RELEASED ONLY IN THE HANDLER'S `finally` (OR BY ITS 10s TTL). THE
+    30s "RECENT ORDER" CHECK OBSERVES AND NEVER BLOCKS** (shoofi-server `routes/order.js`
+    `/api/order/create`, `services/orders/recent-order-check.js`; branch
+    `fix/HIGH-RISK-order-duplicate-check-keeps-lock`, HQ #82e96b, 2026-11-14).
+    - The lock is `order_lock:<appName>:<customerId>`: Redis `SET NX EX 10`, or the in-memory
+      `orderCreationLocks` map under **the same key**. A second request while it is held gets
+      429 `ORDER_IN_PROGRESS`. Until 2026-11-14 the in-memory map was keyed on `customerId`
+      alone, so with Redis down it refused the same customer's order in ANOTHER store.
+    - Until 2026-11-14 the recent-order check RELEASED the lock when it found an order in the
+      last 30s, and then created the order anyway. It blocked nothing and switched off the only
+      real double-submit guard. Never release the lock on a branch that continues.
+    - **The server never sends `DUPLICATE_ORDER`.** shoofi-app `use-checkout-submit.ts` handles it
+      as a generic error dialog. **Decided (owner, 2026-11-14, option C): the check stays
+      log-only and must not become a 409.** Data for 30 days to 2026-11-14: 403 same-customer, same-store pairs within 30s. 369 (92%) of
+      them were a retry after an uncharged status `"0"` attempt, and 0 had both orders alive. So
+      a blanket 30s block would mostly refuse declined-card retries.
+    - Real duplicates are resubmits outside 30s. The idempotency key (`parsedBodey.idempotencyKey`)
+      is the guard for those, and only wallet checkouts send one (cash and card to follow in a
+      shoofi-app ticket). There is no index on `idempotencyKey` in any store DB, but none is
+      needed: the replay lookup `{ idempotencyKey, customerId }` uses `customerId_idx`, which
+      every store DB has.
+    - Test: `test/integration/order-recent-order-check-keeps-lock.js`.
+
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
 `shoofi-app/stores/cart/index.ts` and nothing about it reaches the server until submit, so
