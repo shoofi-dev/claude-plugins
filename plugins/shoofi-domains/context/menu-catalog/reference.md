@@ -1386,6 +1386,8 @@ Code: `routes/kopa/menu-write.js` (thin), `services/kopa/menu-write.js`; tests
     `updatedAt`, `createdBy` (= `req.auth.id`, the partner token's storeUsers id), the admin create's
     keys in the same order (the test runs `POST /api/admin/promotions` on the same fake DB and compares).
     `validatePromotion` errors → `400 { message, errors }` with the admin's messages. → `data` = doc + `_id`.
+    For an active deal those include the texts-vs-fields check (`utils/promotion-title-check.js`,
+    orders CORE invariant 13): a title saying "מעל 165₪" over a ₪20 minimum is refused.
   - `PATCH /api/kopa/promotions/:id` — any form fields; the doc is `sanitizePromotion({ ...stored,
     ...body })` + `updatedAt`, `updatedBy`, `$set` over the stored doc (top-level overlay: `config` and
     `scope` replace as whole objects). With the full form it writes exactly what
@@ -1393,6 +1395,8 @@ Code: `routes/kopa/menu-write.js` (thin), `services/kopa/menu-write.js`; tests
     re-sanitising a stored doc is idempotent. Empty or non-object body → `400`.
   - `POST /api/kopa/promotions/:id/active` — `{ isActive: <JSON boolean> }` (anything else `400`); the
     same re-sanitise with only `isActive` changed, as the admin's "post the doc back" update does.
+    Switching OFF is never refused over the deal's wording; switching ON a deal whose texts
+    contradict its fields is (`400`, the same lines).
   - Ids go through the admin's `getPromotionById` on the proven store's DB: another store's id or a
     malformed one → `404`, nothing written.
   - Side effects equal the admin's: both cache keys, then `syncCampaignCategoryForStore`, swallowed.
