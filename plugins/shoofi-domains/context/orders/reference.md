@@ -1184,6 +1184,12 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   - **MoneyLine** (`src/components/MoneyLine.tsx`, `src/utils/money-summary.ts`) renders
     `order.moneySummary` on every order card / twin card / live-ops row; a twin leg shows its
     GROUP's line ("חלק מתשלום משולב"). No `moneySummary` → the legacy `charge-state.ts` badge.
+    `release_failed` reads "התפיסה ₪N לא שוחררה · לא לזכות ידנית" (amber): N is
+    `moneySummary.heldAmount`, else — a summary stored before shoofi-server
+    `fix/release-failed-held-amount` carries 0 — the order's `paymentAuth`
+    (`releaseFailedHeldAmount`: authorizedAmount, refundRequiredAmount, total). The order is
+    passed only when the summary is the order's own (not a twin group's), so the monitoring
+    screen, which has the summary alone, names no amount rather than ₪0.
   - **"חייבים ללקוח"** (`src/views/admin/money/MoneyOwed.tsx`, `/admin/money-owed`,
     `src/utils/money-owed.ts`): the owed queue (`money/owed`), record a portal refund
     (`money/record-refund`), resolve an in-doubt HYP refund (`money/resolve-unknown`). Finance =

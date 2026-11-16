@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/release-failed-held-amount / 2026-11-15 (invariant 12: a release_failed J5 hold in moneySummary); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -186,6 +186,13 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    answer). A cancel is settled once: a second cancel records `cancelSettlementSkipped` instead.
    Readers: admin `charge-state.ts` (badge), HQ money audit (`cancelled-not-refunded`,
    `uncancel-leftovers`).
+   **A J5 hold HYP refused to release** (`paymentAuth.status: "release_failed"`, e.g.
+   `release_refused_ccode_920`, `refundRequiredAmount` = the order total) was never captured:
+   the money is frozen on the card until `paymentAuth.expiresAt`, nothing is owed, and support
+   must NOT credit it. Its `moneySummary` is `state: "release_failed"` with `heldAmount` =
+   `authorizedAmount ?? refundRequiredAmount ?? total` (display only — owed stays 0; orders
+   CORE invariant 28). Before shoofi-server `fix/release-failed-held-amount` (2026-11-15) that
+   amount was stored as 0; the admin `MoneyLine` falls back to `paymentAuth` for those.
    **Since 2026-11-07 every cancel is also recorded in the charge's money ledger** (orders CORE
    invariant 28, `services/money/*`): `refunded + compensated + owed ≤ captured` is enforced on
    every write. What touches money-in code: (a) `applyCaptureSuccess` (twin) records
