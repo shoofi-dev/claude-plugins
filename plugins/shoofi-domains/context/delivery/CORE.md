@@ -144,11 +144,12 @@ booking time**: editing the saved address later changes nothing on a placed orde
 reference C1; the saved-address side is `customers` CORE invariant 20.
 
 ## Courier task info + problem reports (Nov 2026)
-Seven additive routes for the redesigned courier app (reference §5b,
+Ten additive routes for the redesigned courier app (reference §5b,
 `shoofi-server/docs/courier-task-routes.md`): `GET driver/order/:id/store-status`,
 `POST driver/order/issue`, `GET driver/order/:id/issues`, `GET driver/me/stats`,
-`GET driver/me/active-time` (all `driverSelfAction`: identity = the token, another courier's
-delivery = 404) and `GET admin/issues` + `POST admin/issues/:id/status` (`deliveryDashboardAdmin`).
+`GET driver/me/active-time`, `GET driver/me/day-summary` (all `driverSelfAction`: identity = the
+token, another courier's delivery = 404) and `GET admin/issues`, `POST admin/issues/:id/status`,
+`GET|POST admin/courier-levels` (`deliveryDashboardAdmin`).
 - Reports live in the new **`delivery-company.delivery-issues`** (hyphenated; `db.deliveryIssues`)
   and **never change the delivery** — no status, no reassignment, no money. The admin bell
   (`delivery_issue`) and the flow event are each wrapped (invariant 6).
@@ -156,9 +157,14 @@ delivery = 404) and `GET admin/issues` + `POST admin/issues/:id/status` (`delive
   `late-delivery.js` keyed on `accountableDriverId`; minutes = `computeDayLive`; earnings =
   `effectiveDeliveryFee` (`lib/payments/calc.js`, imported read-only — payouts stay
   `accountant`'s). Change one of those and the courier's profile moves with the admin's screens.
+- `me/stats.level` comes from the admin-set ladder **`shoofi.store {id: 1}.courierLevels`**
+  (written only through `admin/courier-levels`). Not set or not reached → `null`, never a
+  default level. `me/day-summary` is the payments summary's `summary` over the business day,
+  pinned to the real route by a test, and buckets by `created`. `active-time` earnings use
+  completion instead.
 - `me/stats.declines` is `null`, not 0, until the decline feature that writes
   `bookDelivery.declines[]` (`services/delivery/driver-decline.js`) is in the tree (invariant 11's
-  lesson: confirm a writer before reading a field).
+  lesson: confirm a writer before reading a field). `me/stats.acceptance` follows the same rule.
 - The older driver routes they replace for the app are left as they were: `driver/stats` answers
   zeros for everyone and a dozen driver routes have no auth — both flagged, reference C1 / §10.7.
 

@@ -310,19 +310,21 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
 ## 5b. Courier task info + problem reports (shoofir redesign, Nov 2026)
 `routes/delivery/driver-task-info.js` + `routes/delivery/driver-issues.js` (mounted LAST in
 `routes/delivery.js`, on paths no older router declares), logic in
-`services/delivery/courier-task-info.js` + `services/delivery/courier-issues.js`. Repo doc:
+`services/delivery/{courier-task-info,courier-issues,courier-levels,courier-day-summary}.js`. Repo doc:
 **`shoofi-server/docs/courier-task-routes.md`**. Client: shoofir `utils/courier-api.ts`, which
 treats any failure (an older server's 404 included) as "leave that panel out".
 
 | Route | Gate | Answer |
 |---|---|---|
-| `GET /api/delivery/driver/order/:id/store-status` | `driverSelfAction` | `{orderStatus, isReady, readyAt, pickupTime, originalPickupTime, delayMinutes, delayUpdatedAt, expectedDeliveryAt}` |
+| `GET /api/delivery/driver/order/:id/store-status` | `driverSelfAction` | `{orderStatus, isReady, readyAt, pickupTime, originalPickupTime, delayMinutes, delayUpdatedAt, expectedDeliveryAt, deliveryStatus, startedAt, cancelledAt, cancelReason}` |
 | `POST /api/delivery/driver/order/issue` | `driverSelfAction` | `{issueId}` |
 | `GET /api/delivery/driver/order/:id/issues` | `driverSelfAction` | `{issues}` — the caller's own, newest first |
-| `GET /api/delivery/driver/me/stats?days=30` | `driverSelfAction` | `{totalDelivered, courierSince, onTime{windowDays,onTime,late,measured,pct}, rating{avg,count}, declines}` |
+| `GET /api/delivery/driver/me/stats?days=30` | `driverSelfAction` | `{totalDelivered, courierSince, onTime{windowDays,onTime,late,measured,pct}, rating{avg,count}, declines, acceptance{windowDays,assigned,declined,pct}, level{key,name_ar,name_he}}` |
 | `GET /api/delivery/driver/me/active-time?date=` | `driverSelfAction` | `{date, window{start,end}, activeMinutes, inShiftMinutes, outsideShiftMinutes, inWorkingHoursMinutes, earnings{total,deliveries}}` |
+| `GET /api/delivery/driver/me/day-summary?date=` | `driverSelfAction` | `{date, window{start,end}, summary}` — `summary` has exactly `POST /payments/driver/summary`'s keys |
 | `GET /api/delivery/admin/issues?status=&from=&to=&limit=` | `deliveryDashboardAdmin` | `{issues, total}` |
 | `POST /api/delivery/admin/issues/:id/status` | `deliveryDashboardAdmin` | `{issue}`; `handledBy`/`handledAt` + `statusHistory[]` |
+| `GET\|POST /api/delivery/admin/courier-levels` | `deliveryDashboardAdmin` | `{courierLevels}`; POST writes ONLY that key (null/[] removes it) |
 
 - **Identity is the token.** `:id` is a `book-delivery._id`; a delivery whose `driver._id` is not
   the caller is a **404**. The GET routes read no driver id from URL or query.
@@ -343,6 +345,35 @@ treats any failure (an older server's 404 included) as "leave that panel out".
   feedback rows with no `orderObjectId` (old clients) fall back to `appName + orderId = bookId`.
   `declines` is **null** until `services/delivery/driver-decline.js` (shoofi-server #540,
   writes `bookDelivery.declines[]`) is in the tree — nothing on main writes the field.
+- **Acceptance** is null under the same condition as `declines`. Otherwise
+  `assigned` = distinct deliveries booked in the window where the courier is the driver or a
+  previous driver, UNION those he declined there (a decline clears `driver`). `declined` =
+  distinct deliveries he declined in the window. `pct` is a whole percent, null at 0 assigned.
+- **Level**: the ladder is **`shoofi.store {id: 1}.courierLevels`**, on the platform doc that
+  holds `driversSupportPhone`. Shape: `[{key, name_ar, name_he, minDeliveries, minOnTimePct}]`,
+  ≤ 10 entries, keys `[a-z0-9_-]` and unique.
+  - `minDeliveries` is compared with all-time `totalDelivered`. `minOnTimePct` (null = no
+    requirement) is compared with the **30-day** on-time %, whatever `days` was asked, and a
+    courier with nothing measured cannot reach a % level.
+  - The highest level reached wins. Not set / none reached → null; there is **never a default
+    level**.
+  - Edited in the admin web's general settings (`CourierLevelsSettings.tsx`) through
+    `admin/courier-levels` only. A partial body to `/api/shoofiAdmin/store/update` reads as a
+    store status change (it compares `isOpen` etc. against `undefined`): it clears the explore
+    cache and refreshes every customer.
+  - The reader re-validates and drops a malformed ladder.
+- **Day summary** (`me/day-summary`) is the courier's "today" earnings: the payments summary's
+  `summary` object over the business day [D 09:00, D+1 02:00). The default D is the business day
+  now belongs to (before 09:00 it is still yesterday's).
+  - It reuses the summary's own per-delivery helpers (`effectiveDeliveryFee`,
+    `couponDeliveryPortion`) and buckets by **`created`**, like the summary. A test pins it to
+    the real route on a calendar day.
+  - It deliberately differs only at window edges: an instant cut instead of a string compare,
+    a compensation item counts only by its own `approvedAt`, and `status` matches `"4"`/`4`.
+  - It is not `me/active-time`'s `earnings`, which windows on completion.
+- **Store status** also carries the booking's own `deliveryStatus`, `startedAt` (collected),
+  `cancelledAt` and `cancelReason`. The times are a Date on one writer and an ISO string on
+  another; both are returned as ISO.
 - **Active time** = `computeDayLive` for ANY courier (the hourly-only 403 of
   `/api/driver-hours/my` is untouched). `activeMinutes` covers the 09:00→09:00 day the hours
   screens show; `window` is 09:00→02:00. `earnings.total` = Σ `effectiveDeliveryFee`
