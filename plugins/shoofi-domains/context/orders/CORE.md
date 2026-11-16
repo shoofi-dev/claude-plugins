@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-partner@feat/new-order-alarm-media-volume 1a0d0c3 / 2026-11-16 (ref C3: foreground new-order rings on iOS play through the app at media volume, inAppAlarmSound + alarm-player; background and Android unchanged); shoofi-server@fix/twin-prep-range-prep-extra / 2026-11-07 (reference §4 twin prep range + prepExtra); shoofi-app@fix/checkout-coins-single-writer 02086937 (#145) + shoofi-server@b0129caa (main) / 2026-11-16 (invariant 32: coins pay for the items only, the app blocks more, the server refuses silently and stays as is; TotalPriceCMP the one writer of checkout coins; limit line only at the cap; reference §3, §5, C1); shoofi-server@fix/HIGH-RISK-picked-up-only-from-ready / 2026-11-15 (invariant 2: 10/11 only from ready, atomic, dashboard exempt; reference §2, C3, C4); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (invariants 2, 9; reference §2, C3); shoofi-partner@fix/owner-walkthrough / 2026-11-11 (invariant 17: printer per tablet, print failures shown; cancel alert); shoofi-partner@fix/partner-print-failure-log-once-notice / 2026-11-08 (invariant 17: one error row per failed copy; the pop-up was dropped before merge); shoofi-partner@fix/owner-walkthrough + feat/school-orders-v3 / 2026-11-14 (reference C3 customer note: v3 readers OrderCardV3, NewOrderViewV3, SchoolOrderCardV3); shoofi-partner@feat/order-alert-arrival-log / 2026-11-14 (reference C3 "Measuring how a new order reaches the tablet": apps-logs partner_order_alert_received / partner_new_order_seen; listener pin accepts the ref call); shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -15,7 +15,7 @@ per-repo client sections.
 **Yours:** order creation, status transitions, twin orders, order reads/admin/monitoring,
 customer order history, order crons, and the order-side wiring of secondary features
 (coins, world-cup, attribution, coupon usage).
-Server: `routes/order.js`, `routes/twin-order.js`, `routes/order-fraud-*.js`,
+Server: `routes/order.js`, `routes/twin-order.js`, `routes/money.js`, `services/money/*`, `services/orders/cancel-money.js`, `routes/order-fraud-*.js`,
 `routes/admin/order-monitoring.js`, `services/twin-order/*`, `utils/order-stock.js`,
 `utils/order-pricing.js` + `utils/order-pricing-shadow.js`, `routes/order-amend.js`,
 `utils/delivery-row.js` (how an order finds its delivery row, invariant 23),
@@ -26,7 +26,11 @@ Server: `routes/order.js`, `routes/twin-order.js`, `routes/order-fraud-*.js`,
 invariant 16), who may call the coins admin routes (`routes/coins.js` `/api/admin/coins/*` and the
 Coins Settings block of `routes/shoofi-admin.js`, invariant 19), `services/orders/shipping-price-check.js`
 (the log-only delivery-fee check, invariant 20), `routes/order-history.js` +
-`services/orders/order-history.js` (the partner's one-day order history, invariant 21), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
+`services/orders/order-history.js` (the partner's one-day order history, invariant 21),
+`routes/kopa/orders.js` + `services/kopa/orders.js` (Kopa's orders, cancel log and stories,
+invariant 29), the Kopa till: `routes/kopa/{reasons,tables,till-orders,kds,settings}.js` +
+`services/kopa/{reasons,tables,till-orders,kds,settings}.js` (in-store sales in
+`kopaTillOrders`, invariant 30), order crons. Docs: `docs/combo-deals.md` (the order-line half). Clients: checkout+tracking (app), accept/prepare (partner), pickup/deliver
 (shoofir), monitoring/twin-admin (delivery-web).
 
 **Not yours:** payment internals (`payments`), settlement/payouts (`accountant`), driver
@@ -55,8 +59,25 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    helper's `inferred` taste cache), and the AI helper's `deliveredOrders` counts COMPLETED
    statuses, not courier deliveries (reference §5).
 2. **Transition guards:** PENDING(`6`) only from FRAUD_REVIEW; store-accept rejects
-   already-cancelled; `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
+   already-cancelled `4,7,8,9` but **not** REJECTED `5`: its list omits it (`routes/order.js`
+   `/api/order/update/viewd`, ~6002), so a `5` order passes and is overwritten to `1`/`14`/`15`
+   (reference §2); `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
    not `order/update`.
+   **"Handed over" only from "ready"** (`services/orders/picked-up-guard.js`, since
+   2026-11-15): on `/api/order/update`, `10` needs the order at `2`, and `11` at `2` or `3`
+   (the partner `nextStatusFor` edges). The allowed statuses go **in the `updateOne` filter**
+   (`writeFilter.status = { $in: pickedUpFrom }`), so a cancel that lands between the read and
+   the write still wins. A refusal is **`409` `{message, code: "STATUS_ALREADY_CHANGED",
+   currentStatus}`**, the PENDING guard's shape (`statusAlreadyChangedBody`), and runs NONE of
+   the side effects. A retry when the order is already at the target is `200 {unchanged: true}`,
+   also with no side effects. **Dashboard tokens are exempt** (`hasAdminRole(auth,
+   DASHBOARD_ROLES)`), so support behaves exactly as before. The admin web sends no `10`/`11`
+   today (its dropdown offers 6/1/2/3/7/13/5), so the exemption only keeps a deliberate
+   correction possible. Partner, impersonation, driver and customer tokens carry no `roles`,
+   so all of them are guarded.
+   Without this, a stale tablet tap un-cancelled an order and reversed none of the cancel's
+   side effects. Never move this check into a pre-read `if`: that reopens the race. Test:
+   `test/integration/order-picked-up-guard.js`.
 3. **Stock idempotency:** `decrementOrderStock`/`restoreOrderStock` gated on
    `stockDecremented && !stockRestored` + `store.isStockManagment`. Decrement **only** on
    confirmation — a failed charge must never consume stock.
@@ -80,10 +101,18 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    **customers are central** (`shoofi`). Don't cross them.
 8. **Twin peers** are mutated by `services/twin-order/*` directly, never via
    `/api/order/update` (recursion).
-9. **`isFutureOrder`/`isRamadanIftar` are written only when TRUE — never `false`.** Both come
-   from one client-side `orderTimingMode` (`shoofi-app/screens/checkout/index.tsx`) and are
-   attached conditionally in `submitOrder` (`shoofi-app/stores/cart/index.ts`), so on a
-   same-day order the fields are **absent**, not `false`. They are **mutually exclusive** — a
+9. **`isFutureOrder`/`isRamadanIftar`: absent and `false` both mean "no", so test them
+   truthily.** Both come from one client-side `orderTimingMode`
+   (`shoofi-app/screens/checkout/index.tsx`) and are attached only when true in `submitOrder`
+   (`shoofi-app/stores/cart/index.ts` ~709-713). The server then treats them differently:
+   `isFutureOrder` reaches the order only through the `...parsedBodey` spread (`routes/order.js`
+   ~3849), so on a same-day order it is **absent**. `isRamadanIftar` is always written by
+   `/api/order/create` as `isRamadanIftar: isRamadanIftarOrder || false` (~order.js:3905, where
+   `isRamadanIftarOrder = Boolean(orderDate && isRamadanIftar)`, ~3420), so on an ordinary order
+   it is **`false`**. Accept copies both onto the `bookDelivery` doc as `|| false`
+   (~order.js:6427-6428). The server readers of `isRamadanIftar` all test it truthily (`=== true`,
+   a truthiness check, or a `switch (true)` case; verified 2026-11-07). Never query
+   `{$exists: false}` or `=== false` on either flag. They are **mutually exclusive** — a
    ramadan-iftar order can be up to `MAX_RAMADAN_DAYS_AHEAD` = 3 days ahead
    (`shoofi-app/components/checkout/FutureOrderPicker.tsx`) and never carries `isFutureOrder`.
    "Is this order for a later day?" must therefore test **both**, **truthily** — as the server
@@ -439,10 +468,44 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **Image i belongs to queue[i].** A failed capture keeps a `null` slot
       (`captureAlignedToQueue`) and is not printed. Skipping it used to shift later images
       onto the wrong order and mark an unprinted one printed.
+    - **No printer address = printed without paper, exactly like `isDisablePrinter`. There
+      is no fallback printer.** An Epson store whose `printerTarget` is missing, blank,
+      `"null"`, `"<null>"` or `"undefined"` (trimmed, any case; `hasPrinterAddress` in
+      `helpers/printer/printer-selection.ts`) gets `NON_CONNECTING_TARGET_PLACEHOLDER` =
+      `"NO_PRINTER"`, which is never an address. For such a store (and for `isDisablePrinter`)
+      the loop skips the capture (`storePrintsWithoutPaper`) and `printWithOutcome` returns
+      `"printed"` before any connect and with no `printer-testPrint` row
+      (`printsWithoutPaper`), so the order IS marked printed. Urovo/Sunmi are unchanged. The
+      cached printer config is rebuilt when `printerTarget`/`printerType` changes
+      (`printerConfigIsStale`). Until shoofi-partner#65 (2026-11) a blank target fell back to
+      `BT:00:01:90:42:95:AA`, olamhayam's printer. Never reintroduce a fallback address.
     So: never make a print path's success depend on Epson's completion callback alone, and
     never drop the sweep's date or cap. A stuck order is diagnosed from
     `<store>.client-error` `source: "printer-testPrint"` rows (they now carry `outcome`),
-    plus the store's only `isPrinted:false, isViewd:true` orders.
+    plus the store's only `isPrinted:false, isViewd:true` orders. One failed copy is ONE
+    row: `printCopyWithRetry` hands each try `{attempt, maxAttempts}` and the Epson,
+    Urovo and Sunmi helpers report a `"failed"` only on the last try
+    (`shouldReportPrintFailure`, `utils/print-outcome.ts`); a retry that prints leaves no
+    row. `"unconfirmed"` always reports. Rows carry `error.attempt`/`error.attempts`, and
+    a job-building failure is `error.stage: "printOrder"` on the same row (there are no
+    separate `printer-printOrder` rows any more). There is no print-failure pop-up (dropped
+    2026-11-14): the v3 board's red printer bar is the store's signal. `isPrinted:true` with
+    no `printer-testPrint` rows can mean the store has no printer address: check
+    `printerTarget` first.
+    - **Which printer is per tablet, and "none" is a real answer** (behind `PRINTER_SETUP_V3`,
+      shoofi-partner `helpers/printer/tablet-printer.ts`, 2026-11-11). No `all`+`print` role →
+      no printer: no capture, no Bluetooth, no printer warnings. Otherwise: the store's built-in
+      head (urovo/sunmi) → this tablet's own saved choice (a found printer, or «ما عندي طابعة»)
+      → the store's `printerTarget` → not set up (a one-time «طابعة الفواتير» sheet: Epson SDK
+      discovery). Never the old hard-coded fallback address `BT:00:01:90:42:95:AA`: on prod 48
+      of 122 active stores have no `printerTarget` and printed 8 of 1,834 orders (stores with
+      one: 10,744 of 11,127) — those tablets retried a printer they don't have on every order.
+      With the flag off the store's `printerTarget` decides; there is no fallback address either
+      way, and a store with none marks its orders printed without paper (shoofi-partner#65).
+    - **A failed print is shown, not just logged** (`utils/print-failures.ts`, in memory, the
+      printing tablet only): «لم تُطبع» on the card + a bar under the dashboard / orders board (✕ hides the bar until a
+      print succeeds, then the next failure shows it again — shoofi-partner#82);
+      cleared when the order is marked printed. The server still only knows `isPrinted:false`.
 18. **THE STORE-CALENDAR AND ORDER-ADMIN READS ARE GATED PER AUDIENCE, AND THE PARTNER GATE IS
     STORE MEMBERSHIP, NOT "THE TOKEN'S OWN STORE"** (shoofi-server `services/orders/admin-access.js`).
     Until 2026-10-30, anyone who sent a store's `app-name` could close its hours, or read its
@@ -502,7 +565,8 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `update/viewd`, `printed`, `update-delay`, `start-preparing`, `update-start-preparing`,
       `update-item-collected`, `book-delivery`, `book-custom-delivery`, `update-custom-delivery`,
       `drive-in-arrival(-confirm)`, `update/all`). These are status transitions, so any change
-      is high-risk. Ungated money paths `addRefund` and `updateCCPayment` belong to payments.
+      is high-risk. The ungated money path `updateCCPayment` belongs to payments
+      (`addRefund` was removed on 2026-11-03, shoofi-server 29ed5252).
 
 19. **THE COINS ADMIN ROUTES ARE DASHBOARD-ONLY, GATED ON THE ROUTE ITSELF.** Coins have no
     domain of their own; orders owns their order-side wiring and, since 2026-10-30, who may call
@@ -859,6 +923,409 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests (shoofi-app): `__tests__/stores/active-orders-placed-and-stale.test.ts`,
       `__tests__/components/active-orders-error-and-placed.test.tsx`,
       `__tests__/components/order-history-error.test.tsx`.
+
+27. **A CANCEL SETTLES MONEY ONCE AND SAYS WHAT WAS DECIDED; A TWIN UNDO IS REFUSED ONCE MONEY
+    MOVED** (shoofi-server `fix/twin-cancel-safety`, 2026-11-06). Prod cases: twin group
+    `tg_1793989742338_dmfnny` (pier-19 9765-0521 + asaiel 7643-8302, ZCredit ₪177: degraded, undo
+    clicked 3× as silent no-ops, then both legs cancelled with "keep" and no coupon) and snooshy
+    1802-2011 (cancel "keep" → COMP ₪140 → un-cancel → cancel again → also a ₪140 refund flag).
+    - **`cancelMoneyDecision` is `keep` | `refund` | `undecided`** (`CANCEL_MONEY_DECISION`,
+      `services/orders/cancel-money.js`, re-exported by `routes/order.js`). The admin web sends
+      `keep`/`refund` only when money is at stake. A cancel status (4,5,7,8,9) with NO decision
+      (partner reject, status dropdown, driver, crons) is stamped **`undecided`** when
+      `hasCancelMoneyAtStake(order)` (not cash — `payment_method` or `payment_provider` `CASH` —
+      `total > 0`, and `paymentAuth.status` or a non-`failed` `ccPaymentRefData`), and NOT
+      stamped at all otherwise (cash / zero / never paid). Until 2026-11-06 every one of these
+      was stamped `refund`. A value other than keep/refund in the request is dropped.
+      `settleCancelledOrderMoney` still RUNS an unattended cancel as REFUND: a live J5 hold is
+      released exactly as before (`autoRefund: false`), a captured J5 is flagged by the release
+      (`captured_before_cancel`), and — new — a settled charge with no `paymentAuth` on a SINGLE
+      order is flagged `paymentAuth.refundRequired` with **`refundRequiredReason:
+      "cancel_no_decision"`**, `refundRequiredAmount = order.total` (same fields
+      `refundOrderPayment` writes; nothing is sent back). A twin leg gets the stamp and no
+      per-order flag and no per-order settle: one charge covers two orders, so the GROUP decides
+      (invariant 28, `settleTwinAfterLegCancel`).
+    - **`cancelledAt`** is now written on every live → cancelled `/api/order/update`. It is the
+      only marker a cash cancel carries, and the HQ money audit's `uncancel-leftovers` check
+      finds un-cancelled orders by `cancelMoneyDecision || cancelledAt || cancelCompensation`.
+    - **Settle once, on live → cancelled only** (`cancelSettlementSkipReason`, computed on the
+      PRE-update order, before `settleCancelledOrderMoney`): `already_cancelled` (status already
+      4/5/7/8/9), or an un-cancelled order carrying `prior_cancel_compensation`
+      (`cancelCompensation`), `prior_refund_flag` (`paymentAuth.refundRequired`) or
+      `prior_refund_issued` (`paymentAuth.refundedAmount > 0`). Then no settle runs, the
+      client-sent decision is dropped (the first cancel's `cancelMoneyDecision*` stands), and
+      `cancelSettlementSkipped { reason, at, by, requestedDecision, previousStatus }` is written.
+      The other cancel side effects (coins, coupon usage, delivery) still run, but coins are now
+      refunded once per order (invariant 28).
+    - **Twin degrade** (`degradeToSingle`): `degrade.refundOwed` = `computeDegradeRefund` = the
+      dropped leg's `total − shippingPrice`, read BEFORE any shipping transfer, +
+      `combinationFee.customerPays`; **0 (and no auto-refund attempt) unless that leg was
+      card-captured** (`isCardCapturedLeg`: not cash, non-failed `ccPaymentRefData`). There is no
+      automatic ZCredit reversal any more — `degradeAutoRefund` is not read, so `refundAttempted`
+      stays false; the amount is owed on the group ledger (invariant 28). It used
+      `orderPrice` (pre-coupon) and was > 0 on every cash degrade. `refundBreakdown.basis` is
+      `card_captured` | `not_card_captured`. **The group's `paymentStatus` is no longer touched**
+      (it was overwritten to `pending`/`partial_refunded`); refund state lives only in
+      `degrade.refund*`.
+    - **Undo-degrade refusal** (`undoDegradeBlockReason(group, keptOrder, droppedOrder)`, pure,
+      mirrored by the admin web — shoofi-delivery-web#346): `money_already_handled` when
+      `degrade.refundAttempted || degrade.refundCompleted`, or either order has
+      `cancelCompensation`, or either order has a `cancelMoneyDecision` whose
+      `cancelMoneyDecisionAt` is after `degrade.triggeredAt` (a missing timestamp on either side
+      counts as after), or the group's `moneyLedger` has any entry at/after `degrade.triggeredAt`
+      other than `capture`/`release` and the degrade's own undecided `decide`/`owe`
+      (`ledgerMovedSince`); else `kept_side_cancelled` when the kept order's status is 4/5/7/8/9.
+      A successful undo closes the degrade's undecided owe (`cancel_owed`); the dropped leg's
+      coins / coupon / deal uses returned at the degrade are NOT taken back
+      (`undoDegrade.returnedOnDegradeNotReclaimed`).
+      The route answers **409 `{ message, reason }`** (Hebrew message) and nothing is written.
+    - **`db.twinOrderGroups` is the real `twinOrderGroups` collection**
+      (`DatabaseInitializationService`); it pointed at an empty `twin-order-groups`, so undo's
+      group restore (step 6) wrote nowhere and all 7 prod undos (3 groups) left a half-undone
+      group. Every twin writer uses `db.collection('twinOrderGroups')`.
+    - **`cascadeCancel`** stamps `moneyDecision` (keep/refund from `/api/money/cancel` or the
+      triggering order route) or else `undecided` on each leg it cancels when money is at stake and
+      no decision exists; no refund flag. **The dropped leg's status:** a SUPPORT degrade (source
+      `admin` — `POST /api/money/cancel` one side, `/api/twin-order/admin/degrade`) cancels it as
+      `7` CANCELLED_BY_ADMIN with support's reason in `cancelReason` and `twinDegradeSource`; `5`
+      REJECTED only for the store side (timeout sweeper / store reject) — partner reports, HQ and
+      store metrics read 5 as "the store rejected". The customer app's twin header checks
+      "degraded" before "cancelled" (shoofi-app#96). **`degradeToSingle`** returns the dropped leg's coins,
+      coupon uses and store-deal uses (`returnLegExtras`, recorded on `degrade.returnedOnDegrade`).
+    - **Flow events** (`shoofi.orderFlowEvents`, the `trackOrderFlowEvent` writer, swallowed on
+      failure): `twin_degrade`, `twin_undo_degrade`, `twin_cascade_cancel` on BOTH legs
+      (metadata `groupId`, `side`, `role`, actor = the admin), `cancel_money_undecided`
+      (`refundFlagged`, `liveHold`, `isTwinLeg`) and `cancel_settlement_skipped` (`reason`).
+    - **Who may call** (guardrails §3a; only the admin web calls these): every
+      `/api/twin-order/admin/*` action (`cancel`, `degrade`, `undo-degrade`, `assign-driver`) is
+      `auth.required` + `checkAdminRole(TWIN_ADMIN_ROLES)` = master, admin, manager, senior,
+      operator, viewer, editor (support works on `viewer`; `accountant` excluded);
+      `GET /admin/group/:groupId/full` and `GET /api/admin/twin-order-config` take
+      `DASHBOARD_ROLES`; `POST /api/admin/twin-order-config` takes `["admin"]` (+ master). Until
+      2026-11-06 the twin routes were `auth.required` only and the config had no auth.
+    - **The second-dispatch store sees its order** by ONE rule (`utils/twin-order-visibility.js`,
+      reference §4 Dispatch) on both new-orders lists and the badge count: hidden only while the
+      first-dispatch order is live and not accepted. A dropped first store releases it WITH the
+      persistent alert (`twin_second_store_released`); `secondStoreWaiting` tells the admin while
+      it is still hidden. Prod before: 17 groups' kept store opened 8-45 min after the degrade;
+      the 3 failed-undo groups' kept orders were never seen.
+    - Tests (shoofi-server): `twin-cancel-safety.js`, `twin-admin-auth.js`,
+      `order-cancel-undecided.js`, `order-cancel-settle-money.js`,
+      `order-cancel-money-before-status.js`, `hq-money-audit.js`, `money-cancel.js`.
+
+28. **THE CHARGE IS THE UNIT OF MONEY: ONE APPEND-ONLY LEDGER PER CHARGE, ONE SUMMARY, ONE
+    DECISION** (shoofi-server `fix/twin-cancel-safety`, 2026-11-07; contract
+    `worktrees/twin-cancel-money-contract.md`, approved by Sari 2026-11-06).
+    - **Charge keys:** `order:<appName>:<orderObjectId>` (single) and `twin:<groupId>` (one
+      combined capture for both legs + the combination fee). The ledger is `moneyLedger` on the
+      order / on the `twinOrderGroups` doc; `moneySummary` (`services/money/ledger.js`
+      `summarize`, the ONLY place these numbers are computed) is stored beside it and copied onto
+      both twin legs. Orders without one are legacy — the admin falls back to `charge-state.ts`.
+    - **Entry types:** capture, release, decide, compensate, owe, refund, record_refund,
+      refund_unknown, resolve_unknown, change_decision, cancel_owed. `captured = Σcapture`;
+      `compensated = Σcompensate − Σchange_decision`; `refunded = Σrefund + Σrecord_refund +
+      Σresolve_unknown(refunded)`; `owed = Σowe − refunded − Σcancel_owed`. **Invariant, checked
+      before every write: `refunded + compensated + owed ≤ captured`** (a would-be violation is
+      refused and logged CRITICAL — this is what makes snooshy's coupon-AND-refund impossible).
+    - **Writes** (`services/money/money-store.js` `appendEntries`): versioned `updateOne` on
+      `moneyLedgerVersion` (lost race → re-read, retry), entry `key` = idempotency key (a
+      duplicate key is skipped), then the summary, the central owed index
+      `shoofi.moneyOwed` (one row per charge: status open/closed, owedAmount, refundUnknown,
+      unknownEntryId, customer, orders, decision/decidedBy/At) and a `money_<type>` flow event per
+      entry on every order of the charge. **Charge claim:** `moneyClaim {token, at, by}` on the
+      same doc, stale after 2 min; a second money action while one runs → 409
+      `{reason: "charge_busy"}`. `/api/order/update` claims a single order's charge before it
+      settles (twins: the group, in `settleTwinAfterLegCancel`).
+    - **Capture:** twins record `group.capturedAmount` + a `capture` entry in
+      `applyCaptureSuccess` = `computeCombinedTotal` (legs' totals + fee). Singles (and older
+      twins) derive it at first ledger write (`ensureCaptureEntry`): `paymentAuth.capturedAmount`
+      else `order.total` (the server charges `orderDoc.total`); older twins via
+      `twinCapturedAtCapture` (a keep-secondary degrade's shipping transfer taken back off).
+      Creation paths were NOT touched.
+    - **Singles settle through the existing primitives**: `POST /api/money/cancel` runs the whole
+      `/api/order/update` pipeline in-process (`handleOrderUpdate`, exported) with status 7 + the
+      decision, and every single-order cancel (partner, cron, admin) records its outcome with
+      `recordSingleCancel`, read off what `settleCancelledOrderMoney` wrote (release, compensate,
+      refund, or owe from the `refundRequired` flag).
+    - **Twins settle once per decision** (`services/money/money-cancel.js`
+      `settleCancelledMoney`): keep → ONE coupon via `createCancelCompensation({ scope: "twin",
+      amount, decisionKey, groupId })` = `COMP-<primary originalOrderId>[-n]`, the existing
+      Shoofi-funded shape, NOT written on `order.cancelCompensation` (ledger +
+      `moneySummary.couponCodes`); refund → owe (+ HYP auto refund below); undecided → owe. Per-side
+      calls of `createCancelCompensation` / `refundOrderPayment` still refuse twins. Scopes: one
+      side (`this`/`other` → `degradeToSingle({settleMoney:false})`, amount = that leg's total −
+      shipping + fee), `both` (→ `cascadeCancel`), `remaining` (the live leg through the order
+      route). For `both`/`remaining` the amount is what is left (`captured − refunded −
+      compensated − owed`) **plus any open undecided owe, which the decision replaces**
+      (`cancel_owed {decision: undecided}`). Cash / never charged: 0, only a `decide` entry.
+      **`decision: "none"`** is accepted only when the preview has nothing to settle for that scope
+      (refundMode none or amount 0): no `cancelMoneyDecision` stamp, nothing owed, `cancelledAt` +
+      a `cancel_no_money` flow event; with money at stake it is 400 `bad_decision`. It exists so the
+      dialog never has to send "refund" for a cash order (the stamp invariant 27 removed).
+    - **A degrade with no decision** (old admin route, timeout sweeper) records `decide` + `owe`
+      `undecided` for `refundOwed` on the group; a twin leg cancelled through the order route with
+      no decision owes the remainder `undecided`. Both land in the owed queue.
+    - **HYP twin partial refund** (`attemptHypTwinRefund`), behind `twinOrderConfig.hypAutoRefund`
+      (default false): slot claimed first as a `refund_unknown` entry with a unique key, amount
+      capped by `min(owed, captured − refunded − in-doubt)`, one attempt per decision, never
+      retried while any refund is in doubt; a definite answer appends `resolve_unknown`
+      (refunded / not_refunded), a throw (timeout / HTTP error) leaves it unknown → owed queue →
+      `POST /api/money/resolve-unknown`. HYP's sandbox approved an over-refund and every duplicate,
+      so these guards are the only ones. **ZCredit is always manual** (record-refund).
+    - **Endpoints** (`routes/money.js`; only the admin web calls them, #346):
+      `POST /api/money/cancel-preview` and `POST /api/money/cancel` (`{appName, orderId: Mongo _id,
+      scope, decision, reason}`) take the twin-action roles (all but accountant);
+      `POST /api/money/change-decision` (keep→refund: unused coupon balance → owed, coupon
+      `isActive:false`; undecided→refund; undecided→keep), `POST /api/money/record-refund`
+      (capped by owed, idempotent on provider+providerRef; on a single it clears
+      `paymentAuth.refundRequired` once nothing is owed and adds `paymentAuth.refundedAmount`),
+      `POST /api/money/resolve-unknown`, `GET /api/money/owed?status=open|closed|all` take
+      `["accountant"]` (+ master). Errors: `{reason, message, code}`.
+    - **Coins are refunded once per order** (`refundCoins`: `customerCoins.cancelRefundedOrderIds`
+      in the same atomic update; legacy rows recognised by their notes) — the twin path refunded
+      the trigger leg twice (order route + cascade).
+    - **Backfill**: `scripts/money-backfill.js`, DRY-RUN by default; `--apply` only with Sari's OK.
+      Coupons already issued against a twin group count as ONE `compensate` entry each
+      (`collectTwinCompensations`): compensation rows naming a leg / the group, and a manual twin
+      coupon stamped on the legs as `cancelCompensation { couponCode, amount, compensationId,
+      twinGroupId }` (support's shape for dmfnny ₪177 and tg_1794337558463_qo9a4q ₪174, stamped on
+      BOTH legs) — deduped by coupon code / compensation id, so a group so covered owes 0.
+    - Tests (shoofi-server): `money-cancel.js` (ledger, every endpoint, roles, concurrency,
+      re-cancel, cash twin, keep→refund on a partly used coupon, HYP success/refused/timeout/cap,
+      singles through the order pipeline, coins once), plus the invariant-27 tests.
+
+29. **KOPA'S ORDER READS USE THE STORE REPORT'S DAY ON `created`, SUM `orderPrice`, AND COUNT
+    ONLY COMPLETED ORDERS AS SALES** (shoofi-server `routes/kopa/orders.js` +
+    `services/kopa/orders.js`, branch `feat/kopa-phase1`, 2026-11-11; endpoints and shapes in
+    reference C5). All three routes are read-only and gated by `KOPA_REPORTS`. The store is
+    `req.storeMembership.appName`.
+    - **Window:** `storeReportBounds(from, to, storeDoc)` (`services/compensations/report-window.js`).
+      This is the store report's snapped openHours business days, including its
+      `openHoursEnabledMonth` rule. It is matched on **`created`**, never `orderDate`: accept and
+      every delay rewrite `orderDate` (invariant 10). `created` is what the store report,
+      `partner/summary` and the partner history bucket on. It is compared as a string, with the
+      same `+00:00` twin-leg quirk as those readers. ≤ 93 days per request.
+    - **Set:** `HISTORY_STATUSES` (1-5, 7-12). Out: `0`, `6`, `13`, `14`, `15`, a superseded
+      Apple Pay placeholder, and **school-project orders** (`isSchoolProject: {$ne: true}`, as
+      the partner live list does). The school exclusion is the one difference from the partner
+      history (invariant 21), which includes them.
+    - **Amount = `orderPrice`** (`chargedOrderPrice` in `services/payments/store-sales.js`). It is
+      never `total`, has no drive-in added and no coins subtracted. **Sales** (`summary.byPayment`
+      / `summary.total`) are `COMPLETED_STATUSES` only. Cancelled orders go in
+      `summary.cancelled`, and accepted-unfinished ones are counted in `summary.inProgress`.
+      The summary is over the whole filtered range, never one page. So with no other filter,
+      `summary.total` equals the store report's `totalRevenue` minus any completed school
+      order's `orderPrice`.
+    - **Cancel log "who":** only the admin web sends `updatedByName` / `updatedBySource` /
+      `cancelReason` to `/api/order/update`. The partner app sends only a status, so a store
+      reject's `status_change` event says `actor: "System"`. And `order.updatedByName` is the
+      LAST admin-web updater, not necessarily the canceller. So the order is:
+      1. the latest `shoofi.orderFlowEvents` `status_change` INTO the order's current status
+         (looked up by `orderId: {$in: _ids}`, indexed, never by the short number);
+      2. for a twin-service cancel (`cancelReason` `twin_*` / `twinDegradeSource`), the latest
+         `twin_cascade_cancel` / `twin_degrade` event's named admin;
+      3. with no event, `order.updatedByName` + `order.cancelledAt`.
+
+      `by` is null for "System"/"Store Admin". `byRole` is derived from the source, else from
+      the status (5 store, 7 support, 8 customer, 9 driver). The flow-event read is enrichment:
+      if it fails, the rows fall back to step 3 and the log still answers.
+    - **Removed-item price is not recorded.** An amendment keeps `{previousTotal, newTotal}` and
+      a diff `{index, itemId, name, change, from, to?}`, and the removed line is gone from
+      `order.items`. So an item row is priced `previousTotal − newTotal` (`priceBasis:
+      "amendment_delta"`, net of coupon/deal re-pricing) only when that amendment's diff is that
+      single removal. Otherwise `price: null`. Recording the line price would be a change to
+      `routes/order-amend.js` `buildDiff` (amend is high-risk).
+    - **Never returned:** `ccPaymentRefData`, `paymentAuth`, card data, `customerId`, customer
+      tokens, fraud data, `moneyLedger`, the coupon snapshot, `order.address`, an amendment's
+      `byUserId`, a story's `approval` / `marketingItemId`. Every row is built by an allowlist
+      mapper over an inclusion projection.
+    - Tests: `test/integration/kopa/orders.js` (41: the gate matrix on all three routes,
+      overnight window on `created`, the 93-day limit, the status set + school + superseded
+      exclusion, summary across pages, instant sort with a `+00:00` leg, the filters, no leak
+      with the projection ignored, cancel-log rows from events/order fields/amendments,
+      flow-event failure, stories scope + states).
+
+30. **A TILL SALE LIVES IN `kopaTillOrders`, NEVER IN `orders`** (shoofi-server
+    `services/kopa/till-orders.js`, branch `feat/kopa-phase1`, 2026-11-11; the rule is also the
+    header of `services/kopa/store-data.js`). The partner app, the customer app, settlement,
+    invoices, analytics, stock (`utils/order-stock.js`) and every order cron read the store's
+    `orders` collection; none of them may see an in-store sale. So no Kopa till code names
+    `orders`, a till order has its own status vocabulary (`open | paid | cancelled`, strings,
+    not `ORDER_STATUS`), and nothing a till does decrements or restores stock. Each test file
+    pins this with an `orders` spy that fails on ANY call. Extending a reader of `orders` to
+    "also include till sales" is a product decision across settlement, invoicing and
+    analytics. It is not a refactor. Endpoint shapes: reference C5.
+    **One exception, and only for QR table orders** (invariant 31): a diner's order from a table's
+    QR IS an `orders` document (`source: "kopa-qr"`), because the partner app must accept and
+    print it. Till sales are unchanged.
+
+    **Kopa phase 3 (cancellation reasons).** `kopaCancelReasons` `{ nameAR, nameHE, appliesTo:
+    order|item|both, returnToStock, order, active }`. `returnToStock` is stored only: nothing
+    reads it, because till sales never take stock. Delete is a soft `active: false`, so a
+    cancelled till order's `reasonId` still resolves. A cancel accepts only an active reason
+    whose `appliesTo` is its kind or `both`. Customer-order cancels (`/api/order/update`) are
+    unchanged and use no reasons list.
+
+    **Kopa phase 4 (tables, till orders, kitchen screen).**
+    - **Server pricing.** A catalog line's `unitPrice` = `calculateItemUnitPrice` over
+      `loadPricedProducts` (`utils/order-pricing.js`), the same pair amend uses: the current
+      menu price with the category discount, plus extras by `calculateExtrasPrice`. A client
+      `price` / `unitPrice` on a catalog line is ignored. A missing product or a combo with
+      `comboIssues` is 400. An open item (`productId: null`) takes `{ nameAR, price > 0 }`.
+      Changing the extras formula (invariant 11) changes till prices too.
+    - **Totals.** Rounded to the agora per line (`lineTotal`). `subtotal` = Σ non-cancelled
+      lines. `total` = subtotal − discount.amount, or 0 for `isStaffMeal`. **The tip is not in
+      `total`.** `amountDue` = total + tip.amount, and `balance` = amountDue − paidAmount.
+      Discount, tip and refunds were added in phase 4d (2026-11-12) and are documented in
+      payments CORE "Kopa till money (phase 4d)" and payments reference §6b.
+    - **Payments are bookkeeping** (`CASH | EXTERNAL_CARD | TRANSFER | CHEQUE | OTHER | UNPAID`).
+      No card is charged and nothing is printed. `amount ≤ balance` for every method. Cash over
+      the balance goes in `tendered`, and `change = tendered − amount`. The order becomes `paid`
+      when Σ non-UNPAID ≥ amountDue. An optional `clientPaymentId` (uuid) makes a repeat answer
+      the original payment with 200 `replay: true`. A money method (all but UNPAID) needs an
+      open till session, else 409 `NO_OPEN_SESSION` (accountant CORE "Kopa till sessions &
+      reports"). **UNPAID** keeps the order `open` with
+      `unpaid: true` and a trail entry worth the balance. It is never money, so the balance
+      stays owed and a table order keeps its table. Cancelling an order is 409 once any payment
+      (UNPAID included) is recorded. A line change that would take amountDue below what was
+      paid is 409 (`BELOW_PAID`): an open order is never refunded. Refunds are for paid orders
+      only (phase 4d).
+    - **Concurrency.** Every write is `findOneAndUpdate({ _id, status, rev })` + `$inc: { rev: 1 }`.
+      Payments and cancels never retry, so of two tablets paying at once one gets 409
+      `CONFLICT`. Line edits, moves and KDS taps re-read and retry twice, so a KDS tap never
+      overwrites a waiter's new line. One open order per table is checked in code. It is backed
+      by a partial unique index (`status: "open"`, `tableId` a string), which is built in the
+      background and never awaited.
+    - **KDS** reads open till orders only. Line status moves forward only (`new → preparing →
+      ready → served`). A line with no `kitchenIds` shows only in the unfiltered view.
+      `kitchenIds` are read from `kopaItemMeta` (menu-catalog owns the writer).
+
+    **Kopa phase 6 (store settings).** One `kopaStoreSettings` doc (`_id: "settings"`). PUT may
+    never change `receipts.enabled`: a different value is 400 `RECEIPTS_LOCKED`, and the flag is
+    written only by `$setOnInsert` as `false`. Turning receipts on is reserved for a later
+    reviewed phase. The doc is owner-only because it holds the Wi-Fi passwords.
+    - Tests (shoofi-server `test/integration/kopa/`): `reasons.js` (30), `tables.js` (63),
+      `till-orders.js` (81), `kds.js` (21), `settings.js` (17), 212 in all. Each covers the full gate matrix
+      on every route, a failing and a never-settling `createIndex`, and the `orders` spy. In
+      2026-11-11 fault-injection runs, 23 injected faults were each caught.
+
+31. **A KOPA QR TABLE ORDER IS AN `orders` DOCUMENT WITH `source: "kopa-qr"`, CREATED ONLY BY
+    `POST /api/kopa/public/table-orders/:store`, AND EVERY SPECIAL CASE KEYS ON `source`, NEVER ON
+    `receipt_method`** (shoofi-server `services/kopa/table-orders.js` + `routes/kopa/table-orders.js`,
+    branch `feat/HIGH-RISK-kopa-table-orders`, stacked on #580/#581, 2026-11-13; `docs/kopa.md`
+    "Phase 8b"). Rules (Sari, 2026-11-13): no login, a per-table code, within 150 m of
+    `shoofi.stores.location`, cash at the table, no coupon / coins / delivery / commission, and
+    the partner app accepts / prepares / prints it.
+    - **Shape:** `source: "kopa-qr"`, top-level `table: { id, label }` (the partner badge reads
+      `order.table.label`, shoofi-partner#68), `customerId: null`,
+      `customerDetails: { name, phone: "" }`, `order.receipt_method: "TABLE"`,
+      `payment_method`/`payment_provider: "CASH"`, status `"6"`, `isViewd`/`isPrinted` false,
+      `total` = `orderPrice`, `shippingPrice: 0`, `appliedCoupon: null`, `usedCoins: null`,
+      `earnedCoins: 0`, `storeData` (an allowlist of the store doc), and `kopaQr: { idempotencyKey,
+      location }`. The diner's note is `order.commentToStore` (invariant 25), never top-level
+      `note`. `isFirstOrderAtStore` is ABSENT on purpose (invariant 24). The lines have the app
+      shape `{ item_id, name, nameAR, nameHE, qty, price (unit), selectedExtras, img }`.
+    - **The price is the server's only, from the QR menu build** (`buildQrMenu`: `qrPrice` or
+      `price`, then the category discount), plus the chosen `single` options' prices, which are
+      not discounted. This deliberately differs from `calculateItemUnitPrice` (invariant 11), which
+      discounts extras. So **amend refuses these orders** (409 `KOPA_QR_ORDER_NOT_AMENDABLE` in
+      `evaluateEligibility`), because it would reprice at app prices.
+    - **What's orderable in v1** (`tableChoicesOf`, menu-catalog's `services/kopa/qr-menu.js`):
+      every `single` group is required. `multi`, `counter` and `pizza-topping` are not offered.
+      Combo, weight, by-weight, unknown types and option prices that are not numbers are not
+      orderable.
+    - **After the insert**, as a cash app order: `decrementOrderStock` (invariant 3 gates),
+      `fireStoreOwnerNotifications` (not awaited, invariant 6), and an `orderFlowEvents` row with
+      `actorType: "table"`. Nothing customer-side runs.
+    - **The existing paths** were changed additively, each keyed on `isKopaQrOrder`
+      (`services/orders/order-source.js`):
+      - `/api/order/create` deletes a posted `source` / `table` / `kopaQr` before the
+        `...parsedBodey` spread (`SERVER_ONLY_ORDER_FIELDS`). No app sends them.
+      - `/api/order/admin/not-viewd` (the store tablet's new-orders list) used to `continue` on
+        any order whose customer is not found. It now keeps a `kopa-qr` order.
+      - The overdue cron labels it `طاولة <n>`.
+      - `generateUniqueOrderId` / `fireStoreOwnerNotifications` are now exported from
+        `routes/order.js`, unchanged.
+      - Untouched and safe with `customerId: null`: accept (`update/viewd`: a non-DELIVERY order
+        books no courier, the customer notification finds no customer and returns), the cancel
+        side-effects (no coins / coupon), the feedback scheduler (`order?.customerId` guard),
+        `fix-stuck-orders` (non-DELIVERY → `"2"`), and Kopa's customer reads (skip a null
+        `customerId`).
+    - **A legacy app order with `receipt_method: "TABLE"` and no `source` behaves exactly as
+      before**, everywhere: the create path, amend, the not-viewd list and settlement.
+    - **Settlement** excludes a table order from commission on `source === "kopa-qr"` ONLY
+      (shoofi-server#583 `utils/table-orders.js` `TABLE_ORDER_SOURCE`; accountant CORE invariant
+      20, claude-plugins#369). **Deploy order: #583 must be live before the first `kopa-qr` order
+      is written.** Nothing is written while a store's `tableOrdering` is off (the default).
+    - Tests: shoofi-server `test/integration/kopa/table-orders.js` (20).
+
+32. **COINS PAY FOR THE STORE'S ITEMS ONLY, NEVER THE DELIVERY FEE. THE APP BLOCKS MORE, AND
+    THE COINS THE TOTAL TAKES OFF ARE THE COINS THE ORDER CARRIES.** shoofi-app#145. Built
+    2026-11-16 after flafel-baba **3046-8991** (CASH, DELIVERY): items 35 + delivery 20 = 55. The
+    app took 39 coins off on screen and sent `total: 16`. The server refused the coins, saved
+    `usedCoins: null`, kept the 16, and the admin showed «מחיר כולל 16» with no warning.
+    - **The fix lives in the app only (owner, 2026-11-16).** No server change and no admin note:
+      a price-difference note (`order.priceMismatch`, shoofi-server#625 + shoofi-delivery-web#415)
+      was built and closed unmerged. Do not re-propose it as part of a coins fix.
+    - **Server (main, unchanged):** `/api/order/create` validates with
+      `orderAmount: orderPrice || total`, and `orderPrice` is the items price after the store
+      deal. `validateCoinsRedemption` is all-or-nothing: it refuses, never reduces. On refusal
+      create only `console.error`s, saves the order with `usedCoins: null` and the client's
+      `total` (which may already have the coins off), and redeems nothing. Twin `/place` and
+      `/digital-place-pending` validate each side against its own `orderPrice` and refuse the
+      whole checkout with a 400. **So the app's cap must equal `orderPrice` exactly:** if the app
+      ever allows more, a single-store order is saved underpaid again, silently.
+    - **App cap = the items price.** `primaryOrderAmountForCoins = primaryAfterSale` (and
+      `secondaryAfterSale` for the twin side), the same number the order sends as `orderPrice`.
+      Before #145, single-store coins were capped at items + delivery + drive-in − delivery deal
+      − coupon. "Use all" takes the cap, "+" is disabled at it, and a choice above a lowered cap
+      (cart edit, bigger deal, lower balance) is clamped.
+    - **The limit line shows only AT the cap (owner, 2026-11-16).** When the chosen coins reach
+      the cap ("use all", or "+" up to it) and the balance is bigger, the card shows
+      «ניתן לממש עד N מטבעות בהזמנה זו — עד סכום המוצרים» /
+      «يمكنك استخدام حتى N عملة في هذا الطلب — حتى قيمة المنتجات» (`coins-limit`,
+      `coins-limit-secondary`). Never before a press; it goes away again below the cap.
+      Inline strings, because the app's translations come from the DB.
+    - **One writer.** Checkout's `TotalPriceCMP` (`isCheckCoupon`) is the ONE writer of
+      `coinsStore.coinsToUse` / `secondaryCoinsToUse`. It prices its total from what the store
+      holds after the balance clamp, through a MobX `reaction`, and submit reads the same store
+      (`getUsedCoinsForOrder`). `CoinsSelector` only reports through `onCoinsDiscountChange`.
+      `resetCheckoutCoins` is removed; a store switch calls `resetEarnPreview(side)`. Before
+      #145 every mounted selector wrote the store (including the cart's, still mounted under
+      checkout), so the store and the screen disagreed in both directions: 3046-8991 (screen
+      −39, store 0) and burger-house 9416-1116 (store sent 34, debited, `total` not reduced).
+      `serverTotal` DOES subtract accepted coins, so a `totalDrift` equal to
+      `usedCoins.shekelValue` is that second direction: 31 of 3,994 coin orders between
+      2026-10-01 and 2026-11-16. Whether to compensate them is an open owner decision.
+    - Test: shoofi-app `__tests__/components/total-price-coins-single-writer.test.tsx` (8).
+      Emulator before/after: shoofi-app `.maestro/coins-items-limit/`.
+
+33. **THE ORDER-CREATE LOCK BELONGS TO THE REQUEST THAT TOOK IT. ONLY THAT REQUEST RELEASES IT,
+    BY COMPARE-AND-DELETE. THE 30s "RECENT ORDER" CHECK OBSERVES AND NEVER BLOCKS** (shoofi-server
+    `routes/order.js` `/api/order/create`, `utils/owned-lock.js`,
+    `services/orders/recent-order-check.js`; branch `fix/HIGH-RISK-order-create-lock-owner-token`,
+    HQ #ea4fae, folds HQ #82e96b).
+    - The key is `order_lock:<appName>:<customerId>`. Its value is a random owner token, with
+      `ORDER_CREATE_LOCK_TTL_MS` = 120s (the app waits 120s for this call, and ZCredit calls
+      have no timeout). The in-memory fallback `orderCreationLocks` uses **the same key** and
+      the same `{ token, expiresAt }` contract. A second request while it is held gets 429
+      `ORDER_IN_PROGRESS`.
+    - Release happens only in `releaseOrderCreationLock()`: in the route's `finally`, or on a
+      throw before the main `try`. It is a Lua compare-and-delete, never a plain `del`.
+      Before this change the value was `Date.now()` with `EX 10`, and every release was an
+      unconditional `del`. A request that outlived 10s deleted a resubmit's fresh lock, so a
+      third submit went through unlocked. The 30s check and `performFraudChecks` also released
+      it early.
+    - **The server never sends `DUPLICATE_ORDER`.** Decided by the owner (2026-11-14, option
+      C): the 30s check stays log-only (`[recentOrderCheck] recent order within 30s,
+      continuing`) and must not become a 409. In 30 days, 92% of same-customer, same-store
+      pairs within 30s were retries after an uncharged status `"0"` attempt. Resubmits outside
+      30s are guarded by `idempotencyKey`, which only the wallet checkout sends today.
+    - Cost: a release that fails on a Redis error, or a sync throw between the lock and the
+      main `try`, holds the customer for up to 120s, where it used to be 10s.
+    - Tests: `test/integration/owned-lock.js`,
+      `test/integration/order-recent-order-check-keeps-lock.js` (A's TTL lapses, B locks, A
+      finishes, so B's key survives and C gets 429).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

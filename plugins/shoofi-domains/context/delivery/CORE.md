@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -120,6 +120,18 @@ Full write-up: **`shoofi-server/docs/delivery-only-bookings.md`**.
   `exec-dashboard/delivery-metrics.js`) and add the two fees as their own settlement lines.
 - The store's list is filtered **server-side**: default = active work queue (`1,2,3,5`),
   عرض الكل = no status filter at all (not a date toggle), newest 200, `appName`-scoped.
+- **On the store's card the STATUS decides the state, never `isPendingAssignment`:** rows from
+  before Sept 2026 and rows support marked delivered/cancelled can still carry
+  `isPendingAssignment: true` on status 4 or a cancel (v1 `screens/delivery-only/list` checks the
+  flag first and labels them «بانتظار تعيين سائق»). The partner v3 screen (shoofi-partner
+  `helpers/deliveries/bookings.ts`, behind `DELIVERIES_V3`) maps 1 → waiting (flag / no driver =
+  searching, driver set = offered, not accepted), 2 / 5 / 3 → on the way (to the store / at the
+  store / collected), 4 → delivered, -1/-2/-3 → cancelled. No status change is **pushed** to the
+  tablet; the v3 screen polls every 20 s while open — the **active** query only (status index,
+  ~15 docs on prod). **Never poll `isAll: true`:** no index covers `{appName, isDeliveryOnly}`, so
+  it reads the whole `book-delivery` collection (106,782 docs, ~234 ms, 2026-11-11) for a store's
+  dozen rows; the screen reloads it only when the active set changes. `pickupTime` is a bare
+  `"HH:mm"`, meaningless on a row from another day.
 
 ## The dropoff note is TWO fields — the driver card shows both
 `order.order.address.notes` = the **landmark** the customer saved ON THE ADDRESS («علامة مميزة
@@ -310,11 +322,14 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
       `metadata.companyInfo.name` (`book-delivery.js`, reads `company.storeName`) is always
       `undefined`, and `utils/crons/delivery-completion-delay-checker.js` reads
       `order.driver?.name`, so its admin push always says "נהג: לא ידוע".
-    - **Driver arrival at the store has no field.** Only the optional driver tap
+    - **Driver arrival at the store has no GPS-derived field.** Only the optional driver tap
       (`delivery_waiting_in_store` flow event, status `5`) or a reconstruction from
       `delivery-company.driverLocationHistory` (30-day TTL on `expiresAt`) — first fix within
       150 m of `bookDelivery.storeLocation` after dispatch. Pending: shoofi-server PR #285
       (`lib/support-analytics/delay-analysis.js`, not merged) implements exactly that.
+      Since shoofi-server#485 the tap also writes **`waitingInStoreAt`** (BSON `Date`) on the
+      booking, so tapped arrivals from then on carry their instant; every earlier status-`5`
+      row has none, and a courier who never taps still has no arrival at all.
 12. **`isPendingAssignment` is a queue-membership CLAIM TOKEN, not a status — and every exit
     from the queue must burn it, not only cancel.** `processPendingAssignments`
     (`services/delivery/delayed-assignment.js`) dispatches on
@@ -587,6 +602,51 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
       an older same-store decoy are inserted first. On the old code 12 of 16 fail; the 4 that
       pass are the pure-module and unique-bookId compatibility pins.
 
+
+21. **The store sees its courier through ONE reader and ONE frame — and every new writer of
+    `driver` or `status` on a booking must send the frame.** `services/delivery/courier-status.js`
+    (shoofi-server#485):
+    - **Reader.** `attachCourierSummaries` adds `courier` to every DELIVERY row of
+      `POST /api/order/admin/orders` (the partner order list) with ONE
+      `{appName, "order._id": {$in}}` read of `book-delivery` per page, projected to a whitelist
+      (`COURIER_SUMMARY_PROJECTION` — never the ~20 KB `assignmentMetadata` blob) and served by
+      the `{'order._id': 1}` index from `DatabaseInitializationService`. States: `searching`
+      (`"1"`, no `driver._id`) · `assigned` (`"1"` with a driver — offered, not accepted) ·
+      `arriving` (`"2"`) · `at_store` (`"5"`, the tap) · `picked_up` (`"3"`) · `delivered` (`"4"`)
+      · `cancelled` (`-1/-2/-3`, with `cancelledBy`). `courier: null` = no booking; a non-delivery
+      row has no key; a failed read serves the page without any key. Of several bookings for one
+      order, the newest live one wins over a newer cancelled one.
+    - **`book-delivery.order._id` is an ObjectId OR a 24-hex STRING.** Partner-accept spreads
+      the order document in (ObjectId); `POST /api/delivery/book` takes it from a JSON body
+      (string). Any lookup by order must ask for both (`idVariants`). `GET
+      /api/delivery/order/:orderId/driver` asked for the ObjectId only, so the partner's driver
+      dialog 404ed on a string-stored booking; it matches both since shoofi-server PR 486.
+      Still ObjectId-only, unreached today: the `order._id` branch of `GET delivery/book/:bookId`
+      (every client passes the short `orderId`, which its `bookId` branch matches) and the
+      support location update in `routes/customer.js` (it also matches on `bookId`).
+    - **ETA = the engine's assignment-time `estimatedArrivalAtStore`; there is no live ETA.**
+      It is quoted only for the courier who holds the row NOW: after a reassignment only
+      `reassignmentMetadata.pickupFeasibility` (the reassign routes leave the previous courier's
+      blob in `assignmentMetadata`); after a manual queue assignment
+      `assignmentMetadata.pickupFeasibility`, but never on a twin row (the twin manual assign
+      spreads the previous metadata); otherwise only `assignmentMethod: 'score-based'`. Basis must
+      be `current-location`/`future-location` (invariant 15's `neutral-location` is never a time),
+      and a passed estimate is null, not 0.
+    - **Frame.** `notifyStoreCourierUpdated(booking, {reason})` sends
+      `{type: "courier_updated", data: {orderId, bookId, deliveryId, reason, timestamp}}` to
+      `sendToAppAdmins('shoofi-partner', …, booking.appName)` — a nudge to refetch, never a state.
+      Fire-and-forget and non-throwing; call it right after the committed write and before
+      `centralizedFlowMonitor` (which re-throws). Sent today from the five driver transitions
+      (+ the twin approve cascade's peer), `createPendingDelivery`, the atomic claim — **after** it
+      wins, never on `matchedCount === 0` — and its twin mirror, the immediate `bookDelivery`
+      insert, admin `assign`/`reassign`/`cancel`/`order/cancel`/`order/status/update`, store
+      `order/cancel`, the company-admin `/:adminId/order/:orderId/reassign`, and the twin manual
+      `assign-driver`. **Twin: each side is a different store's booking, so each side gets its own
+      frame to its own `appName`.** A writer that skips it leaves the card stale until the next
+      focus. Order-side cancels in `routes/order.js` already send `order_status_updated`.
+    - **Reach.** `sendToAppAdmins` iterates only the sending process's sockets — no Redis
+      fan-out — and prod runs two instances, so a frame does not reach a tablet held by the other
+      instance. True of every partner frame; the card must keep its focus/action refetch.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
