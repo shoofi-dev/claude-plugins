@@ -334,6 +334,11 @@
           "desc": "CORE: personal, expired and unknown coupons are one identical 404"
         },
         {
+          "file": "services/payments/order-authorization.js",
+          "regex": "if \\(provider !== \"HYP\"\\) \\{[\\s\\S]{0,600}?return flag\\(`refund_unsupported_provider_\\$\\{\\(provider \\|\\| \"unknown\"\\)\\.toLowerCase\\(\\)\\}`\\);",
+          "desc": "CORE invariant 12 (e): a refund on any non-HYP charge (ZCredit, stamped with no provider) is a refund_unsupported_provider_* flag, never a refund"
+        },
+        {
           "file": "services/coupons/public-coupon.js",
           "regex": "if \\(isFlagOn\\(coupon\\.onlyForOneCustomer\\)\\) return false;\\s*if \\(coupon\\.claimedByUserId\\) return false;",
           "desc": "CORE: a one-customer-only or claimed coupon is never promotable"

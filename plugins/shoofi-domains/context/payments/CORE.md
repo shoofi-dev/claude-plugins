@@ -204,6 +204,17 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    (idempotent: a compensation row with that `cancelDecisionKey` is reused) — one Shoofi-funded
    `COMP-<primary originalOrderId>[-n]` per twin decision; per-side calls still refuse twins.
    Invoices are untouched.
+   (e) **An explicit `refund` on a single ZCredit charge is ALWAYS a flag, never a refund.**
+   `refundOrderPayment` sends anything whose `auth.provider || ccPaymentRefData.provider` is not
+   `HYP` to `refund_unsupported_provider_<provider|unknown>`, and a ZCredit order stamps neither
+   field, so in prod it reads **`refund_unsupported_provider_unknown`**: 35 of 63 open flags on
+   2026-11-16, all ZCredit (31 card, 4 Apple Pay), none HYP. So `refundRequired` is mostly NOT the
+   undecided-cancel case, and support choosing "refund" does not move money. The flags raised
+   before the money ledger shipped (61 of 63) have no `moneyLedger` and no `shoofi.moneyOwed`
+   row, so the "חייבים ללקוח" screen does not show them until `scripts/money-backfill.js` runs.
+   The HQ money audit's `refund-owed-open` (HQ #ea6a72, branch
+   `fix/HIGH-RISK-refund-owed-work-queue`) is the windowless list of all of them;
+   `cancelled-not-refunded` alone only sees a cancel for 7 days, then drops it unresolved.
 
 ## Kopa till money (phase 4d) — bookkeeping, NOT a charge
 shoofi-server `services/kopa/till-money.js` + `routes/kopa/till-money.js` (branch
