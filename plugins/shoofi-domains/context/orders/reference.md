@@ -961,8 +961,31 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     Resources (the iOS project is committed), so a new sound needs a native build, not OTA.
     Used by the series and by the first local alert (`schedulePushNotification`). The ▶
     preview is a local notification under one id (`ALARM_PREVIEW_ID`), removed before the
-    next preview and when the screen closes, so a new ▶ stops the one playing. iOS only:
-    Android plays the `default` channel's sound.
+    next preview and when the screen closes, so a new ▶ stops the one playing (it also stops
+    the app's own player, next bullet). iOS only: Android plays the `default` channel's sound.
+  - **How loud: in the foreground on iOS the APP plays the ring, at MEDIA volume**
+    (shoofi-dev/shoofi-partner, branch `feat/new-order-alarm-media-volume`, 2026-11-16; store
+    owners: "not loud enough"). iOS plays a notification sound at the "Ringtone and Alerts"
+    volume, and on an iPad the volume buttons change only the media volume unless Settings →
+    Sounds → "Change with Buttons" is on (off by default), so turning the tablet up did not
+    make the alarm louder. Now the foreground notification handler (`utils/notification/index.ts`
+    `setNotificationHandler`) asks `inAppAlarmSound` (`utils/in-app-alarm-sound.ts`, pure) whether
+    to play it itself: iOS only, and only for `ORDER_WAITING_NOTIFICATION_TYPES` (the server's
+    `new_order_alert` + `order_reminder` pushes, `new_order_local`, `new_order_alarm`) plus
+    `alarm_preview`. If so, `playAlarmInApp` (`utils/notification/alarm-player.ts`, expo-audio,
+    one player per sound, `playsInSilentMode`, `mixWithOthers`) plays it and the banner shows with
+    `shouldPlaySound: false`. Which sound: `data.sound` (the app's own rings and the preview put
+    it there, because iOS hides a notification's sound file name from JS; content.sound reads
+    `"custom"`), else this tablet's chosen sound, else `store.wav`. So the server's pushes also
+    ring with the tablet's choice in the foreground. A ring the app cannot start within 1.5 s
+    (or that throws) keeps the system sound, so the alarm is never silenced by the player.
+    `cancelAndDismiss` (accept / count 0 / logout) and `stopAlarmPreview` call `stopAlarmInApp`.
+    **Unchanged:** the background (iOS plays the notification's own sound at the alert volume;
+    the handler does not run there), Android, and every non-order notification (delivery delay,
+    future-order reminder, drive-in arrival). expo-audio is native: binaries from 1.0.15
+    (runtime 1.0.4) only. Its Android manifest's `RECORD_AUDIO` is removed
+    (`tools:node="remove"`) and an iOS `NSMicrophoneUsageDescription` is present only so App Store
+    processing accepts the binary; the app never records.
   - **Numbers** (`ALARM_SETTINGS`, `utils/new-order-alarm.ts`). Every time comes from one
     deterministic grid per cycle (`alarmCycleGrid`):
     1. **While the server's reminder window runs**, one local ring a minute at **:30
