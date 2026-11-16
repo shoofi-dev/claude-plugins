@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@feat/driver-decline-reassign / 2026-11-14 (invariants 5, 12, 21: the courier's decline, PEER_COLLECTED, the twin peer-copy exclusion, reasonCode, cleared per-courier stamps); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -235,7 +235,9 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
    as "available". A screen built on `isOnline` reports a fleet of 220 that is really 3.
 5. **Twins always go pending** and (single mode) must share ONE driver: the
    `twinPickupSequence:1` side drives selection, the peer mirrors it, and `assignDriverAt` is
-   aligned to the later side. Breaking any of it splits a twin.
+   aligned to the later side. Breaking any of it splits a twin. One deliberate exception: the
+   scheduler never mirrors a peer's courier onto a side whose `declinedDriverIds` holds him
+   (invariant 21); that side is scored instead, so a declined courier is not handed the job back.
 6. **Manual-admin routing:** companies with `isControlledByAdmin && manualAssignmentOnly` route
    to a company **admin**, not a driver. Don't auto-assign them. Corollary for reports: a
    company's admin login (`delivery-company.customers`, `role: "admin"`) **also takes jobs** —
@@ -339,7 +341,9 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
     85,296 dispatch attempts each: 97.6% of every row in
     `delivery-company.assignment-decisions`, which makes that collection unreadable as a
     measure of dispatch pressure until you filter them out. The token is minted in exactly
-    one place (`createPendingDelivery`, always alongside status `"1"`), so
+    two places, both alongside status `"1"`: `createPendingDelivery`, and the courier's decline
+    (`declineDelivery` in `services/delivery/driver-decline.js`, invariant 21), which puts an
+    assigned booking back in the queue. So
     **`WAITING_FOR_APPROVE` is the only status a genuinely-queued booking can hold** — the
     status filter in the scan excludes all seven others. That filter is a second line of
     defence, not the fix; and keep it a `$nin`, never an `$in` of `"1"`, because `$nin` also
@@ -599,6 +603,42 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
       an older same-store decoy are inserted first. On the old code 12 of 16 fail; the 4 that
       pass are the pure-module and unique-bookId compatibility pins.
 
+
+21. **A courier's DECLINE is a re-queue, not a cancel.** `POST /api/delivery/driver/order/decline`
+    (`services/delivery/driver-decline.js`, `...driverSelfAction`) is allowed only before pickup
+    (status `1`, `2` or `5`) and only on the caller's own booking. It writes the queue's own
+    entry state — status `"1"`, `isPendingAssignment: true`, `driver: null`, `company: null`,
+    `assignedAt: null`, `assignDriverAt` = now (offset STRING, see invariant 12) — plus
+    `declinedDriverIds` (`$addToSet`, ObjectIds) and a `declines[]` entry.
+    - **`declines[]` entry:** `{driverId, reason, reasonCode, fromStatus, assignedAt, approvedAt,
+      assignmentMethod, reassignedAt, at}`. `reason` is free text (trimmed, max 200).
+      `reasonCode` is optional, one of `DECLINE_REASON_CODES` (`far | too_big | shift_ending |
+      other`), else a 400 `INVALID_REASON_CODE`. A body with `reason` alone (older driver apps) is
+      still accepted, with `reasonCode: null`.
+    - **The first courier's stamps are cleared** (`$unset` of `PER_COURIER_FIELDS`: `approvedAt`,
+      `activeOrderCount`, `assignmentMetadata`, `reassignedAt`, `reassignedBy`,
+      `reassignmentMetadata`) and copied onto the `declines[]` entry. Left on the row they would
+      describe the next courier's job: `services/delivery/late-delivery.js` reads `reassignedAt` /
+      `reassignmentMetadata` as the dispatch instant and the previous courier.
+    - **Who gets it next:** the next `processPendingAssignments` tick re-dispatches it.
+      `findScoredDrivers` drops every id in `excludeDriverIds` (the booking's and, for a twin, its
+      peer's `declinedDriverIds`) before the capacity fallback. When nobody else is eligible it
+      waits for the next tick like any unassignable booking.
+    - **The twin peer-copy honours it too.** In single mode `assignDriverToPendingDelivery` copies
+      a peer's courier onto a pending side without scoring (invariant 5). It skips that copy when
+      the peer's courier is on THIS booking's `declinedDriverIds` and scores instead
+      (`peerDriverDeclinedHere`); the peer keeps its own courier.
+    - **Twins:** a single-mode twin is one job, so declining either leg re-queues both. If the
+      peer is already past pickup (status `3`, `4`, or cancelled with `startedAt` set,
+      `isPastPickup`), the decline is refused with 409 `PEER_COLLECTED` and nothing is written.
+      A split-mode leg is declined alone.
+    - **Notices:** no customer push (the cancel route's "a new driver will be assigned" push is a
+      promise no code keeps; the decline sends nothing). A `delivery_declined_by_driver` flow event
+      (metadata `declineReason`, `declineReasonCode`), and a notice to the company's admins for an
+      `isControlledByAdmin` company.
+    - **Race-safe:** the write is filtered on the courier AND a declinable status, so a decline
+      racing a pickup or a reassign changes nothing (409 `NOT_DECLINABLE`). Driver cancel (`-1`,
+      terminal) is unchanged and still exists.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
