@@ -123,11 +123,16 @@ default off: a DELIVERY order to an address that is not one of the customer's sa
 400 `DELIVERY_ADDRESS_REQUIRED`; APPLEPAY / HYP exempt — customers CORE invariant 19) →
 lock (Redis `SET NX` + in-mem fallback + 30s dup check) → fraud checks → generate
 `originalOrderId`/`orderId` → image upload → decide initial status → validate coins
-(no debit) → price corrections, in this order: coupon entitlement (`enforceCouponEntitlement`:
+(no debit; measured against the ITEMS price `orderPrice`, all-or-nothing; a refusal keeps the
+order with `usedCoins: null` and records `coinsRedemptionRejected`, CORE invariant 32) → price
+corrections, in this order: coupon entitlement (`enforceCouponEntitlement`:
 ownership + partial-use balance only) → store promotions + the delivery deal-vs-coupon
 conflict (`enforcePromotions`, `resolveDeliveryConflict`) → **fixed-delivery-price coupon
 recompute** (`enforceDeliveryPriceCoupon`, CORE invariant 14). Each one corrects `total`
-and never rejects → build `orderDoc` → **insert into store `orders`** (authoritative) →
+and never rejects → build `orderDoc` → shadow pricing (`serverPricing`) → **price mismatch**
+(`assessPriceMismatch`: the server-owned `priceMismatch` / `coinsRedemptionRejected` are
+deleted from the body spread, then set; describe-only, try/caught, CORE invariant 32) →
+**insert into store `orders`** (authoritative) →
 `[shippingPriceCheck]` fired and **never awaited** (log-only; a DELIVERY fee below the area
 tariff → one warn line + `order.shippingPriceCheck`, CORE invariant 20) →
 **stock decrement if status≠"0"** → first-order attribution → Apple Pay session
@@ -231,6 +236,22 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   server-side; `surcharge`, `extrasPrice` and the names are ticket snapshots. `comboIssues`
   is never persisted on an item (amend strips it); creation keeps them under
   `serverPricing.comboIssues`. CORE invariants 11–12.
+- **`orders.serverPricing`** = the create-time shadow (`utils/order-pricing-shadow.js`):
+  `{ computedAt, serverOrderPrice, serverOriginalOrderPrice, serverTotal, serverCouponDiscount,
+  clientOrderPrice, clientTotal, clientCouponDiscount, orderPriceDrift, totalDrift,
+  driftDetected, missingProductIds, comboIssues }`. `totalDrift = serverTotal − clientTotal`.
+  `serverTotal` subtracts the client's coupon amount and the coins the server ACCEPTED. Not
+  shown to anyone as is: `driftDetected` fires on any agora. CORE invariants 11, 32.
+- **`orders.priceMismatch`** (top level, ABSENT unless flagged) = `{ clientTotal, serverTotal,
+  expectedTotal, difference, itemsDifference, reason, coinsRefused?, tolerance, source,
+  detectedAt }`. `difference = total − expectedTotal` (negative = the customer was asked for
+  less). `reason` ∈ `coins-refused` | `items-priced-differently` | `delivery-fee-missing` |
+  `coupon-not-deducted` | `unexplained`. `source: "create"` when persisted. The admin reads
+  return `source: "derived"` for an older order and never write it. CORE invariant 32.
+- **`orders.coinsRedemptionRejected`** (ABSENT unless the server refused the app's coins) =
+  `{ requestedAmount, requestedShekelValue, reason, message, maxCoins, orderAmount, detectedAt }`,
+  `reason` = `validateCoinsRedemption`'s `code`. The order then has `usedCoins: null` and no
+  `redeem` row. CORE invariant 32.
 - **`orders.shippingPriceCheck`** = `{ expected, submitted, areaId, paused, checkedAt }`,
   `$set` after the insert ONLY when a DELIVERY order's posted `shippingPrice` is below its
   area's tariff (paused areas included). Absent on every other order, so
@@ -646,6 +667,25 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
   `stores/twin-order/index.ts`,
   `hooks/checkout/use-checkout-submit.ts`, `screens/checkout/index.tsx`,
   `screens/order/{active,item,history}/*`, `consts/{api.js,shared.ts}`.
+- **Checkout coins** (CORE invariant 32; the rules below hold once shoofi-app#145 merges):
+  - **One writer.** Checkout's `TotalPriceCMP` (`components/total-price`, `isCheckCoupon`) is
+    the only writer of `coinsStore.coinsToUse` / `secondaryCoinsToUse`. It prices its total
+    from the store (a MobX `reaction`, after the balance clamp in `setCoinsToUse`), and submit
+    sends the same store (`use-checkout-submit.ts` → `getUsedCoinsForOrder`). So the coins the
+    total takes off are the coins the order carries. It zeroes both sides on mount.
+  - `CoinsSelector` (`components/coins-selector`) reports only through
+    `onCoinsDiscountChange` and never writes the coins in use. On a store switch it calls
+    `coinsStore.resetEarnPreview(side)`, which clears the earn preview only. The primary side
+    clears both previews. `resetCheckoutCoins` no longer exists. The cart's `TotalPriceCMP`
+    prices its own preview and never touches the store.
+  - **Cap = the items price.** `primaryOrderAmountForCoins = primaryAfterSale` (the side's items
+    after its store deal, before the coupon), i.e. the `orderPrice` the server validates
+    against. The selector clamps a choice that falls above a lowered cap, and shows
+    «ניתן לממש עד N מטבעות בהזמנה זו — עד סכום המוצרים» when the balance is bigger.
+  - Before #145 (main until it merges): every mounted selector wrote the store, and
+    single-store coins were capped at items + delivery + drive-in − delivery deal − coupon. Both
+    failure directions are in prod: 3046-8991 (screen −39, store 0 → `usedCoins: null`,
+    `total` 16) and burger-house 9416-1116 (store 34 sent and debited, `total` not reduced). Test: `__tests__/components/total-price-coins-single-writer.test.tsx`.
 - **Gotchas**: `order/create` is **multipart** (twin / Apple-Pay / HYP calls are JSON);
   the client `ORDER_STATUS` enum **omits `"0"` and `"13"`** (used only as literals) — keep
   in mind when reasoning about pending-payment/fraud states on the customer side.
@@ -1338,6 +1378,23 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
     `DeliveryListAnalytics`. Those are courier-dispatch views.
   - **No edit path and no `bookDelivery` mirror.** It is not «הערות לשליח» (`commentToCourier`),
     which is delivery-only and editable through `POST /api/order/comment-to-courier`.
+
+- **Price mismatch note** (CORE invariant 32, shoofi-delivery-web#415):
+  - **Reader:** `src/components/Cards/PriceMismatchNote.tsx` reads `order.priceMismatch` only
+    (`getPriceMismatch`: needs numeric `clientTotal`, `expectedTotal`, a non-zero `difference`).
+    It never looks at `serverPricing`. `priceMismatchText` builds the two lines: the headline
+    «שים לב: הסכום שהלקוח ראה (16₪) שונה מהסכום שהשרת חישב (55₪) — הפרש 39₪ לטובת הלקוח»
+    («לרעת הלקוח» when the customer was asked for more), then one line per `reason`
+    (`coins-refused` names the coins and the refusal, «מעל סכום המוצרים 35₪»; unknown →
+    «לא נמצא בהזמנה הסבר להפרש.»; amended order → «(נכון לזמן יצירת ההזמנה)»).
+  - **Where it shows:** `CardOrder` right under both headers (desktop + mobile), next to
+    «מחיר כולל», so also in `/admin/orders`, `OrderDetailModal`, the live-ops order details and
+    `CardTwinOrder` (a twin side never carries one). `CompensationModal` under its «מחיר כולל».
+  - **Where the data comes from:** `order/admin/all-orders` and `analytics/order/:id`, which
+    derive the field for older orders. Any other source of order documents shows no note
+    for an older order.
+  - A note, not a toast: `dir="rtl"`, `text-right`, `role="note"`, red tints that the palette
+    remaps for dark mode.
 
 ## C5. shoofi-kopa — the store till back-office (web)
 Kopa (repo `shoofi-kopa`) is the store's back-office web app. It calls the server like the

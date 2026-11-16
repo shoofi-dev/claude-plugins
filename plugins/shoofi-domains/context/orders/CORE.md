@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@fix/HIGH-RISK-picked-up-only-from-ready / 2026-11-15 (invariant 2: 10/11 only from ready, atomic, dashboard exempt; reference §2, C3, C4); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (invariants 2, 9; reference §2, C3); shoofi-partner@fix/owner-walkthrough / 2026-11-11 (invariant 17: printer per tablet, print failures shown; cancel alert); shoofi-partner@fix/partner-print-failure-log-once-notice / 2026-11-08 (invariant 17: one error row per failed copy; the pop-up was dropped before merge); shoofi-partner@fix/owner-walkthrough + feat/school-orders-v3 / 2026-11-14 (reference C3 customer note: v3 readers OrderCardV3, NewOrderViewV3, SchoolOrderCardV3); shoofi-partner@feat/order-alert-arrival-log / 2026-11-14 (reference C3 "Measuring how a new order reaches the tablet": apps-logs partner_order_alert_received / partner_new_order_seen; listener pin accepts the ref call); shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@feat/order-price-mismatch-note (#625) + shoofi-delivery-web@feat/order-price-mismatch-note (#415) + shoofi-app@fix/checkout-coins-single-writer 5c0a2c66 (#145) / 2026-11-16 (invariant 32: order.priceMismatch, coinsRedemptionRejected, coins capped at the items price, TotalPriceCMP the one writer of checkout coins; invariant 11 pointer; reference §3, §5, C1, C4); shoofi-server@fix/HIGH-RISK-picked-up-only-from-ready / 2026-11-15 (invariant 2: 10/11 only from ready, atomic, dashboard exempt; reference §2, C3, C4); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (invariants 2, 9; reference §2, C3); shoofi-partner@fix/owner-walkthrough / 2026-11-11 (invariant 17: printer per tablet, print failures shown; cancel alert); shoofi-partner@fix/partner-print-failure-log-once-notice / 2026-11-08 (invariant 17: one error row per failed copy; the pop-up was dropped before merge); shoofi-partner@fix/owner-walkthrough + feat/school-orders-v3 / 2026-11-14 (reference C3 customer note: v3 readers OrderCardV3, NewOrderViewV3, SchoolOrderCardV3); shoofi-partner@feat/order-alert-arrival-log / 2026-11-14 (reference C3 "Measuring how a new order reaches the tablet": apps-logs partner_order_alert_received / partner_new_order_seen; listener pin accepts the ref call); shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -20,7 +20,8 @@ Server: `routes/order.js`, `routes/twin-order.js`, `routes/money.js`, `services/
 `utils/order-pricing.js` + `utils/order-pricing-shadow.js`, `routes/order-amend.js`,
 `utils/delivery-row.js` (how an order finds its delivery row, invariant 23),
 `services/coupons/delivery-price-enforcement.js` + `services/twin-order/twin-delivery-price.js`
-(the order-side guard for fixed-delivery-price coupons, invariant 14), `utils/marketing-touch.js`
+(the order-side guard for fixed-delivery-price coupons, invariant 14), `utils/order-price-mismatch.js`
+(`order.priceMismatch` + `coinsRedemptionRejected`, invariant 32), `utils/marketing-touch.js`
 (order-side marketing attribution, invariant 15), `services/marketing/order-facts.js` +
 `services/marketing/reconcile.js` (one marketing fact per checkout, kept true by a cron —
 invariant 16), who may call the coins admin routes (`routes/coins.js` `/api/admin/coins/*` and the
@@ -144,7 +145,8 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     `loadPricedProducts`, which must keep returning it) or when the weight is the only
     non-header extra; otherwise as an add-on with the first step bundled. Creation charges
     the client total and only **shadow-compares** (`utils/order-pricing-shadow.js` →
-    `order.serverPricing.driftDetected`); **amend** (`routes/order-amend.js` `repriceOrder`)
+    `order.serverPricing.driftDetected`; what the admin is shown is the filtered verdict
+    `order.priceMismatch`, invariant 32); **amend** (`routes/order-amend.js` `repriceOrder`)
     is server-authoritative through `calculateOrderPricing`. **Combo lines add a fourth
     function to the same lockstep:** `calculateComboExtrasPrice(comboProduct, item, components)`
     (`utils/order-pricing.js`) is a port of `shoofi-app/helpers/combo-pricing.ts`
@@ -1258,6 +1260,77 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       20, claude-plugins#369). **Deploy order: #583 must be live before the first `kopa-qr` order
       is written.** Nothing is written while a store's `tableOrdering` is off (the default).
     - Tests: shoofi-server `test/integration/kopa/table-orders.js` (20).
+
+32. **`order.priceMismatch` IS THE SERVER'S VERDICT THAT `total` IS WRONG. IT DESCRIBES AND NEVER
+    CHARGES. COINS PAY FOR THE ITEMS ONLY, AND A REFUSED REDEMPTION IS RECORDED, NOT SILENT.**
+    shoofi-server#625 (`utils/order-price-mismatch.js`, `docs/order-price-mismatch.md`), admin
+    shoofi-delivery-web#415, app shoofi-app#145. Built 2026-11-16 after flafel-baba **3046-8991**
+    (CASH, DELIVERY): items 35 + delivery 20 = 55. The app took 39 coins off on screen and sent
+    `total: 16`. The server refused the coins, saved `usedCoins: null`, kept the 16, and the admin
+    showed «מחיר כולל 16» with no warning.
+    - **One rule, `assessPriceMismatch(order)`:** `expectedTotal = max(0, serverPricing.serverTotal
+      + serverPricing.clientCouponDiscount − appliedCoupon.discountAmount)` (the shadow's total,
+      re-based on the coupon the order carries NOW). `difference = total − expectedTotal`.
+      Flagged when `|difference| > ₪0.5` (`PRICE_MISMATCH_TOLERANCE`) and not explained.
+      `serverTotal` already takes off the items deal, the delivery deal, the client's coupon
+      amount and the coins the server **accepted**. Explained, never flagged: a missing product
+      or `COMBO_COMPONENT_MISSING` (data gap); `twinGroupId` (twin placement computes no
+      `serverPricing`); `difference ≈ usedCoins.shekelValue` (**owner's decision, 2026-11-16**,
+      relayed with the task); and the server's own coupon formula explaining the total
+      (`full_discount` whose `discountAmount` left out the fee). Reasons, first match:
+      `coins-refused` → `items-priced-differently` → `delivery-fee-missing` →
+      `coupon-not-deducted` → `unexplained`.
+    - **Persisted once, at create**, right after `serverPricing` and before the insert, and only
+      when flagged. It is server-owned: `delete orderDoc.priceMismatch` /
+      `coinsRedemptionRejected` runs first, because `...parsedBodey` would let a client write it.
+      It is try/caught (invariant 6). **Never backfilled.** The two reads behind the admin card
+      derive it for older orders with the SAME function, `withPriceMismatch` (never written,
+      `source: "derived"`, skipped for an amended order, whose creation-time `serverPricing` is
+      stale): `POST /api/order/admin/all-orders` (both branches) and
+      `GET /api/analytics/order/:orderId`. Neither projects. A new admin surface reads one of
+      them; it never re-derives the rule client-side, and never shows `serverPricing.driftDetected`
+      (far noisier, and its `totalDrift` sign is server − client).
+    - **The coins-only exemption hides real losses: check before you widen or remove it.**
+      `serverTotal` DOES subtract coins. The 31 "coins-only" orders since 2026-10-01 (of 3,994
+      coin orders; 3,958 agree exactly) have a `total` that was NOT reduced by the coins they
+      carry. The coins WERE debited (burger-house 9416-1116: `redeem` 34 in `customer-coins`),
+      and a cash courier collects `total` (shoofi-shoofir `utils/order-payment.ts`). That is the
+      mirror image of 3046-8991, from the same two-writer cause (below). Flagging them is one line
+      in `assessPriceMismatch` plus a reason; it waits on the owner.
+    - **Coins pay for the store's ITEMS only, never the delivery fee.** Server:
+      `/api/order/create` validates with `orderAmount: orderPrice || total`, and `orderPrice` is
+      the items price after the store deal. Twin `/place` validates each side against its own
+      `orderPrice`. App (once shoofi-app#145 merges; on main before it, `components/total-price`
+      capped single-store coins at items + delivery + drive-in − delivery deal − coupon, so it
+      allowed coins the server then refused): `primaryOrderAmountForCoins =
+      primaryAfterSale`, the same number the order sends as `orderPrice`, and the coins card says
+      «ניתן לממש עד N מטבעות בהזמנה זו — עד סכום המוצרים» when the balance is bigger.
+    - **A refused redemption.** `validateCoinsRedemption` is all-or-nothing. It never reduces the
+      coins, it refuses them, and every refusal carries a `code` (`feature-disabled`,
+      `no-balance`, `insufficient-balance`, `exceeds-order-amount` with `maxCoins`, `error`).
+      Single-store create still saves the order with `usedCoins: null` and the client's `total`
+      (which may already have the coins off), redeems nothing, and now records
+      **`order.coinsRedemptionRejected = { requestedAmount, requestedShekelValue, reason, message,
+      maxCoins, orderAmount, detectedAt }`**. When that accounts for the difference, the mismatch
+      reason is `coins-refused`, and the admin note says «הלקוח ביקש לממש 39 מטבעות, השרת דחה (מעל
+      סכום המוצרים 35₪)». Twin `/place` and `/digital-place-pending` refuse the whole checkout
+      with a 400 instead. Charging the server total, or refusing the order, is an open owner
+      decision and is NOT built.
+    - **App: the coins the total is priced with are the coins the order carries** (once
+      shoofi-app#145 merges). Checkout's `TotalPriceCMP` (`isCheckCoupon`) is the ONE writer of
+      `coinsStore.coinsToUse` / `secondaryCoinsToUse` (`setCoinsToUse` / `setSecondaryCoinsToUse`).
+      It prices its total from what the store holds after the balance clamp, through a MobX
+      `reaction`, never from its own copy. Submit reads the same store (`getUsedCoinsForOrder`).
+      `CoinsSelector` only reports through `onCoinsDiscountChange` and never writes the coins in
+      use. `resetCheckoutCoins` is removed; a store switch calls `resetEarnPreview(side)`, which
+      clears only the earn preview. The cart's `TotalPriceCMP` prices its own preview and never
+      touches the store. Before #145, every mounted selector wrote the store (including the
+      cart's, still mounted under checkout), so the store and the screen disagreed in both
+      directions (3046-8991: the screen took 39 off while the store held 0; burger-house 9416-1116: the store sent 34 while the total was not reduced).
+    - Tests: shoofi-server `test/integration/order-price-mismatch.js` (29: the prod sample,
+      coins-only vs flagged, the two admin routes); shoofi-delivery-web
+      `src/components/Cards/__tests__/PriceMismatchNote.test.tsx`; shoofi-app
+      `__tests__/components/total-price-coins-single-writer.test.tsx` (#145).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
