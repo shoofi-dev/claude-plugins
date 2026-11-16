@@ -66,11 +66,14 @@
         "test/integration/money-cancel.js",
         "routes/kopa/table-orders.js",
         "services/kopa/table-orders.js",
-        "services/orders/order-source.js"
+        "services/orders/order-source.js",
+        "services/orders/picked-up-guard.js",
+        "test/integration/order-picked-up-guard.js"
       ],
       "symbols": {
         "services/kopa/table-orders.js": ["createTableOrder", "priceItems", "storeOpenState", "checkLocation", "buildTableOrderDoc"],
         "services/orders/order-source.js": ["isKopaQrOrder"],
+        "services/orders/picked-up-guard.js": ["pickedUpAllowedFrom", "statusAlreadyChangedBody"],
         "routes/order.js": [
           "processCreditCardPayment",
           "processHypTokenPayment",
@@ -628,7 +631,14 @@
         {"file": "routes/order.js", "regex": "if \\(isKopaQrOrder\\(order\\)\\) \\{\\s*finalOrders\\.push\\(order\\);", "desc": "CORE invariant 31: admin/not-viewd keeps a customer-less kopa-qr order (any other order whose customer is not found is still skipped)"},
         {"file": "routes/order-amend.js", "regex": "KOPA_QR: \"KOPA_QR_ORDER_NOT_AMENDABLE\"", "desc": "CORE invariant 31: amend refuses a kopa-qr order (it would reprice at app prices)"},
         {"file": "services/kopa/table-orders.js", "regex": "source: KOPA_QR_SOURCE,\\s*table: \\{ id: table\\.tableId, label: table\\.label \\},\\s*customerId: null,", "desc": "CORE invariant 31: source, a top-level table { id, label } and no customer"},
-        {"file": "services/kopa/table-orders.js", "regex": "routes\\.fireStoreOwnerNotifications\\(orderDoc, req, appName\\); // never awaited", "desc": "CORE invariants 6 + 31: the table order's store-owner alert is not awaited"}
+        {"file": "services/kopa/table-orders.js", "regex": "routes\\.fireStoreOwnerNotifications\\(orderDoc, req, appName\\); // never awaited", "desc": "CORE invariants 6 + 31: the table order's store-owner alert is not awaited"},
+        {"file": "services/orders/picked-up-guard.js", "regex": "\\[ORDER_STATUS\\.PICKED_UP\\]: Object\\.freeze\\(\\[ORDER_STATUS\\.COMPLETED\\]\\),\\s*\\[ORDER_STATUS\\.PICKED_UP_BY_DRIVER\\]: Object\\.freeze\\(\\[\\s*ORDER_STATUS\\.COMPLETED,\\s*ORDER_STATUS\\.WAITING_FOR_DRIVER,?\\s*\\]\\)", "desc": "CORE invariant 2: 'handed over' only from 'ready': 10 only from 2, 11 only from 2/3 (the partner nextStatusFor edges)"},
+        {"file": "services/orders/picked-up-guard.js", "regex": "if \\(hasAdminRole\\(auth, DASHBOARD_ROLES\\)\\) return null;", "desc": "CORE invariant 2: only a dashboard token (roles) is exempt from the picked-up guard; partner, impersonation, driver and customer tokens are guarded"},
+        {"file": "services/orders/picked-up-guard.js", "regex": "const statusAlreadyChangedBody = \\(currentStatus\\) => \\(\\{\\s*message: \\\"הסטטוס כבר עודכן\\\",\\s*code: \\\"STATUS_ALREADY_CHANGED\\\",\\s*currentStatus,\\s*\\}\\);", "desc": "CORE invariant 2 / reference §2: the ONE STATUS_ALREADY_CHANGED body (PENDING guard 400, picked-up guard 409) that clients handle"},
+        {"file": "routes/order.js", "regex": "const pickedUpFrom = pickedUpAllowedFrom\\(updateobj\\?\\.status, req\\.auth\\);", "desc": "CORE invariant 2: /api/order/update decides the picked-up guard from the token, never from the body"},
+        {"file": "routes/order.js", "regex": "if \\(pickedUpFrom\\) writeFilter\\.status = \\{ \\$in: pickedUpFrom \\};\\s*const written = await db\\.orders\\.updateOne\\(\\s*writeFilter,\\s*\\{ \\$set: updateobj \\},", "desc": "CORE invariant 2: the guard is ATOMIC: the allowed statuses are in the updateOne filter, never only a pre-read check"},
+        {"file": "routes/order.js", "regex": "if \\(pickedUpFrom && !\\(written && written\\.matchedCount > 0\\)\\) \\{[\\s\\S]{0,1200}?return res\\.status\\(200\\)\\.json\\(\\{ message: \\\"Order successfully updated\\\", unchanged: true \\}\\);[\\s\\S]{0,800}?return res\\.status\\(409\\)\\.json\\(statusAlreadyChangedBody\\(now\\.status\\)\\);\\s*\\}\\s*const order = await db\\.orders\\.findOne\\(", "desc": "CORE invariant 2: a refused picked-up write answers (retry at target = 200 unchanged, else 409 STATUS_ALREADY_CHANGED) BEFORE the re-read that feeds every side effect"},
+        {"file": "test/integration/order-picked-up-guard.js", "regex": "ATOMIC: a cancel between the route's read and its write still wins", "desc": "CORE invariant 2: the race test that fails if the guard becomes a pre-read check"}
       ]
     },
     "shoofi-app": {

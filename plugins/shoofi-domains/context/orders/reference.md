@@ -84,15 +84,30 @@ Buckets (`docs/customer-orders-snapshot.md`): **completed** `2,3,10,11,12` ·
   `delivery-company.bookDelivery` (+ flow events / pushes); `complete` reads the store order
   only to schedule the feedback push. So "delivered" = `bookDelivery.status "4"` +
   `bookDelivery.completedAt` — the order stays at `3`/`2`. `10`/`11` come from the
-  partner's `order/update`; no live client sends `9`/`12` (label-only), though
-  `/api/order/update` still handles a `9` if one arrives.
+  partner's `order/update` (the admin web sends none: its dropdown offers 6/1/2/3/7/13/5);
+  no live client sends `9`/`12`
+  (label-only), though `/api/order/update` still handles a `9` if one arrives.
+- **Handed over** (`order/update`) → `2`→`10` (pickup / drive-in), `2`/`3`→`11` (delivery).
+  For a non-dashboard caller, those are the ONLY edges into `10`/`11` (guard below).
 - **Twin cascade** mutates the peer side **directly via services**, not routes (avoids recursion).
 
 **Transition guards you must not weaken:** PENDING(`6`) only from FRAUD_REVIEW
 (`order.js`); `/update/viewd` rejects already-cancelled `4,7,8,9` with a 400
 `ORDER_CANCELLED` (~order.js:6002-6025). That list omits REJECTED `5`, and no other status
 check follows it, so accepting a `5` order overwrites it to `1` (or `14`/`15`);
-`start-preparing` only from `14`. Fields: `status`, `statusUpdatedAt`,
+`start-preparing` only from `14`; **`10` only from `2` and `11` only from `2`/`3`** on
+`/api/order/update` for every caller without a dashboard role
+(`services/orders/picked-up-guard.js` `pickedUpAllowedFrom`, 2026-11-15). That guard is atomic:
+`handleOrderUpdate` puts the allowed statuses in the `updateOne` filter and checks
+`matchedCount`. When nothing matched it re-reads the status. At the target, it answers `200
+{message: "Order successfully updated", unchanged: true}` (an idempotent retry). An unknown
+order is a 404. Anything else is **`409 {message: "הסטטוס כבר עודכן", code:
+"STATUS_ALREADY_CHANGED", currentStatus}`**, the same body the PENDING guard returns with a
+400. None of these early answers runs a side effect (websocket, `status_change` flow event,
+feedback push, customer or driver push). It exists because a stale partner card could write
+`10`/`11` over a support cancel (`7`): an un-cancel that left the COMP coupon, the compensation,
+the coins refund and the `-3` booking in place. A dashboard token (`roles`) is exempt on
+purpose, so support's behaviour is unchanged. Fields: `status`, `statusUpdatedAt`,
 `statusUpdateReason`, `completedAt`, `viewdAt`, `isViewd`, `isPrinted`, `orderDate`.
 **`readyMinutes` is NOT an order field** — accept takes it as a request param and does not
 persist it (~0% of prod orders carry it; only `/update-start-preparing` writes it, on future
@@ -729,16 +744,28 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   in shoofi-server 29ed5252, 2026-11-03.)
 - **Transition rule**: ACCEPT goes through **`order/update/viewd`** (NOT `order/update`);
   all other forward/back transitions use `order/update` with an explicit `status` the
-  client computes in `stores/orders/index.tsx`: forward `updateOrderStatus` (main ~259):
-  `1→3` delivery / `1→2` takeaway; `3→11`; `2→11` delivery / `2→10` takeaway; `10→4`;
-  `15→1`. Back `updateOrderToPrevStatus` (main ~396): `2`/`3`/`4` → `1`, without SMS. The
-  `10→4` arm is unreachable from the list: its collapsed and expanded rows both hide the next
-  button on `10`/`11` (`list/index.v2.tsx` ~2861, ~3145, `pickedUpStatuses`).
-- **Order rules helper** (shoofi-partner feat/orders-v3-rules, bf6dd52; not on main yet):
-  `helpers/orders/order-rules.ts`, pinned by `helpers/orders/__tests__/order-rules.test.ts`.
-  On that branch `updateOrderStatus` / `updateOrderToPrevStatus` call `nextStatusFor` /
-  `prevStatusFor` from it; the transitions above are unchanged. It also exports
-  `showsCollapsedNextButton` / `showsExpandedNextButton` / `showsBackToPreparing` /
+  client computes in `stores/orders/index.tsx`: forward `updateOrderStatus` →
+  `nextStatusFor`: `1→3` delivery / `1→2` takeaway; `3→11`; `2→11` delivery / `2→10`
+  takeaway; `15→1`. A picked-up order (`10`/`11`) has NO next step. The old `10→4` arm was
+  removed because status `4` refunds a card customer and the store is not paid for it. Back
+  `updateOrderToPrevStatus` → `prevStatusFor`: `2`/`3`/`4` → `1`, without SMS.
+  **The server enforces the two "handed over" edges** (reference §2 guard, CORE invariant 2): a
+  `10`/`11` tap on a card whose order has meanwhile moved (support cancelled it, another tablet
+  already handed it over) gets **`409 {message, code: "STATUS_ALREADY_CHANGED",
+  currentStatus}`** and nothing is written. A repeat of a tap that already landed gets `200
+  {unchanged: true}`. The partner interceptor reacts only to 401, so a screen that does not
+  catch the 409 shows nothing. It should refresh the card from `currentStatus`.
+  The v3 board does (shoofi-partner#86): `isStatusAlreadyChanged` (HTTP 409) in
+  `screens/admin/order/list/index.v3.tsx` `updateOrderStatus` reloads the board instead of
+  restoring the stale card. The same PR puts the one-tap «handed over» on the COLLAPSED ready
+  card (`showsCollapsedHandoverButton`: status `2`/`3`; a drive-in only once
+  `driveInArrival.arrivedAt` is set, because at `10` the customer's «I've arrived» button
+  disappears). Nothing but the store moves a delivery order to `11`.
+- **Order rules helper** (on main since the v3 rules landed): `helpers/orders/order-rules.ts`,
+  pinned by `helpers/orders/__tests__/order-rules.test.ts`. `updateOrderStatus` /
+  `updateOrderToPrevStatus` call `nextStatusFor` / `prevStatusFor` from it. It also exports
+  `showsCollapsedNextButton` / `showsCollapsedHandoverButton` / `isStatusAlreadyChanged` /
+  `showsExpandedNextButton` / `showsBackToPreparing` /
   `showsDelayButton` / `showsAmendButton` / `showsCompensationButton`, `tabStatusList` /
   `tabCount` / `visibleTabs`, `isReadyTooEarly` (the `readyOrderUpdateStatusMinMinutes`
   guard), `prepTimeSlots` (the twin second-store window, below), `canAccept`,
@@ -1212,6 +1239,12 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
     `statusChangeNeedsCancelDialog`): an order with money at stake no longer offers the
     cancel/reject statuses there (they would be stamped `undecided` with nobody asked) — cancels go
     through "בטל הזמנה" and its dialog; "בטל הזמנה" is hidden on status 5.
+    It offers no `10`/`11` (labels `ORDER_STATUS_HEBREW_SHORT` in `useOrderActions.tsx`:
+    6/1/2/3/7/13/5), and no other admin screen sends them. An admin token (`roles`) is still
+    exempt from the server's "handed over only from ready" guard (CORE invariant 2). So if
+    `10`/`11` is ever added to the dropdown, support can correct an order from any status. Doing
+    that on a cancelled order is still an un-cancel, and it reverses none of the cancel's side
+    effects.
   - **Undo guard** (`src/utils/twin-cancel.ts` `undoDegradeBlock`) mirrors the server's
     `undoDegradeBlockReason` and also reads `group.moneySummary` (a coupon, a refund or a refund in
     doubt since the degrade hides undo).
