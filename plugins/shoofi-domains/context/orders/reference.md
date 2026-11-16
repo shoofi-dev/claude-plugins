@@ -174,6 +174,16 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   Not handled: `degradeToSingle` with `keepSide:'secondary'` moves the FULL primary fee onto the
   kept order (`$inc total`) while the primary's coupon usage stays. This was already true for
   every delivery coupon before this change.
+- **Prep range (customer ETA)**: `/quote` returns `twinPrepRange` = the SLOWER side's
+  `minReady`/`maxReady` + `twinDeliveryBufferMin` (plus `primaryReady`/`secondaryReady`); the
+  app's checkout adds the primary's courier area ETA on top (`shoofi-app
+  components/address/index.tsx`). Each side's range includes that store's active extra prep time
+  (`activePrepExtraMinutes`, `prepExtra` — menu-catalog CORE invariant 30), read from the RAW
+  per-store doc. `/place` and `/digital-place-pending` embed each side's store doc as
+  `order.storeData` through `withPrepExtraReadyRange`, because the twin header's pending
+  countdown (`OrderTimer`, status `6`/`13`) reads `storeData.maxReady` — a single-store order's
+  snapshot is the client's already-raised copy from `POST /api/store`. The stored store doc is
+  never raised. Test: `test/integration/twin-prep-extra.js`.
 - **Customer notes**: `commentToCourier` is ONE note for the shared courier and is written on
   both legs. `commentToStore` is ONE NOTE PER STORE: `primary.commentToStore` goes on the primary
   leg and `secondary.commentToStore` on the secondary. `buildSkeletonOrder` cleans each value,
@@ -189,7 +199,9 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   (4/5/7/8/9, string or number), the group is `degraded_to_single`/`cancelled`, or the first
   order was accepted (`viewdAt`, any status after). Fail open. `twinPeerInfo` (the readyMinutes
   cap) only for a live, accepted peer. The peer is looked up by `peerOrderId` pinned to
-  `twinGroup.groupId` (the short number repeats), falling back to the group id.
+  `twinGroup.groupId` (the short number repeats), falling back to the group id. Which side is the longer-prep one comes from the measured 7-day
+  `avgPrepTime` (`twin-prep-time-service.js`, growth snapshots), not `minReady`/`maxReady`, so
+  extra prep time does not change the order.
   **The second store's persistent alert** (push + reminder cron) fires on the first store's accept
   (`order/update/viewd`) — and, since 2026-11-10, also when the first store is DROPPED
   (`degradeToSingle` → `releaseSecondStore`: kept order is pickupSequence 2, status 6/14, not
