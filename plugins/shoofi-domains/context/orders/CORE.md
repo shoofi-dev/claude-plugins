@@ -616,8 +616,17 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **Where and when:** in `/api/order/create` only, right after `db.orders.insertOne(orderDoc)`
       and `scheduleOrderFact`, as `runShippingPriceCheck({...}).catch(() => {})`, **never
       awaited**. It never rejects and never changes `shippingPrice` or `total`. A lookup that
-      throws or never answers leaves the order and its response untouched (invariant 6). Twin
-      `/place` / `/digital-place-pending` do not call it.
+      throws or never answers leaves the order and its response untouched (invariant 6).
+    - **Twin: the PRIMARY leg only** (shoofi-server#561, HQ #e76d26). `routes/twin-order.js`
+      `/place` and `/digital-place-pending` fire it the same un-awaited way
+      (`fireTwinPrimaryShippingPriceCheck`, after both inserts, in the primary store's db). The
+      primary carries the whole fee, posted exactly like a single order's; the combination fee
+      lives on `twinGroup`. The secondary is ₪0 by design and stays exempt, as does a leg with no
+      `twinGroup.role` (a booking's bare `twinGroupId`). Measured 2026-11-17 over 60 days: 623
+      primaries, 577 at the tariff, 5 above, 40 exempt by coupon/deal, 1 below (nshnosh
+      7168-0724, ₪20 vs ₪38); 619 of 623 secondaries at ₪0. Card twins are checked at placement
+      (status `"0"`), so a failed placement's cancelled primary can carry a flag.
+      `test/integration/twin-shipping-price-check.js`.
     - **Comparison:** the posted `Number(shippingPrice) || 0` against the area's `price`, with
       ₪0.01 tolerance. Only a fee BELOW the tariff is flagged. `shippingPrice` is already the
       PRE-discount fee: a coupon rides on `discountAmount`, a store delivery deal on `total`
@@ -629,8 +638,9 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       (`paused: area.isActive !== true`). It deliberately does NOT use
       `resolveDeliveryTariffCeiling`, which returns a ceiling with store-zone / ₪100 fallbacks and
       skips paused areas. An unmatched area here is `unresolved`, never a mismatch.
-    - **Exempt (no lookup, no flag):** receipt method ≠ `DELIVERY`; `isDeliveryOnly`; twin
-      (`twinGroup.groupId`, or a booking's `twinGroupId`); an `appliedCoupon.coupon` with
+    - **Exempt (no lookup, no flag):** receipt method ≠ `DELIVERY`; `isDeliveryOnly`; a twin leg
+      that is not the primary (`twinGroup.role !== "primary"` with `twinGroup.groupId`, or a
+      booking's `twinGroupId`); an `appliedCoupon.coupon` with
       `type: 'delivery_price'`, `discountType: 'full_discount'`, `isFreeDelivery`, or
       `isDeliveryCoupon` (`discountType: 'delivery'` / `type: 'free_delivery'`); `promotions.delivery`.
       These are belt and braces: current bundles never lower `shippingPrice` for them.
