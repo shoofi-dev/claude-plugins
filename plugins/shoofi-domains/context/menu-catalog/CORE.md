@@ -75,6 +75,14 @@ boundary and say so in the PR.
    `menuCache.clearStore(appName)` **and** `menuCache.clearStore(\`${appName}_schoolProject\`)`.
    Missing one serves a stale menu for up to the 5-minute TTL. Menu cache is **customer-only** —
    admin/partner bypass it, so never add caching there (hidden products would leak).
+   **Clearing the cache does not reach a customer already on the menu** — the app holds the menu
+   in memory. A write that changes what a customer sees also pushes `menu_refresh`
+   (`shoofi-shopping`): use `refreshCustomerMenus(appName, data)` (`utils/menu-refresh.js`),
+   which clears both keys and sends one push per store, debounced 3 s. Product insert (incl.
+   create-from-mock) / update / delete, `activeTastes`, and store- and general-category
+   add/update/delete all go through it (2026-11-10); the availability routes and the stock/restore
+   crons push on their own. Pure ordering writes only clear (`clearMenuCaches`). Detail and the
+   app side: reference §6.
 3. **Displayed price is derived at READ time** from the category's `discountPercent` (max across
    the product's categories). The stored `product.price` is **not** what the customer sees.
 4. **Stock invariant** (stock-managed stores, `store.isStockManagment`): `quantity <= 0` ⟺
