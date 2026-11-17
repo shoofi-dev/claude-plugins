@@ -269,8 +269,12 @@ reference C5.
   `GET hyp-tokenize-failure` effectively never runs; a decline and a closed sheet are reported by
   the app to `POST /api/payments/hyp-tokenize-session/:sessionId/result` (own session, only from
   `pending`), and `utils/crons/hyp-token-session-sweep-cron.js` ends anything `pending` after 30
-  min (`services/payments/hyp-token-sessions.js`). The success writers have no status filter, so
-  a late success still ends `verified` over `abandoned`/`failed` — on purpose.
+  min (`services/payments/hyp-token-sessions.js`). The server's own dead ends end it too, through
+  `endPendingSession` (pending-only, never throws): a declining CCode on the success URL →
+  `failed` (`failureSource: server_success_url`), a `hyp-process-token` 400 → `failed`
+  (`server_process_token`), and any process-token failure after the ownership check → `error`.
+  The success writers have no status filter, so a late success still ends `verified` over
+  `abandoned`/`failed` — on purpose. Nothing reads this status; it is for measurement only.
 - `creditCards` (§4), `couponUsages`, `customerCoins`, `storeReports`,
   `amazonconfigs {app: hyp|invoiceProvider|greeninvoice|amazon}`, `stores` (has `hyp{}`).
 - Per-store `orders.ccPaymentRefData` — the union payment record (ZCredit vs HYP shapes) +

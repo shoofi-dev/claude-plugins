@@ -106,7 +106,8 @@
         "services/payments/hyp-token-sessions.js": [
           "recordClientOutcome",
           "sweepAbandonedSessions",
-          "SWEEP_AFTER_MINUTES"
+          "SWEEP_AFTER_MINUTES",
+          "endPendingSession"
         ]
       },
       "patterns": [
