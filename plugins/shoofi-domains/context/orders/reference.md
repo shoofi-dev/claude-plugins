@@ -868,9 +868,17 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   store-analytics gate, `routes/order-history.js`), partner-only, and the `reports` role only
   decides whether `totals` is filled. A store user without it gets the list and `totals: null`,
   never a 403 (CORE invariant 21).
-  **Any 401 signs the store out** (`utils/http-interceptor` → `OPEN_GENERAL_SERVER_ERROR_DIALOG`
-  `isSignOut: true` → `resetAppState` + restart), so a partner-polled route must never 401 a
-  logged-in terminal.
+  **A 401 on a live session signs the store out** (`utils/http-interceptor` →
+  `dialogForRequestError` in `utils/request-error-dialog.ts` → `OPEN_GENERAL_SERVER_ERROR_DIALOG`
+  `isSignOut: true` → `resetAppState`; «retry» restarts into login), so a partner-polled route
+  must never 401 a logged-in terminal. A 401 on a request with no token, or one in flight while
+  the owner signs out (`authStore.logOut` sets `setSigningOut(true)`), opens nothing.
+  The same function picks ONE dialog per failure (2026-11-17, owners: «stuck after the
+  internet comes back»): network error → only the no-internet dialog (two native modals at
+  once can leave iOS taking no taps); timeout → server error, unless already known offline.
+  The server-error «retry» no longer restarts the app: it emits `SERVER_ERROR_RETRY` and
+  `App.tsx` runs `prepare()` again. NetInfo: lost → no-internet dialog; back → it closes and
+  `prepare()` reloads.
 - **"New customer" badge source** (CORE invariant 24): `order.isFirstOrderAtStore` arrives
   on the whole documents of `admin/orders`, `admin/all/not-viewd` and `admin/not-viewd`. Badge
   only on `=== true`; absent (old orders, a failed lookup) = no badge. The v3 history endpoint
