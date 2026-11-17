@@ -1,6 +1,6 @@
 # Accountant / Settlement / Payouts — Domain Context
 
-> last-verified §4 Kopa QR table orders (CORE invariant 20: split off the sales row, `tableOrders*` only, every reader listed): shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13; §4 (partner/summary + daily-orders validate their period first, 400 INVALID_PERIOD; reportPeriod guards its day loop): shoofi-server@fix/partner-summary-date-validation / 2026-11-12; §12 (Kopa till sessions, Z/X, drawer, till reports, receipts built-but-off; till money separate from settlement): shoofi-server@feat/kopa-phase1 / 2026-11-12; §12 "No money without a shift" (session gate, money leases, window end): shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12; §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
+> last-verified §6b (the courier app's next payout, CORE invariant 21): shoofi-server@feat/courier-next-payout / 2026-11-16; §4 Kopa QR table orders (CORE invariant 20: split off the sales row, `tableOrders*` only, every reader listed): shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13; §4 (partner/summary + daily-orders validate their period first, 400 INVALID_PERIOD; reportPeriod guards its day loop): shoofi-server@fix/partner-summary-date-validation / 2026-11-12; §12 (Kopa till sessions, Z/X, drawer, till reports, receipts built-but-off; till money separate from settlement): shoofi-server@feat/kopa-phase1 / 2026-11-12; §12 "No money without a shift" (session gate, money leases, window end): shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12; §1/§4 (partner/summary + daily-orders = the store report's figures from generateStoreReportData in-process, opt-in via `figures: "report"`, else the legacy answer unchanged; stores-export-new's body in services/payments/store-sales.js): shoofi-server@fix/partner-summary-figures / 2026-11-09; §3/§4 (flat-15% routes deleted: partner/details, admin/partners, admin/analytics): shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08; §5 (send-invoice when Shoofi owes the store): shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08; §5 (send-invoice for an all-cash store): shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08; §5/§8/§9 (the owner's EZcount consent): shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07; §6/§8/§9/§10: shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (report state derived from the facts); §5/§8/§9/§10: shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05
 
 > **Who you are:** the agent that owns **money OUT + the books** — computing what stores
 > and delivery companies/drivers are owed, issuing tax invoices, and generating bank
@@ -411,6 +411,22 @@ reports, 2026-11-02). The company **gross** fees are **`feesByCash` / `feesByCre
 "מזומן" line reads `feesByCash`). Card is the same number either way (Shoofi pays the full card fee);
 cash is not. Never read the company `earningsByCash` as "cash collected": the financial overview did,
 and showed "מזומן נטו" = ₪0 for 10/2026 (real ₪97,716).
+
+## 6b. The courier's next payout (driver app) — `services/courier-payout/courier-payout.js`
+`GET /api/delivery/driver/me/payout` (`routes/delivery/driver-payout.js`, mounted in `routes/delivery.js`;
+gate `driverSelfAction` — shoofir token, the courier is `req.auth.id`). Answer:
+`{ payoutDay: number|null, nextPayoutDate: ISO|null, reportMonth: "YYYY-MM", amount: number|null }`,
+e.g. `{ "payoutDay": 10, "nextPayoutDate": "2026-12-10T00:00:00+02:00", "reportMonth": "2026-11", "amount": 30 }`.
+Client: shoofir `utils/courier-api.ts` `getMyPayout` (type `MyPayout`). Rules: CORE invariant 21.
+- `parsePayoutDay` — the platform doc's `courierPayoutDay`, integer 1–28 else null (admin web mirror:
+  `src/views/admin/settings/courierPayoutDay.ts`, the «שליחים» card on `ShoofiSettings.tsx`, saved by the
+  existing `POST /api/shoofiAdmin/store/update`).
+- `nextPayout(now, day)` — Israel calendar; `nextPayoutDate` is 00:00 Israel on that date with ITS offset.
+- `planMonthCoverage` — stored reports inside the month (by their Israel dates) + the gaps; a report
+  across the month or overlapping reports → `ambiguous`.
+- `resolveDirectPayee` — one driver record, no company admin, not `isControlledByAdmin`.
+- `courierPayoutAmount` — Σ stored `netTotal` + the engine per gap; engine runs cached in-process 5 min
+  per company + day range (stored reports are read on every call). Rounded to agorot, never clamped.
 
 ## 7. MASAV bank payouts — `routes/admin/masav.js`
 `POST /api/admin/masav/generate`  — **decoupled from the reports**: consumes a
