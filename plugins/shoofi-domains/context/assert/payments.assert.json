@@ -349,6 +349,11 @@
           "desc": "CORE: where it works = checkout's applicableTo.stores rule (empty = every store)"
         },
         {
+          "file": "routes/coupon.js",
+          "regex": "\\.find\\(\\{ _id: \\{ \\$in: ids \\} \\}, \\{ projection: \\{ cityId: 1, city_id: 1 \\} \\}\\)[\\s\\S]{0,200}?const c = a\\.cityId \\|\\| a\\.city_id;",
+          "desc": "CORE 'Who a coupon applies to': a coupon's supportedCities is matched against the order's AREA cityId (resolveCityIdsFromAreaIds) — the area's PICKUP zone, i.e. where the store is, never the customer's town; customer targeting is supportedAreas"
+        },
+        {
           "file": "services/coupons/public-coupon.js",
           "regex": "const UPCOMING_WINDOW_DAYS = 30;",
           "desc": "CORE: an upcoming coupon shows only within 30 days of its start"
