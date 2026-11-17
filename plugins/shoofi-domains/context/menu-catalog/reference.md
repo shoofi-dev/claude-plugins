@@ -811,9 +811,10 @@ the cache read.
 - Kopa phase 3: `GET /api/kopa/meta`, `GET /api/kopa/kitchens` (`KOPA_TILL`);
   `PUT /api/kopa/meta/items/:productId`, `PUT /api/kopa/meta/categories/:categoryId`,
   `POST /api/kopa/kitchens`, `PATCH|DELETE /api/kopa/kitchens/:id` (`KOPA_OWNER`) (§7l).
-- `POST /api/admin/menu/copy` and `POST /api/admin/menu/copy/:runId/rollback` **[admin]**
-  (`PRODUCT_ADMIN`, so any dashboard role; no partner path). Both are in the admin audit map. They
-  copy one store's whole menu into another, and undo it (§7n).
+- `POST /api/admin/menu/copy` and `POST /api/admin/menu/copy/:runId/rollback`: `auth.required` +
+  `checkAdminRole(PRICE_EDIT_ROLES)`, i.e. every dashboard role except `accountant` (master passes),
+  with no partner path. This is NOT `PRODUCT_ADMIN`. Both are in the admin audit map. They copy one
+  store's whole menu into another, and undo it (§7n).
 
 ## 7b. Nightly catalog lint — the cron and the app event contract
 `utils/crons/catalog-lint-cron.js` — `30 4 * * *` Asia/Jerusalem, registered in `app.js` inside
@@ -1590,6 +1591,13 @@ Code: `routes/kopa/qr-menu.js` (owner), `routes/kopa/qr-menu-public.js` (no auth
 `services/catalog/menu-copy.js` holds the logic; `routes/admin/menu-copy.js` is thin and mounted
 under `/api/admin`. Server doc: `docs/menu-copy.md`. Tests: `test/integration/menu-copy.js`
 (in-memory Mongo).
+
+**Gate** (`MENU_COPY_GATE` in the route): `auth.required` + `checkAdminRole(PRICE_EDIT_ROLES)` from
+`services/catalog/bulk-price-update.js`, i.e. master, admin, manager, senior, operator, editor,
+viewer. An `accountant`-only token gets 403, because a whole-menu replace is a bulk destructive write
+and accountant seats are not on the menu screens. It matches the admin web's `MENU_COPY_ROLES`
+(`src/components/Sidebar/menu-access.ts`) and copy-arabic-products. No token is 401; a customer,
+partner or driver token is 403.
 
 **`POST /api/admin/menu/copy`** `{ sourceAppName, targetAppName, dryRun: boolean, mode?: "replace", confirm?: string }`:
 - `dryRun: true` → `200 { dryRun: true, source: { appName, generalCategories, categories, products,
