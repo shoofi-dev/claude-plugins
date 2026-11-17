@@ -155,6 +155,11 @@ hangs the request (CORE invariant 11), so none of them answered.
   issues a Shoofi-paid `COMP-*` coupon). A twin leg's refund is always flagged for a person
   (`refund_twin_order_manual`). Note: the comment above `CANCEL_MONEY_DECISION` still says
   KEEP's coupon is created by hand — stale since cancel-compensation.js; the code issues it.
+  `refundData` on any order is historical-only: nothing in shoofi-server reads it
+  (`test/integration/order-addrefund-route-removed.js` pins the 404). A real refund is recorded
+  as `paymentAuth.refundedAmount` — `$set` by `refundOrderPayment`'s HYP success write
+  (`services/payments/order-authorization.js`), `$inc`'d by `clearSingleRefundFlagIfSettled`
+  when finance records a portal refund (`services/money/money-cancel.js`).
 - **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
   charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
   `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,
