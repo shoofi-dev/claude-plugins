@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/coupon-draft-customer-area / 2026-11-17 (Who a coupon applies to: supportedCities = the store's pickup zone, supportedAreas = the customer's route); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -275,6 +275,27 @@ coupon its total took off: TotalPrice is its only writer (reference.md, "Coupons
 converse holds too: a coupon the total did NOT use (`couponSuppressed`: it lost to a delivery
 deal, or it is a delivery coupon on a pickup / drive-in order) stays on the card as "not used" and
 is not sent.
+
+**Who a coupon applies to** — `applicableTo` (`routes/coupon.js`: `/api/coupons/apply` and
+the auto-apply scorer `GET /api/coupons/auto-apply/:customerId`). Every non-empty list is ANDed;
+an empty one is "all":
+- `stores` — the order's store `appName`.
+- `supportedCities` — **the STORE's pickup zone, never the customer's town.** It is compared
+  with `resolveCityIdsFromAreaIds(areaIds)` = each area's `cityId`, and an area is a
+  pickup→dropoff route whose `cityId` is the zone the store sits in (delivery CORE: `areas`).
+  The `areaId` the app sends is `availableDrivers.area._id` from `findBestAreaForLocation`
+  (shape holds the customer AND city holds the store). With no area, auto-apply falls back to
+  the store's own `supportedCities`. The admin form labels it «אזור החנות (איסוף)».
+- `supportedAreas` — the order's area id, one "store zone - customer town" route
+  («גלגוליה - כפר ברא»): **the only field that targets where the customer is**
+  («אזור הלקוח (מסלול משלוח)»).
+- So "Kfar Bara customers of a Jaljulia store" = `stores` + `supportedAreas`, cities empty.
+  Kfar Bara in `supportedCities` with a Jaljulia store matches no order (G0F8JG9Z,
+  2026-11-17); Jaljulia in `supportedCities` matches that store's orders to EVERY town.
+  Coupon drafts block the first shape (accountant CORE invariant 13).
+- Known gaps (open, 2026-11-17): `/api/coupons/available` and `/customer/:id/available` (the
+  store-page banner) skip the cities check; the app's typed-code path (`CouponInput`) sends no
+  `areaIds`, so a typed code limited by zone or area is always refused.
 
 **What is advertised** — `GET /api/coupons/active` feeds the store-page carousel AND the home
 store-card tag (shoofi-app `couponsStore.activeCoupons`, label `t(storeTagName)`). It lists public,

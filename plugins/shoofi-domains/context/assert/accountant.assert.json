@@ -607,6 +607,16 @@
           "desc": "CORE invariant 13: settle-on-read — an approving draft whose reserved code exists is marked created, so one draft can never create a second coupon"
         },
         {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "block\\(targetingConflictMessage\\(conflict, ctx\\), field\\)|'subNameForStore',\\s*[\\r\\n]+\\s*'supportedAreas',\\s*[\\r\\n]+\\s*'categories',\\s*[\\r\\n]+\\]\\);",
+          "desc": "CORE invariant 13 targeting: stores / store zones (supportedCities) / customer areas (supportedAreas) that share no pickup zone are a draft blocker («הקופון לא יחול על אף הזמנה», targetingConflict). Valid-before leg = main's DRAFT_MANAGED_FIELDS still holding supportedAreas before shoofi-server fix/coupon-draft-customer-area; drop the leg once that PR has merged"
+        },
+        {
+          "file": "services/coupons/coupon-draft-assistant.js",
+          "regex": "\\\"supportedCities\\\" is the STORE's pickup zone|4\\. STORES and CITIES — use appName values from the store list",
+          "desc": "CORE invariant 13 targeting: the draft assistant's rule 4a — supportedCities is the store's pickup zone, customer targeting is supportedAreas, never claim cities filters by the customer (the G0F8JG9Z reply, 2026-11-17). Valid-before leg = main's old rule 4; drop it once shoofi-server fix/coupon-draft-customer-area has merged"
+        },
+        {
           "file": "routes/admin/coupon-templates.js",
           "regex": "err\\.code === 'COUPON_TEMPLATE_INVARIANT'\\)\\s*\\{\\s*[\\r\\n]+\\s*return res\\.status\\(422\\)",
           "desc": "CORE invariant 13: the plain #320 picker turns a too-low amount under the fixed default split into a 422 — the too-HIGH case is still silent there"
@@ -1526,6 +1536,11 @@
       ],
       "symbols": {},
       "patterns": [
+        {
+          "file": "src/views/admin/coupons/CouponForm.tsx",
+          "regex": "אזור החנות \\(איסוף\\)|ערים לחיפוש חנויות ואזורי משלוח",
+          "desc": "CORE invariant 13 targeting: the coupon form names supportedCities as the STORE's pickup zone («אזור החנות (איסוף)»), not a customer city. Valid-before leg = the old «ערים לחיפוש חנויות ואזורי משלוח» heading; drop it once shoofi-delivery-web fix/coupon-form-zone-labels has merged"
+        },
         {
           "file": "src/views/admin/reports/ReportsList.tsx",
           "regex": "(\"/hyp/admin/reports/\\$\\{report\\._id\\}/create-store-invoice\"|`/hyp/admin/reports/\\$\\{report\\._id\\}/create-store-invoice`)\\),\\s*\\n\\s*\\(done\\) =>",
