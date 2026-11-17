@@ -1404,6 +1404,34 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   - **No edit path and no `bookDelivery` mirror.** It is not «הערות לשליח» (`commentToCourier`),
     which is delivery-only and editable through `POST /api/order/comment-to-courier`.
 
+- **Combo lines on the admin order card** (CORE invariant 12 "Readers", branch
+  `fix/admin-order-combo-picks`, 2026-11-17). Before it, `CardOrder` tested only
+  `selectedExtras`, which is `{}` on a combo line, so it printed "תוספות: —" (order 5160-7994).
+  - **Helpers:** `src/utils/combo-order-display.ts`, pure: `lineHasChoices`,
+    `comboSelectionsOf`, `findMenuProduct`, `resolveComboComponent`, `comboPickName`,
+    `comboPickSurcharge`, plus ports of the partner's `sortComboSelections` /
+    `comboSlotLabel` (`components/shared/ComboSelectionsDisplay.tsx`) and
+    `listComponentSelections` (`helpers/combo-summary.ts`). The admin is Hebrew, so names
+    read `nameHE || nameAR`.
+  - **Card (`OrderComboPicksWeb` in `CardOrder.tsx`):** under the line's "תוספות:" (mobile and
+    desktop share `renderLineChoices`), one row per pick: slot chip, the stored name, `+₪surcharge`
+    when > 0 (display snapshot, never charged). It shows without the menu. Before "הצג פרטי תוספות"
+    loads the menu (`GET /api/menu`, `app-type: shoofi-admin`: hidden products included, combo
+    options carry `option.product` snapshots), the chips read "בחירה n". After it, they read
+    "<section> n", and each pick's choices render through the existing `OrderExtrasDisplayWeb`.
+    The component's extras come from the menu product first, then the option snapshot. The "—"
+    and the "הצג פרטי תוספות" button both use `lineHasChoices`, which counts
+    `comboSelections` too. A plain line renders as before.
+  - **Amend sheet (`AmendOrderModal.tsx`):** a combo line's picks are listed read-only (name,
+    surcharge, a one-line summary of the choices). Amend stays qty/remove for a combo line
+    (CORE invariant 12). The sheet's `ExtrasEditor` still renders for the combo's OWN extras
+    definition. It renders nothing when that is empty, as on the 5160-7994 box. A combo with
+    its own extras would get an editor whose change the server refuses with
+    `400 COMBO_EXTRAS_NOT_AMENDABLE`. It is not hidden yet.
+  - **Tests:** `src/utils/__tests__/combo-order-display.test.ts`,
+    `tests/e2e/orders/order-combo-picks.spec.ts` (fixture: the real 5160-7994 line,
+    `tests/e2e/factories/combo-order-data.ts`), run folder `tests/e2e/runs/combo-order-picks/`.
+
 ## C5. shoofi-kopa — the store till back-office (web)
 Kopa (repo `shoofi-kopa`) is the store's back-office web app. It calls the server like the
 partner app: a partner token, `app-type: shoofi-partner`, the store in `app-name`. Its order
