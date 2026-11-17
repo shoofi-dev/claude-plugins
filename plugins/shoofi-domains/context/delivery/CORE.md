@@ -615,6 +615,12 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
     resend). A different courier still lands at `"1"`. `reassignmentMetadata.newDriverId` +
     `assignmentMetadataDescribesPreviousDriver: true` mark the engine's `assignmentMetadata` as
     describing someone else.
+    The four flow-tracking calls in the manual paths (admin assign pending, admin cancel,
+    `order/status/update`, company-admin reassign) are wrapped and run AFTER the pushes
+    (invariant 6). `POST /api/delivery/admin/cancel` also accepts `convertToPickup: true` /
+    `cancelReasonCode: "customer_pickup"`. The conversion (orders invariant 32) runs after the
+    `-3` write and is wrapped: it reports in `pickupConversion` in the 200 body and never 500s the
+    cancel. It is refused when the booking was delivered before the cancel.
 
 
 ## Known status (human-confirmed — do NOT "fix")

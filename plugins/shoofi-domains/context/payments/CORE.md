@@ -204,6 +204,21 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    (idempotent: a compensation row with that `cancelDecisionKey` is reused) — one Shoofi-funded
    `COMP-<primary originalOrderId>[-n]` per twin decision; per-side calls still refuse twins.
    Invoices are untouched.
+13. **A card order converted to pickup OWES its delivery fee in the ledger; nothing on the
+    order changes** (`services/money/pickup-fee-owe.js`, shoofi-server#605, orders invariant 32).
+    - **Amount:** the fee paid, which is `shippingPrice` minus a delivery-coupon discount, never
+      below 0.
+    - **When it is owed:** only if `paymentAuth.status === "captured"`, or if there is no
+      `paymentAuth` and `orderWasCharged` is true. Every other state goes to `manual:<reason>`.
+    - **Sequence:** `claimCharge` → `ensureCaptureEntry` → `<chargeKey>:pickup` decide +
+      `<chargeKey>:pickup:owe` owe (reason `converted_to_pickup_delivery_fee`) → release. The
+      fixed keys make a retry write nothing.
+    - **Never written:** `total`, `shippingPrice`, `paymentAuth.*`, `ccPaymentRefData` and
+      `invoices[]`; `refundRequired` is never set either. The issued delivery document needs a
+      credit note, which finance writes by hand.
+    - **Audit:** HQ `refund-anomaly` exempts a refund no larger than that owe on a live order.
+    - **Known gap:** a later single-order cancel of a converted card order refunds from `total`
+      and ignores the ₪20 already refunded, so it can over-refund.
 
 ## Kopa till money (phase 4d) — bookkeeping, NOT a charge
 shoofi-server `services/kopa/till-money.js` + `routes/kopa/till-money.js` (branch

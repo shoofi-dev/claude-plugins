@@ -1243,6 +1243,24 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       20, claude-plugins#369). **Deploy order: #583 must be live before the first `kopa-qr` order
       is written.** Nothing is written while a store's `tableOrdering` is off (the default).
     - Tests: shoofi-server `test/integration/kopa/table-orders.js` (20).
+32. **CONVERT TO PICKUP CHANGES THE RECEIPT METHOD AND THE FEE THE CUSTOMER PAID — NEVER
+    `status`, `orderPrice` OR THE BOOKING** (shoofi-server#605,
+    `services/orders/convert-to-pickup.js`, HQ #cf11c1). An order whose courier an admin
+    cancelled (`-3`) because the customer collects it becomes `order.receipt_method: "TAKEAWAY"`
+    plus a `pickupConversion` audit record, both written in one `$set`. It is reached through
+    `POST /api/delivery/admin/cancel` with `convertToPickup: true` (or
+    `cancelReasonCode: "customer_pickup"`), or through `POST /api/delivery/admin/convert-to-pickup`.
+    - **The fee paid** is `shippingPrice` minus a delivery-coupon discount, never below 0. A
+      `full_discount` coupon or a store delivery deal goes to `manual:`.
+    - **Cash:** `total` and `shippingPrice` drop by the fee paid, never rebuilt from
+      `orderPrice`.
+    - **Card:** no money field changes; the fee is owed in the ledger (payments invariant 13).
+    - **Never written:** `status`, `orderPrice` / `originalOrderPrice`, coupons, coins,
+      `created` and the booking. Settlement (`services/payments/store-sales.js`) reads none of
+      the fields that do change, so no store report moves.
+    - **Refused:** a cancelled order, a non-DELIVERY order, a twin leg, status `"0"`, or any
+      live or delivered booking. Calling it again is idempotent.
+    - Tests: `test/integration/convert-to-pickup.js` (24).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
