@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@feat/kopa-qr-shared-menu / 2026-11-13 (invariant 34 + reference 7m: the QR menu shares the app menu, rule collections, qrOnly needs isHidden, 20 s cache); shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@fix/pizza-free-topping-count (#479) + shoofi-app@design/round-2 b581604 (reference §4 free pizza-topping slots) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 outOfStoreUntil admin-only projection + 07:00 restore) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 misheard dish name, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@feat/admin-menu-copy / 2026-11-17 (invariant 35 + reference 7n: menu copy between stores, new ids + full remap, resets, replace + rollback; the menu-copy pins use the [new, old] form until the server PR is on main); shoofi-server@feat/kopa-qr-shared-menu / 2026-11-13 (invariant 34 + reference 7m: the QR menu shares the app menu, rule collections, qrOnly needs isHidden, 20 s cache); shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@fix/pizza-free-topping-count (#479) + shoofi-app@design/round-2 b581604 (reference §4 free pizza-topping slots) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 outOfStoreUntil admin-only projection + 07:00 restore) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 misheard dish name, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -122,9 +122,11 @@
         "routes/admin/extras-catalog.js",
         "scripts/seed-extras-catalog.js",
         "docs/extras-icons.md",
-        "test/integration/extras-icons.js"
+        "test/integration/extras-icons.js",
+        "services/catalog/clone-from-template.js"
       ],
       "symbols": {
+        "services/catalog/clone-from-template.js": ["cloneProductForStore", "mockProductId: product._id"],
         "services/catalog/category-access.js": ["CATALOG_ADMIN", "DASHBOARD_ROLES"],
         "services/catalog/public-store.js": ["toPublicStore", "PRIVATE_STORE_FIELDS"],
         "services/catalog/store-update-access.js": ["STORE_UPDATE_ACCESS", "PARTNER_STORE_FIELDS", "storeUpdateGate", "pickPartnerStoreFields", "partnerRefusedChanges"],
@@ -2452,6 +2454,76 @@
           "file": "routes/admin/extras-catalog.js",
           "regex": "const ADMIN = \\[auth\\.required, checkAdminRole\\(\\[\"master\", \"admin\", \"manager\"\\]\\)\\];",
           "desc": "reference §7: the extras catalog admin API is master|admin|manager"
+        },
+        {
+          "file": ["services/catalog/menu-copy.js", "services/catalog/clone-from-template.js"],
+          "regex": "(?:const productMap = new Map\\(source\\.products\\.map\\(\\(d\\) => \\[str\\(d\\._id\\), new ObjectId\\(\\)\\]\\)\\);|const cloneProductForStore = \\()",
+          "desc": "doc CORE invariant 35 / reference 7n: every copied document gets a NEW ObjectId (old->new maps keyed by the string _id) TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
+        },
+        {
+          "file": ["services/catalog/menu-copy.js", "services/catalog/clone-from-template.js"],
+          "regex": "(?:if \\(mapped\\) doc\\.categoryOrders\\[String\\(mapped\\)\\] = order;|const cloneProductForStore = \\()",
+          "desc": "doc CORE invariant 35: the KEYS of categoryOrders are remapped onto the new category ids, unmapped keys dropped TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
+        },
+        {
+          "file": ["services/catalog/menu-copy.js", "services/catalog/clone-from-template.js"],
+          "regex": "(?:return mapped === undefined \\? \\{ \\.\\.\\.option \\} : \\{ \\.\\.\\.option, productId: mapped \\};|const cloneProductForStore = \\()",
+          "desc": "doc CORE invariant 35 + 10: combo option productIds point at the COPIED components; an unmapped one is left for validateComboReferences to refuse TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
+        },
+        {
+          "file": ["services/catalog/menu-copy.js", "services/catalog/clone-from-template.js"],
+          "regex": "(?:doc\\.quantity = 0;\\s*doc\\.isInStore = false;\\s*doc\\.outOfStockByQuantity = true;|const cloneProductForStore = \\()",
+          "desc": "doc CORE invariant 35 + 4: a stock-managed target starts every copied product at quantity 0, out of stock TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
+        },
+        {
+          "file": ["services/catalog/menu-copy.js", "services/catalog/clone-from-template.js"],
+          "regex": "(?:doc\\.discountPercent = 0;\\s*doc\\.isCampaign = false;|const cloneProductForStore = \\()",
+          "desc": "doc CORE invariant 35: copied categories carry no discount and are not campaigns TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
+        },
+        {
+          "file": ["services/catalog/menu-copy.js", "services/catalog/clone-from-template.js"],
+          "regex": "(?:await menuCache\\.clearStore\\(appName\\);\\s*await menuCache\\.clearStore\\(`\\$\\{appName\\}_schoolProject`\\);|const cloneProductForStore = \\()",
+          "desc": "doc CORE invariant 35 + 2: the menu copy clears BOTH of the target's cache keys TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
+        },
+        {
+          "file": ["services/catalog/menu-copy.js", "services/catalog/clone-from-template.js"],
+          "regex": "(?:const lockKey = \\(appName\\) => `menu-copy:\\$\\{appName\\}`;|const cloneProductForStore = \\()",
+          "desc": "doc CORE invariant 35 / reference 7n: the Redis lock key is menu-copy:<target> TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
+        },
+        {
+          "file": ["services/catalog/menu-copy.js", "services/catalog/clone-from-template.js"],
+          "regex": "(?:const BACKUP_TTL_DAYS = 7;|const cloneProductForStore = \\()",
+          "desc": "doc CORE invariant 35 / reference 7n: a replaced menu is kept 7 days for the rollback TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
+        },
+        {
+          "file": ["services/catalog/menu-copy.js", "services/catalog/clone-from-template.js"],
+          "regex": "(?:const BACKUPS = \"menu-copy-backups\";|const cloneProductForStore = \\()",
+          "desc": "doc reference 2 / 7n: the replaced target's documents go to shoofi.menu-copy-backups TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
+        },
+        {
+          "file": ["routes/admin/menu-copy.js", "routes/admin/catalog-lint.js"],
+          "regex": "(?:router\\.post\\(\"/menu/copy\", \\.\\.\\.PRODUCT_ADMIN,|router\\.post\\(\"/catalog-lint/run\", auth\\.required,)",
+          "desc": "doc CORE invariant 35 / reference 7: POST /api/admin/menu/copy is gated by PRODUCT_ADMIN (any dashboard role, master passes) TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
+        },
+        {
+          "file": ["routes/admin/menu-copy.js", "routes/admin/catalog-lint.js"],
+          "regex": "(?:router\\.post\\(\"/menu/copy/:runId/rollback\", \\.\\.\\.PRODUCT_ADMIN,|router\\.post\\(\"/catalog-lint/run\", auth\\.required,)",
+          "desc": "doc CORE invariant 35 / reference 7: the rollback route carries the same gate TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
+        },
+        {
+          "file": "services/audit/admin-audit-routes.js",
+          "regex": "(?:pattern: '/api/admin/menu/copy', method: 'POST'|pattern: '/api/admin/menu-spellcheck/accept', method: 'POST')",
+          "desc": "doc reference 7: both menu-copy POSTs are in the admin audit map. TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
+        },
+        {
+          "file": "app.js",
+          "regex": "(?:app\\.use\\(\"/api/admin\", menuCopyRoutes\\);|app\\.use\\(\"/api/admin\", catalogLintRoutes\\);)",
+          "desc": "doc reference 7n: routes/admin/menu-copy.js is mounted under /api/admin. TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
+        },
+        {
+          "file": "services/database/DatabaseInitializationService.js",
+          "regex": "(?:db\\.menuCopyBackups\\.createIndex\\(\\{ expiresAt: 1 \\}, \\{ background: true, expireAfterSeconds: 0 \\}\\)|db\\.hqDataChangeBackups = db\\.collection\\('hq-data-change-backups'\\);)",
+          "desc": "doc reference 2: menu-copy-backups has a TTL index on expiresAt. TRANSITIONAL: the second path holds on shoofi-server main before the menu-copy PR (feat/admin-menu-copy) lands; drop it once that PR is on main"
         }
       ]
     },
