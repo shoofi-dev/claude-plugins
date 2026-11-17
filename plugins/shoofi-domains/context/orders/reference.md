@@ -83,7 +83,9 @@ Buckets (`docs/customer-orders-snapshot.md`): **completed** `2,3,10,11,12` ·
   `start`/`complete`/`cancel` (`routes/delivery/orders.js`) update only
   `delivery-company.bookDelivery` (+ flow events / pushes); `complete` reads the store order
   only to schedule the feedback push. So "delivered" = `bookDelivery.status "4"` +
-  `bookDelivery.completedAt` — the order stays at `3`/`2`. `10`/`11` come from the
+  `bookDelivery.completedAt` — the order stays at `3`/`2`. `order.completedAt` is the STORE's
+  ready / waiting-for-driver stamp, not delivery: anything customer-facing that means "has the
+  food" reads `feedbackEligible` (CORE invariant 33). `10`/`11` come from the
   partner's `order/update` (the admin web sends none: its dropdown offers 6/1/2/3/7/13/5);
   no live client sends `9`/`12`
   (label-only), though `/api/order/update` still handles a `9` if one arrives.
@@ -307,6 +309,15 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   admin order-monitoring + the `investigate-order` skill. Traps:
   - **No TTL, no retention.** `cleanupOldEvents` (`centralized-flow-monitor.js`) is never
     called; history runs back to 2025-07-24 (~11.8M docs, 2026-10-06).
+  - **`status_change` from `/api/order/update` names the token's person since 2026-11-17**
+    (CORE invariant 33, `resolveOrderUpdateActor`): `actorType` `store` (partner tablet, name from
+    `shoofi.storeUsers`), `admin` (admin token, or the admin behind an impersonation token, with
+    `metadata.viaImpersonation` + `impersonatedUserId`), `driver`, `customer`, `system`;
+    `metadata.actorSource` = `partner|admin|driver|customer|system`, `metadata.appType`. Older rows:
+    every partner press is `actor: "System"`, `actorType: "system"`, and support's are
+    `actorType: "shoofi_support"` (from the body). Readers handle both: the admin
+    `OrderFlowDashboard` labels admin/store/system, `services/kopa/orders.js` reads `admin` and
+    `shoofi_support` as support and treats `store admin` / `system` as unnamed.
   - **`order_viewed` `metadata.previousStatus` is always wrong** — `/update/viewd` reads it
     from the order re-fetched *after* its `$set`, so it equals the new status. Pre-accept
     status (normally `6`) is not recorded there; take it from the prior event.
@@ -539,6 +550,14 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 - `delivery-pickup-checker` (3 min) / `delivery-completion-delay-checker` (4 min): `bookDelivery` delay alerts.
 - `fix-stuck-orders` (daily 7am): iterates ALL store DBs; stale `1` → `3`/`2`. School variant separate.
 - `fraud-check-schedule`, `feedback-notification`, `persistent-alerts`, `growth-snapshots` (feeds twin prep-time).
+- `feedback-notification` (2 min, `utils/crons/feedback-notification-cron.js`) drains
+  `shoofi.pending-feedback-notifications` (`db.pendingFeedbackNotifications`; index `sendAt`
+  only) and DELETES each row once sent. Rows come from two writers: the courier's "delivered"
+  (`routes/delivery/orders.js`, `receiptMethod: "DELIVERY"`, `sendAt` +30 min) and the store's
+  status write for a non-delivery order (`handleOrderUpdate` → `planTakeawayFeedbackPush`, CORE
+  invariant 33). Before sending a NON-delivery row it re-reads the order (`stillEligibleAtSend`)
+  and drops it when `isFeedbackEligible` says no; unreadable → sent. Skips a row already rated
+  (by `orderObjectId`, or store + short number for old rows).
 
 ## 9. Where you may act freely vs. must stop
 **Safe zone — implement + PR normally (still inherit all gates):**
@@ -625,6 +644,16 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
     store's `10`/`11` (shoofi-app#139, 2026-11-15). **The group status badge is not rendered
     today** (commented out in the header's status strip since the twin card landed); the timer,
     the ETA line and the per-side labels are what the customer sees.
+- **«Rate order ⭐» button** (`screens/order/{active,history,item}`, the twin header) and its
+  `checkFeedbackStatus` → `POST customer-feedback/check` (already rated?). It used to show on
+  `order.completedAt` — the STORE's ready (`2`) / waiting-for-driver (`3`) stamp — so a delivery
+  order offered a rating while the courier was still driving (6534-2091). The server now sends
+  `feedbackEligible` on `customer-active-orders`, `customer-orders-history` and
+  `customer-last-completed-order` (CORE invariant 33). The customer-app change (a separate
+  shoofi-app PR) keys on it and falls back to `completedAt` only when the field is absent (older
+  server); until that update reaches phones, the `completedAt` rule still runs. `screens/order/item` finds its order
+  in those two lists, so it needs no endpoint of its own. The rating push (`feedback_request`) opens
+  the same modal (`hooks/use-notifications.ts`, `components/dialogs/feedback-modal-based-event.tsx`).
 - **Tracking = POLLING every 30s** — **no websocket for customer order status** (WS is only
   used for store/menu refresh elsewhere). Detail: `screens/order/item`, timer `order-timer.tsx`
   keyed on status, ETA via `delivery/book/{bookId}`.
