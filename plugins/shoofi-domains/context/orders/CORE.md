@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-delivery-web@fix/admin-order-combo-picks / 2026-11-17 (invariant 12 readers: a combo line's choices are in comboSelections, the admin order card lists them; reference C4); shoofi-server@fix/deal-title-matches-fields / 2026-11-16 (invariant 13: a deal's texts must match its fields on save, promotion-title-check); shoofi-partner@feat/new-order-alarm-media-volume 1a0d0c3 / 2026-11-16 (ref C3: foreground new-order rings on iOS play through the app at media volume, inAppAlarmSound + alarm-player; background and Android unchanged); shoofi-server@fix/twin-prep-range-prep-extra / 2026-11-07 (reference §4 twin prep range + prepExtra); shoofi-app@fix/checkout-coins-single-writer 02086937 (#145) + shoofi-server@b0129caa (main) / 2026-11-16 (invariant 32: coins pay for the items only, the app blocks more, the server refuses silently and stays as is; TotalPriceCMP the one writer of checkout coins; limit line only at the cap; reference §3, §5, C1); shoofi-server@fix/HIGH-RISK-picked-up-only-from-ready / 2026-11-15 (invariant 2: 10/11 only from ready, atomic, dashboard exempt; reference §2, C3, C4); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (invariants 2, 9; reference §2, C3); shoofi-partner@fix/owner-walkthrough / 2026-11-11 (invariant 17: printer per tablet, print failures shown; cancel alert); shoofi-partner@fix/partner-print-failure-log-once-notice / 2026-11-08 (invariant 17: one error row per failed copy; the pop-up was dropped before merge); shoofi-partner@fix/owner-walkthrough + feat/school-orders-v3 / 2026-11-14 (reference C3 customer note: v3 readers OrderCardV3, NewOrderViewV3, SchoolOrderCardV3); shoofi-partner@feat/order-alert-arrival-log / 2026-11-14 (reference C3 "Measuring how a new order reaches the tablet": apps-logs partner_order_alert_received / partner_new_order_seen; listener pin accepts the ref call); shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/rate-after-delivery / 2026-11-17 (invariant 33: «rate order» = feedbackEligible on the customer reads, isFeedbackEligible one rule, takeaway keeps ready from prod data, takeaway push timing + send-time re-check, status_change actor from the token; invariant 29 cancel-log note; reference §2, §8, orderFlowEvents, C1); shoofi-delivery-web@fix/admin-order-combo-picks / 2026-11-17 (invariant 12 readers: a combo line's choices are in comboSelections, the admin order card lists them; reference C4); shoofi-server@fix/deal-title-matches-fields / 2026-11-16 (invariant 13: a deal's texts must match its fields on save, promotion-title-check); shoofi-partner@feat/new-order-alarm-media-volume 1a0d0c3 / 2026-11-16 (ref C3: foreground new-order rings on iOS play through the app at media volume, inAppAlarmSound + alarm-player; background and Android unchanged); shoofi-server@fix/twin-prep-range-prep-extra / 2026-11-07 (reference §4 twin prep range + prepExtra); shoofi-app@fix/checkout-coins-single-writer 02086937 (#145) + shoofi-server@b0129caa (main) / 2026-11-16 (invariant 32: coins pay for the items only, the app blocks more, the server refuses silently and stays as is; TotalPriceCMP the one writer of checkout coins; limit line only at the cap; reference §3, §5, C1); shoofi-server@fix/HIGH-RISK-picked-up-only-from-ready / 2026-11-15 (invariant 2: 10/11 only from ready, atomic, dashboard exempt; reference §2, C3, C4); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (invariants 2, 9; reference §2, C3); shoofi-partner@fix/owner-walkthrough / 2026-11-11 (invariant 17: printer per tablet, print failures shown; cancel alert); shoofi-partner@fix/partner-print-failure-log-once-notice / 2026-11-08 (invariant 17: one error row per failed copy; the pop-up was dropped before merge); shoofi-partner@fix/owner-walkthrough + feat/school-orders-v3 / 2026-11-14 (reference C3 customer note: v3 readers OrderCardV3, NewOrderViewV3, SchoolOrderCardV3); shoofi-partner@feat/order-alert-arrival-log / 2026-11-14 (reference C3 "Measuring how a new order reaches the tablet": apps-logs partner_order_alert_received / partner_new_order_seen; listener pin accepts the ref call); shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -1135,9 +1135,11 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `summary.total` equals the store report's `totalRevenue` minus any completed school
       order's `orderPrice`.
     - **Cancel log "who":** only the admin web sends `updatedByName` / `updatedBySource` /
-      `cancelReason` to `/api/order/update`. The partner app sends only a status, so a store
-      reject's `status_change` event says `actor: "System"`. And `order.updatedByName` is the
-      LAST admin-web updater, not necessarily the canceller. So the order is:
+      `cancelReason` to `/api/order/update`. The partner app sends only a status; since
+      2026-11-17 (invariant 33) the `status_change` event names the store user from the token
+      (`actorType: "store"`), and rows from before that say `actor: "System"`. And
+      `order.updatedByName` is the LAST admin-web updater, not necessarily the canceller. So the
+      order is:
       1. the latest `shoofi.orderFlowEvents` `status_change` INTO the order's current status
          (looked up by `orderId: {$in: _ids}`, indexed, never by the short number);
       2. for a twin-service cancel (`cancelReason` `twin_*` / `twinDegradeSource`), the latest
@@ -1317,6 +1319,71 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       2026-10-01 and 2026-11-16. Whether to compensate them is an open owner decision.
     - Test: shoofi-app `__tests__/components/total-price-coins-single-writer.test.tsx` (8).
       Emulator before/after: shoofi-app `.maestro/coins-items-limit/`.
+
+33. **«RATE ORDER» MEANS THE CUSTOMER HAS THE FOOD — `order.feedbackEligible`, ONE RULE, NEVER
+    `completedAt`.** shoofi-server `fix/rate-after-delivery`, 2026-11-17, after VAPEGO **6534-2091**
+    (DELIVERY): the app showed «درّج الطلب ⭐» for ~18 min while the courier was still driving,
+    because it keyed on `completedAt`, which `/api/order/update` stamps on the store's `2` / `3`
+    (the kitchen, not the customer — invariant 1).
+    - **The rule** is `isFeedbackEligible(order, courier)` (`utils/feedback-eligibility.js`, pure):
+      cancelled `4/5/7/8/9`, unpaid `0`, or fully refunded (`moneySummary.refundedAmount ≥
+      capturedAmount > 0`) → false. **DELIVERY**: the booking's courier state (`summarizeCourier`,
+      delivery CORE invariant 21) is `delivered` → true, whatever the store pressed; a live booking
+      short of that (searching … `picked_up`) → false; **no live Shoofi booking** (none, or every
+      one cancelled: the store's own courier / an external provider) → the store's hand-over `11`
+      / `12`; courier **unknown** (lookup failed) → false. **Non-delivery** (TAKEAWAY, DRIVEIN,
+      anything else) → the completed bucket `2/3/10/11/12`. Twins: per side, on that side's own
+      booking.
+    - **Takeaway keeps "ready" (`2`), decided from prod data.** Prod, 90 days to
+      2026-11-17: TAKEAWAY 5,707 orders finished at `2` vs 7,039 at `10`, DRIVEIN 353 vs 297 —
+      45% never reach `10`. Bimodal per store: 48 of 132 stores press it under 20% of the time
+      (4,496 orders, 34%: GCP 1 of 1,665, burger-house 1 of 621, tortilla 3 of 598). Requiring `10`
+      would remove the rating from a third of takeaway orders. In the same 30 days every finished
+      DELIVERY order had a Shoofi booking, so the no-booking branch is rare (36 orders had every
+      booking cancelled by an admin).
+    - **Where it is sent:** `GET /api/order/customer-active-orders`, `/customer-orders-history`
+      and `/customer-last-completed-order` (`{ order }`, `null` unchanged), through
+      `attachFeedbackEligibility` (`services/orders/attach-feedback-eligibility.js`): ONE
+      `book-delivery` read per page across the page's stores (`appName ∈ stores` ×
+      `order._id ∈ ids`, the `order._id` index), paired back on (store, `_id`) — never on `_id`
+      alone, never on the short number (invariant 22). Booking choice = the partner card's
+      `pickBookingForOrder`. Only the boolean goes out; the courier summary is NOT added to the
+      customer payload. Never throws: a failed read serves the page with every delivery order
+      `false`. `GET /api/order/customer-orders` and `POST /api/customer/orders` do not carry it (no
+      customer-app caller on main).
+    - **The contract with the customer app** (its change is a separate shoofi-app PR): the
+      active-orders and history headers, the twin header, `checkFeedbackStatus` and
+      `screens/order/item` read `feedbackEligible`, and fall back to the old `completedAt` rule
+      when the field is ABSENT (an older server). **So the server deploys first.** Until the app
+      update reaches phones, the old rule still runs there.
+    - **The takeaway `feedback_request` push** (`handleOrderUpdate`, non-delivery only) follows the
+      same rule through `planTakeawayFeedbackPush`: still triggered by ready, but sent 30 min after
+      `max(now, orderDate)` (never before the collection slot; 5.5% of takeaway orders are marked
+      ready > 15 min early); the store's `10/11/12` moves a PENDING push to 30 min after that press
+      (in prod the press lands a median 11.8 min after ready, 27% of the time > 30 min); and a
+      hand-over on an order that was ALREADY ready (`currentOrder.completedAt`) never inserts a
+      second row — the cron deletes a row once sent, so "no row" used to mean "ask again". The
+      cron (`utils/crons/feedback-notification-cron.js` `stillEligibleAtSend`) re-reads a
+      non-delivery order at send time and drops the row when it is no longer eligible (cancelled,
+      back to `1`); it fails OPEN (store DB / order unreadable → sent as before). **The delivery
+      push is unchanged**: 30 min after the courier's "delivered" (`routes/delivery/orders.js`),
+      not re-checked.
+    - **Who pressed it.** The `status_change` flow event written by `/api/order/update` takes its
+      actor from the verified TOKEN (`resolveOrderUpdateActor`,
+      `services/orders/order-update-actor.js`), never the body: partner `{phone,id}` →
+      `shoofi.storeUsers.fullName`, `actorType: "store"`; admin `{id, fullName, roles}` → the admin,
+      `"admin"`; an impersonation token (`imp: true, by`) → the ADMIN in `by`, `"admin"`, with
+      `metadata.viaImpersonation` + `impersonatedUserId`; driver → `delivery-company.customers`,
+      `"driver"`; customer → `"customer"`. `metadata.actorSource` = `partner|admin|driver|customer|system`;
+      the body's `updatedBy*` stay in metadata as the client's claim. Before this, 19,787 of the
+      20,747 `status_change` rows of the 30 days to 2026-11-17 read `"System"` (the other 960 were
+      support): every partner press. Rows from before the deploy still read "System".
+      **Not changed:** the order document's `updatedBy*` (still only what the admin web sends;
+      the partner's cancel alert reads `updatedBySource`), `cancelActor` / the cancel-money event,
+      and the status write itself.
+    - Tests: shoofi-server `test/integration/feedback-eligibility.js` (22, incl. 6534-2091: `3` +
+      `picked_up` → false), `customer-orders-feedback-eligible.js` (8),
+      `order-update-actor-and-feedback-push.js` (11), `feedback-notification-eligibility.js` (4).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
