@@ -181,7 +181,7 @@
             "consts/consts.js"
           ],
           "regex": "(?:\"order\\.receipt_method\": TAKEAWAY, pickupConversion|PICKED_UP_BY_DRIVER: \"11\")",
-          "desc": "CORE invariant 32: convert-to-pickup writes receipt_method + the pickupConversion audit in one $set - valid-before leg (consts) holds on main; drop it once shoofi-server#605 has merged"
+          "desc": "CORE invariant 33: convert-to-pickup writes receipt_method + the pickupConversion audit in one $set - valid-before leg (consts) holds on main; drop it once shoofi-server#605 has merged"
         },
         {
           "file": "routes/order.js",

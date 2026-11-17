@@ -205,7 +205,7 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    `COMP-<primary originalOrderId>[-n]` per twin decision; per-side calls still refuse twins.
    Invoices are untouched.
 13. **A card order converted to pickup OWES its delivery fee in the ledger; nothing on the
-    order changes** (`services/money/pickup-fee-owe.js`, shoofi-server#605, orders invariant 32).
+    order changes** (`services/money/pickup-fee-owe.js`, shoofi-server#605, orders invariant 33).
     - **Amount:** the fee paid, which is `shippingPrice` minus a delivery-coupon discount, never
       below 0.
     - **When it is owed:** only if `paymentAuth.status === "captured"`, or if there is no

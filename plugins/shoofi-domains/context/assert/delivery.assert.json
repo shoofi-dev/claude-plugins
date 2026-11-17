@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@fix/delivery-reassign-history-same-driver 6209ca24 / 2026-11-14 (CORE invariant 21: reassignmentHistory on every manual assignment, same-courier 409 same_driver, allowSameDriver resend); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/delivery-reassign-history-same-driver 6209ca24 / 2026-11-14 (CORE invariant 22: reassignmentHistory on every manual assignment, same-courier 409 same_driver, allowSameDriver resend); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -816,17 +816,17 @@
             "routes/delivery/admin.js"
           ],
           "regex": "(?:const SAME_DRIVER_CODE = \"same_driver\";|status: DELIVERY_STATUS\\.WAITING_FOR_APPROVE,\\s*company: company,)",
-          "desc": "CORE invariant 21: the same-courier refusal answers code 'same_driver' - valid-before leg is main's unconditional reset to \"1\"; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
+          "desc": "CORE invariant 22: the same-courier refusal answers code 'same_driver' - valid-before leg is main's unconditional reset to \"1\"; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
         },
         {
           "file": "routes/delivery/admin.js",
           "regex": "(?:\\$push: \\{ reassignmentHistory: historyEntry \\}|\\{ \\$set: updateData \\}\\s*\\);)",
-          "desc": "CORE invariant 21: admin reassign appends reassignmentHistory in the same write as the $set - valid-before leg is main's bare $set; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
+          "desc": "CORE invariant 22: admin reassign appends reassignmentHistory in the same write as the $set - valid-before leg is main's bare $set; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
         },
         {
           "file": "routes/delivery/admin.js",
           "regex": "(?:confirmations\\.length && forceAssign !== true && !resendToSameDriver|confirmations\\.length && forceAssign !== true\\))",
-          "desc": "CORE invariant 21: forceAssign clears the soft-block confirmations but never the same-courier refusal; only allowSameDriver (a resend) skips both - valid-before leg is main; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
+          "desc": "CORE invariant 22: forceAssign clears the soft-block confirmations but never the same-courier refusal; only allowSameDriver (a resend) skips both - valid-before leg is main; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
         },
         {
           "file": [
