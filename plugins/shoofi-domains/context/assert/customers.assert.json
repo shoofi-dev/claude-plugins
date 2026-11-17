@@ -897,7 +897,7 @@
         },
         {
           "file": "src/views/admin/customer-campaigns/CustomerCampaignsList.tsx",
-          "regex": "קבוצת ביקורת: \\{campaign\\.execution\\.holdoutCount\\}",
+          "regex": "קבוצת ביקורת:(?:\", \"[^\"]*\"\\)\\})? \\{campaign\\.execution\\.holdoutCount\\}",
           "desc": "CORE invariant 12: the list shows holdoutCount in the results column"
         },
         {"file": "src/utils/marketing-approval.ts", "regex": "export const STUCK_SENDING_MS = 60 \\* 60 \\* 1000;", "desc": "CORE invariant 17: the admin's stuck-sending rule mirrors the server's (an hour, no start, no progress)"},
@@ -914,7 +914,7 @@
         },
         {
           "file": ["src/views/admin/marketing/glossary.ts", "src/views/admin/marketing/hub/active-model.ts"],
-          "regex": "export const NO_SUBJECT_LABEL = \"(?:כללי \\(לא על משהו מסוים\\)|כללי \\(בלי יעד\\)|ללא יעד)\";",
+          "regex": "export const NO_SUBJECT_LABEL = (?:tr\\()?\"(?:כללי \\(לא על משהו מסוים\\)|כללי \\(בלי יעד\\)|ללא יעד)\"[;,]",
           "desc": "CORE invariant 11: items without a subject are grouped as כללי (לא על משהו מסוים), last - the label lives in the marketing glossary (one name per thing)"
         },
         {

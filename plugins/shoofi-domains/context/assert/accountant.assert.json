@@ -1576,7 +1576,7 @@
         },
         {
           "file": "src/components/tax-consent/taxConsentView.ts",
-          "regex": "export const CONSENT_TITLE = 'אישור EZcount ברשות המסים — מתחדש כל 3 חודשים';",
+          "regex": "export const CONSENT_TITLE = (?:tr\\()?'אישור EZcount ברשות המסים — מתחדש כל 3 חודשים'[;,]",
           "desc": "CORE invariant 19: the admin names EZcount's 3-month consent, not the שופי שופינג permission"
         },
         {
