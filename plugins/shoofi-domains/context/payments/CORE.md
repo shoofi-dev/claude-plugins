@@ -188,6 +188,10 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
      A hold still `authorized` past expiry is NOT cleared.
    `refund_unsupported_provider_unknown` flags are **ZCredit** charges
    (ZCredit data has no `provider`), which means real money owed and a portal refund.
+   **The visible owner of owed money is `shoofi.moneyOwed`** (the «חייבים ללקוח» screen,
+   `/admin/money-owed`). Each open row is also an urgent HQ "Needs you" item (source
+   `money-owed`, `services/hq/inbox-sources.js`). A `refundRequired` flag set before
+   2026-11-11 has no ledger, so it is on neither until `scripts/money-backfill.js` brings it in.
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
