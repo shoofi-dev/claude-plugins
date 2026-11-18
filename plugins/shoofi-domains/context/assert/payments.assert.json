@@ -339,6 +339,16 @@
       ],
       "patterns": [
         {
+          "file": "data/zcredit-config.ts",
+          "regex": "CreateInvoice: \"true\"",
+          "desc": "CORE invariant 10: the app opens the ZCredit wallet session with a gateway document always on, so ZCredit Apple Pay is never manual (by design until ZCredit is retired)"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "IsTaxFree: \"false\"",
+          "desc": "CORE invariant 10: the ZCredit cart item is never tax-free, so exempt stores get a document with VAT on this path"
+        },
+        {
           "file": "consts/shared.ts",
           "regex": "PAYMENT_METHODS",
           "desc": "client payment-method constants"
