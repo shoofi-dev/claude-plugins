@@ -590,7 +590,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
         words where the picture is actually free and **rejects** stray lettering, wrong food or
         props out of scale. Wrong food is judged against the store's dish **photos** (the
         `subject` references), the menu name only as a label — a loose name («קוקיז קינדר» is a
-        drizzled slice) must not reject a faithful picture. Rejected: drawn once more (counts against `marketingImageDailyLimit`), then
+        drizzled slice) must not reject a faithful picture. A subject with NO dish (a Shoofi-wide
+        coupon / page) may have no food at all — only food that is shown is judged (`foodLine`;
+        before 2026-11-18 every such picture failed "no food is visible"). Rejected: drawn once more (counts against `marketingImageDailyLimit`), then
         the job fails `picture_rejected`.
       - The words are composed per language by the bridge's Chromium (`compose` task,
         `queue.js`), so a STORY now gets an Arabic and a Hebrew picture too (`mediaAR` /
@@ -776,6 +778,28 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
           written for the place (`copies[place]`); a banner waits for them. Saving goes through the
           same writers and counts each file as used. «יצירות» rows also keep `review { score,
           verdict, vote }` (media-archive `withReviews`), copied from the job while it is kept.
+        - **A general קידום — the occasion** (2026-11-18, owner: "Black Friday, November sales, a
+          GTA 6 release — search the internet and learn about the promotion if it's not a store or
+          a meal"): a set whose subject is NOT a store / store_new / product, with a note, searches
+          the note on Brave first (`creative/occasion.js learnOccasion`, the finder's `braveSearch`
+          — same key, same monthly count) and gives the director the top titles + descriptions as
+          THE OCCASION section — context, never facts for the words. Kept on the set (`occasion`,
+          public: query + titles + urls + error). Never blocks: no key / no answer → planned from
+          the note. With NO dishes the set prompt says the occasion is the idea (knowledge.md "An
+          offer for all stores": plain unbranded takeaway or no food, no brand / logo / character /
+          face). The words may name the occasion's Latin words and plain numbers the person typed
+          (`facts.allowOccasion`, applied at create / update and on later edits via
+          `factsForJob`); prices, percents and dates stay the subject's facts only. By default the
+          occasion's OWN marks (logo / title art, characters, signature look) are wanted in the picture
+          (job `occasionMarks`; the picture check and the reviewer allow them, no other brand's); the
+          set's `brandSafe: true` («זהירות משפטית») turns them off — owner's call, 2026-11-18.
+        - **«ערוך כללים»** (2026-11-18, `creative/rules.js`): `rules: { off, free, modelWords }` on a set —
+          12 switchable rules (faces, hands, text, brands, realDish, tooPerfect, photoReal, scale,
+          duplicates, alcoholPork, calmArea, safeZones) told to every AI step and dropped from the fixed
+          prompt lines / picture-check rejects; `free` = the note is the prompt as written (no director,
+          no reviewer; note required); `modelWords` = the model draws each language into the scene,
+          read back (`readWords`) and checked against the words asked for (`afterModelWords`, one
+          redraw, then `words_drawn_wrong`). **The words guard is never a switch.**
         - **«אעלה בעצמי» — the person's own picture** (2026-11-18): `POST
           /api/admin/marketing/media/upload` (multipart `file` + `place` banner|story|popup|social +
           `lang` + the subject; `services/marketing/media-upload.js`, marketing roles) puts a JPEG /
