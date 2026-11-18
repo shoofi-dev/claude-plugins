@@ -661,7 +661,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       render is a `marketing image render` row (model `artlist:<id>`, backend `artlist`,
       `costUsd: 0`, `meta.credits` = that model's credits). A daily guard (`budget.js`) refuses with 429 past
       `shoofi.store {id:1}.marketingAiDailyBudgetUsd` (default $3) or
-      `marketingImageDailyLimit` (default 20 renders).
+      `marketingImageDailyLimit` (default 20 renders). Both are set in the admin, «היוצר» → «מכסה יומית»
+      (`GET/PUT /api/admin/marketing/creative/limits`, `budget.js todayUsage / saveLimits`; PUT is master /
+      admin only; images 1–500, $0.5–50). Prod was raised to 100 pictures on 2026-11-18.
     - **Revising a picture keeps every guarantee** (2026-10-31). `POST /:jobId/revise` with no
       notes ("עוד אפשרות") re-renders the same brief and words (`image.js rerender`, no Claude
       call) — with `model` ("צייר שוב עם…", 2026-11-02), drawn by that model, same references; with notes ("בקש שינוי") Claude gets the previous brief, its words and the fenced

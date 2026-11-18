@@ -147,7 +147,7 @@
         "services/marketing/generate/renders.js": ["claimOnce", "notMine", "marketing image render", "CREDITS_PER_RENDER", "modelFromGroup", "renderedModel", "compress"],
         "services/marketing/generate/image-models.js": ["IMAGE_MODELS", "DEFAULT_MODEL", "MODELS_CAPABILITY", "resolveModel", "availableModels"],
         "services/marketing/generate/references.js": ["candidates", "chosenReferences", "computeBestSellers", "MAX_DISHES"],
-        "services/marketing/generate/budget.js": ["marketingAiDailyBudgetUsd", "marketingImageDailyLimit", "UNPRICED_BUDGET_PRICE"],
+        "services/marketing/generate/budget.js": ["todayUsage", "saveLimits", "LIMIT_RANGES", "marketingAiDailyBudgetUsd", "marketingImageDailyLimit", "UNPRICED_BUDGET_PRICE"],
         "services/marketing/generate/voice.js": ["HEBREW_VOICE", "ARABIC_VOICE"],
         "services/customer-campaigns/marketing-push-policy.js": [
           "marketingPushCap",
@@ -181,6 +181,7 @@
         "services/marketing/generate/facts.js": ["allowOccasion"],
         "services/marketing/media-upload.js": ["upload", "fitOf", "SIZES", "marketing-uploads/", "UploadError"],
         "routes/marketing-media.js": ["/upload", "mediaUpload.upload"],
+        "routes/marketing-creative.js": ["/api/admin/marketing/creative/limits"],
         "routes/marketing-creation-sets.js": ["/api/admin/marketing/creative/sets", "for-job/:jobId"],
         "services/marketing/creative/instagram-finder.js": ["findFor", "startFind", "findAll", "appNames", "approve", "reject", "usage", "instagramSearch", "marketingInstagramSearchUsage", "BRAVE_SEARCH_API_KEY"],
         "routes/social-connections.js": ["bad_app_names", "instagram/find-all", "instagram/find-usage", "/instagram/find", "suggestion/:verdict(approve|reject)"],
