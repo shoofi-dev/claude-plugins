@@ -1111,6 +1111,17 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
     editing a saved address never changes an order already placed. What the courier/partner
     screens do with that order field is `orders` / `delivery`'s.
     Pinned by shoofi-server `test/integration/customer-address-fields.js`.
+    **The customer app has ONE live add/edit address form: `components/address/AddressFormWithMap.tsx`**
+    (shoofi-app), opened by `OPEN_NEW_ADDRESS_WITH_MAP_DIALOG` from `components/address/AddressList.tsx`.
+    Its save awaits `getLocationSupported` → `addAddress` / `updateAddress`, shows
+    `failed-to-save-address` from the `catch` and releases the spinner in `finally`.
+    `components/address/AddressForm.tsx` (un-awaited `getLocationSupported(...).then`, reads
+    `res.available`), `NewAddressBasedEventDialog` and the `AddAddress` / `EditAddress` routes are
+    legacy with no opener: the only emitter of `OPEN_NEW_ADDRESS_BASED_EVENT_DIALOG` is
+    `handleAddNew` in `AddressSelector.tsx`, which nothing calls. A bug report against
+    `AddressForm.tsx` is a report against dead code - confirm the screen first. The form's
+    error texts are DB translations (`shoofi.translations`, `{key, ar, he}`); a key missing there
+    renders as the raw key (2026-11-18: `failed-to-save-address` has no row).
 21. **Kopa sessions never write `storeUsers.token`** (nor anything else on `storeUsers`;
     shoofi-server `feat/kopa-phase1`, phase 4a, 2026-11-11). A Kopa login is `POST
     /api/kopa/auth/request-code` + `verify`, which issues an opaque token stored only as its
