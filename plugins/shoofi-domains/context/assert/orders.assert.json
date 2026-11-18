@@ -1,6 +1,6 @@
 {
   "doc": "orders",
-  "lastVerified": "shoofi-partner@feat/new-order-alarm-loop / 2026-11-07 (ref C3: the new-order alarm repeats until accepted); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (CORE invariants 2, 9; reference §2, C3); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (CORE invariant 31, Kopa QR table orders); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (CORE invariants 27-28); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
+  "lastVerified": "shoofi-server@fix/rate-after-delivery / 2026-11-17 (CORE invariant 33: feedbackEligible on the customer reads, isFeedbackEligible one rule, takeaway keeps ready from prod data, takeaway push timing + send-time re-check, status_change actor from the token; reference §2, §8, orderFlowEvents, C1); shoofi-delivery-web@fix/admin-order-combo-picks / 2026-11-17 (CORE invariant 12 readers: the admin order card + amend sheet list a combo line's comboSelections; ref C4); shoofi-partner@feat/new-order-alarm-media-volume 1a0d0c3 / 2026-11-16 (ref C3: foreground new-order rings on iOS play through the app at media volume, inAppAlarmSound + alarm-player; background and Android unchanged); shoofi-server@fix/twin-prep-range-prep-extra / 2026-11-07 (reference §4 twin prep range + prepExtra); shoofi-app@fix/checkout-coins-single-writer 02086937 (#145) + shoofi-server@b0129caa (main) / 2026-11-16 (CORE invariant 32: coins pay for the items only, the app blocks more, the server refuses silently and stays as is; TotalPriceCMP the one writer of checkout coins; limit line only at the cap; reference §3, §5, C1); shoofi-partner@feat/new-order-alarm-loop / 2026-11-07 (ref C3: the new-order alarm repeats until accepted); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (CORE invariants 2, 9; reference §2, C3); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (CORE invariant 31, Kopa QR table orders); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (CORE invariants 27-28); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (CORE invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (CORE invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (CORE invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 orders.order.address, C4 admin address display); shoofi-server@feat/first-order-at-store / 2026-11-08 (CORE invariant 24); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (CORE invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (CORE invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (CORE invariant 21); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (CORE invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (CORE invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (CORE invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (CORE invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (CORE invariant 16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (CORE invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (CORE invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -72,11 +72,14 @@
         "services/database/DatabaseInitializationService.js",
         "routes/kopa/table-orders.js",
         "services/kopa/table-orders.js",
-        "services/orders/order-source.js"
+        "services/orders/order-source.js",
+        "services/orders/picked-up-guard.js",
+        "test/integration/order-picked-up-guard.js"
       ],
       "symbols": {
         "services/kopa/table-orders.js": ["createTableOrder", "priceItems", "storeOpenState", "checkLocation", "buildTableOrderDoc"],
         "services/orders/order-source.js": ["isKopaQrOrder"],
+        "services/orders/picked-up-guard.js": ["pickedUpAllowedFrom", "statusAlreadyChangedBody"],
         "routes/order.js": [
           "processCreditCardPayment",
           "processHypTokenPayment",
@@ -570,6 +573,8 @@
         {"file": "routes/shoofi-admin.js", "regex": "const \\{ DASHBOARD_ROLES: COINS_SETTINGS_ROLES \\} = require\\(\"\\.\\./utils/analytics-access\"\\);\\s*const COINS_SETTINGS_ADMIN = \\[coinsSettingsAuth\\.required, coinsSettingsRoleCheck\\(COINS_SETTINGS_ROLES\\)\\];", "desc": "CORE invariant 19: the coin-settings gate is auth.required + every dashboard role, built inside the Coins Settings block"},
         {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/admin/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,[\\s\\S]*?router\\.post\\(\"/api/admin/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,", "desc": "CORE invariant 19: reading and flipping the platform-wide coins switch is dashboard-only"},
         {"file": "routes/shoofi-admin.js", "regex": "router\\.get\\(\"/api/admin/store/:appName/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,[\\s\\S]*?router\\.post\\(\"/api/admin/store/:appName/coins-settings\", \\.\\.\\.COINS_SETTINGS_ADMIN,", "desc": "CORE invariant 19: a store's earn rate / coin value is dashboard-only (no mobile caller; the partner toggle is commented out)"},
+        {"file": "routes/promotion.js", "regex": "(?:const textErrors = configErrors\\.length \\|\\| !doc\\.isActive \\? \\[\\] : promotionTextConflicts\\(doc\\);|return errors\\.concat\\(validatePromotionConfig\\(doc\\)\\);)", "desc": "CORE invariant 13: the save validation adds the texts-vs-fields check only for an active deal whose config is clean - valid-before leg is main before shoofi-server#626 (config check only); drop that leg once it has merged"},
+        {"file": ["utils/promotion-title-check.js", "routes/promotion.js"], "regex": "(?:function promotionTextConflicts\\(promotion\\)|return errors\\.concat\\(validatePromotionConfig\\(doc\\)\\);)", "desc": "CORE invariant 13: promotionTextConflicts lives in utils/promotion-title-check.js - valid-before leg is main before shoofi-server#626; drop routes/promotion.js from this file list once it has merged"},
         {"file": ["services/promotions/promotion-assistant.js", "routes/promotion.js"], "regex": "(?:const FEATURE = \"promotion-assistant\";|previewPromotionQuote\\(\\{)", "desc": "CORE §promotions: the deal assistant is its own service, services/promotions/promotion-assistant.js - valid-before leg is the admin promotions route still reading the one ranking through previewPromotionQuote; drop routes/promotion.js from this file list once shoofi-server#377 has merged"},
         {"file": ["services/promotions/promotion-assistant.js", "routes/promotion.js"], "regex": "(?:runPromotionAssistant|previewPromotionQuote\\(\\{)", "desc": "CORE §promotions: runPromotionAssistant is the entry point POST /api/admin/promotions/assist calls - valid-before leg is previewPromotionQuote in the admin promotions route; drop routes/promotion.js from this file list once shoofi-server#377 has merged"},
         {"file": ["services/promotions/promotion-assistant.js", "routes/promotion.js"], "regex": "(?:applyPromotionProposal|previewPromotionQuote\\(\\{)", "desc": "CORE §promotions: applyPromotionProposal keeps only what the deal form can hold (known type/config keys, ids from THIS store) - valid-before leg is previewPromotionQuote in the admin promotions route; drop routes/promotion.js from this file list once shoofi-server#377 has merged"},
@@ -652,7 +657,28 @@
         {"file": "routes/order.js", "regex": "if \\(isKopaQrOrder\\(order\\)\\) \\{\\s*finalOrders\\.push\\(order\\);", "desc": "CORE invariant 31: admin/not-viewd keeps a customer-less kopa-qr order (any other order whose customer is not found is still skipped)"},
         {"file": "routes/order-amend.js", "regex": "KOPA_QR: \"KOPA_QR_ORDER_NOT_AMENDABLE\"", "desc": "CORE invariant 31: amend refuses a kopa-qr order (it would reprice at app prices)"},
         {"file": "services/kopa/table-orders.js", "regex": "source: KOPA_QR_SOURCE,\\s*table: \\{ id: table\\.tableId, label: table\\.label \\},\\s*customerId: null,", "desc": "CORE invariant 31: source, a top-level table { id, label } and no customer"},
-        {"file": "services/kopa/table-orders.js", "regex": "routes\\.fireStoreOwnerNotifications\\(orderDoc, req, appName\\); // never awaited", "desc": "CORE invariants 6 + 31: the table order's store-owner alert is not awaited"}
+        {"file": "services/kopa/table-orders.js", "regex": "routes\\.fireStoreOwnerNotifications\\(orderDoc, req, appName\\); // never awaited", "desc": "CORE invariants 6 + 31: the table order's store-owner alert is not awaited"},
+        {"file": "services/orders/picked-up-guard.js", "regex": "\\[ORDER_STATUS\\.PICKED_UP\\]: Object\\.freeze\\(\\[ORDER_STATUS\\.COMPLETED\\]\\),\\s*\\[ORDER_STATUS\\.PICKED_UP_BY_DRIVER\\]: Object\\.freeze\\(\\[\\s*ORDER_STATUS\\.COMPLETED,\\s*ORDER_STATUS\\.WAITING_FOR_DRIVER,?\\s*\\]\\)", "desc": "CORE invariant 2: 'handed over' only from 'ready': 10 only from 2, 11 only from 2/3 (the partner nextStatusFor edges)"},
+        {"file": "services/orders/picked-up-guard.js", "regex": "if \\(hasAdminRole\\(auth, DASHBOARD_ROLES\\)\\) return null;", "desc": "CORE invariant 2: only a dashboard token (roles) is exempt from the picked-up guard; partner, impersonation, driver and customer tokens are guarded"},
+        {"file": "services/orders/picked-up-guard.js", "regex": "const statusAlreadyChangedBody = \\(currentStatus\\) => \\(\\{\\s*message: \\\"הסטטוס כבר עודכן\\\",\\s*code: \\\"STATUS_ALREADY_CHANGED\\\",\\s*currentStatus,\\s*\\}\\);", "desc": "CORE invariant 2 / reference §2: the ONE STATUS_ALREADY_CHANGED body (PENDING guard 400, picked-up guard 409) that clients handle"},
+        {"file": "routes/order.js", "regex": "const pickedUpFrom = pickedUpAllowedFrom\\(updateobj\\?\\.status, req\\.auth\\);", "desc": "CORE invariant 2: /api/order/update decides the picked-up guard from the token, never from the body"},
+        {"file": "routes/order.js", "regex": "if \\(pickedUpFrom\\) writeFilter\\.status = \\{ \\$in: pickedUpFrom \\};\\s*const written = await db\\.orders\\.updateOne\\(\\s*writeFilter,\\s*\\{ \\$set: updateobj \\},", "desc": "CORE invariant 2: the guard is ATOMIC: the allowed statuses are in the updateOne filter, never only a pre-read check"},
+        {"file": "routes/order.js", "regex": "if \\(pickedUpFrom && !\\(written && written\\.matchedCount > 0\\)\\) \\{[\\s\\S]{0,1200}?return res\\.status\\(200\\)\\.json\\(\\{ message: \\\"Order successfully updated\\\", unchanged: true \\}\\);[\\s\\S]{0,800}?return res\\.status\\(409\\)\\.json\\(statusAlreadyChangedBody\\(now\\.status\\)\\);\\s*\\}\\s*const order = await db\\.orders\\.findOne\\(", "desc": "CORE invariant 2: a refused picked-up write answers (retry at target = 200 unchanged, else 409 STATUS_ALREADY_CHANGED) BEFORE the re-read that feeds every side effect"},
+        {"file": "test/integration/order-picked-up-guard.js", "regex": "ATOMIC: a cancel between the route's read and its write still wins", "desc": "CORE invariant 2: the race test that fails if the guard becomes a pre-read check"},
+        {"file": "routes/order.js", "regex": "orderAmount: parsedBodey\\.orderPrice \\|\\| parsedBodey\\.total\\n", "desc": "CORE invariant 32: the server validates coins against the ITEMS price (orderPrice), never the delivery fee, and refuses silently (usedCoins: null, client total kept) - the owner keeps this server-side as is (2026-11-16); the app cap must equal it"},
+        {"file": ["utils/feedback-eligibility.js", "routes/order.js"], "regex": "(?:if \\(courier && courier\\.state === COURIER_DELIVERED\\) return true;|\\(updateobj\\.status === ORDER_STATUS\\.COMPLETED \\|\\| updateobj\\.status === \"10\"\\) &&)", "desc": "CORE invariant 33: a delivery order is rateable once the courier delivered (isFeedbackEligible) - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
+        {"file": ["utils/feedback-eligibility.js", "routes/order.js"], "regex": "(?:if \\(courier === null \\|\\| courier\\.state === COURIER_CANCELLED\\) \\{\\s*return DELIVERY_HANDED_OVER_STATUSES\\.includes\\(status\\);|\\(updateobj\\.status === ORDER_STATUS\\.COMPLETED \\|\\| updateobj\\.status === \"10\"\\) &&)", "desc": "CORE invariant 33: delivery with no live Shoofi booking falls back to the store's hand-over 11/12 - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
+        {"file": ["utils/feedback-eligibility.js", "routes/order.js"], "regex": "(?:if \\(!isDeliveryOrder\\(order\\)\\) return COMPLETED_STATUSES\\.includes\\(status\\);|\\(updateobj\\.status === ORDER_STATUS\\.COMPLETED \\|\\| updateobj\\.status === \"10\"\\) &&)", "desc": "CORE invariant 33: takeaway / drive-in keep ready (2) - the completed bucket 2/3/10/11/12 - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
+        {"file": ["services/orders/attach-feedback-eligibility.js", "routes/order.js"], "regex": "(?:\\.find\\(\\{ appName: \\{ \\$in: appNames \\}, \"order\\._id\": \\{ \\$in: ids \\} \\}, \\{ projection: COURIER_SUMMARY_PROJECTION \\}\\)|\\(updateobj\\.status === ORDER_STATUS\\.COMPLETED \\|\\| updateobj\\.status === \"10\"\\) &&)", "desc": "CORE invariant 33: one book-delivery read per page across the page's stores, on the order._id index - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
+        {"file": ["services/orders/attach-feedback-eligibility.js", "routes/order.js"], "regex": "(?:const keyOf = \\(appName, orderId\\) => `\\$\\{appName\\}\\|\\$\\{String\\(orderId\\)\\}`;|\\(updateobj\\.status === ORDER_STATUS\\.COMPLETED \\|\\| updateobj\\.status === \"10\"\\) &&)", "desc": "CORE invariant 33: bookings are paired back on (store, order _id), never _id alone - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
+        {"file": "routes/order.js", "regex": "(?:const withFeedback = await attachFeedbackEligibility\\(\\{\\s*appDb: req\\.app\\.db,\\s*orders: activeOrders,|res\\.status\\(200\\)\\.json\\(activeOrders\\);)", "desc": "CORE invariant 33: customer-active-orders carries feedbackEligible - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
+        {"file": "routes/order.js", "regex": "(?:const withFeedback = await attachFeedbackEligibility\\(\\{\\s*appDb: req\\.app\\.db,\\s*orders: allOrders,|\\(updateobj\\.status === ORDER_STATUS\\.COMPLETED \\|\\| updateobj\\.status === \"10\"\\) &&)", "desc": "CORE invariant 33: customer-orders-history carries feedbackEligible - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
+        {"file": "routes/order.js", "regex": "(?:orders: \\[order\\],\\s*appNameOf: \\(\\) => appName,|return res\\.status\\(200\\)\\.json\\(\\{ order: order \\|\\| null \\}\\);)", "desc": "CORE invariant 33: customer-last-completed-order carries feedbackEligible - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
+        {"file": ["utils/feedback-eligibility.js", "routes/order.js"], "regex": "(?:insertIfMissing: !wasReadyBefore,|\\(updateobj\\.status === ORDER_STATUS\\.COMPLETED \\|\\| updateobj\\.status === \"10\"\\) &&)", "desc": "CORE invariant 33: a hand-over on an order already ready never schedules a second feedback push - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
+        {"file": "routes/order.js", "regex": "(?:wasReadyBefore: Boolean\\(currentOrder\\?\\.completedAt\\),|\\(updateobj\\.status === ORDER_STATUS\\.COMPLETED \\|\\| updateobj\\.status === \"10\"\\) &&)", "desc": "CORE invariant 33: handleOrderUpdate plans the takeaway push from the pre-write completedAt - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
+        {"file": "utils/crons/feedback-notification-cron.js", "regex": "(?:if \\(!\\(await stillEligibleAtSend\\(appDb, item\\)\\)\\) \\{|// Skip if feedback already submitted)", "desc": "CORE invariant 33: the cron re-checks a non-delivery order at send time - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
+        {"file": "routes/order.js", "regex": "(?:actor: actor\\.label,\\s*actorId: actor\\.id \\|\\| 'system',\\s*actorType: actor\\.actorType,|actor: updateobj\\.updatedByName \\|\\| req\\.user\\?\\.fullName \\|\\| 'System',)", "desc": "CORE invariant 33: the status_change actor comes from the token (resolveOrderUpdateActor), never the body - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
+        {"file": ["services/orders/order-update-actor.js", "routes/order.js"], "regex": "(?:if \\(auth\\.imp === true && auth\\.by\\) return SOURCES\\.ADMIN;|actor: updateobj\\.updatedByName \\|\\| req\\.user\\?\\.fullName \\|\\| 'System',)", "desc": "CORE invariant 33: an impersonation token is recorded as the admin in `by` - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"}
       ]
     },
     "shoofi-app": {
@@ -805,7 +831,12 @@
           "file": "helpers/active-orders-labels.ts",
           "regex": "\"orders-load-retry\"",
           "desc": "CORE invariant 26: own retry key, because prod's retry translation reads OK"
-        }
+        },
+        {"file": "components/total-price/index.tsx", "regex": "(?:const ownsCheckoutCoins = isCheckCoupon && !!coinsStore;|const primaryOrderAmountForCoins = isTwinMode\\n)", "desc": "CORE invariant 32 / reference C1: checkout's TotalPriceCMP is the ONE writer of coinsStore checkout coins and prices the total from the store - valid-before leg is main's items+delivery coins cap (main before shoofi-app#145, and only then); drop the valid-before leg once shoofi-app#145 has merged"},
+        {"file": "components/total-price/index.tsx", "regex": "(?:const primaryOrderAmountForCoins = primaryAfterSale;|const primaryOrderAmountForCoins = isTwinMode\\n)", "desc": "CORE invariant 32 / reference C1: the app caps coins at the items price (what the server validates against) - valid-before leg as above; drop the valid-before leg once shoofi-app#145 has merged"},
+        {"file": "stores/coins/index.ts", "regex": "(?:resetEarnPreview\\(side: \\\"primary\\\" \\| \\\"secondary\\\"\\): void \\{|resetCheckoutCoins\\(\\): void \\{)", "desc": "reference C1: resetCheckoutCoins is gone; a store switch clears only the earn preview (resetEarnPreview(side)) - valid-before leg is main's resetCheckoutCoins; drop the valid-before leg once shoofi-app#145 has merged"},
+        {"file": "components/coins-selector/index.tsx", "regex": "(?:coinsStore\\.resetEarnPreview\\?\\.\\(secondary \\? \\\"secondary\\\" : \\\"primary\\\"\\);|coinsStore\\.resetCheckoutCoins\\?\\.\\(\\);)", "desc": "reference C1: CoinsSelector never writes the coins in use, it reports through onCoinsDiscountChange - valid-before leg is main's resetCheckoutCoins call; drop the valid-before leg once shoofi-app#145 has merged"},
+        {"file": "components/coins-selector/index.tsx", "regex": "(?:const isCappedByOrder = isMaxed && balance > maxCoins;|coinsStore\\.resetCheckoutCoins\\?\\.\\(\\);)", "desc": "reference C1: the limit line shows only when the chosen coins are AT the cap (owner, 2026-11-16) - valid-before leg is main's resetCheckoutCoins call; drop it once shoofi-app#145 has merged"}
       ]
     },
     "shoofi-partner": {
@@ -831,12 +862,30 @@
         "utils/print-queue.ts",
         "utils/print-batch.ts",
         "stores/auth/index.ts",
-        "utils/http-interceptor/index.ts"
+        "utils/http-interceptor/index.ts",
+        "utils/request-error-dialog.ts",
+        "utils/in-app-alarm-sound.ts",
+        "utils/notification/alarm-player.ts"
       ],
       "symbols": {
         "utils/notification/index.ts": [
           "schedulePushNotification",
-          "store.wav"
+          "store.wav",
+          "inAppAlarmSound",
+          "playAlarmInApp",
+          "shouldPlaySound: !inApp"
+        ],
+        "utils/in-app-alarm-sound.ts": [
+          "inAppAlarmSound",
+          "IN_APP_ALARM_TYPES",
+          "ORDER_WAITING_NOTIFICATION_TYPES",
+          "alarm_preview"
+        ],
+        "utils/notification/alarm-player.ts": [
+          "playAlarmInApp",
+          "stopAlarmInApp",
+          "playsInSilentMode",
+          "mixWithOthers"
         ],
         "stores/new-order-alerts/index.ts": [
           "takeNewOrders",
@@ -867,7 +916,8 @@
           "newOrderAlarmApprovedLocally",
           "stopNewOrderAlarm",
           "ALARM_PREVIEW_ID",
-          "stopAlarmPreview"
+          "stopAlarmPreview",
+          "stopAlarmInApp"
         ],
         "utils/new-order-alarm-prefs.ts": [
           "DEFAULT_ALARM_PREFS",
@@ -1053,8 +1103,23 @@
         {"file": "stores/auth/index.ts", "regex": "await shoofiAdminStore\\.setStoreDBName\\(appName\\);\\s*await this\\.updateUserToken\\(newToken\\);", "desc": "CORE invariant 18: switchStore persists the new store BEFORE the new token, so a poll can carry B with A's token - why the server gate is membership, not exact match"},
         {"file": "stores/orders/index.tsx", "regex": "isAdminAll\\s*\\?\\s*ORDER_API\\.GET_ADMIN_ALL_NOT_VIEWD_ORDERS_API\\s*:\\s*ORDER_API\\.GET_ADMIN_NOT_VIEWD_ORDERS_API", "desc": "CORE invariant 18 / ref C3: the feed is all/not-viewd when isAdmin(ROLES.all) (every prod store user), not-viewd otherwise"},
         {"file": "utils/http-interceptor/index.ts", "regex": "config\\.headers\\[\"Authorization\"\\] = \"Token \" \\+ token;[\\s\\S]{0,600}?config\\.headers\\[\"app-type\"\\] = \"shoofi-partner\";", "desc": "ref C3: partner requests send Token auth + app-type shoofi-partner (what storeMemberGate keys on)"},
-        {"file": "utils/http-interceptor/index.ts", "regex": "if \\(error\\?\\.message\\?\\.includes\\(\"401\"\\)\\) \\{\\s*DeviceEventEmitter\\.emit\\(`OPEN_GENERAL_SERVER_ERROR_DIALOG`, \\{\\s*show: true,\\s*isSignOut: true,", "desc": "CORE invariant 18: any 401 signs the store out (resetAppState + restart) - a partner-polled route must never 401 a logged-in terminal"},
+        {"file": "utils/request-error-dialog.ts", "regex": "if \\(status === 401 \\|\\| status === 402\\) \\{\\s*if \\(!f\\.sentToken \\|\\| f\\.signingOut\\) return null;\\s*return \\{ dialog: \"server\", isSignOut: true \\};", "desc": "CORE invariant 18: a 401 on a request that carried a token (outside a sign-out) signs the store out - a partner-polled route must never 401 a logged-in terminal"},
+        {"file": "utils/http-interceptor/index.ts", "regex": "openDialogForRequestError\\(error\\);\\s*// console\\.log\\(error\\)\\s*return Promise\\.reject\\(error\\);", "desc": "ref C3: every failed partner request goes through dialogForRequestError (one dialog, or none)"},
         {"file": "stores/orders/index.tsx", "regex": "const storeDB = await AsyncStorage\\.getItem\\(\"@storage_storeDB\"\\);\\s*return axiosInstance\\s*\\.get\\(api, \\{\\s*headers: \\{\\s*\"app-name\": storeDB,", "desc": "CORE invariant 18: the feed's app-name is @storage_storeDB (the token's store or a membership) - what storeMemberGate accepts"}
+      ]
+    },
+    "shoofi-delivery-web": {
+      "files": [
+        "src/utils/combo-order-display.ts",
+        "src/components/Cards/CardOrder.tsx",
+        "src/components/Modals/AmendOrderModal.tsx"
+      ],
+      "symbols": {},
+      "patterns": [
+        {"file": "src/utils/combo-order-display.ts", "regex": "comboSelectionsOf\\(item\\)\\.length > 0", "desc": "CORE invariant 12 readers / ref C4: lineHasChoices counts a combo line's comboSelections, not only its selectedExtras ({} on a combo line)"},
+        {"file": "src/components/Cards/CardOrder.tsx", "regex": "items\\?\\.some\\(\\(product: any\\) => lineHasChoices\\(product\\)\\)", "desc": "ref C4: the admin card's \"הצג פרטי תוספות\" button is offered for a combo line too"},
+        {"file": "src/components/Cards/CardOrder.tsx", "regex": "<OrderComboPicksWeb item=\\{product\\} menu=\\{orderMenuData\\?\\.menu \\|\\| null\\} />", "desc": "CORE invariant 12 readers / ref C4: the admin order card lists a combo line's picks under its line"},
+        {"file": "src/components/Modals/AmendOrderModal.tsx", "regex": "amend-combo-picks-\\$\\{index\\}", "desc": "ref C4: the amend sheet shows a combo line's picks read-only"}
       ]
     }
   }
