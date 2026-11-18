@@ -81,7 +81,10 @@ For these: write the analysis + the exact diff you *would* make + the risks, ope
   then stock/coins/invoice. Endpoints: `save-apple-pay-session`,
   `update-apple-pay-order-session` (terms-guard), `verify-apple-pay-payment`,
   `zcredit-apple-pay-callback/:intentId` (server safety-net capture, no auth).
-- **`updateCCPayment`** (`order.js`) — standalone ZCredit status confirm (`GetTransactionStatusByReferenceId`).
+
+"Invoice" above is §5: under manual issuance (the production state) the card paths issue
+through EZcount after the charge; only the ZCredit Apple/Google Pay session still queues the
+Gmail fetch. `updateCCPayment` was removed from `routes/order.js` on 2026-11-03.
 
 ## 3b. Coupons between quote and charge (map)
 Where a coupon's discount is computed, re-computed or trusted on the way to a charge. Fixed
@@ -116,7 +119,15 @@ wins, a tie goes to the deal). Settlement readers of the snapshot are the `accou
   token from `getToken` (J5 hosted flow), charged with the soft protocol.
 
 ## 5. Per-order customer receipt (invoicing you own)
-The provider (ZCredit/HYP) emits the **customer** receipt at charge time; the server
+**Two paths, and in production the first is the rule** (CORE invariant 10; prod state
+checked 2026-11-18). **Manual issuance:** with `invoiceConfig.manualInvoicesEnabled` on
+(`services/payments/invoice-config.js`) the charge carries no invoice parameters and
+`services/payments/order-invoices.js` issues the documents afterwards through EZcount
+`createDoc` — type 320, or 400 for an exempt store's own document — recorded on
+`order.invoices[]`. HYP Apple/Google Pay is always issued this way. **Gateway path (the
+rest of this section):** only with the flag off, and for ZCredit Apple/Google Pay sessions
+(`finalizeApplePayOrder`), which never consult the flag.
+On the gateway path the provider (ZCredit/HYP) emits the **customer** receipt at charge time; the server
 captures `DocumentID`/`Hesh` and, in **background `setImmediate`**,
 `invoiceMailService.saveInvoice(docId)` (`utils/invoice-mail.js`) — fetches the PDF from
 the `customerinvoices@shoofi.app` Gmail by docId, uploads to DO Spaces, and sets
