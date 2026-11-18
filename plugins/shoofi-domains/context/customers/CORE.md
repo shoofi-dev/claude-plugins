@@ -582,8 +582,17 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       `docs/creative-engine.md`) draws banner / story / social pictures whenever a bridge
       heartbeats `compose` and `shoofi.store {id:1}.marketingCreativeEngine !== false` — else the
       one-shot path above. Its rules:
-      - The background is TEXT-FREE and drawn from the **dishes only** — the logo is NOT sent to
-        the model; the compositor places the real file. Default model GPT Image 2.6 (group 669).
+      - The background is TEXT-FREE and drawn from the **dishes only** — a store's logo is NOT sent
+        to the model; the compositor places the real file. Default model GPT Image 2.6 (group 669).
+      - **Shoofi's own logo is the exception** (`creative/own-brand.js`, 2026-11-18): a קידום with NO
+        store (a coupon for all stores, an occasion) is Shoofi's, so `references.chosenReferences`
+        gives it Shoofi's real logo (`assets/brand/logo/shoofi-logo.png`, uploaded once, reference id
+        `shoofi-logo`). The compositor sets it beside the words AND the generator gets it — only as
+        the print on Shoofi's packaging, in Shoofi's colours (lime #87EA5C, dark green #15330D),
+        "never invent another Shoofi mark". Before, such a picture had no logo reference and an
+        asked-for "Shoofi logo on the bag" came out as a made-up red "S" (WTS1LYMY). The picture
+        check answers `logoOk` for these jobs: a made-up logo rejects the picture even with the
+        text rule off (only «חופשי» lets it through). `references.logo: false` still drops it.
       - The layout is picked in code (`layouts.js`), **never one of the store's last two** for that
         channel (`marketingStoreProfiles.recent`).
       - The words on the picture (`kicker` / `tag` / `head` / `sub` per language) go through the
@@ -797,8 +806,8 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
           THE OCCASION section — context, never facts for the words. Kept on the set (`occasion`,
           public: query + titles + urls + error). Never blocks: no key / no answer → planned from
           the note. With NO dishes the set prompt says the occasion is the idea (knowledge.md "An
-          offer for all stores": plain unbranded takeaway or no food, no brand / logo / character /
-          face). The words may name the occasion's Latin words and plain numbers the person typed
+          offer for all stores": no food, or takeaway in Shoofi's own packaging with the logo only from
+          the reference image — see "Shoofi's own logo" above; no other brand / logo / character / face). The words may name the occasion's Latin words and plain numbers the person typed
           (`facts.allowOccasion`, applied at create / update and on later edits via
           `factsForJob`); prices, percents and dates stay the subject's facts only. The Latin words of the
           occasion's search result titles are allowed too (`allowOccasionNames`: "GTA VI" when the note said
