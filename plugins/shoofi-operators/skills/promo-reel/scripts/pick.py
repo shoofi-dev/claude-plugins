@@ -75,13 +75,18 @@ def main():
     ap.add_argument("--subject", required=True, choices=["deal", "dish", "store", "coupon"])
     ap.add_argument("--dish-type", default="other")
     ap.add_argument("--styles", default=",".join(FITS))
+    # The owner's defaults (2026-11-07): plain is the default — no voice, no Shadi; the soundtrack
+    # is on unless switched off. Each is asked for per reel.
+    ap.add_argument("--voice", action="store_true", help="add a voice-over (Artlist credits)")
+    ap.add_argument("--shadi", action="store_true", help="allow Shadi (the shadi style, lip-sync credits)")
+    ap.add_argument("--no-music", action="store_true", help="no soundtrack")
     ap.add_argument("--write", action="store_true")
     a = ap.parse_args()
 
     path = Path(a.history)
     history = json.loads(path.read_text()) if path.exists() else []
     seed = f"{a.store}|{datetime.date.today().isoformat()}"
-    styles = [s for s in a.styles.split(",") if a.subject in FITS.get(s, set())]
+    styles = [s for s in a.styles.split(",") if a.subject in FITS.get(s, set()) and (a.shadi or s != "shadi")]
     if not styles:
         raise SystemExit(f"no approved style fits a {a.subject}")
     pick = {
@@ -94,7 +99,9 @@ def main():
         "opening": least_recent(OPENING, history, "opening", a.store, seed),
         "motion": least_recent(MOTIONS.get(a.dish_type, MOTIONS["other"]), history, "motion", a.store, seed),
         "sound": least_recent(SOUNDS, history, "sound", a.store, seed),
-        "music": least_recent([m["title"] for m in MUSIC], history, "music", a.store, seed),
+        "music": None if a.no_music else least_recent([m["title"] for m in MUSIC], history, "music", a.store, seed),
+        "voice": a.voice,
+        "shadi": a.shadi,
     }
     print(json.dumps(pick, ensure_ascii=False, indent=1))
     if a.write:

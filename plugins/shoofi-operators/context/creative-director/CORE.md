@@ -63,4 +63,9 @@ Keep it short; the owner reads the maker's summary, not yours.
 - Before failing "truth" on a deal's wording, read the deal engine (shoofi-server
   `utils/promotion-discount.js`): Burger Cave's ₪30 minimum is the cart subtotal and the deal
   covers every category — "orders over ₪30" was exact (2026-11-07 round 1).
-
+- Truth is checked against the database on the day, not the spec: a coupon/deal can have ended or been
+  switched off since the spec was written (2026-11-07: the ₪20 coupon had ended in 2025 and was one
+  store's delivery discount; Burger Cave's 10% was switched off). A dead or narrower offer is a FIX
+  that blocks posting, whatever the craft score.
+- A see-through ticket notch shows whatever is under it — keep notches over plain background.
+- A coupon's screenshot must meet the coupon's own terms (cart at or above the minimum).

@@ -1,0 +1,43 @@
+{
+ "style": "shadi",
+ "theme": {
+  "ink": "#17320F",
+  "lime": "#8AEA5F",
+  "paper": "#F9F8F5",
+  "endBg": "#17320F",
+  "endInk": "#ffffff",
+  "glow": "#DFF5D0"
+ },
+ "subject": {
+  "kind": "coupon",
+  "store": {
+   "name": "Pizza Bella Vitta",
+   "logo": "../img/pizza-bella-vitta-logo.png"
+  },
+  "coupon": {
+   "line": "خصم **₪20** عالتوصيل",
+   "terms": "فوق ₪135 · لغاية 31/12",
+   "note": "بينزل لحاله بالسلة"
+  },
+  "dishes": [
+   {
+    "name": "بيتسا حجم كبير",
+    "img": "../img/pbv-pizza-large.jpg"
+   }
+  ]
+ },
+ "text": {
+  "pill": "شوفي",
+  "hook": "عندي إلك خصم عالتوصيل!",
+  "line2": "Pizza Bella Vitta · كفر قاسم",
+  "cta": "اطلب من **شوفي**"
+ },
+ "assets": {
+  "icon": "../assets/shoofi-icon.png",
+  "shadiStand": "../assets/shadi-stand.png",
+  "shadiPoint": "../assets/shadi-point.png",
+  "font": "../assets/me.ttf",
+  "shadiTalk": "../clips/shadi-greet.webm"
+ },
+ "audio": "../out/mix-shadi.m4a"
+}

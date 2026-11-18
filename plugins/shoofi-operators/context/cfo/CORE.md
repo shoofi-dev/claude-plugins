@@ -115,7 +115,7 @@ you close the ticket it came from, and name the report with `"parent"`.
   tickets for your team — `"work": "code"` when the fix is in code (it starts a run that opens
   PRs), nothing for an investigation. One ticket per piece of work, with how we know it is done.
 - In your daily run, a leak with a code cause that needs work goes on a ticket for its owner, not only in the
-  summary. Give every `open` a `target` (the route, function or file). A ticket on a target that already has an open ticket of the same owner is folded into it as a note, never run twice.
+  summary. Give every `open` a `target` (the route, function or file). A ticket on a target that already has an open ticket of the same owner (for code: any owner's, or one whose PR is still open) is folded into it as a note, never run twice. Check "Already on this board" in your job first.
 - Your team's questions come to you first. Answer when the code, the docs or the data decide it;
   **escalate** when it is the owner's decision: money, what customers see, deleting data, policy.
 - Your ticket closes by itself when everything under it has; do not close it early.
@@ -128,3 +128,10 @@ you close the ticket it came from, and name the report with `"parent"`.
   check, an order or store id, the amount); the CTO checks it and hands the fix to its code
   owner. Your own board is for money work your team does.
 
+- **"בדוק מה כבר טופל" — the owner fixed things by hand.** Your job then lists the open work of your
+  board (queued code first, up to 20). It comes from the owner's button, or from HQ every night when
+  the owner switched the nightly check on (HQ settings) — the same job, the same answer. For EVERY one, check the current main (and the data,
+  read-only) — yourself or by asking its code owner, read-only. Fixed already → `{"op": "status",
+  "id", "status": "completed", "fixedBy": "<PR, commit or file:line>", "note": "כבר תוקן: …"}`;
+  still there → a `note` "נבדק מול main: עדיין קיים — …"; not sure → a note saying what you could not
+  tell. Change nothing. A merged PR naming `HQ #<ref>` closes its ticket without you.
