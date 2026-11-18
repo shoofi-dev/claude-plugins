@@ -830,6 +830,18 @@ they differ only in `app-type`, default `app-name`, and post-login navigation.
 `screens/login` → `customer/create`; `screens/verify-code` (4 cells) → `customer/validateAuthCode`
 → `authStore.updateUserToken` → fire-and-forget `aiHelperStore.mergeAfterLogin()` (§5a); new
 user → `screens/insert-customer-name` → `customer/update-name`.
+- **"Resend the code" on `screens/verify-code` posts `customer/create` again** for the phone
+  already typed, through `helpers/request-login-code.ts` (a copy of the body `screens/login`
+  builds inline — keep the two in step), and stays on the screen. The server stores a **new**
+  `authCode` over the old one on every request, so only the latest code logs in, and it goes
+  out by SMS + WhatsApp each time.
+- The resend cooldown is **client-only**: AsyncStorage `@storage_verifyCode` (30s × count,
+  reset after 10 minutes), started only after the request succeeded. Nothing on the server
+  throttles `customer/create` (known gap 2).
+- A failed verify or resend request opens the general server-error dialog
+  (`OPEN_GENERAL_SERVER_ERROR_DIALOG`). **Dismissing that dialog restarts the app**
+  (`components/dialogs/general-server-error.tsx` `hideDialog` → `RNRestart.Restart()`), so
+  "retry" there means starting login over, not retrying in place.
 Token in AsyncStorage `@storage_userToken`, sent as `Authorization: Token`. Also sends a
 generated **`device-id`** (`@storage_deviceId`, never cleared) — read by the fraud checks,
 stories and app-logs, and the owner key of a visitor's taste profile (§5a). Stores:
