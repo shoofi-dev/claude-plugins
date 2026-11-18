@@ -778,6 +778,18 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
           written for the place (`copies[place]`); a banner waits for them. Saving goes through the
           same writers and counts each file as used. «יצירות» rows also keep `review { score,
           verdict, vote }` (media-archive `withReviews`), copied from the job while it is kept.
+        - **A general קידום — the occasion** (2026-11-18, owner: "Black Friday, November sales, a
+          GTA 6 release — search the internet and learn about the promotion if it's not a store or
+          a meal"): a set whose subject is NOT a store / store_new / product, with a note, searches
+          the note on Brave first (`creative/occasion.js learnOccasion`, the finder's `braveSearch`
+          — same key, same monthly count) and gives the director the top titles + descriptions as
+          THE OCCASION section — context, never facts for the words. Kept on the set (`occasion`,
+          public: query + titles + urls + error). Never blocks: no key / no answer → planned from
+          the note. With NO dishes the set prompt says the occasion is the idea (knowledge.md "An
+          offer for all stores": plain unbranded takeaway or no food, no brand / logo / character /
+          face). The words may name the occasion's Latin words and plain numbers the person typed
+          (`facts.allowOccasion`, applied at create / update and on later edits via
+          `factsForJob`); prices, percents and dates stay the subject's facts only.
         - **«אעלה בעצמי» — the person's own picture** (2026-11-18): `POST
           /api/admin/marketing/media/upload` (multipart `file` + `place` banner|story|popup|social +
           `lang` + the subject; `services/marketing/media-upload.js`, marketing roles) puts a JPEG /
