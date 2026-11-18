@@ -559,8 +559,10 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       `hidden`, `not_new`. This is invariant 11's "promote existing offers only" at the content
       layer.
     - **The guard is the control, not the prompt.** `guard.js checkText` rejects any generated
-      percentage, ₪ amount, other number, date, time, Latin word (a code), month or weekday
-      name, "today only" / "tomorrow", "free" or "discount" that the facts do not allow
+      percentage, ₪ amount, other number, date, time, code (a Latin token with digits, or one
+      after "code" / "קוד" / "كود" — plain Latin words and names are NOT checked since 2026-11-18:
+      "GTA VI" was refused when the note said "gta 6"), month or weekday
+      name, "today only" / "tomorrow", "free" or "discount" (also English, whole words) that the facts do not allow
       (Arabic-Indic digits normalised first). One bad field drops the whole AR + HE idea; the
       retry is told why; none left → 422 `no_valid_copy`. Never "repair" a rejected token. The
       image job runs the same guard on its headline / caption before anything renders. It
@@ -798,7 +800,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
           offer for all stores": plain unbranded takeaway or no food, no brand / logo / character /
           face). The words may name the occasion's Latin words and plain numbers the person typed
           (`facts.allowOccasion`, applied at create / update and on later edits via
-          `factsForJob`); prices, percents and dates stay the subject's facts only. By default the
+          `factsForJob`); prices, percents and dates stay the subject's facts only. The Latin words of the
+          occasion's search result titles are allowed too (`allowOccasionNames`: "GTA VI" when the note said
+          "gta 6") — never their numbers. By default the
           occasion's OWN marks (logo / title art, characters, signature look) are wanted in the picture
           (job `occasionMarks`; the picture check and the reviewer allow them, no other brand's); the
           set's `brandSafe: true` («זהירות משפטית») turns them off — owner's call, 2026-11-18.
