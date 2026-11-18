@@ -765,6 +765,10 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
         is left alone and, when something was changed for it, answers `note_he` (`LIVE_LOCKED_HE`);
         `approve: true` is the item's own approve (`item-approve.js approveItemNow`, also
         behind `POST …/items/:id/approve`). Never fork a place's validation into the set.
+        - **«צור שוב את כולם» plans again** (2026-11-18): `PUT …/sets/:id` `{ retry, replan: true }` runs
+          the director first with the set's CURRENT note, rules and occasion (`planFor`, which also learns
+          the occasion), then the retried places. A plain `retry` keeps the plan. Before this, a note or a
+          rule changed after «צור» never reached the picture.
         - **Joining an item** (2026-11-15): `POST …/sets` with `itemId` attaches the set to a קידום
           made elsewhere (`attached: true`): the subject is the ITEM's (a different one is 400
           `item_subject`), the timing starts as the item's (`items.freshPlan`), and save adds the
