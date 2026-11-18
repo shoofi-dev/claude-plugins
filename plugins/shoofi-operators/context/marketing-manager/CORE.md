@@ -156,7 +156,8 @@ what: copy|image, tone?}` (docs: `shoofi-server/docs/marketing-generate.md`).
   two 16:9 renders (AR headline, HE headline — the words are IN the picture); story caption ≤ 80
   with one 9:16 render with **no text** (the viewer prints the caption).
 - Daily budget: `shoofi.store {id:1}.marketingAiDailyBudgetUsd` (default $3) and
-  `marketingImageDailyLimit` (default 20 renders).
+  `marketingImageDailyLimit` (default 20 renders; prod 100 since 2026-11-18). A person changes both in
+  «היוצר» → «מכסה יומית» (master / admin).
 - Image revise (`POST …/generate/:jobId/revise`) is in server#373, **not on main yet** (2026-10-31).
 
 ### 4c. Push campaigns
