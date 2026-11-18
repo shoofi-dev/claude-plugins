@@ -36,7 +36,15 @@ if it supports **BOTH** `store.supportedCities` (ObjectId[] — permission) **AN
 
 ## 2. bookDelivery lifecycle & DELIVERY_STATUS
 `delivery-company.bookDelivery`, one per delivery. `bookId = order.orderId`,
-`originalBookId = order.originalOrderId` (set at partner-accept, `order.js`).
+`originalBookId = order.originalOrderId` (set at partner-accept, `order.js`). **`bookId` is not
+unique** (first4+last4 of `originalOrderId`; 88 bookIds shared across stores in prod,
+2026-11-08) — an order's row is located by `originalBookId` through
+`deliveryRowFilterForOrder` (`utils/delivery-row.js`), never by `bookId` alone (CORE
+invariant 20; orders CORE invariant 23). A delivery-side request (`delivery/admin/cancel`,
+`delivery/update`) is located by `locateDeliveryRow` (`services/delivery/delivery-row-locator.js`).
+It takes `deliveryId` (the row `_id`), else `originalBookId` + `bookId`, else legacy `bookId`
+(+ `appName`). Several matches resolve to the single live row (status `1/2/3/5` or pending), or the
+request is refused with a 409 and no write.
 **Status constants are authoritative in `consts/consts.js`** (`DELIVERY_STATUS`):
 `1` WAITING_FOR_APPROVE → `2` APPROVED → `3` COLLECTED_FROM_RESTAURANT (pickup) →
 `4` DELIVERED; `5` WAITING_IN_STORE; cancels `-1` by-driver, `-2` by-store, `-3` by-admin.
@@ -89,6 +97,28 @@ open and focus, and every call is a refusal while the platform flag is off.
 **Tests:** `test/integration/delivery-only-region-fee.js`, `delivery-support-gate.js`,
 `store-delivery-only-expense.js`; `scripts/delivery-only-preflight.js` is a read-only prod
 pre-flight for stores/regions that would book at ₪0.
+
+## 2c. Courier state for the store (partner order card)
+`services/delivery/courier-status.js`; rules and emit points in CORE invariant 21. Each DELIVERY
+row of `POST /api/order/admin/orders` carries:
+
+```ts
+courier: null | {            // null = no booking for this order (not accepted / platform switch off)
+  state: "searching" | "assigned" | "arriving" | "at_store" | "picked_up" | "delivered" | "cancelled";
+  driverName: string | null;        // first word of booking.driver.fullName
+  etaToStoreMinutes: number | null; // engine estimate, current courier only, measured basis, not passed
+  etaToStoreAt: string | null;      // ISO instant of that estimate (client-side countdown)
+  cancelledBy: "driver" | "store" | "admin" | null;
+  updatedAt: string | null;         // ISO; created / reassignedAt‖assignedAt / approvedAt /
+}                                   // waitingInStoreAt / startedAt / completedAt / cancelledAt
+```
+Frame: `{type: "courier_updated", data: {orderId, bookId, deliveryId, reason, timestamp}}` to the
+booking's `appName` (`orderId` = the store order `_id` as a string, null on delivery-only).
+`reason` ∈ `searching, assigned, approved, at_store, picked_up, delivered, reassigned,
+cancelled_by_driver, cancelled_by_store, cancelled_by_admin, status_updated` — informational;
+the client refetches rather than trusting it. Tests: `test/integration/courier-status.js`,
+`test/integration/courier-updated-frame.js`. Latency (local, 55-row page, 96k bookings):
++0.5–1 ms with the `order._id` index, +~22 ms without it.
 
 ## 3. Driver assignment (`services/delivery/`)
 **Area match** (`assignDriver.js findBestAreaForLocation`): customer point →
@@ -324,13 +354,18 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   expectedDeliveryAt, area(embedded), company(embedded), driver(embedded), bookId,
   originalBookId, appName, customerLocation, order(snapshot), twinGroupId,
   twinPickupSequence, twinAssignmentMode, twinPeer, twinDegraded, *DelayNotified*,
-  assignedAt, completedAt(Date), isReadyForPickup, readyForPickupAt}`.
+  assignedAt, approvedAt, waitingInStoreAt(Date), startedAt, completedAt(Date), cancelledAt,
+  isReadyForPickup, readyForPickupAt}`.
+  ⚠️ `order._id` is an ObjectId on partner-accept bookings and a 24-hex **string** on bookings
+  made over `POST /api/delivery/book` — query both forms (CORE invariant 21).
   ⚠️ Fields that are not what they look like (CORE invariant 11): `readyForPickupAt` exists
   only if a driver was already assigned when the store pressed ready — the full store-ready
   source is `shoofi.orderFlowEvents` `status_change` status `"3"`. `company.storeName` and
   `driver.name` are never populated — use `company.nameHE`/`nameAR`, `driver.fullName`.
-  There is **no driver-arrived-at-store field**: use the optional `delivery_waiting_in_store`
-  flow event or `driverLocationHistory` within 150 m of `storeLocation`. Assignment lag =
+  There is **no GPS-derived arrival field**: the optional "waiting in store" tap writes
+  `waitingInStoreAt` (since shoofi-server#485; absent on older status-`5` rows) and the
+  `delivery_waiting_in_store` flow event; otherwise `driverLocationHistory` within 150 m of
+  `storeLocation`. Assignment lag =
   `assignedAt − max(assignDriverAt, created)` (CORE invariant 2), never `− assignDriverAt`.
 - `store` (company) — `supportedCities[ObjectId], supportedAreas
   [{areaId,price,minOrder,eta}], isControlledByAdmin, manualAssignmentOnly, accounting,
@@ -362,11 +397,15 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
 - **ORDERS (you're the callee)**: at partner-accept `routes/order.js` builds `deliveryData`
   and fire-and-forgets `deliveryService.bookDelivery(...)` — **only if the GLOBAL switch
   `shoofi.store {id:1}.isSendNotificationToDeliveryCompany` is on** (else NO bookDelivery is
-  created platform-wide, §10). Order cancellation mirrors into `bookDelivery` (→ `-3`). You don't edit `order.js`.
+  created platform-wide, §10). Order cancellation mirrors into `bookDelivery` (→ `-3`) on the row located by
+  `deliveryRowFilterForOrder` and written by its `_id`. You don't edit `order.js`.
 - **PAYOUTS = accountant**: driver/company pay (`routes/driver-reports.js`, `driverDailyHours`,
   `shoofi.compensations`) and MASAV are the accountant's. You provide the delivery data; they compute pay.
 - **NOTIFICATIONS**: driver/store/customer push + WS (`driver_location_update`,
   `driver_status_updated`, `pickup_delayed`, `delivery_delayed`) via the notification domain.
+  `courier_updated` (store tablet, CORE invariant 21) is sent by delivery code itself through
+  `websocketService.sendToAppAdmins`; that transport's single-process reach is the notification
+  domain's to fix.
 
 ## C — Client repos (full-stack)
 ### C1. shoofi-shoofir — DRIVER app (the main delivery client)
@@ -402,6 +441,24 @@ it silently does not exist for twins.
 own row and **replaces the order table with a two-line money block** (تدفع للمتجر / تحصّل من الزبون,
 both `order.price`) — the order panel would otherwise render an all-zero table, since there is
 no order.
+**Dropoff details under the address (2026-11-10, shoofir `feat/driver-sees-address-note`):** both
+`OrderCard` and `TwinOrderCard` render, under the street line, (a) a building line from
+`floorNumber` / `apartmentNumber` / `entrance` («طابق 2 · شقة 4 · مدخل ب», only the parts that are
+non-blank) and (b) the customer's **landmark note** `order.order.address.notes` («علامة مميزة للسائق»
+in the customer app) in a **blue** banner, labelled «علامة مميزة:». It is deliberately a sibling of,
+and NOT the same as, the amber «ملاحظات للمندوب» banner, which is `order.order.commentToCourier`
+(typed at checkout). Landmark sits with the address, the checkout comment stays where it was below
+it; either renders only when non-blank. The share-to-WhatsApp text in `OrderCard` adds the same two
+lines under the address line. Logic is the pure `utils/address-details.ts` (Arabic/Hebrew labels
+inline, because translations are DB-served), pinned by `utils/__tests__/address-details.test.ts`.
+All four fields ride the existing `'order.order.address': 1` whitelist in `POST /api/delivery/list`
+(`routes/delivery/orders.js`) — no server change. **They are a snapshot from booking time:** the
+address object is copied onto the order at checkout and onto `bookDelivery` at booking, so a
+customer who edits the saved address afterwards does NOT change what the courier sees. Writing and
+cleaning those fields on the saved address (≤ 200 note / ≤ 20 others, add keeping
+apartment + entrance) is `customers` CORE invariant 20. For a twin pair the values come from
+whichever leg carries them (one customer, one dropoff), rendered once in the shared header.
+A delivery-only booking has no `order`, so neither line ever renders there.
 **Dead/inherited (leave alone):** `services/deliveryDriverService.ts` (legacy fetch dup,
 `app-name: shoofi-app`), `getNearbyOrders`/`getSchedule` (no UI callers), customer-app city/address remnants.
 
@@ -419,7 +476,7 @@ routes in `src/index.tsx`) are the only callers of `delivery/{update, book, crea
 employe-list, employe-payments}`, now dashboard-token only. `views/admin/driver-routes` posts
 `delivery/list` for any driver, and the order card reads `delivery/order/:id`.
 `POST delivery/admin/order/cancel` has **no client at all** on main (only the root script
-`test-delivery-status-notifications.js`); the web cancels through `delivery/admin/cancel`; boards `DeliveryMonitor`, `DeliveryListAnalytics`,
+`test-delivery-status-notifications.js`); the web cancels through `delivery/admin/cancel` (`CancelDeliveryModal` → `buildCancelDeliveryData`: `{deliveryId: deliveryOrder._id, bookId}`, never `bookId` alone); boards `DeliveryMonitor`, `DeliveryListAnalytics`,
 `OpsDashboard`. **Live driver map**: `GET delivery/drivers/locations` + WS
 (`views/admin/driver-locations/DriverLocationsMap.tsx`); its pins and the restaurant↔customer
 colour pairing (`getOrderColor(bookId)`, a hash into a fixed 15-slot palette) live in
@@ -461,7 +518,10 @@ the second most common status in `delivery-company.book-delivery` after `"4"`. E
 delivery-status renderer in the repo falls back to the raw value
 (`shared/opsDashboardUtils.ts`, `live-ops/logic/stepper.ts`), and so must any new one, because
 `"0"` is reachable and is in no enum: `POST /api/delivery/update` → `updateDelivery`
-(`services/delivery/book-delivery.js`) `$set`s the request body unvalidated and branches on it.
+(`services/delivery/book-delivery.js`) `$set`s the request body unvalidated (minus its identifier
+keys) and branches on it. No client has ever done that successfully, though. The legacy
+`/delivery-list` page echoes the whole row including `_id`, which `updateDelivery` refuses, as
+Mongo's immutable-`_id` error did before (CORE invariant 20).
 **Delivery-only:** `DeliveryListAnalytics.tsx` marks these rows with a `ידנית` badge and shows a
 `ביטול משלוח` button — `isDeliveryOnly && !CLOSED_DELIVERY_STATUSES.includes(status)` — which
 POSTs `delivery/order/status/update` with `status: -3`. That route clears `isPendingAssignment`
@@ -487,6 +547,10 @@ The town dropdown is `react-native-dropdown-picker`, whose list renders **inline
 after it paint over it, and `zIndex` fixes only iOS while `elevation` reorders the whole
 subtree on the Urovo POS, so the quote lines below it are unmounted while it is open.
 **Partner has NO driver-assignment surface** — it books and reads, it never picks a driver.
+**Courier status on the order card (§2c):** the list rows of `POST order/admin/orders` carry
+`courier` and the server sends `courier_updated`; the v3 list
+(`screens/admin/order/list/index.v3.tsx` `WsOrderEvents`) must add that type to its refetch
+filter, and `components/orders-v3/OrderCardV3.tsx`'s memo comparator must compare `courier`.
 **Dead/inherited (leave alone):** `components|screens|stores/delivery-driver/*` (a pre-admin
 copy of the shoofir driver UI — no `isAdmin`, no reassign, no `DriverReassignModal`, and no
 navigation entry point despite being registered in `navigation/MainStackNavigator.tsx`),

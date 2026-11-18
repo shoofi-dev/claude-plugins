@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<!--
+  The stage: 1080x1920, every layer positioned by a pure function of time.
+  render.mjs calls window.prepare(spec), then window.renderAt(t) for each frame and
+  screenshots it — so a frame is the same however slowly it is captured.
+-->
+<style>
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #000; }
+  * { box-sizing: border-box; }
+  body { font-family: ME, 'Geeza Pro', 'Arial Hebrew', sans-serif; }
+  #stage { position: relative; width: 1080px; height: 1920px; overflow: hidden; }
+  .layer { position: absolute; will-change: transform, opacity; }
+  .full { inset: 0; }
+  .cover { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .txt { direction: rtl; text-align: center; line-height: 1.25; white-space: pre-line; }
+  .box { border-radius: 36px; padding: 26px 40px; }
+  .pill { border-radius: 999px; padding: 14px 34px; display: inline-flex; align-items: center; gap: 18px; }
+  .card { border-radius: 34px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.35); background: #fff; }
+  .chip { display: inline-block; border-radius: 999px; padding: 12px 30px; margin: 8px; }
+  .ticket { border-radius: 30px; position: relative; }
+  .ticket::before, .ticket::after { content: ""; position: absolute; top: 50%; width: 56px; height: 56px; border-radius: 50%; transform: translateY(-50%); background: var(--hole); }
+  .ticket::before { left: -28px; } .ticket::after { right: -28px; }
+  .phone { background: #111; border-radius: 64px; padding: 16px; box-shadow: 0 30px 70px rgba(0,0,0,.35); }
+  .phone .scr { border-radius: 50px; overflow: hidden; background: #fff; position: relative; }
+  .hl { position: absolute; border: 7px solid var(--lime); border-radius: 18px; box-shadow: 0 0 0 4px var(--ink); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="styles.js"></script>
+<script>
+(() => {
+  const W = 1080, H = 1920;
+  const stage = document.getElementById('stage');
+  const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+  const ease = {
+    linear: (x) => x,
+    out: (x) => 1 - Math.pow(1 - x, 3),
+    inOut: (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2),
+    back: (x) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); },
+  };
+  let layers = [];
+  let duration = 0;
+
+  /** One layer: {id, html, start, end, x, y, w, h, z, in: {kind, dur}, out: {kind, dur}, kb: {from, to, ox, oy}} */
+  function mount(spec) {
+    stage.innerHTML = '';
+    // The brand font (MiddleEast, from shoofi-app) — Arabic and Hebrew in one face.
+    const font = document.createElement('style');
+    font.textContent = `@font-face { font-family: ME; src: url('${spec.assets.font}'); }`;
+    document.head.appendChild(font);
+    document.documentElement.style.setProperty('--lime', spec.theme.lime);
+    document.documentElement.style.setProperty('--ink', spec.theme.ink);
+    // A banner is 16:9; a reel 9:16 (the default).
+    const [sw, sh] = spec.size || [1080, 1920];
+    for (const n of [document.documentElement, document.body, stage]) Object.assign(n.style, { width: sw + 'px', height: sh + 'px' });
+    layers = window.STYLES[spec.style](spec);
+    duration = Math.max(...layers.map((l) => l.end));
+    for (const l of layers) {
+      const el = document.createElement('div');
+      el.className = 'layer' + (l.full ? ' full' : '');
+      if (!l.full) Object.assign(el.style, { left: (l.x ?? 0) + 'px', top: (l.y ?? 0) + 'px', width: l.w ? l.w + 'px' : 'auto', height: l.h ? l.h + 'px' : 'auto' });
+      el.style.zIndex = l.z ?? 1;
+      el.innerHTML = l.html;
+      stage.appendChild(el);
+      l.el = el;
+      l.inner = el.firstElementChild;
+      l.videos = [...el.querySelectorAll('video')];
+    }
+    return duration;
+  }
+
+  /** Where a layer is at time t: opacity and transform from its in/out animations and Ken Burns. */
+  function place(l, t) {
+    const el = l.el;
+    if (t < l.start || t >= l.end) { el.style.visibility = 'hidden'; return; }
+    el.style.visibility = 'visible';
+    let op = 1, tx = 0, ty = 0, sc = 1, rot = l.rot || 0;
+    const a = l.in, b = l.out;
+    if (a) {
+      const p = clamp((t - l.start) / (a.dur || 0.4));
+      if (a.kind === 'fade') op *= ease.out(p);
+      if (a.kind === 'rise') { op *= ease.out(p); ty += (1 - ease.out(p)) * (a.by ?? 80); }
+      if (a.kind === 'slam') { op *= clamp(p * 3); sc *= 1 + (1 - ease.back(p)) * (a.from ?? 0.9); }
+      if (a.kind === 'pop') { op *= clamp(p * 2.5); sc *= 0.6 + 0.4 * ease.back(p); }
+      if (a.kind === 'slideL') { op *= clamp(p * 2); tx += (1 - ease.out(p)) * -(a.by ?? 700); }
+      if (a.kind === 'slideR') { op *= clamp(p * 2); tx += (1 - ease.out(p)) * (a.by ?? 700); }
+      if (a.kind === 'drop') { op *= clamp(p * 3); sc *= 1 + (1 - ease.out(p)) * 0.35; rot += (1 - ease.out(p)) * (a.spin ?? 8); }
+      if (a.kind === 'up') { ty += (1 - ease.out(p)) * (a.by ?? 1400); }
+    }
+    if (b) {
+      const p = clamp((t - (l.end - (b.dur || 0.3))) / (b.dur || 0.3));
+      if (b.kind === 'fade') op *= 1 - ease.inOut(p);
+      if (b.kind === 'sink') { op *= 1 - ease.inOut(p); ty += ease.inOut(p) * 60; }
+      if (b.kind === 'shrink') { op *= 1 - ease.inOut(p); sc *= 1 - 0.3 * ease.inOut(p); }
+    }
+    if (l.pulse) sc *= 1 + 0.03 * Math.sin((t - l.start) * Math.PI * 2 * l.pulse);
+    el.style.opacity = op;
+    el.style.transform = `translate(${tx}px, ${ty}px) scale(${sc}) rotate(${rot}deg)`;
+    if (l.kb && l.inner) {
+      // Ken Burns on the image inside: scale and drift across the layer's life.
+      const p = ease.inOut(clamp((t - l.start) / (l.end - l.start)));
+      const s = l.kb.from + (l.kb.to - l.kb.from) * p;
+      const ox = (l.kb.ox || 0) * p, oy = (l.kb.oy || 0) * p;
+      l.inner.style.transform = `translate(${ox}px, ${oy}px) scale(${s})`;
+    }
+    // A layer's own motion, beyond the shared in/out kinds (the end card's rings and shine, a dish splitting).
+    if (l.tick) l.tick(t - l.start, el, l);
+    if (l.punch) {
+      // A cut that lands: the frame starts slightly big and settles in the first 0.25 s.
+      const p = clamp((t - l.start) / 0.25);
+      el.style.transform += ` scale(${1 + 0.08 * (1 - ease.out(p))})`;
+    }
+  }
+
+  /** Seek every visible clip to its own time and wait until each frame is there. */
+  function seekVideos(t) {
+    const waits = [];
+    for (const l of layers) {
+      if (!l.videos.length || t < l.start || t >= l.end) continue;
+      for (const v of l.videos) {
+        const want = Math.min(Math.max(0, t - l.start), Math.max(0, (v.duration || 0) - 0.04));
+        if (Math.abs(v.currentTime - want) < 0.001) continue;
+        waits.push(new Promise((r) => { v.addEventListener('seeked', r, { once: true }); v.currentTime = want; }));
+      }
+    }
+    return Promise.all(waits);
+  }
+
+  window.prepare = async (spec) => {
+    const d = mount(spec);
+    await document.fonts.ready;
+    await Promise.all([...document.querySelectorAll('video')].map((v) => (v.readyState >= 1 ? 0 : new Promise((r) => { v.onloadedmetadata = v.onerror = r; }))));
+    await Promise.all([...document.images].map((im) => (im.complete ? 0 : new Promise((r) => { im.onload = im.onerror = r; }))));
+    return d;
+  };
+  /**
+   * The creative director's measurable checks (render.mjs --review), at the given times:
+   *  - resolution: every visible photo/clip, its displayed size (with its Ken Burns zoom) over its
+   *    real pixels — above 1.15 it is stretched and will look soft;
+   *  - duplicates: a 9x8 difference hash of every photo; two pictures within 6 bits are the same
+   *    photo (menus reuse one photo for several dishes);
+   *  - text: every text block inside the canvas, inside the safe zone on a 9:16 reel, and not
+   *    overlapping another text block.
+   */
+  window.review = async (times, safe) => {
+    const out = { resolution: [], duplicates: [], text: [] };
+    const seen = new Map();
+    const hash = (el) => {
+      try {
+        const c = document.createElement('canvas'); c.width = 9; c.height = 8;
+        const g = c.getContext('2d'); g.drawImage(el, 0, 0, 9, 8);
+        const d = g.getImageData(0, 0, 9, 8).data; let bits = '';
+        for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+          const a = (y * 9 + x) * 4, b = a + 4;
+          bits += (d[a] + d[a + 1] + d[a + 2]) > (d[b] + d[b + 1] + d[b + 2]) ? '1' : '0';
+        }
+        return bits;
+      } catch (_) { return null; }
+    };
+    for (const t of times) {
+      await window.renderAt(t);
+      const boxes = [];
+      for (const l of layers) {
+        if (t < l.start || t >= l.end) continue;
+        for (const m of l.el.querySelectorAll('img, video')) {
+          if (m.dataset.bg) continue; // a deliberately blurred backdrop, not a picture to judge
+          const r = m.getBoundingClientRect();
+          const nw = m.naturalWidth || m.videoWidth, nh = m.naturalHeight || m.videoHeight;
+          if (!nw || !nh || r.width < 40) continue;
+          // object-fit: cover — the picture is scaled to fill the box on its tighter side.
+          const cover = getComputedStyle(m).objectFit === 'cover';
+          const f = cover ? Math.max(r.width / nw, r.height / nh) : Math.min(r.width / nw, r.height / nh);
+          const src = m.currentSrc || m.src;
+          const name = decodeURIComponent(src.split('/').pop());
+          if (f > 1.15) out.resolution.push({ t, file: name, factor: +f.toFixed(2), shown: [Math.round(r.width), Math.round(r.height)], real: [nw, nh] });
+          if (m.tagName === 'IMG' && r.width > 150 && !/icon|logo|shadi/i.test(name)) {
+            const h = hash(m);
+            if (h) {
+              for (const [other, oh] of seen) {
+                if (other === name) continue;
+                let dist = 0; for (let i = 0; i < 64; i++) if (h[i] !== oh[i]) dist++;
+                if (dist <= 6 && !out.duplicates.some((d) => (d.a === other && d.b === name) || (d.a === name && d.b === other))) out.duplicates.push({ a: other, b: name, bits: dist });
+              }
+              seen.set(name, h);
+            }
+          }
+        }
+        for (const tx of l.el.querySelectorAll('.txt')) {
+          const r = tx.getBoundingClientRect();
+          if (!r.width || getComputedStyle(l.el).opacity === '0') continue;
+          boxes.push({ r, text: tx.textContent.trim().slice(0, 40) });
+          const W = stage.clientWidth, H = stage.clientHeight;
+          if (r.left < 0 || r.top < 0 || r.right > W || r.bottom > H) out.text.push({ t, problem: 'outside the canvas', text: tx.textContent.trim().slice(0, 40) });
+          else if (safe && (r.top < safe.top || r.bottom > safe.bottom || r.right > safe.right)) out.text.push({ t, problem: 'outside the safe zone', text: tx.textContent.trim().slice(0, 40), box: [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)] });
+        }
+      }
+      for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i].r, b = boxes[j].r;
+        const ix = Math.min(a.right, b.right) - Math.max(a.left, b.left), iy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (ix > 12 && iy > 12) out.text.push({ t, problem: 'text overlaps text', text: `${boxes[i].text} / ${boxes[j].text}` });
+      }
+    }
+    return out;
+  };
+
+  window.renderAt = async (t) => { for (const l of layers) place(l, t); await seekVideos(t); };
+})();
+</script>
+</body>
+</html>

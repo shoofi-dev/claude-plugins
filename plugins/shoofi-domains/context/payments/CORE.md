@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/HIGH-RISK-refund-idempotency-guard / 2026-11-06 (invariant 12 — refund at most once per order); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/HIGH-RISK-refund-idempotency-guard cee54355 / 2026-11-18 (invariant 13 — refund at most once per order; ref §6 refund paths re-verified); shoofi-server@fix/coupon-draft-customer-area / 2026-11-17 (Who a coupon applies to: supportedCities = the store's pickup zone, supportedAreas = the customer's route); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -114,6 +114,24 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    sale — and never fails the order: failures land on `order.invoices[]` and are retried by
    `utils/crons/invoice-retry-cron.js`, which is deliberately **not** gated on the flag so
    a rollback cannot strand a customer who paid while it was on.
+   ⚠️ **The documents are FIXED AT CAPTURE.** Capture plans them once and records every one
+   on `order.invoices[]` (failed ones too, with their `amount`). A retry re-issues only a
+   recorded, not-`issued` document at the amount capture planned — never re-plans from
+   post-capture totals, never re-issues an `issued` one, never originates an unrecorded one.
+   **A TWIN leg never reaches `planSingleOrderInvoices`:** `issueInvoicesForOrder` routes any
+   `order.twinGroup.groupId` to `retryTwinOrderInvoices`, which loads the group + both legs,
+   rebuilds the capture-time figures (`twinAtCapture`: a keep-secondary degrade's
+   `degrade.shippingTransferred` is taken back off the secondary, as `undoDegrade` does; the
+   charge is `computeCombinedTotal`, checked against a ZCredit `payload.TransactionSum` when
+   one exists), re-plans the GROUP with `planTwinInvoices`, and issues only this leg's
+   failed documents. The delivery document — shipping + combination fee — lives on the
+   primary only. If anything cannot be proven (group/peer missing, a recorded amount the
+   re-plan does not reproduce, a record the twin plan does not have — e.g. a delivery doc on
+   the secondary — or an unrecorded doc on this leg) it issues nothing and sets
+   `order.invoicesHeld {reason, detail, groupId, at}`; the cron's query skips held orders
+   until a person clears the field. Before 2026-11-06 the cron used the single planner on
+   twins: a primary retry dropped the fee from the delivery doc and a degraded secondary
+   retry issued a second delivery doc (prod had 0 such retries pending when fixed).
    ⚠️ The customer document carries **`ua_uuid`** — Shoofi's EZcount user holds several
    businesses and this says which one issues it. `CUSTOMER_DOC_UA_UUID` in `amazonconfigs
    {app:"hyp"}` overrides the constant in `utils/hyp.js`; an **empty string there stops the
@@ -145,21 +163,98 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
      2026-08-10..09-22). Their documents are in `invoices[]`, not Gmail. A fetch for `"EZ"`
      would search `subject:EZ`, publish an arbitrary customer's mail at the public key
      `invoices/doc-EZ.pdf` and mark one arbitrary order completed.
+   - **"Does this order have a receipt?" is answered by `invoices[]`, never by
+     `ccPaymentRefData.invoiceStatus`.** A real document is an entry with
+     `status: "issued"` (`INVOICE_STATUS.ISSUED` in `services/payments/order-invoices.js`)
+     and a `docNumber`/`docUuid`/`pdfLink`; a `failed` entry is a pending retry. Any reader
+     that projects orders must include `invoices`. The HQ money audit's `receipt-missing`
+     check (`hasIssuedDocument`, `services/hq/money-audit/checks-money-in.js`) false-flagged
+     all 2,894 of those orders until it did.
    ⚠️ **Never put lib/auth `restrict` on a JSON route.** Sessions are off in `app.js`, so it
    throws inside an async middleware and the request **hangs with no response**. Until
    2026-10-30 that is what `pending`, `retry` and `process-all` did.
-12. **A customer refund is issued at most once per order.** `refundOrderPayment`
+12. **A cancel's `cancelMoneyDecision` is `keep` | `refund` | `undecided`, and an undecided
+   settled charge is FLAGGED, never refunded** (shoofi-server `fix/twin-cancel-safety`,
+   2026-11-06; full rules in orders CORE invariant 27). `undecided` is stamped on a cancel that
+   arrived with no decision on an order with money at stake (it used to read `refund`). For a
+   single order charged outright (no `paymentAuth`), the order route writes the same flag
+   fields as `refundOrderPayment` with **`paymentAuth.refundRequiredReason:
+   "cancel_no_decision"`** and `refundRequiredAmount = order.total`; `order-authorization.js`
+   is unchanged — a J5 hold is still released by `releaseOrderAuthorization` (a captured one
+   flagged `captured_before_cancel`), and `refundOrderPayment` still runs only on an explicit
+   `refund`. Twin legs get no per-order flag (`refund_twin_order_manual` stays the explicit-refund
+   answer). A cancel is settled once: a second cancel records `cancelSettlementSkipped` instead.
+   Readers: admin `charge-state.ts` (badge), HQ money audit (`cancelled-not-refunded`,
+   `uncancel-leftovers`).
+   **Since 2026-11-07 every cancel is also recorded in the charge's money ledger** (orders CORE
+   invariant 28, `services/money/*`): `refunded + compensated + owed ≤ captured` is enforced on
+   every write. What touches money-in code: (a) `applyCaptureSuccess` (twin) records
+   `group.capturedAmount` = `computeCombinedTotal` + a ledger `capture` entry, best-effort after
+   the capture; (b) **HYP twin partial refunds** (`attemptHypTwinRefund` → `utils/hyp-pay`
+   `refundTransaction`, `zikoyAPI`) run only with `twinOrderConfig.hypAutoRefund` (default
+   **false**): a `refund_unknown` slot is written BEFORE the call, the amount is capped by the
+   ledger, one attempt per decision, never retried, and a thrown call stays in doubt for
+   `POST /api/money/resolve-unknown`. HYP's sandbox (2026-11-06, test masof 0010332520) approved
+   an over-refund (₪6 on ₪3) and every duplicate, so these guards are the only ones. (c) **ZCredit
+   is never refunded automatically** — `degradeAutoRefund` is no longer read and
+   `refundPartial` is not called; finance records portal refunds with
+   `POST /api/money/record-refund`, which on a single order also clears
+   `paymentAuth.refundRequired` once nothing is owed and adds `paymentAuth.refundedAmount`.
+   (d) `createCancelCompensation` takes `scope: "twin"` + an explicit `amount` + `decisionKey`
+   (idempotent: a compensation row with that `cancelDecisionKey` is reused) — one Shoofi-funded
+   `COMP-<primary originalOrderId>[-n]` per twin decision; per-side calls still refuse twins.
+   Invoices are untouched.
+13. **A single-order customer refund is issued at most once.** `refundOrderPayment`
    (`services/payments/order-authorization.js`) returns `{ success: true, alreadyRefunded }`
    with no HYP call and no write when `isAlreadyRefunded(paymentAuth)` holds: any of
    `refundedAmount > 0`, `refundTransId` or `refundedAt`. A partial earlier refund counts,
-   because this path only refunds the whole order. Two concurrent cancels are serialised by an
-   atomic claim, `paymentAuth.refundClaimedAt`, taken just before `zikoyAPI` (the filter requires
-   both it and `refundedAt` to be absent). The loser returns `alreadyClaimed` and writes nothing.
-   A refusal from HYP releases the claim, so a retry is allowed. A throw after the request was
-   sent keeps the claim, because the outcome is unknown: the order is flagged `refund_error` and a
-   person checks HYP. `settleCancelledOrderMoney`'s `wasCharged` (`routes/order.js`) reads the
-   same helper. **Never call `refundTransaction` for an order outside this function.**
-   (HQ #d20d40, 2026-11-06)
+   because this path only refunds the whole order. The route's settled-once rule (invariant 12,
+   `cancelSettlementSkipReason`) reads the order as it was BEFORE the update, so two cancels at
+   the same moment both pass it. They are serialised here by an atomic claim,
+   `paymentAuth.refundClaimedAt`, taken just before `zikoyAPI` (the filter requires both it and
+   `refundedAt` to be absent). The loser returns `alreadyClaimed` and writes nothing.
+   - A refusal from HYP releases the claim (in the same write as the flag), so a retry is allowed.
+   - A throw before the HYP call (loading credentials) releases it.
+   - A throw once the call has started (timeout, network, or our success write failing) keeps it,
+     because the outcome is unknown. The order is flagged `refund_error` and a person checks HYP.
+
+   `refundRequired` is only the fallback (ref §6). `settleCancelledOrderMoney`'s `wasCharged`
+   (`routes/order.js`) reads the same helper. Twin HYP refunds have their own guard, the ledger
+   slot in invariant 12 (b). **Never call `refundTransaction` for a single order outside this
+   function.** (HQ #d20d40)
+
+## Kopa till money (phase 4d) — bookkeeping, NOT a charge
+shoofi-server `services/kopa/till-money.js` + `routes/kopa/till-money.js` (branch
+`feat/kopa-phase1`, 2026-11-12), and the totals in `services/kopa/till-orders.js`.
+Full rules: reference §6b. Orders CORE invariant 30 owns the till order itself.
+- **No money moves.** Discounts, tips, till payments and till refunds are records on a
+  `kopaTillOrders` document. No card is processed, and HYP and ZCredit are never called.
+  Nothing writes `orders`, `paymentAuth`, `creditCards` or any money-in collection. None of
+  invariants 1–13 applies, and none of them is touched. A till refund is the store handing
+  money back by its own means. It is NOT a provider refund and NOT the
+  `cancelMoneyDecision` / money-ledger path.
+- **Totals.** `total` = subtotal − discount.amount (0 for a staff meal). **The tip is not in
+  `total`.** `amountDue` = total + tip.amount, `balance` = amountDue − paidAmount, and the order
+  is `paid` when the payments reach `amountDue`. Discount and tip amounts are re-computed by
+  the server on every write, half-up to the agora. A discount is capped at the subtotal.
+- **Manager PIN** (`verifyManagerPin`, customers reference 5g) for a discount, removing one,
+  and every refund. One exception: a discount that matches the order's customer-profile
+  `standingDiscount` exactly (same type, same value) when the profile phone is the order's
+  phone. It is stored as `source: "standing"` with `approvedBy: null`.
+- **Idempotency.** Every write is CAS `findOneAndUpdate({ _id, status, rev })` and is never
+  retried, so of two concurrent writes one wins and the other gets 409. A payment's
+  `clientPaymentId` (uuid) and a refund's `clientRefundId` make a repeat answer the original
+  with 200 and `replay: true`. That holds when the order is already paid, and when two
+  identical requests race. The sum of refunds is at most `paidAmount`, and a refund never
+  deletes or cancels a line.
+- **No money without a shift** (shoofi-server@feat/kopa-phase5 407a0533, 2026-11-12). A new
+  till payment with a money method (all but UNPAID) and every new till refund need an open till
+  session. Otherwise 409 `NO_OPEN_SESSION` and nothing is written. A replay, UNPAID, a discount
+  and a tip need none. Each new entry carries `sessionId`. Rules and the close race: accountant
+  CORE "Kopa till sessions & reports", accountant reference §12.
+- The Z / X sessions and till reports (`services/kopa/till-sessions.js`, `till-reports.js`)
+  read `discount.amount`, `tip.amount` and `refunds[]` from the order. This doc does not
+  cover them.
 
 ## Method resolution — what the picker offers (UI-only)
 `GET /api/payment-methods` (`routes/payment-methods.js`) decides the list; the app only adds
@@ -194,7 +289,31 @@ formula module, `utils/coupon-discount.js` (`computeCouponDiscount`), used by
 (`enforceCouponEntitlement`) — **except** for the fixed-delivery-price type.
 Creation does NOT notice a total lower than items + fee − coupon − deals − coins with nothing to
 explain it (shadow pricing records the drift and the order is kept), so the app must send the
-coupon its total took off: TotalPrice is its only writer (reference.md, "Coupons").
+coupon its total took off: TotalPrice is its only writer (reference.md, "Coupons"). The
+converse holds too: a coupon the total did NOT use (`couponSuppressed`: it lost to a delivery
+deal, or it is a delivery coupon on a pickup / drive-in order) stays on the card as "not used" and
+is not sent.
+
+**Who a coupon applies to** — `applicableTo` (`routes/coupon.js`: `/api/coupons/apply` and
+the auto-apply scorer `GET /api/coupons/auto-apply/:customerId`). Every non-empty list is ANDed;
+an empty one is "all":
+- `stores` — the order's store `appName`.
+- `supportedCities` — **the STORE's pickup zone, never the customer's town.** It is compared
+  with `resolveCityIdsFromAreaIds(areaIds)` = each area's `cityId`, and an area is a
+  pickup→dropoff route whose `cityId` is the zone the store sits in (delivery CORE: `areas`).
+  The `areaId` the app sends is `availableDrivers.area._id` from `findBestAreaForLocation`
+  (shape holds the customer AND city holds the store). With no area, auto-apply falls back to
+  the store's own `supportedCities`. The admin form labels it «אזור החנות (איסוף)».
+- `supportedAreas` — the order's area id, one "store zone - customer town" route
+  («גלגוליה - כפר ברא»): **the only field that targets where the customer is**
+  («אזור הלקוח (מסלול משלוח)»).
+- So "Kfar Bara customers of a Jaljulia store" = `stores` + `supportedAreas`, cities empty.
+  Kfar Bara in `supportedCities` with a Jaljulia store matches no order (G0F8JG9Z,
+  2026-11-17); Jaljulia in `supportedCities` matches that store's orders to EVERY town.
+  Coupon drafts block the first shape (accountant CORE invariant 13).
+- Known gaps (open, 2026-11-17): `/api/coupons/available` and `/customer/:id/available` (the
+  store-page banner) skip the cities check; the app's typed-code path (`CouponInput`) sends no
+  `areaIds`, so a typed code limited by zone or area is always refused.
 
 **What is advertised** — `GET /api/coupons/active` feeds the store-page carousel AND the home
 store-card tag (shoofi-app `couponsStore.activeCoupons`, label `t(storeTagName)`). It lists public,

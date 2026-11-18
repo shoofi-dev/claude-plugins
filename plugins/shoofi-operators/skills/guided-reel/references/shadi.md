@@ -55,7 +55,13 @@ speed and he stops sounding like one person. Cut it into segments afterwards
 - **Numbers as words, ه not ة on عشره**: «عشره شيكل», «عشرين شيكل», «سبعين شيكل», «تسعين يوم».
   A ة makes the model read the construct state «عشرت».
 - Words that came out right and can be reused: طوّالي، لحالها، بتوخذ، بتلاقيها، هسّا، لَهَسّا،
-  عالواتساب، عالطلب.
+  عالواتساب، عالطلب، جْديد (jdīd)، أُطلُبو.
+- Never «هلأ» (Lebanese/Syrian) or «الآن» — «هسّا».
+- **ق keeps its q.** Bare «مقلي» and «مَقْلي» came out *magli* (a Bedouin g); «مَأْلي» dropped it.
+  The kasra under the lam fixed it: **«مَقْلِي»** (2026-11-07, checked against the owner's own
+  recording). Mark the vowel after a ق-syllable when the model hardens it.
+- Foreign dish names: tashkeel, not Latin letters — «سْوِيت دِيَابْلو» (Sweet Diablo) was the owner's
+  pick of three (Latin «Sweet Diablo», tashkeel, a stretched «سْوِييت»).
 
 ### Hebrew wording
 Plural imperative (היכנסו, לחצו, שלחו), plain spoken Hebrew, השליח (Hebrew keeps it). Numbers

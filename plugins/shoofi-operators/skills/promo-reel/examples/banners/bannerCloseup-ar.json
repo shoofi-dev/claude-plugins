@@ -1,0 +1,46 @@
+{
+ "style": "bannerCloseup",
+ "theme": {
+  "ink": "#17320F",
+  "lime": "#8AEA5F",
+  "paper": "#F9F8F5",
+  "endBg": "#17320F",
+  "endInk": "#ffffff",
+  "glow": "#DFF5D0"
+ },
+ "subject": {
+  "kind": "dish",
+  "store": {
+   "name": "ماستر برجرز",
+   "logo": "../img/master-burger-logo.png"
+  },
+  "dishes": [
+   {
+    "name": "سويت ديابلو",
+    "img": "../img/6adf253722cb9f000d7cd7ab.jpg"
+   }
+  ],
+  "chips": [
+   "أناناس مقلي",
+   "تاكيز",
+   "صوص ديابلو"
+  ],
+  "price": "₪75"
+ },
+ "text": {
+  "pill": "شوفي",
+  "hook": "جديد",
+  "cta": "اطلب من شوفي",
+  "ctaButton": "اطلب من شوفي"
+ },
+ "assets": {
+  "icon": "../assets/shoofi-icon.png",
+  "shadiStand": "../assets/shadi-stand.png",
+  "shadiPoint": "../assets/shadi-point.png",
+  "font": "../assets/me.ttf"
+ },
+ "size": [
+  1920,
+  1080
+ ]
+}
