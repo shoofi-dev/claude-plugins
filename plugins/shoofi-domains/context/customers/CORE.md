@@ -793,6 +793,13 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
           occasion's OWN marks (logo / title art, characters, signature look) are wanted in the picture
           (job `occasionMarks`; the picture check and the reviewer allow them, no other brand's); the
           set's `brandSafe: true` («זהירות משפטית») turns them off — owner's call, 2026-11-18.
+        - **«ערוך כללים»** (2026-11-18, `creative/rules.js`): `rules: { off, free, modelWords }` on a set —
+          12 switchable rules (faces, hands, text, brands, realDish, tooPerfect, photoReal, scale,
+          duplicates, alcoholPork, calmArea, safeZones) told to every AI step and dropped from the fixed
+          prompt lines / picture-check rejects; `free` = the note is the prompt as written (no director,
+          no reviewer; note required); `modelWords` = the model draws each language into the scene,
+          read back (`readWords`) and checked against the words asked for (`afterModelWords`, one
+          redraw, then `words_drawn_wrong`). **The words guard is never a switch.**
         - **«אעלה בעצמי» — the person's own picture** (2026-11-18): `POST
           /api/admin/marketing/media/upload` (multipart `file` + `place` banner|story|popup|social +
           `lang` + the subject; `services/marketing/media-upload.js`, marketing roles) puts a JPEG /
