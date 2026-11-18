@@ -174,7 +174,7 @@
         "routes/marketing-items.js": ["/api/admin/marketing/items"],
         "services/marketing/channel-writers.js": ["createBanner", "createStory", "createNote", "checkBannerInput", "targetForLink"],
         "services/marketing/item-approve.js": ["approveItemNow", "refreshCustomers"],
-        "services/marketing/creation-sets.js": ["free_needs_note", "rules_bad", "factsForJob", "learnOccasion", "brandSafe", "occasionMarks", "createSet", "getSet", "updateSet", "saveSet", "marketingCreationSets", "setsOfItems", "mediaPicks", "attachTo", "openForJob", "startStoryVideo", "afterJobSettled", "uploadPick", "uploadCopy", "replaceLivePicture", "LIVE_PICTURE_PLACES", "LIVE_LOCKED_HE"],
+        "services/marketing/creation-sets.js": ["historyView", "pick_bad", "MAX_HISTORY", "free_needs_note", "rules_bad", "factsForJob", "learnOccasion", "brandSafe", "occasionMarks", "createSet", "getSet", "updateSet", "saveSet", "marketingCreationSets", "setsOfItems", "mediaPicks", "attachTo", "openForJob", "startStoryVideo", "afterJobSettled", "uploadPick", "uploadCopy", "replaceLivePicture", "LIVE_PICTURE_PLACES", "LIVE_LOCKED_HE"],
         "services/marketing/creative/placement.js": ["allowMarks", "readWords"],
         "services/marketing/creative/rules.js": ["parseRules", "offText", "isOff", "safeZones", "alcoholPork"],
         "services/marketing/creative/occasion.js": ["learnOccasion", "occasionText", "publicOccasion", "STORE_KINDS", "braveSearch"],
