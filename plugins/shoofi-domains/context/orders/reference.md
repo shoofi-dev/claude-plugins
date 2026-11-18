@@ -1223,6 +1223,15 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   "مجدولة" section under the new column (one extra fetch with the same endpoint, statuses from
   `visibleTabs`). A drive-in card shows "الزبون برّا" while `driveInArrival.arrivedAt` is set
   and the order is not picked up (#51); the list refetches on the `drive_in_arrival` frame.
+  When the store is closed or busy the new column says so (`helpers/orders/board-store-state.ts`
+  `boardStoreState`, from the header's `storeOpenStateStore`): a red «المحل مسكّر» block, or an
+  amber «المحل مشغول [حتى HH:mm]» block for `isBusy` / `busyUntil`; it fills the column when
+  nothing waits, else it is a banner over the waiting orders. The closed block also says when
+  the store opens by itself (`nextOpening` → `opensAt`): the end of a timed closure
+  (`closedUntil`), or the next opening by `openHours` (skipping `closedDays`) when it is only out
+  of hours; «يفتح بعد N د» up to 60 minutes ahead, else the time (today / tomorrow / date).
+  A manual close with no `closedUntil` shows no opening. Tablet v3 board only: phones, the
+  Urovo and the shipped (non-v3) screens have no such block.
 - **List date window.** `POST /api/order/admin/orders` drops the upper `orderDate` bound when the
   body says `isOrderLaterSupport: true`, so a day query means "that day ONWARD". v2's 14-day
   strip sent it for every day; v3 (#50) shows today only (live) and puts past days behind
