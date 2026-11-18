@@ -590,7 +590,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
         words where the picture is actually free and **rejects** stray lettering, wrong food or
         props out of scale. Wrong food is judged against the store's dish **photos** (the
         `subject` references), the menu name only as a label — a loose name («קוקיז קינדר» is a
-        drizzled slice) must not reject a faithful picture. Rejected: drawn once more (counts against `marketingImageDailyLimit`), then
+        drizzled slice) must not reject a faithful picture. A subject with NO dish (a Shoofi-wide
+        coupon / page) may have no food at all — only food that is shown is judged (`foodLine`;
+        before 2026-11-18 every such picture failed "no food is visible"). Rejected: drawn once more (counts against `marketingImageDailyLimit`), then
         the job fails `picture_rejected`.
       - The words are composed per language by the bridge's Chromium (`compose` task,
         `queue.js`), so a STORY now gets an Arabic and a Hebrew picture too (`mediaAR` /
