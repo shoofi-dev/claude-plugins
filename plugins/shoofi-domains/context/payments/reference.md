@@ -148,17 +148,58 @@ hangs the request (CORE invariant 11), so none of them answered.
 - **`POST /api/order/addRefund` is GONE** — removed in shoofi-server 29ed5252 (HQ #7e2d32,
   2026-11-03). It was bookkeeping only (pushed `refundData[]`, no provider reversal, no auth);
   its only callers were the client refund dialogs removed under HQ #1a2f9e, and no store DB
-  held a `refundData` row. Do not look for it or restore it. A cancel's money is decided by
-  `settleCancelledOrderMoney` in `routes/order.js` (`cancelMoneyDecision`: `refund` →
-  `orderAuthorization.refundOrderPayment` releases a hold or flags a settled charge for a
-  person; `keep` → the charge is captured/kept and `services/payments/cancel-compensation.js`
-  issues a Shoofi-paid `COMP-*` coupon). A twin leg's refund is always flagged for a person
-  (`refund_twin_order_manual`). Note: the comment above `CANCEL_MONEY_DECISION` still says
-  KEEP's coupon is created by hand — stale since cancel-compensation.js; the code issues it.
-- **Twin combined capture** (`services/twin-order/twin-payment-service.js`): one ZCredit
-  charge for primary+secondary+combination fee (`captureCombined`, money IN); retryable.
-  `refundPartial` (negative `TransactionSum`) is gated behind `twinOrderConfig.degradeAutoRefund`,
-  ZCredit field shape **unverified across terminals — sandbox first**.
+  held a `refundData` row. Do not look for it or restore it. The test
+  `test/integration/order-addrefund-route-removed.js` pins the removal (404, nothing written,
+  no registered path).
+- **A single order's cancel money** is decided by `settleCancelledOrderMoney` in
+  `routes/order.js`. Twin legs never enter it; see the twin bullet below.
+  - `keep`: the charge is captured or kept, and `services/payments/cancel-compensation.js`
+    issues a Shoofi-paid `COMP-*` coupon automatically.
+  - `refund`, chosen explicitly by support: money is sent back.
+    - With a J5 `paymentAuth`, it runs `releaseOrderAuthorization({ autoRefund: true })`.
+    - With a plain charge, it runs `refundOrderPayment({ reason: "cancelled_by_support" })`.
+  - No decision, on a settled charge: nothing is sent back. It is flagged `refundRequired`,
+    reason `cancel_no_decision` (`flagUndecidedCancelRefund`).
+  - `wasCharged` is false once `isAlreadyRefunded(auth)` holds.
+- **Releasing a hold is `releaseOrderAuthorization`** (`services/payments/order-authorization.js`).
+  - A live J5 hold is dropped with HYP `CancelTrans`, so no money moves.
+  - A refused or thrown release becomes `RELEASE_FAILED` and is flagged
+    (`release_refused_ccode_*` / `release_error`). It is never refunded, because nothing
+    was captured.
+  - An already-captured order goes to `captured_before_cancel`. It calls `refundOrderPayment`
+    only with `autoRefund`; otherwise it is flagged.
+- **`refundOrderPayment` is a real HYP credit**, never a flag by design.
+  - It calls `refundTransaction` (`utils/hyp-pay.js`, `action=zikoyAPI`) on
+    `paymentAuth.captureTransId` or `ccPaymentRefData.HypTransactionId`, for
+    `capturedAmount || order.total`.
+  - On success it writes `refundedAmount`, `refundedAt`, `refundTransId` and
+    `refundRequired: false`.
+  - The idempotency guard and the atomic `paymentAuth.refundClaimedAt` claim are CORE
+    invariant 13.
+  - `refundRequired` (+ `refundRequiredReason` / `refundRequiredAmount`) is **only the
+    fallback**:
+    - a twin leg: `refund_twin_order_manual`;
+    - a non-HYP provider: `refund_unsupported_provider_<p>`, ZCredit in practice;
+    - no transaction id: `refund_no_transaction_id`;
+    - no amount: `refund_no_amount`;
+    - an HYP refusal: `refund_refused_ccode_*`;
+    - a throw: `refund_error`.
+- **Twin combined capture** (`services/twin-order/twin-payment-service.js` `captureCombined`):
+  one charge for primary + secondary + the combination fee, money IN, retryable.
+  - It goes through ZCredit, or through HYP (`chargeCombinedHyp`, and its wallet sibling)
+    for a saved HYP card or HYP wallet. `paymentLink.provider` records which.
+- **Twin cancel money** is the group's: `services/money/money-cancel.js`
+  (`settleTwinAfterLegCancel` → `settleCancelledMoney`). There is one decision per group.
+  - `keep`: one coupon.
+  - `refund`: the amount is owed for a person.
+  - Only for an HYP charge with `twinOrderConfig.hypAutoRefund` on (default false):
+    an automatic partial refund, `attemptHypTwinRefund`, capped by the ledger and never
+    retried blind. ZCredit is always manual.
+- **`refundPartial`** (ZCredit-only negative `TransactionSum`; refuses any other provider)
+  **has no production caller**, only tests. `degradeToSingle` no longer calls it, and
+  **`degradeAutoRefund` is not read** (`twin-group-service.js`: "no longer read"). The flag is
+  still stored by `routes/admin/twin-order-config.js`. Its ZCredit field shape is still
+  **unverified across terminals: sandbox first**.
 → **Store/driver payouts (MASAV) and settlement refunds are the `accountant` domain, not yours.**
 
 ## 6b. Kopa till money (phase 4d) — bookkeeping, separate from HYP charges
