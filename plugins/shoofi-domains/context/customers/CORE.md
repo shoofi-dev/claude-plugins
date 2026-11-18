@@ -798,7 +798,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
           offer for all stores": plain unbranded takeaway or no food, no brand / logo / character /
           face). The words may name the occasion's Latin words and plain numbers the person typed
           (`facts.allowOccasion`, applied at create / update and on later edits via
-          `factsForJob`); prices, percents and dates stay the subject's facts only. By default the
+          `factsForJob`); prices, percents and dates stay the subject's facts only. The Latin words of the
+          occasion's search result titles are allowed too (`allowOccasionNames`: "GTA VI" when the note said
+          "gta 6") — never their numbers. By default the
           occasion's OWN marks (logo / title art, characters, signature look) are wanted in the picture
           (job `occasionMarks`; the picture check and the reviewer allow them, no other brand's); the
           set's `brandSafe: true` («זהירות משפטית») turns them off — owner's call, 2026-11-18.

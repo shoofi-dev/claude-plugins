@@ -178,7 +178,7 @@
         "services/marketing/creative/placement.js": ["allowMarks", "readWords"],
         "services/marketing/creative/rules.js": ["parseRules", "offText", "isOff", "safeZones", "alcoholPork"],
         "services/marketing/creative/occasion.js": ["learnOccasion", "occasionText", "publicOccasion", "STORE_KINDS", "braveSearch"],
-        "services/marketing/generate/facts.js": ["allowOccasion"],
+        "services/marketing/generate/facts.js": ["allowOccasion", "allowOccasionNames"],
         "services/marketing/media-upload.js": ["upload", "fitOf", "SIZES", "marketing-uploads/", "UploadError"],
         "routes/marketing-media.js": ["/upload", "mediaUpload.upload"],
         "routes/marketing-creative.js": ["/api/admin/marketing/creative/limits"],
