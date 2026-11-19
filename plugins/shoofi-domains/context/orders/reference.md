@@ -1242,6 +1242,14 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   new-orders v1/v2 (above the items), item details and the school list. Tickets print a stacked
   label + text box after the items, directly above the staff «ملاحظة:» line, `textAlign: "left"`
   (the printed RIGHT edge under forced RTL; never a label/value row — the partner#41 clipping).
+  The school tickets (`components/order-invoice-school/*`, 80mm and Urovo) print the same box
+  through one component, `components/order-invoice-school/customer-note-box.tsx`: the student
+  ticket prints its order's note; the class distribution sheet and the combined prepare ticket
+  cover many orders, so they print each student's name with their note
+  (`getSchoolCustomerNotes`, orders with no note left out). The prepare ticket is given the
+  print response's `ordersList` for this: `combinedOrder` is the FIRST order with everyone's
+  items, so its own `order.commentToStore` is one student's note and must never be printed as
+  the ticket's note.
   On the v3 redesign (`components/orders-v3/*`, the unmerged partner stack #45–#64 and the PRs
   stacked on it) the same helper is read by `OrderCardV3` (board/list cards), `NewOrderViewV3`
   (above the lines) and, from partner#80, `SchoolOrderCardV3` (the v3 school list).
