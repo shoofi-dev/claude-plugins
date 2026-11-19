@@ -1282,6 +1282,12 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   is the items (`orderPrice`); drive-in is its own row.
 - **«استلمت» labels only:** ready delivery (3) → 11 «استلمها السائق», ready pickup/drive-in (2) →
   10 «استلمها الزبون»; the transitions are unchanged and only the store makes them.
+  `nextActionLabel` (order-rules.ts) returns a **label key** (`partner-v3.action-*` in
+  `components/orders-v3/labels.ts`), never text; the card renders it with `v3t` in the app
+  language (he: «השליח אסף» / «הלקוח אסף» / «מוכנה» / «התחלת הכנה»). The status tabs and the
+  board's third column use `partner-v3.tab-picked-up` / `tab-future` / `iftar` the same way. A
+  literal Arabic string, or `t("<Arabic word>")` with no `defaultValue`, shows Arabic on a
+  Hebrew tablet (the DB dictionary has no such keys) — the non-v3 screens still do this.
 - **Delay:** the sheet offers +5/+10/+15/+20, says the customer is notified, and keeps the
   one-delay rule (client-side; the server stores only the LAST `delayMinutes`).
 
