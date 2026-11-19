@@ -276,6 +276,14 @@ with local Mongo for the counts. These are not prod counts._
       `LABEL_KEY_RE` in `services/coupons/coupon-drafts.js`), BEFORE the coupon is created, and
       a collision answers 409. Partner and driver labels are never generated: they stay
       `shoofi-will-pay`. Feature doc: shoofi-server `docs/coupon-drafts.md` "Labels and translations".
+    - **The auto store-page subtitle is the whole sentence** (`withBenefit` in
+      `services/coupons/coupon-drafts.js`, 2026-11-19): the store-page title, then the condition
+      ("توصيل بـ5₪ لطلب فوق 140₪"), per language. shoofi-app's store strip
+      (`components/shared/CouponCarousel.tsx`) prints `t(subNameForStore)` ALONE when a coupon has
+      one, so a `store-sub` row holding only the condition shows half a sentence (WTS1LYMY read
+      "لطلب فوق 140₪" beside a store deal from ₪200). A subtitle a person wrote is not touched, and
+      rows written before the change keep the bare condition until the coupon is reopened and
+      approved again. When you write or fix a `store-sub` row by hand, write the benefit too.
   - **Seed scripts** `scripts/seed-*-translations.js` write the central DB directly with a
     backup file; `scripts/rollback-translations.js` undoes a run.
 ### `images` — auxiliary image library: `{ data:{uri}, type, subType }`.

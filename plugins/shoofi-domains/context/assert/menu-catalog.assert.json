@@ -942,6 +942,11 @@
         },
         {
           "file": "services/coupons/coupon-drafts.js",
+          "regex": "if \\(storeSub && storeSub\\.mode === 'auto' && storeTitle\\) \\{\\s*Object\\.assign\\(storeSub, withBenefit\\(",
+          "desc": "doc reference §2 writers: the AUTO store-page subtitle is the store title plus the condition (withBenefit); a custom subtitle is never touched"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
           "regex": "if \\(!LABEL_KEY_RE\\.test\\(key\\)\\) throw",
           "desc": "doc CORE invariant 24: labelKey refuses any key outside the namespace before a write"
         },
