@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/coupon-draft-customer-area / 2026-11-17 (Who a coupon applies to: supportedCities = the store's pickup zone, supportedAreas = the customer's route); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@main 3acf0b66 + shoofi-app@main c7f8204 / 2026-11-19 (invariant 10: "wallet orders always manual" is HYP wallets only; a ZCredit wallet session is built in the app with fixed VAT); shoofi-server@fix/coupon-draft-customer-area / 2026-11-17 (Who a coupon applies to: supportedCities = the store's pickup zone, supportedAreas = the customer's route); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -145,6 +145,21 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    Reach: wallet orders always (unconditionally manual), card orders only where the flag is
    on — a gateway-issued document cannot take a `ua_uuid`, and `EZ.*` is an undocumented
    pass-through that can reject the whole charge, so do not try `EZ.ua_uuid`.
+   ⚠️ **"Wallet orders always" means HYP wallets only** (`payment_provider` `HYP_APPLEPAY` /
+   `HYP_GOOGLEPAY`, `issueWalletOrderInvoices` in `routes/order.js`). A **ZCredit** wallet
+   order (`payment_provider: "APPLEPAY"`, has `order.sessionId`) never gets manual documents
+   and never follows invariant 9: the app builds the WebCheckout session itself and posts it
+   straight to ZCredit with `CreateInvoice: "true"` (shoofi-app `data/zcredit-config.ts`) and
+   a fixed `IsTaxFree: "false"` (`screens/checkout/index.tsx` `createZCreditSession`), so the
+   server cannot change the document — `finalizeApplePayOrder` only fetches the one ZCredit
+   issued (`invoiceMailService.saveInvoice(docId)`). A VAT-exempt store therefore got a VAT
+   document on that path. Which path a wallet takes is `resolveWalletProvider`
+   (`services/payments/wallet-provider-config.js`); production runs
+   `walletPaymentConfig {provider: "hyp", enableForAllStores: true}`, so ZCredit wallets are
+   left to iOS binaries ≤ 1.0.22 (they never read the provider) and to a rollback. Measured
+   2026-11-19 on the 21 exempt stores: 67 ZCredit wallet orders since 2026-08-01, 66 of them
+   from iOS 1.0.22, the last on 2026-10-13; every wallet order since is HYP with a type-400
+   store document. Tell the two apart by `order.payment_provider`, not by "it was Apple Pay".
 11. **Only admin-dashboard users may call the per-order invoice queue routes, and only
    owners may write to the queue.** `/api/admin/invoices/{pending,retry,process-all,webhook}`
    (`routes/admin.js`) drive the `utils/invoice-mail.js` Gmail-fetch queue. No client, cron,
