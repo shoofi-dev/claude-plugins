@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -569,6 +569,16 @@
           "file": "routes/delivery/admin.js",
           "regex": "router\\.get\\(\"/api/delivery/order/:orderId/driver\", \\.\\.\\.storeOwnerOrDashboard, async",
           "desc": "the partner's driver row reads only its own store's deliveries (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:if \\(isCancelledStatus\\(delivery\\.status\\)\\) \\{\\s*return res\\.status\\(200\\)\\.json\\(null\\);|let delivery = await db\\.bookDelivery\\.findOne\\(\\s*withDeliveryScope\\(req, \\{ \"order\\._id\": \\{ \\$in: \\[getId\\(orderId\\), String\\(orderId\\)\\] \\} \\}\\))",
+          "desc": "CORE invariant 21: the partner's driver dialog answers null for a cancelled delivery (the row keeps `driver` as history) - valid-before leg is the bare findOne on main before shoofi-server fix/cancelled-delivery-hide-courier; drop it once that has merged"
+        },
+        {
+          "file": "services/delivery/courier-status.js",
+          "regex": "driverName: (?:NAMELESS_STATES\\.has\\(state\\)|state === COURIER_STATES\\.SEARCHING) \\? null : firstName\\(",
+          "desc": "CORE invariant 21: the courier summary names nobody while searching and once cancelled - valid-before leg (SEARCHING only) is main before shoofi-server fix/cancelled-delivery-hide-courier; drop it once that has merged"
         },
         {
           "file": "routes/delivery/admin.js",

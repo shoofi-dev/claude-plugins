@@ -832,6 +832,12 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   card (`showsCollapsedHandoverButton`: status `2`/`3`; a drive-in only once
   `driveInArrival.arrivedAt` is set, because at `10` the customer's «I've arrived» button
   disappears). Nothing but the store moves a delivery order to `11`.
+  **Cancelled delivery** (`isDeliveryCancelled`: a DELIVERY row whose `courier.state` is
+  `cancelled`, i.e. cancelled and not re-booked — delivery CORE invariant 21): the collapsed
+  ready card shows NO one-tap, and the expanded card's button reads «تم التسليم» instead of
+  «استلمها السائق» (`nextActionLabel(status, order)`). The transition is the same `3 → 11`; only
+  the one-tap and the wording change. Order 7129-4235 (2026-11-19): the store tapped «the driver
+  took it» under a red «delivery cancelled» line and a paid order with no courier left the board.
 - **Order rules helper** (on main since the v3 rules landed): `helpers/orders/order-rules.ts`,
   pinned by `helpers/orders/__tests__/order-rules.test.ts`. `updateOrderStatus` /
   `updateOrderToPrevStatus` call `nextStatusFor` / `prevStatusFor` from it. It also exports
@@ -1281,7 +1287,8 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   «السائق يدفع للمحل نقداً» on the ticket; pickup / drive-in: the customer. The ticket's «سعر الطلب»
   is the items (`orderPrice`); drive-in is its own row.
 - **«استلمت» labels only:** ready delivery (3) → 11 «استلمها السائق», ready pickup/drive-in (2) →
-  10 «استلمها الزبون»; the transitions are unchanged and only the store makes them.
+  10 «استلمها الزبون»; the transitions are unchanged and only the store makes them. With the
+  delivery cancelled the ready delivery's label is «تم التسليم» (no driver took it).
 - **Delay:** the sheet offers +5/+10/+15/+20, says the customer is notified, and keeps the
   one-delay rule (client-side; the server stores only the LAST `delayMinutes`).
 

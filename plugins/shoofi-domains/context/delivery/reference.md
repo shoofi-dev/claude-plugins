@@ -105,7 +105,8 @@ row of `POST /api/order/admin/orders` carries:
 ```ts
 courier: null | {            // null = no booking for this order (not accepted / platform switch off)
   state: "searching" | "assigned" | "arriving" | "at_store" | "picked_up" | "delivered" | "cancelled";
-  driverName: string | null;        // first word of booking.driver.fullName
+  driverName: string | null;        // first word of booking.driver.fullName; null while searching
+                                    // AND once cancelled (the row keeps `driver` as history)
   etaToStoreMinutes: number | null; // engine estimate, current courier only, measured basis, not passed
   etaToStoreAt: string | null;      // ISO instant of that estimate (client-side countdown)
   cancelledBy: "driver" | "store" | "admin" | null;
