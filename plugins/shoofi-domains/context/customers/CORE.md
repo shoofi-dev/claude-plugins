@@ -778,6 +778,10 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
         is left alone and, when something was changed for it, answers `note_he` (`LIVE_LOCKED_HE`);
         `approve: true` is the item's own approve (`item-approve.js approveItemNow`, also
         behind `POST …/items/:id/approve`). Never fork a place's validation into the set.
+        - **A redraw gets what a new picture would** (2026-11-18, `syncJobWithSet` before the revise and
+          👎-fix redraws): the set's current `rules`, `occasionMarks`, «חופשי» prompt, and a missing logo
+          reference (Shoofi's own for a Shoofi-wide קידום) + `logoUrl`. Before it, a redraw kept what the
+          picture was made with — the generator invented a "Shoofi" logo with nothing to copy.
         - **«צור שוב את כולם» plans again** (2026-11-18): `PUT …/sets/:id` `{ retry, replan: true }` runs
           the director first with the set's CURRENT note, rules and occasion (`planFor`, which also learns
           the occasion), then the retried places. A plain `retry` keeps the plan. Before this, a note or a
