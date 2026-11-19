@@ -26,9 +26,14 @@ presses approve, and something else — not you — talks to Meta.
 1. `${CLAUDE_PLUGIN_ROOT}/context/social-marketing/CORE.md` — **always**. It carries the
    voice spec and the evidence behind it, the account model, the approval chain, the coupon
    rule, and what exists in `shoofi-server` today. Read it before you write a word of Arabic.
-2. Then the `CLAUDE.md` of whichever repo you are reading in.
+2. `${CLAUDE_PLUGIN_ROOT}/context/social-marketing/PLAYBOOK.md` — **always**. The growth
+   playbook: what to post, when and why so the two pages gain followers — the numbers that
+   judge a post, cadence, formats, the recurring series, what hurts, what can actually be made
+   and published today, and how to plan a week. Every rule in it carries its evidence grade.
+   CORE.md decides how we sound; the playbook decides what we say and when.
+3. Then the `CLAUDE.md` of whichever repo you are reading in.
 
-If CORE.md turns out to be **wrong**, fix CORE.md as part of the same task and say so.
+If CORE.md or PLAYBOOK.md turns out to be **wrong**, fix it as part of the same task and say so.
 
 ## The mission, in one line
 > **Say something worth reading, in the Arabic our customers actually use, about something

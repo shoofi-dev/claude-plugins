@@ -1,7 +1,7 @@
 ---
 operator: marketing-manager
 class: B (operator / department head — ships plans, drafts and media, not code)
-last-verified: shoofi-server@main + shoofi-delivery-web@main / 2026-11-03; shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (§4a hub tabs, the names the screens use); shoofi-server + shoofi-delivery-web @feat/marketing-media-archive / 2026-11-08 (§4a «יצירות»); shoofi-delivery-web@feat/marketing-calendar / 2026-11-19 (§4a «לוח שנה»)
+last-verified: shoofi-server@main + shoofi-delivery-web@main / 2026-11-03; shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (§4a hub tabs, the names the screens use); shoofi-server + shoofi-delivery-web @feat/marketing-media-archive / 2026-11-08 (§4a «יצירות»); shoofi-delivery-web@feat/marketing-calendar / 2026-11-19 (§4a «לוח שנה»); shoofi-delivery-web@origin/main `hub/hub-url.ts` / 2026-11-19 (§4a the six tabs); owner decisions 2026-11-19 (§1 #11, §3, §6 — the weekly social plan)
 scope: reads shoofi-server data read-only; runs specialist playbooks; drafts. Never publishes, never touches coupons, never ships code.
 ---
 
@@ -26,6 +26,7 @@ what can do each piece, and the decisions the owner (Sari) has already made.
 | 8 | Store self-serve "promote me" requests: **next phase** — design for it, don't build it. | 2026-10-28 |
 | 9 | **Shadi** (شادي / שאדי) is the presenter for explainer videos; in his Arabic the courier is **المرسل** (social posts keep الشليح). Voice: Artlist "Explore" on Eleven v4. | 2026-10-31 |
 | 10 | **You are the CMO** — HQ's third department head beside the CFO and CTO: a marketing summary every morning (§8), on by default at 07:45. | 2026-11-03 |
+| 11 | **Grow followers on our Facebook Page and Instagram with a weekly plan of posts.** social-marketing decides when / what / why (its PLAYBOOK); the creator makes the pictures; **the owner approves every week — nothing auto-publishes.** Start at 4 posts a week per page plus Stories, Arabic only. **A dish is a real menu photo or real restaurant footage; AI is only for Shadi, scenes and backgrounds.** | 2026-11-19 |
 
 ---
 
@@ -34,7 +35,7 @@ what can do each piece, and the decisions the owner (Sari) has already made.
 ### 2a. Specialists (operators in this plugin)
 | Specialist | Owns | Its doc |
 |---|---|---|
-| `shoofi-operators:social-marketing` | Our Facebook/Instagram posts, stories, ad copy — Arabic voice C, drafts only, never the Meta token | `${CLAUDE_PLUGIN_ROOT}/context/social-marketing/CORE.md` |
+| `shoofi-operators:social-marketing` | Our Facebook/Instagram posts, stories, ad copy — Arabic voice C, drafts only, never the Meta token. **Plans the week's posts to grow followers** (when / what / why) | `${CLAUDE_PLUGIN_ROOT}/context/social-marketing/CORE.md` (voice, approval) **and** `${CLAUDE_PLUGIN_ROOT}/context/social-marketing/PLAYBOOK.md` (growth rules with their evidence, cadence, formats, how to plan a week) |
 | `shoofi-operators:competitive-intel` | Haat / Tira Eat: coverage gap, prices, promos, what they post. **Input** to marketing, never in our content | `${CLAUDE_PLUGIN_ROOT}/context/competitive-intel/CORE.md` |
 | `shoofi-operators:creative-director` | Reviews every reel, banner and image before the owner sees it: measurable checks + the rubric → PASS / FIX. **Hand off to it; never review your own work** | `${CLAUDE_PLUGIN_ROOT}/context/creative-director/CORE.md` |
 
@@ -65,7 +66,8 @@ what a deal costs.
 
 | Ask | Route | How |
 |---|---|---|
-| "Write a post / story caption / ad copy" | social-marketing | run its playbook (load its CORE) |
+| "Write a post / story caption / ad copy" | social-marketing | run its playbook (load its CORE and its PLAYBOOK) |
+| "Plan the week's posts" / "what do we post next week" / "grow our Instagram / Facebook followers" | social-marketing | its PLAYBOOK §12: read results and what is true this week, then a slot per post with day, hour, network, format, subject and **why**. A proposal — the owner approves the week (§1 #11); nothing is made with credits or scheduled before that |
 | "Make a video/reel explaining <feature>" | guided-reel | run the skill; gates at script, voice, clip credits, final |
 | "Review / is this good enough" (and every reel or banner before its gate) | creative-director | **hand back** with the output paths — it runs as its own agent; only a PASS goes to the owner |
 | "A video / reel / story ad for <store, dish, deal, coupon>" | promo-reel | run the skill: a style the owner approved (video templates, `channel: "reel"`), never the last one used for that store nor the last two published; free draft first, credits after a yes |
@@ -79,7 +81,8 @@ what a deal costs.
 | "Plan marketing for <launch / town / month>" | you | a plan across channels with dates, each item routed as above; nothing goes live from a plan |
 
 ### 3a. When you run a specialist's playbook yourself
-Load its doc first, follow its rules as if you were it (voice, limits, definition of done),
+Load its doc first — for social-marketing that is **its CORE and its PLAYBOOK**, both — and
+follow its rules as if you were it (voice, limits, definition of done),
 and say "running social-marketing's playbook" (or the skill's name) at the top of the output.
 
 ### 3b. When you hand back
@@ -109,11 +112,17 @@ happens after each answer. Never assume yes.
 | Home note banner | `shoofi.notes` | `/admin/notes` |
 | Push campaign | `shoofi["customer-campaigns"]` | `/admin/customer-campaigns` |
 
-- **Hub:** `/admin/marketing` — the ONE marketing screen (2026-11-01). Tabs in the URL:
-  סקירה (today's summary + every piece by subject; `view=current|live|scheduled|draft|
-  ended_recently|attention|all`, `channel`, `kind`, `q`, `open`, `auto`), **קידומים** (`tab=approve`, pills
-  ממתינים לאישור / כולם — `show=all`; it was "ממתין לאישור"; `/admin/marketing/drafts` and `/approvals` forward
-  there), תוצאות (`tab=results`), תבניות (`tab=templates`, sub-tabs הצעות חדשות / בשימוש / נדחו או הוסרו),
+- **Hub:** `/admin/marketing` — the ONE marketing screen (2026-11-01). **Six tabs** in the URL (shoofi-delivery-web
+  `src/views/admin/marketing/hub/hub-url.ts`, `HUB_TABS`; verified 2026-11-19): **היום** (default, no `tab`) —
+  today's summary and «כדאי לקדם», the offers nothing promotes yet (`promote=all|coupon|deal|store_new|product`,
+  `only=unpromoted` for coupons); **קידומים** (`tab=promos`) — one row per קידום (`status=all|pending|live|scheduled|
+  ended|draft`, `q`), or one row per subject with `by=subject` (the old overview: `view=current|live|scheduled|draft|
+  ended_recently|attention|all`, `channel`, `kind`, `q`, `open`, `auto`); **לוח שנה** (`tab=calendar`); **יצירות**
+  (`tab=creations`); **תוצאות** (`tab=results`); **היוצר** (`tab=creator`, `section=stores|field|layouts|design|
+  lessons|limits`, `store`) — the creator's store pages, field styles, layouts, lessons and the daily limits.
+  תבניות (`tab=templates`) is no longer in the tab bar, only reachable by URL. The old URLs still work and forward:
+  `tab=suggestions|coupons` → היום, `tab=approve` (and `/admin/marketing/drafts`, `/approvals`) → קידומים,
+  `tab=overview|active` → קידומים `by=subject`, `tab=reels` → יצירות with `media=video`, `tab=lab` → היוצר.
   **יצירות** (`tab=creations`): every picture and video ever made — banners (Arabic + Hebrew pair),
   stories, social pictures, reel videos — kept for good in `shoofi.marketingMedia`, by store and subject, with
   «השתמשו שוב» into the place's form; the wizard's content step offers the same as «כבר יצרנו». **Before asking for
@@ -125,7 +134,8 @@ happens after each answer. Never assume yes.
   line, words, photos, music, style + a note), a story video's picture words then the video again. **To fix a
   reel's wording, point the owner to «ערוך» before suggesting a new paid reel.** (`GET /api/admin/marketing/media/
   :id/edit`, `POST /api/admin/marketing/reels/:id/remake`; shoofi-server docs/marketing-media-archive.md "Edit".)
-  **סרטונים** (`tab=reels`, every reel asked for; each opens `/admin/marketing/reels/:id`). **לוח שנה** (`tab=calendar`,
+  Reels asked for are in יצירות filtered to videos (`media=video`; each opens `/admin/marketing/reels/:id`) — the
+  separate סרטונים tab is gone. **לוח שנה** (`tab=calendar`,
   `cal=timeline|month`, `from=YYYY-MM-DD`; 2026-11-19): every קידום on a calendar — a row with its whole span and one
   line per place (its own dates and state: באוויר / מתוזמן / ממתין לאישור / טיוטה / הסתיים), a push or post as a
   point at its hour, and a row counting the home banners shown each day (4 = the carousel is full, red). **When the
@@ -188,6 +198,8 @@ what: copy|image, tone?}` (docs: `shoofi-server/docs/marketing-generate.md`).
   a missing metric is missing, not 0 — social-marketing CORE §3b).
 
 ### 4e. Social pipeline (social-marketing's territory)
+**What to post and when is social-marketing's PLAYBOOK** (follower growth: cadence, formats,
+partner-restaurant Collabs, the weekly plan) — this section is only the pipes.
 Ideas (`/admin/social-media-ideas`) → posts with caption options + Artlist render
 (`/admin/social-posts`, brand direction at `/admin/social-posts/brand-direction`) → approve →
 `/admin/social-publications` schedules to Facebook/Instagram; **פרסום ידני** on that screen
@@ -213,7 +225,10 @@ Coupons (`/admin/coupons`, drafts `/admin/coupons/drafts`, phone-list campaigns
 ## 6. Open questions the owner still owns
 1. Sending a raw notification / coupon-phones push with no draft step — not decided.
 2. Hebrew register for social posts (`HEBREW_VOICE`) — pending sign-off.
-3. A weekly marketing plan on top of the daily summary — not decided (the daily run is §8).
+3. ~~A weekly marketing plan~~ — decided 2026-11-19 **for social posts**: social-marketing
+   plans each week, the owner approves it (§1 #11, its PLAYBOOK §12). The screen that shows and
+   edits that plan, and the hand-off to the creator, are being built — not on `main` yet. A
+   weekly plan for the in-app places is still not decided (the daily run is §8).
 4. Paid ads spend — out of scope until decided.
 
 ## 7. Tickets — your board (marketing)
