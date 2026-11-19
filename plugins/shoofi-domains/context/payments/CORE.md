@@ -387,6 +387,25 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
     records it. A legitimate current client posts the server's number, so this fires on a
     tampered or stale fee, or where the tariff ceiling disagrees with the app's area price.
 
+## HYP sessions — who may read one (`routes/hyp-pay.js`)
+- **An authenticated route that looks a session up by `sessionId` must compare its
+  `customerId` to the token before it returns or writes anything.** The shape is
+  `session.customerId !== req.auth.id` → `403 {error: "Unauthorized"}` — two **strings**: both
+  create-session routes store `req.auth.id` raw. Storing an ObjectId, or `getId()` on one side
+  only, makes the strict compare refuse the owner. `hyp-process-token` (`hypTokenSessions`)
+  always had it; `hyp-verify` (`hypPaySessions`) only since HQ #66308d (shoofi-server #658) —
+  before that any logged-in caller holding a `sessionId` got its `paymentData`.
+- **The four redirect routes are tokenless on purpose** — `GET /api/order/hyp-{success,failure}`
+  and `GET /api/payments/hyp-tokenize-{success,failure}`. HYP sends the customer's browser
+  there; never add `auth.required` or a customer check to them.
+- **The hosted-page PAY session flow is dormant** (`hyp-create-session` → `hyp-success` →
+  `hyp-verify` → `order.hypSessionId`): no client calls it and `shoofi.hypPaySessions` was empty
+  on 2026-11-19. Only the add-card (tokenize) half is live. A bug there is real but exposes
+  nobody yet — say so instead of grading it by what it would do with traffic.
+- **Still open:** `POST /api/order/create` attaches a `verified` pay session by
+  `order.hypSessionId` (`routes/order.js`, `hypPaySessions.findOne`) with no `customerId`
+  comparison and no "consumed" marker.
+
 ## Known status (human-confirmed — do NOT "fix")
 - **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.
   HYP tokenization does not store CVV; this resolves as ZCredit is retired. **Do not
