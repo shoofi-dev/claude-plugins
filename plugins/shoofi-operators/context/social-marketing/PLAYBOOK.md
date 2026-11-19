@@ -1,7 +1,7 @@
 ---
 operator: social-marketing
 class: B (operator / department head — ships drafts and a weekly plan, not code)
-last-verified: web research read 2026-11-19 (three reports: Instagram ranking and formats; Facebook ranking and Meta's APIs; food-delivery and Arabic-audience practice); shoofi-server@origin/main / 2026-11-19 (§9 what can be made and published); shoofi-server@feat/social-week-plan / 2026-11-19 (§9 intro, §12 the `social-plan` block)
+last-verified: web research read 2026-11-19 (three reports: Instagram ranking and formats; Facebook ranking and Meta's APIs; food-delivery and Arabic-audience practice); shoofi-server@origin/main / 2026-11-19 (§9 what can be made and published); shoofi-server@feat/social-week-plan / 2026-11-19 (§9 intro, §12 the `social-plan` block); FIELD.md / 2026-11-20 (§12 step 5a, §12b)
 scope: WHEN, WHAT and WHY we post on Shoofi's own Facebook Page and Instagram to grow followers. The voice is CORE.md §1; this file never overrides it.
 ---
 
@@ -406,6 +406,9 @@ Each is a repeatable slot. "Buildable" is against §9 **today**.
 4. **What is true this week** — live stores, top dishes of the last 7 days with photos, new
    stores, public coupons and running deals nothing promotes yet (the hub's «כדאי לקדם» list).
 5. **The date** — occasions in the week being planned (§11).
+5a. **What the others post** — FIELD.md §5 (the rules) and the last two weeks of the daily watch
+   (the job text carries it; `shoofi.socialWatchPosts` otherwise). An occasion or a moment they
+   rode and we did not is a candidate for the loose slot — under FIELD.md rules 2–3, never a copy.
 6. **§9** — what can actually be made and sent.
 
 ### Then write the plan
@@ -473,6 +476,16 @@ and stores it (`shoofi-server services/marketing/social-plan.js absorbPlan`):
 At 72 hours for each post, record shares ÷ reach, reach, saves and the page's follower change
 against the slot's WHY. A rule that our numbers confirm or contradict **twice** goes into §13,
 with the dates.
+
+---
+
+## 12b. What the others post
+
+The two competitors in our towns and the big delivery brands are read once a day, and what a
+scan of them taught us is **FIELD.md** — read it with this file. Its §5 rules bind a plan the
+same way the rules here do; where they add to a section above (people before offers, one
+launch post and one last-day post, a greeting must carry something, every post has a caption,
+at most two of four posts are a dish or an offer), FIELD.md is the newer evidence.
 
 ---
 
