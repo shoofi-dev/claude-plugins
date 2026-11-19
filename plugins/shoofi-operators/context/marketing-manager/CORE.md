@@ -1,7 +1,7 @@
 ---
 operator: marketing-manager
 class: B (operator / department head — ships plans, drafts and media, not code)
-last-verified: shoofi-server@main + shoofi-delivery-web@main / 2026-11-03; shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (§4a hub tabs, the names the screens use); shoofi-server + shoofi-delivery-web @feat/marketing-media-archive / 2026-11-08 (§4a «יצירות»)
+last-verified: shoofi-server@main + shoofi-delivery-web@main / 2026-11-03; shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (§4a hub tabs, the names the screens use); shoofi-server + shoofi-delivery-web @feat/marketing-media-archive / 2026-11-08 (§4a «יצירות»); shoofi-delivery-web@feat/marketing-calendar / 2026-11-19 (§4a «לוח שנה»)
 scope: reads shoofi-server data read-only; runs specialist playbooks; drafts. Never publishes, never touches coupons, never ships code.
 ---
 
@@ -125,7 +125,14 @@ happens after each answer. Never assume yes.
   line, words, photos, music, style + a note), a story video's picture words then the video again. **To fix a
   reel's wording, point the owner to «ערוך» before suggesting a new paid reel.** (`GET /api/admin/marketing/media/
   :id/edit`, `POST /api/admin/marketing/reels/:id/remake`; shoofi-server docs/marketing-media-archive.md "Edit".)
-  **סרטונים** (`tab=reels`, every reel asked for; each opens `/admin/marketing/reels/:id`). **Wizard** "קידום חדש"
+  **סרטונים** (`tab=reels`, every reel asked for; each opens `/admin/marketing/reels/:id`). **לוח שנה** (`tab=calendar`,
+  `cal=timeline|month`, `from=YYYY-MM-DD`; 2026-11-19): every קידום on a calendar — a row with its whole span and one
+  line per place (its own dates and state: באוויר / מתוזמן / ממתין לאישור / טיוטה / הסתיים), a push or post as a
+  point at its hour, and a row counting the home banners shown each day (4 = the carousel is full, red). **When the
+  owner asks "what runs when" or "is there room for another banner on <day>", read it there** (it is the same
+  `GET /api/admin/marketing/items?show=all` list as «קידומים»; no data of its own). A click on a day opens the
+  wizard with that day pre-set (`/admin/marketing/create?start=YYYY-MM-DD`, 10:00 Israel time). Read only: dates are
+  changed in the קידום's places, not by dragging (not built). **Wizard** "קידום חדש"
   `/admin/marketing/new?subject=…` with a step bar 1 מה מקדמים · 2 מתי · 3 איפה · 4 תמונה / טקסט · 5 שמירה · 6 אישור
   (subject = `coupon | store | store_new | product | deal | page` → pick a place → generate or upload → the place's form
   prefilled), a קידום (marketing item) `/admin/marketing/items/:id`. Every form and the item page return to `?back=`.
