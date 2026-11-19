@@ -1,7 +1,7 @@
 ---
 operator: social-marketing
 class: B (operator / department head — ships drafts and a weekly plan, not code)
-last-verified: web research read 2026-11-19 (three reports: Instagram ranking and formats; Facebook ranking and Meta's APIs; food-delivery and Arabic-audience practice); shoofi-server@origin/main / 2026-11-19 (§9 what can be made and published)
+last-verified: web research read 2026-11-19 (three reports: Instagram ranking and formats; Facebook ranking and Meta's APIs; food-delivery and Arabic-audience practice); shoofi-server@origin/main / 2026-11-19 (§9 what can be made and published); shoofi-server@feat/social-week-plan / 2026-11-19 (§9 intro, §12 the `social-plan` block)
 scope: WHEN, WHAT and WHY we post on Shoofi's own Facebook Page and Instagram to grow followers. The voice is CORE.md §1; this file never overrides it.
 ---
 
@@ -291,10 +291,11 @@ them at that rate, and never a week with zero posts.**
 
 ## 9. What can be made, published and read today — keep plans buildable
 
-Verified against shoofi-server `origin/main`, 2026-11-19. **A weekly plan screen and the
-automated plan → creator hand-off are being built; they do not exist yet and will be
-documented here by that feature's own companion PR.** Until then a plan is a proposal a person
-carries into the admin.
+Verified against shoofi-server `origin/main`, 2026-11-19. **The weekly plan screen and the plan → creator hand-off exist from shoofi-server
+`feat/social-week-plan`** (`docs/social-week-plan.md` there; the admin's מרכז שיווק →
+«תוכנית לרשתות»): you hand the week in as a `social-plan` block (§12), the owner moves, edits
+and approves each slot, and a slot's picture is the creator's, the dish's menu photo, or a
+file the owner uploads.
 
 ### 9a. What the creator («היוצר») and the skills make
 
@@ -432,6 +433,41 @@ and is treated as a test, with the number that would prove it.
   content; nothing is generated with credits and nothing is scheduled without that yes.
 - End with: the plan's total cost, the assumptions it depends on, and the one thing you want
   to learn from this week.
+
+**When the job is HQ's weekly plan run** (every Thursday 10:00 for the next week, or the
+owner's «הצעה לשבוע» button — the job text says so and gives the week), you write nothing
+yourself: the answer ends with ONE fenced block, nothing after it, and the server validates
+and stores it (`shoofi-server services/marketing/social-plan.js absorbPlan`):
+
+````
+```social-plan
+{"week":"YYYY-MM-DD (the week's Sunday, as the job gave it)",
+ "summary":"<Hebrew, two sentences: the idea of the week>",
+ "slots":[{"day":"YYYY-MM-DD","time":"HH:MM","format":"post|story|reel",
+   "targets":["facebook","instagram"],"series":"<§10 series or one-off>",
+   "subject":{"kind":"product|deal|coupon|store|store_new|page","id":"…","appName":"…"} or null,
+   "title":"<Hebrew, one line: what the post is>",
+   "caption":"<Arabic, voice C — ONE caption, the best of your options>",
+   "pictureNote":"<Hebrew: what the picture or video shows>",
+   "why":"<Hebrew: the rule (§ + grade) or our result it rests on>"}]}
+```
+````
+
+- **One caption per slot**, not options: the owner edits it on the screen.
+- **Subject ids are read from the database in this run**, never remembered: a product or
+  deal `_id` with its store `appName`; a public coupon `_id`; a store's `appName` as `id`;
+  a page is one of `invite-friends`, `my-coupons`, `coins`, `for-you`. `null` = no subject,
+  and then the owner uploads the picture.
+- **What each format becomes:** `post` with a dish subject uses the dish's own menu photo
+  (never drawn); `post` with any other subject is drawn by the creator from `pictureNote`;
+  `reel` and `story` are files the owner uploads, so plan one only when `pictureNote` says
+  exactly what to film. A carousel is refused.
+- A slot outside the week, in the past, with a broken time or with no caption is **dropped**
+  and listed to the owner; at most 12 slots are read. A new plan replaces only your own
+  untouched suggestions — a slot the owner edited, drew, approved or added stays, and the job
+  lists those so you plan around them.
+- "Tags", "Needs a person" and "Cost" from the table above go into `pictureNote` / `why`
+  where they matter; the block has no fields for them yet.
 
 ### After the week
 At 72 hours for each post, record shares ÷ reach, reach, saves and the page's follower change

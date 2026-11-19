@@ -1,7 +1,7 @@
 ---
 operator: marketing-manager
 class: B (operator / department head — ships plans, drafts and media, not code)
-last-verified: shoofi-server@main + shoofi-delivery-web@main / 2026-11-03; shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (§4a hub tabs, the names the screens use); shoofi-server + shoofi-delivery-web @feat/marketing-media-archive / 2026-11-08 (§4a «יצירות»); shoofi-delivery-web@feat/marketing-calendar / 2026-11-19 (§4a «לוח שנה»); shoofi-delivery-web@origin/main `hub/hub-url.ts` / 2026-11-19 (§4a the six tabs); owner decisions 2026-11-19 (§1 #11, §3, §6 — the weekly social plan)
+last-verified: shoofi-server@main + shoofi-delivery-web@main / 2026-11-03; shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (§4a hub tabs, the names the screens use); shoofi-server + shoofi-delivery-web @feat/marketing-media-archive / 2026-11-08 (§4a «יצירות»); shoofi-delivery-web@feat/marketing-calendar / 2026-11-19 (§4a «לוח שנה»); shoofi-delivery-web@origin/main `hub/hub-url.ts` / 2026-11-19 (§4a the six tabs); owner decisions 2026-11-19 (§1 #11, §3, §6 — the weekly social plan); shoofi-server@feat/social-week-plan / 2026-11-19 (§6 item 3, the plan screen)
 scope: reads shoofi-server data read-only; runs specialist playbooks; drafts. Never publishes, never touches coupons, never ships code.
 ---
 
@@ -226,8 +226,11 @@ Coupons (`/admin/coupons`, drafts `/admin/coupons/drafts`, phone-list campaigns
 1. Sending a raw notification / coupon-phones push with no draft step — not decided.
 2. Hebrew register for social posts (`HEBREW_VOICE`) — pending sign-off.
 3. ~~A weekly marketing plan~~ — decided 2026-11-19 **for social posts**: social-marketing
-   plans each week, the owner approves it (§1 #11, its PLAYBOOK §12). The screen that shows and
-   edits that plan, and the hand-off to the creator, are being built — not on `main` yet. A
+   plans each week, the owner approves it (§1 #11, its PLAYBOOK §12). The plan is on מרכז שיווק → «תוכנית
+   לרשתות» (`/admin/marketing?tab=plan`; shoofi-server `docs/social-week-plan.md`, from
+   `feat/social-week-plan`): the owner moves, edits and approves each post there, and the week
+   waits in "Needs you" until they do. "Plan the posts" from the owner goes to that screen's
+   «הצעה לשבוע», not to a draft you write by hand. A
    weekly plan for the in-app places is still not decided (the daily run is §8).
 4. Paid ads spend — out of scope until decided.
 
