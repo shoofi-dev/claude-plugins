@@ -835,6 +835,7 @@
         "helpers/printer/printer-selection.ts",
         "utils/print-outcome.ts",
         "utils/print-attempts.ts",
+        "utils/print-failures.ts",
         "utils/print-queue.ts",
         "utils/print-batch.ts",
         "stores/auth/index.ts",
@@ -921,6 +922,10 @@
           "ordersUnderPrintAttemptCap",
           "recordUnprintedAttempt",
           "clearPrintAttempts"
+        ],
+        "utils/print-failures.ts": [
+          "PRINT_FINISHED_STATUSES",
+          "forgetFinished"
         ],
         "helpers/printer/printer-selection.ts": [
           "hasPrinterAddress",
@@ -1055,6 +1060,16 @@
           "file": "utils/print-attempts.ts",
           "regex": "ORDER_STATUS\\.IN_PROGRESS,\\s*ORDER_STATUS\\.COMPLETED,\\s*ORDER_STATUS\\.WAITING_FOR_DRIVER,\\s*ORDER_STATUS\\.PENDING,\\s*\\];",
           "desc": "doc CORE invariant 17: the sweep's statuses are 1,2,3,6 only, never cancelled/rejected/left-the-store"
+        },
+        {
+          "file": "utils/print-failures.ts",
+          "regex": "ORDER_STATUS\\.CANCELLED,\\s*ORDER_STATUS\\.REJECTED,\\s*ORDER_STATUS\\.CANCELLED_BY_ADMIN,\\s*ORDER_STATUS\\.CANCELLED_BY_CUSTOMER,\\s*ORDER_STATUS\\.CANCELLED_BY_DRIVER,\\s*ORDER_STATUS\\.PICKED_UP,\\s*ORDER_STATUS\\.PICKED_UP_BY_DRIVER,\\s*ORDER_STATUS\\.DELIVERED,\\s*\\];",
+          "desc": "doc CORE invariant 17: a print failure is dropped for cancelled (4,5,7,8,9) and left-the-store (10,11,12) orders, never for ready (2/3)"
+        },
+        {
+          "file": "stores/orders/index.tsx",
+          "regex": "printFailures\\.forgetFinished\\(\\(response\\?\\.data \\|\\| response\\)\\?\\.ordersList\\);",
+          "desc": "doc CORE invariant 17: every orders read (getOrdersFromServer) feeds forgetFinished"
         },
         {
           "file": "App.tsx",
