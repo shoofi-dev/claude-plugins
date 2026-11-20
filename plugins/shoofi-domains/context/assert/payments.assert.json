@@ -104,6 +104,26 @@
       },
       "patterns": [
         {
+          "file": "services/payments/order-authorization.js",
+          "regex": "if \\(isAlreadyRefunded\\(auth\\)\\) \\{",
+          "desc": "CORE invariant 13: refundOrderPayment returns before HYP for an order that already records a refund"
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "\"paymentAuth\\.refundClaimedAt\": \\{ \\$exists: false \\},",
+          "desc": "CORE invariant 13: the atomic refund claim, so concurrent cancels credit once"
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "\\{ releaseClaim: !sentToGateway \\}",
+          "desc": "CORE invariant 13: a refund whose outcome is unknown keeps its claim and is never retried blind"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "!orderAuthorization\\.isAlreadyRefunded\\(auth\\) &&",
+          "desc": "CORE invariant 13: the cancel route's wasCharged ignores already-refunded orders"
+        },
+        {
           "file": "services/kopa/till-orders.js",
           "regex": "const dueC = totalC \\+ tipC;",
           "desc": "CORE Kopa till money: the tip is NOT in total; amountDue = total + tip"

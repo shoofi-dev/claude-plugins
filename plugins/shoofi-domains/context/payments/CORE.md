@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/coupon-draft-customer-area / 2026-11-17 (Who a coupon applies to: supportedCities = the store's pickup zone, supportedAreas = the customer's route); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/HIGH-RISK-refund-idempotency-guard cee54355 / 2026-11-18 (invariant 13 — refund at most once per order; ref §6 refund paths re-verified); shoofi-server@fix/coupon-draft-customer-area / 2026-11-17 (Who a coupon applies to: supportedCities = the store's pickup zone, supportedAreas = the customer's route); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -204,6 +204,24 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    (idempotent: a compensation row with that `cancelDecisionKey` is reused) — one Shoofi-funded
    `COMP-<primary originalOrderId>[-n]` per twin decision; per-side calls still refuse twins.
    Invoices are untouched.
+13. **A single-order customer refund is issued at most once.** `refundOrderPayment`
+   (`services/payments/order-authorization.js`) returns `{ success: true, alreadyRefunded }`
+   with no HYP call and no write when `isAlreadyRefunded(paymentAuth)` holds: any of
+   `refundedAmount > 0`, `refundTransId` or `refundedAt`. A partial earlier refund counts,
+   because this path only refunds the whole order. The route's settled-once rule (invariant 12,
+   `cancelSettlementSkipReason`) reads the order as it was BEFORE the update, so two cancels at
+   the same moment both pass it. They are serialised here by an atomic claim,
+   `paymentAuth.refundClaimedAt`, taken just before `zikoyAPI` (the filter requires both it and
+   `refundedAt` to be absent). The loser returns `alreadyClaimed` and writes nothing.
+   - A refusal from HYP releases the claim (in the same write as the flag), so a retry is allowed.
+   - A throw before the HYP call (loading credentials) releases it.
+   - A throw once the call has started (timeout, network, or our success write failing) keeps it,
+     because the outcome is unknown. The order is flagged `refund_error` and a person checks HYP.
+
+   `refundRequired` is only the fallback (ref §6). `settleCancelledOrderMoney`'s `wasCharged`
+   (`routes/order.js`) reads the same helper. Twin HYP refunds have their own guard, the ledger
+   slot in invariant 12 (b). **Never call `refundTransaction` for a single order outside this
+   function.** (HQ #d20d40)
 
 ## Kopa till money (phase 4d) — bookkeeping, NOT a charge
 shoofi-server `services/kopa/till-money.js` + `routes/kopa/till-money.js` (branch
@@ -212,7 +230,7 @@ Full rules: reference §6b. Orders CORE invariant 30 owns the till order itself.
 - **No money moves.** Discounts, tips, till payments and till refunds are records on a
   `kopaTillOrders` document. No card is processed, and HYP and ZCredit are never called.
   Nothing writes `orders`, `paymentAuth`, `creditCards` or any money-in collection. None of
-  invariants 1–12 applies, and none of them is touched. A till refund is the store handing
+  invariants 1–13 applies, and none of them is touched. A till refund is the store handing
   money back by its own means. It is NOT a provider refund and NOT the
   `cancelMoneyDecision` / money-ledger path.
 - **Totals.** `total` = subtotal − discount.amount (0 for a staff meal). **The tip is not in
