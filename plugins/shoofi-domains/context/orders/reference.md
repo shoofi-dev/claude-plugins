@@ -1090,8 +1090,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   - Multi-store `goToStore` (switch store, then open the list) still navigates directly.
     Its race with the same redirect, which a store switch re-triggers through
     `storeData.id`, has not been verified on a device.
-  - The component sits behind `hideHHeaderScreens`, so a tap while the menu or cart screen
-    is open is not routed.
+  - The component sits behind `hideHHeaderScreens`, so a tap while the cart screen (and, in
+    the v2 shell only, the menu screen) is open is not routed. With `HEADER_V3` the menu
+    screen shows the header, see the v3 flags below.
 - ⚠️ **Never seed that ledger on the badge-refresh path — it silences the alarm entirely.**
   The badge refresh, not the poll, is what learns about a new order first — and it does so
   through the **push**, not a websocket frame. At creation the server sends each store user a
@@ -1151,7 +1152,28 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   - **Flags.** `ORDERS_LIST_V3` / `NEW_ORDERS_V3` / `HEADER_V3` (`consts/feature-flags.ts`
     ~23-44) are off in shipped builds. They turn on for one bundle when Metro/EAS runs with
     `EXPO_PUBLIC_PARTNER_ORDERS_V3=1`. When on, v3 wins over v2 in `MainStackNavigator.tsx`.
-    `HEADER_V3` restyles only the shared header.
+    `HEADER_V3` is the app's one top row (shoofi-partner feat/v3-shell-back-everywhere,
+    owner feedback 2026-11-17), not only a restyle:
+    - `components/layout/header/ShellBarV3.tsx` draws Back + the page name at the start edge
+      on every page except Home, the bell and the store-status pill, and the Shoofi logo at
+      the end edge. **The logo is Home; there is no Home icon.** `header.tsx` renders it for
+      store staff when `HEADER_V3` is on.
+    - A screen publishes its name (and, optionally, its own back) with
+      `useShellTitle(title, onBack?)` (`hooks/use-shell-title.ts`, store
+      `stores/shell-header`), and its component leaves its own back / title row out
+      (`shellTitle`). The orders list, new-order, school-orders, stock, sales, deliveries,
+      settings, products, reports and compensations screens all do. A screen that publishes
+      nothing still gets Back, with no name.
+    - The hook is a no-op without the flag, so the shipped (v2) screens are unchanged.
+    - The products list (`menuScreen`) is no longer in `hideHHeaderScreens` when `HEADER_V3`
+      is on, so the header (and `CrossStoreOrdersGlobal` under it) shows there too.
+    - **«سجل الطلبات» is a tile on Home** (`DashboardV3` key `order-history`): it opens
+      `admin-orders` with the route param `history: true`, and `list/index.v3.tsx` starts in
+      the history on today. The param is consumed once. The «السجل» switch on the orders
+      screen stays.
+    - The light / dark switch (☾) left the orders header, and the language row left Home:
+      both are in «إعدادات المحل» → «هذا الجهاز» (`StoreSettingsV3` `device`), per tablet,
+      applied at once and not part of the save bar.
   - **Rules** come from `helpers/orders/order-rules.ts` (above).
   - **Money** is in `helpers/orders/order-money.ts` (branch `fix/order-money-settlement`; main
     still has the two old formulas, `getPartnerPaymentSummary` for the list and the new-order
