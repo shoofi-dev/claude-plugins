@@ -75,7 +75,13 @@ documents backed up first — the filter must cover everything it touches or ins
 and `apply()`. After the merge HQ runs `plan()` on production and the owner sees it and
 presses Run; at autonomy `data` HQ runs it by itself. Every target is backed up before it
 runs and Undo restores it. A file runs once — a fix to one that ran is a new file. At most
-20,000 documents per change; split a bigger one. `migrations/` and `scripts/` hold older
+100,000 documents per change across all targets (`MAX_BACKUP_DOCS` in
+`services/hq/data-changes.js`; the backup is paged, so that is a ceiling, not a memory limit);
+split a bigger one. The backup copies **whole documents**, so a change that exists to remove a
+secret (card CVV, a terminal password) must give that target an exclusion-only
+`backupProjection` — `{ "ccPaymentRefData.payload.CVV": 0 }` — or the secret survives in
+`hq-data-change-backups`; undo then never brings an excluded field back. `apply()` must not
+`toArray()` a large set. `migrations/` and `scripts/` hold older
 one-off scripts — nothing new goes there. These PRs are always red for auto-merge.
 
 ### Be proactive: report what you find
