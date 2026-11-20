@@ -462,7 +462,11 @@ and stores it (`shoofi-server services/marketing/social-plan.js absorbPlan`):
   a page is one of `invite-friends`, `my-coupons`, `coins`, `for-you`. `null` = no subject,
   and then the owner uploads the picture.
 - **What each format becomes:** `post` with a dish subject uses the dish's own menu photo
-  (never drawn); `post` with any other subject is drawn by the creator from `pictureNote`;
+  (never drawn); `post` with any other subject is drawn by the creator from `pictureNote`, and code sets
+  Shoofi's logo, a short Arabic headline and the offer's number ON the picture (owner,
+  2026-11-20: a picture with no logo, no occasion and no number is a bad post) — so **name the
+  occasion in `title`** ("בלק פריידי: משלוח ב-11 ₪"), pick a subject whose facts carry the
+  numbers, describe only the scene in `pictureNote`, and never write "no text on the picture";
   `story` with a subject that is not a dish is drawn by the creator too — the tall picture with
   its words on it (owner, 2026-11-20). A Story shows no caption, so **the `caption` you write is
   the text on the picture: one short line**, and `pictureNote` describes the scene. A `story`
