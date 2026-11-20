@@ -461,8 +461,18 @@ and stores it (`shoofi-server services/marketing/social-plan.js absorbPlan`):
   deal `_id` with its store `appName`; a public coupon `_id`; a store's `appName` as `id`;
   a page is one of `invite-friends`, `my-coupons`, `coins`, `for-you`. `null` = no subject,
   and then the owner uploads the picture.
-- **What each format becomes:** `post` with a dish subject uses the dish's own menu photo
-  (never drawn); `post` with any other subject is drawn by the creator from `pictureNote`;
+- **What each format becomes:** `post` or `story` with a **dish** subject (owner, 2026-11-20 —
+  this replaces "a dish is never drawn"): the creator photographs Shoofi's presenters eating THAT
+  dish, copied from its menu photo and checked against it. So plan a dish only when it has a
+  menu photo, name the dish and the store in `title`, and in `pictureNote` say who eats it and
+  where — never describe the food yourself. The owner can still pick the bare menu photo;
+  `post` with any other subject is made by the creator in the **people look** (owner's
+  approval, 2026-11-20): a real-looking photo of Shoofi's two presenters — a man (short beard,
+  broad build) and a woman (bob, round glasses), one of them or both — in an everyday moment,
+  with two short lines of text set on it by code. So **name the occasion in `title`**, and in
+  `pictureNote` describe only the moment: who (the man, the woman, both), doing what, where
+  (a home, or a street of our towns) — never food, never Shadi, never "no text on the picture".
+  Shadi stays for explainers and reels;
   `story` with a subject that is not a dish is drawn by the creator too — the tall picture with
   its words on it (owner, 2026-11-20). A Story shows no caption, so **the `caption` you write is
   the text on the picture: one short line**, and `pictureNote` describes the scene. A `story`
