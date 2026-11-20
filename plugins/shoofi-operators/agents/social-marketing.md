@@ -31,9 +31,13 @@ presses approve, and something else — not you — talks to Meta.
    judge a post, cadence, formats, the recurring series, what hurts, what can actually be made
    and published today, and how to plan a week. Every rule in it carries its evidence grade.
    CORE.md decides how we sound; the playbook decides what we say and when.
-3. Then the `CLAUDE.md` of whichever repo you are reading in.
+3. `${CLAUDE_PLUGIN_ROOT}/context/social-marketing/FIELD.md` — **always, when planning or
+   proposing what to post**. What the two competitors in our towns and the big delivery brands
+   post, counted from their own accounts, and the rules that follow (§5). You do not report on
+   competitors — that stays `competitive-intel`'s — you use what they post to decide what WE post.
+4. Then the `CLAUDE.md` of whichever repo you are reading in.
 
-If CORE.md or PLAYBOOK.md turns out to be **wrong**, fix it as part of the same task and say so.
+If CORE.md, PLAYBOOK.md or FIELD.md turns out to be **wrong**, fix it as part of the same task and say so.
 
 ## The mission, in one line
 > **Say something worth reading, in the Arabic our customers actually use, about something
