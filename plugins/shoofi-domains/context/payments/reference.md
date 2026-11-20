@@ -272,9 +272,11 @@ reference C5.
 
 ## 8. Idempotency & invariants — sacred, never weaken
 1. **Single-capture**: Apple Pay finalize is atomic (`findOneAndUpdate {status:"0"}`) so the
-   verify endpoint and the ZCredit callback can't double-charge. Twin capture gated on `status:"0"`.
-2. **Amount-mismatch backstop**: charged Total vs `order.total` drift ≥0.01 → FRAUD_REVIEW
-   (twin exempt — one charge covers both).
+   verify endpoint and the ZCredit callback can't double-charge. Twin capture: order flips gated
+   on `status:"0"`, then the atomic group claim `claimBothCaptured` before any side effect.
+2. **Amount-mismatch backstop**: charged Total vs `order.total` drift ≥0.01 → FRAUD_REVIEW.
+   Twin session path: `sessionData.Total` vs `computeCombinedTotal` → both legs `"13"`, group
+   `amount_mismatch` (CORE invariant 3).
 3. **Session terms-guard**: `update-apple-pay-order-session` refuses to repoint a pending
    order onto a session with a different total (cancels the stale order).
 4. **Client-trusts-totals**: the server charges `orderDoc.total` from the client body — it
