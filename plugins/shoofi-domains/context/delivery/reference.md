@@ -10,7 +10,7 @@
 
 ## 0. Scope
 Server: `routes/delivery.js` (barrel) + `routes/delivery/{orders,driver,admin,company,
-geography}.js`, `routes/geo.js`, `routes/driver-shift-manager.js`, `services/delivery/*`
+geography,driver-task-info,driver-issues}.js`, `routes/geo.js`, `routes/driver-shift-manager.js`, `services/delivery/*`
 (`assignDriver.js`, `delayed-assignment.js`, `book-delivery.js`, `assignment-scheduler.js`,
 `driver-status-service.js`), `lib/delivery/helpers`, delivery crons. Clients: driver app
 (shoofir), admin (delivery-web), partner booking (§ Clients). **NOT yours:**
@@ -329,6 +329,79 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
 - **Shifts** (`routes/driver-shift-manager.js`, `driverShifts` collection): booking system
   gated by `useBookingSystem`; peak-hours per `cityArea`; permanent-drivers; block/unblock.
 
+## 5b. Courier task info + problem reports (shoofir redesign, Nov 2026)
+`routes/delivery/driver-task-info.js` + `routes/delivery/driver-issues.js` (mounted LAST in
+`routes/delivery.js`, on paths no older router declares), logic in
+`services/delivery/{courier-task-info,courier-issues,courier-levels,courier-day-summary}.js`. Repo doc:
+**`shoofi-server/docs/courier-task-routes.md`**. Client: shoofir `utils/courier-api.ts`, which
+treats any failure (an older server's 404 included) as "leave that panel out".
+
+| Route | Gate | Answer |
+|---|---|---|
+| `GET /api/delivery/driver/order/:id/store-status` | `driverSelfAction` | `{orderStatus, isReady, readyAt, pickupTime, originalPickupTime, delayMinutes, delayUpdatedAt, expectedDeliveryAt, deliveryStatus, startedAt, cancelledAt, cancelReason}` |
+| `POST /api/delivery/driver/order/issue` | `driverSelfAction` | `{issueId}` |
+| `GET /api/delivery/driver/order/:id/issues` | `driverSelfAction` | `{issues}` — the caller's own, newest first |
+| `GET /api/delivery/driver/me/stats?days=30` | `driverSelfAction` | `{totalDelivered, courierSince, onTime{windowDays,onTime,late,measured,pct}, rating{avg,count}, declines, acceptance{windowDays,assigned,declined,pct}, level{key,name_ar,name_he}}` |
+| `GET /api/delivery/driver/me/active-time?date=` | `driverSelfAction` | `{date, window{start,end}, activeMinutes, inShiftMinutes, outsideShiftMinutes, inWorkingHoursMinutes, earnings{total,deliveries}}` |
+| `GET /api/delivery/driver/me/day-summary?date=` | `driverSelfAction` | `{date, window{start,end}, summary}` — `summary` has exactly `POST /payments/driver/summary`'s keys |
+| `GET /api/delivery/admin/issues?status=&from=&to=&limit=` | `deliveryDashboardAdmin` | `{issues, total}` |
+| `POST /api/delivery/admin/issues/:id/status` | `deliveryDashboardAdmin` | `{issue}`; `handledBy`/`handledAt` + `statusHistory[]` |
+| `GET\|POST /api/delivery/admin/courier-levels` | `deliveryDashboardAdmin` | `{courierLevels}`; POST writes ONLY that key (null/[] removes it) |
+
+- **Identity is the token.** `:id` is a `book-delivery._id`; a delivery whose `driver._id` is not
+  the caller is a **404**. The GET routes read no driver id from URL or query.
+- **Store status** reads `<bookDelivery.appName>.orders` by `bookDelivery.order._id` (never for a
+  `shoofi`/`delivery-company` appName; null for delivery-only). `isReady` = order status
+  `3/2/10/11/12`, or `isReadyForPickup`, or delivery `3/4`. `readyAt` = `readyForPickupAt`, else
+  the latest `orderFlowEvents {orderId: <order ObjectId>, eventType:"status_change", status:"3"}`
+  (keyed on the ObjectId — the short `orderNumber` repeats across stores). Clocks are passed
+  through as stored (`"24:06"` is legal, CORE invariant 10).
+- **Reports never move the delivery.** Bell (`type: "delivery_issue"`) and flow event
+  (`delivery_issue_reported`) each in their own try/catch after the insert. `outcome` only for
+  `cancelled_after_pickup` AND only on a row cancelled (`-1/-2/-3`, both types) with `startedAt`
+  → else **409** `NOT_CANCELLED_AFTER_PICKUP`. >10 reports per courier per delivery → 429.
+- **Stats** reuse the shared rules: on-time = `late-delivery.js` over completed rows where the
+  courier is current OR under `PREVIOUS_DRIVER_KEYS`, counted for `accountableDriverId` only
+  (windowed on `completedAt`, with a `created` bound widened by a day for the index). Rating =
+  `shoofi.customers-feedback.deliveryRating` joined by `orderObjectId = bookDelivery.order._id`;
+  feedback rows with no `orderObjectId` (old clients) fall back to `appName + orderId = bookId`.
+  `declines` is **null** until `services/delivery/driver-decline.js` (shoofi-server #540,
+  writes `bookDelivery.declines[]`) is in the tree — nothing on main writes the field.
+- **Acceptance** is null under the same condition as `declines`. Otherwise
+  `assigned` = distinct deliveries booked in the window where the courier is the driver or a
+  previous driver, UNION those he declined there (a decline clears `driver`). `declined` =
+  distinct deliveries he declined in the window. `pct` is a whole percent, null at 0 assigned.
+- **Level**: the ladder is **`shoofi.store {id: 1}.courierLevels`**, on the platform doc that
+  holds `driversSupportPhone`. Shape: `[{key, name_ar, name_he, minDeliveries, minOnTimePct}]`,
+  ≤ 10 entries, keys `[a-z0-9_-]` and unique.
+  - `minDeliveries` is compared with all-time `totalDelivered`. `minOnTimePct` (null = no
+    requirement) is compared with the **30-day** on-time %, whatever `days` was asked, and a
+    courier with nothing measured cannot reach a % level.
+  - The highest level reached wins. Not set / none reached → null; there is **never a default
+    level**.
+  - Edited in the admin web's general settings (`CourierLevelsSettings.tsx`) through
+    `admin/courier-levels` only. A partial body to `/api/shoofiAdmin/store/update` reads as a
+    store status change (it compares `isOpen` etc. against `undefined`): it clears the explore
+    cache and refreshes every customer.
+  - The reader re-validates and drops a malformed ladder.
+- **Day summary** (`me/day-summary`) is the courier's "today" earnings: the payments summary's
+  `summary` object over the business day [D 09:00, D+1 02:00). The default D is the business day
+  now belongs to (before 09:00 it is still yesterday's).
+  - It reuses the summary's own per-delivery helpers (`effectiveDeliveryFee`,
+    `couponDeliveryPortion`) and buckets by **`created`**, like the summary. A test pins it to
+    the real route on a calendar day.
+  - It deliberately differs only at window edges: an instant cut instead of a string compare,
+    a compensation item counts only by its own `approvedAt`, and `status` matches `"4"`/`4`.
+  - It is not `me/active-time`'s `earnings`, which windows on completion.
+- **Store status** also carries the booking's own `deliveryStatus`, `startedAt` (collected),
+  `cancelledAt` and `cancelReason`. The times are a Date on one writer and an ISO string on
+  another; both are returned as ISO.
+- **Active time** = `computeDayLive` for ANY courier (the hourly-only 403 of
+  `/api/driver-hours/my` is untouched). `activeMinutes` covers the 09:00→09:00 day the hours
+  screens show; `window` is 09:00→02:00. `earnings.total` = Σ `effectiveDeliveryFee`
+  (`lib/payments/calc.js`, the per-delivery figure behind `payments/driver/summary`
+  `totalEarnings`) over delivered, non-delivery-only rows **completed** in the window.
+
 ## 6. Crons (prod-only, Redis-locked; `docs/distributed-cron-jobs.md`)
 `assignment-scheduler` (60s — assign due pendings) · `delivery-pickup-checker` (3m) ·
 `delivery-completion-delay-checker` (4m) · `delivery-coverage-alert` (5m → `shoofi` DB, collection
@@ -392,6 +465,13 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   be dispatchable yet invisible to the `$or`.
 - Geo: `cities, parentCities, cityAreas, areas, areasGeometry`. Ops: `driverStatusHistory,
   driverLocationHistory(30-day TTL on `expiresAt`), driverShifts, driverDailyHours, deliveryConfig`.
+- `delivery-issues` (code `db.deliveryIssues`, **hyphenated**, new Nov 2026, §5b) — one courier
+  problem report per doc: `{deliveryId(ObjectId), bookId, originalBookId, appName,
+  orderObjectId(ObjectId|null), driverId(ObjectId), driverName, kind, items[{index,name,qty}],
+  decision, outcome, waitedSeconds, arrivedAt(Date), note, deliveryStatus, status:"open"|"handled",
+  createdAt(Date), handledBy{id,name}, handledAt, statusHistory[], updatedAt}`. Indexes built at
+  boot in `DatabaseInitializationService` (`{deliveryId,driverId,createdAt}`,
+  `{status,createdAt}`, `{createdAt}`), never awaited before an insert.
 
 ## 8. Cross-domain edges (hand off, don't reach in)
 - **ORDERS (you're the callee)**: at partner-accept `routes/order.js` builds `deliveryData`
@@ -421,6 +501,29 @@ the token: a different body `driverId` is a 403, and a delivery not assigned to 
 invariant 19). The order list is `POST delivery/list {customerId}` (own id; a company admin of an
 `isControlledByAdmin` company gets its company's rows). Order details are `GET delivery/order/:id`,
 for the driver's own deliveries and, for a company admin, its company's.
+⚠️ **Status `"1"` never reaches a driver through `delivery/list`.** For `role` `driver`/`employe`
+the handler sets `status: {$ne: "1"}` AFTER building `status: {$in: statusList}`, so the spread
+REPLACES the client's list: a booking already assigned to him and waiting for his approval is not
+in the response even when `statusList` asks for `"1"`. He learns of it from the push/WS offer only.
+A company admin (`role: "admin"`) gets no such filter. (Verified in `routes/delivery/orders.js`,
+2026-11-16.)
+⚠️ **Several driver-app routes still have NO auth** (the `NOT_YET_GATED.driver` list in
+`test/integration/delivery-driver-loop-admin-auth.js`, which may only shrink): `driver/stats`,
+`driver/earnings`, `driver/order/note` (+ `DELETE …/note/:orderId/:driverId`, `note/comment`),
+`driver/notifications` (+ `/read`), `notifications/{create,admin}`, `driver/location`,
+`driver/availability`, `driver/schedule`, `driver/nearby-orders`,
+`driver/:driverId/location-history`, `drivers/locations`. They take the driver id from the body
+or URL. Their responses are redacted (`response-redaction.js`), but anyone can read or write as
+any driver on them.
+⚠️ **`POST delivery/driver/stats` answers zeros.** It filters `"driver._id": driverId` with the
+body's STRING id, and `driver._id` is stored as an ObjectId, so it only ever matches rows whose
+id happens to be a string (none in production; a few local e2e seed rows, which is why a local
+run can show non-zero `totalOrders` with `deliveredOrders: 0` — checked 2026-11-16: 3 vs the
+courier's 4 real deliveries). It also reads a `deliveryTime` field and sums `order.price`. Use
+`GET delivery/driver/me/stats` (§5b). `driver/earnings` does cast to ObjectId and works, but sums
+raw `order.shippingPrice` (no twin combination fee), so it can differ from the payments summary.
+**Redesign routes (§5b):** store status, problem reports, `me/stats`, `me/active-time` —
+`utils/courier-api.ts`, every reader optional.
 `DELIVERY_STATUS` copy = `1..4` (`consts/shared.ts`). Key: `stores/delivery-driver/index.ts`,
 `screens/delivery-driver/*`, `hooks/{useDriverLocationTracking,use-websocket}.ts`.
 **Company-admin dispatch lives HERE, not in partner:** an admin of an `isControlledByAdmin`
@@ -588,6 +691,10 @@ dialog, but every screen that polls this route already sits behind the auth-gate
    (don't starve assignment). Do NOT re-enable it without an explicit task.
 5. **`driver-inactivate-cron` disabled** (commented in app.js) — confirm intended.
 6. **Dead/inherited** across clients (per `_shared-guardrails.md` §1c) — noted above; hands-off.
+7. **Flagged 2026-11-16, awaiting a verdict:** `POST /api/delivery/driver/stats` returns zeros
+   for everyone (string-vs-ObjectId filter, C1), and the unauthenticated driver routes listed in
+   C1. Neither was changed by the courier-redesign routes (§5b), which are additive. Do not
+   "fix" `driver/stats` in place without checking its callers — the redesign reads `me/stats`.
 
 ## 11. Definition of done
 Inherit `_shared-guardrails.md` §7. For delivery specifically: any change to assignment,

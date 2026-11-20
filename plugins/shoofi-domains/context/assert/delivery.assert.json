@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server + shoofi-delivery-web@feat/courier-task-info-routes / 2026-11-16 (reference 5b courier task info + problem reports, levels, day-summary, C1 delivery/list status-1 filter + driver/stats zeros); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -841,6 +841,71 @@
           ],
           "regex": "(?:admin/cancel legacy \\{bookId\\} shared by 3 rows cancels the single live one|bookId: deliveryData\\.bookId  // Match by bookId)",
           "desc": "CORE invariant 20: the decoy-first tests (another store + same store older row inserted ahead of the real one) - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": [
+            "routes/delivery.js"
+          ],
+          "regex": "(?:router\\.use\\(require\\(\"\\./delivery/driver-issues\"\\)\\)|router\\.use\\(require\\(\"\\./delivery/admin\"\\)\\))",
+          "desc": "reference 5b: the courier task-info + issues routers are mounted in the delivery barrel - valid-before leg is the admin mount on main; drop the valid-before leg once shoofi-server feat/courier-task-info-routes has merged"
+        },
+        {
+          "file": [
+            "services/delivery/courier-issues.js",
+            "services/delivery/admin-access.js"
+          ],
+          "regex": "(?:const ISSUE_COLLECTION = \"delivery-issues\"|const driverSelfAction = \\[auth\\.required, driverSelfInBody\\(\"driverId\"\\)\\])",
+          "desc": "CORE courier section: problem reports live in delivery-company.delivery-issues - valid-before leg is the driverSelfAction gate the routes use; drop the valid-before leg once shoofi-server feat/courier-task-info-routes has merged"
+        },
+        {
+          "file": [
+            "services/delivery/courier-task-info.js",
+            "services/delivery/late-delivery.js"
+          ],
+          "regex": "(?:c\\.accountableDriverId !== me|function summarizeLateDeliveries)",
+          "desc": "reference 5b: me/stats on-time is the shared late rule keyed on accountableDriverId - valid-before leg is the shared rule itself; drop the valid-before leg once shoofi-server feat/courier-task-info-routes has merged"
+        },
+        {
+          "file": [
+            "services/delivery/courier-task-info.js",
+            "lib/payments/calc.js"
+          ],
+          "regex": "(?:total \\+= effectiveDeliveryFee\\(r\\)|function effectiveDeliveryFee)",
+          "desc": "reference 5b: me/active-time earnings sum effectiveDeliveryFee, the payments summary's per-delivery figure - valid-before leg is the helper itself; drop the valid-before leg once shoofi-server feat/courier-task-info-routes has merged"
+        },
+        {
+          "file": [
+            "services/delivery/courier-task-info.js",
+            "services/delivery/late-delivery.js"
+          ],
+          "regex": "(?:DECLINES_SUPPORTED = fs\\.existsSync\\(path\\.join\\(__dirname, \"driver-decline\\.js\"\\)\\)|const PREVIOUS_DRIVER_KEYS = \\[)",
+          "desc": "CORE courier section: me/stats declines is null until services/delivery/driver-decline.js exists - valid-before leg is stable late-delivery text; drop the valid-before leg once shoofi-server feat/courier-task-info-routes has merged"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "status: \\{ \\$ne: DELIVERY_STATUS\\.WAITING_FOR_APPROVE \\}",
+          "desc": "reference C1: POST /api/delivery/list hides status \"1\" from role driver/employe, overriding the client's statusList"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "\"driver\\._id\": driverId,\\s*created: \\{ \\$gte: start\\.format\\(\\), \\$lte: end\\.format\\(\\) \\}",
+          "desc": "reference C1 / 10.7: POST /api/delivery/driver/stats filters driver._id with the body's STRING id, so it answers zeros"
+        },
+        {
+          "file": [
+            "services/delivery/courier-levels.js",
+            "services/delivery/admin-access.js"
+          ],
+          "regex": "(?:shoofiDb\\.store\\.findOne\\(\\{ id: 1 \\}, \\{ projection: \\{ courierLevels: 1 \\} \\}\\)|const deliveryDashboardAdmin = \\[auth\\.required, dashboardRoleGate\\])",
+          "desc": "reference 5b: the courier level ladder is shoofi.store {id:1}.courierLevels - valid-before leg is the admin gate its routes use; drop the valid-before leg once feat/courier-task-info-routes has merged"
+        },
+        {
+          "file": [
+            "services/delivery/courier-day-summary.js",
+            "lib/payments/calc.js"
+          ],
+          "regex": "(?:const coupon = couponDeliveryPortion\\(d\\);|function couponDeliveryPortion)",
+          "desc": "reference 5b: me/day-summary reuses the payments summary's per-delivery helpers - valid-before leg is the helper itself; drop the valid-before leg once feat/courier-task-info-routes has merged"
         }
       ]
     },
@@ -1038,6 +1103,14 @@
           "file": "src/components/Modals/CancelDeliveryModal.tsx",
           "regex": "(?:await onCancel\\(buildCancelDeliveryData\\(deliveryOrder, cancelReason\\.trim\\(\\), \"admin\"\\)\\);|bookId: deliveryOrder\\.bookId \\|\\| deliveryOrder\\._id,)",
           "desc": "CORE invariant 20: CancelDeliveryModal builds its body with buildCancelDeliveryData (never bookId alone) - valid-before leg is the old bookId-only payload on main before the code PR; drop it once shoofi-delivery-web fix/admin-cancel-delivery-by-original-id has merged"
+        },
+        {
+          "file": [
+            "src/views/admin/settings/CourierLevelsSettings.tsx",
+            "src/views/admin/settings/ShoofiSettings.tsx"
+          ],
+          "regex": "(?:axiosInstance\\.post\\('/delivery/admin/courier-levels'|<WalletProviderSettings />)",
+          "desc": "reference 5b: the courier-level ladder is edited by its own card through admin/courier-levels, not the bulk settings save - valid-before leg is the neighbouring card on main; drop the valid-before leg once feat/courier-task-info-routes has merged"
         }
       ]
     }
