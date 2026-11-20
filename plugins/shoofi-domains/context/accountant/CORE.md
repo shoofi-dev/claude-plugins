@@ -612,6 +612,17 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       the amend re-split, every `delivery_price` order carries resolved shares, so only an
       order that bypassed both can hit this. Resolving the share from the document there would
       be a live billing change for every percent-split coupon. **Ask.**
+    - **Where the resolved shares sit: `appliedCoupon.coupon.storeDiscount` / `.shoofiDiscount`,
+      never the root.** The guard returns `{ ...appliedCoupon, coupon, discountAmount }`
+      (`services/coupons/delivery-price-enforcement.js:136-141`) and amend writes the same
+      place, so the root of a stored `appliedCoupon` is `{ coupon, discountAmount }` only. In
+      prod, 0 of 613 coupon orders since 2026-10-20 carry a root `storeDiscount`. Every reader
+      must go root-then-nested (`resolveCouponFields`, `services/exec-dashboard/coupon-funding.js`).
+      A root-only read sees "no split" on every order: the money audit's `coupon-funding` check
+      (`services/hq/money-audit/checks-settlement.js`) did exactly that and flagged a whole
+      campaign, 30 orders and ₪545, on 2026-11-19 (HQ #608299). The legacy `/stores-export`
+      (`routes/payments/admin.js:733`) is still root-only and still called by the admin web's
+      PaymentManagement screen.
 
 16. **The compensation API is gated per audience, in the route — never by role alone** (2026-10-29;
     before that all eleven `/api/shoofiAdmin/compensations*` routes had no auth at all, and `add`
