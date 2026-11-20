@@ -97,7 +97,7 @@ delivery price (`type: 'delivery_price'`) rules are in CORE; this is the call-si
 | Twin | `/api/twin-order/place` + `digital-place-pending` → `enforceTwinSideDeliveryPrice` | primary fee only; secondary's claim removed |
 | Shadow | `utils/order-pricing-shadow.js` | observation only; the total uses the client's coupon |
 | Charge | `processCreditCardPayment` / `processHypTokenPayment` / `processHypWalletPayment` / `finalizeApplePayOrder` / `captureCombined` | charge `order.total` (or the combined persisted totals); nothing recomputes a coupon |
-| J5 | `services/payments/order-authorization.js` | hold = `computeAuthAmount(total)`; capture reads `order.total` |
+| J5 | `services/payments/order-authorization.js` | hold = `computeAuthAmount(total)`; capture reads `order.total`; a refused release keeps `heldAmount` = the hold (CORE invariant 13) |
 | Amend | `routes/order-amend.js` → `calculateOrderPricing` | re-prices from the order's coupon SNAPSHOT, never the document; this type may shrink, never grow (`amendedDeliveryPriceDiscount`); split re-written with it; non-numeric total → 409 `AMEND_UNPRICEABLE` (orders owns amend) |
 | Refund / recharge | `refundOrderPayment`, `services/payments/order-recharge.js` | `capturedAmount` / `order.total` — no coupon math |
 
@@ -290,6 +290,9 @@ reference C5.
    `paymentAuth.refundRequiredReason` reasons written on cancel are `captured_before_cancel`,
    `release_refused_ccode_*`, `release_error` (release), `refund_*` (explicit refund) and
    `cancel_no_decision` (an undecided settled single charge, written by `routes/order.js`).
+   A refused release (`release_failed`) is retried by the hourly capture sweep and expires
+   after the hold window; `paymentAuth.refundRequiredResolution` then says why the flag was
+   cleared (`released_on_retry` | `hold_lapsed`). Full rules: CORE invariant 13.
 
 ## App — shoofi-app (customer) payment client
 - **Method resolution**: `helpers/get-supported-payment-methods.ts` → GET `payment-methods`;
@@ -375,7 +378,8 @@ CLAUDE.md do-not-touch list in §0. (Reporting/settlement/invoicing routes belon
 ## 10. Known status (human-confirmed) — do NOT silently "fix"
 - **KNOWN, migration in progress — hands off:** CVV is stored in plaintext today only
   because the platform is **mid-migration from ZCredit to HYP** (§2). HYP tokenization
-  does not store CVV (HYP cards already save `cvv:''`); plaintext CVV goes away as ZCredit
+  does not store CVV (HYP cards are saved with no `cvv` key since 2026-11-20; before, `''`);
+  old orders and flow events also carried it — see CORE Known status; plaintext CVV goes away as ZCredit
   is retired. **Do NOT independently rip out CVV handling** — it's tied to the migration.
   When touching card code, prefer HYP and never add new CVV storage.
 - **CONFIRMED — REMOVE (backlog #1):** `hyp-test-soft` debug endpoint (`hyp-pay.js`)

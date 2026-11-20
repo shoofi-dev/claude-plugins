@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa till money + reference 6b: a till payment with a money method and every till refund need an open till session, 409 NO_OPEN_SESSION, checked before the manager PIN; sessionId on each entry); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/j5-token-hold-release / 2026-11-20 (CORE invariant 13: refused J5 release — getToken retry on 920, hourly retry, expired, audit check; Known status CVV on orders/flow events); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa till money + reference 6b: a till payment with a money method and every till refund need an open till session, 409 NO_OPEN_SESSION, checked before the manager PIN; sessionId on each entry); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -30,7 +30,9 @@
         "services/kopa/till-money.js",
         "routes/kopa/till-money.js",
         "services/kopa/till-orders.js",
-        "test/integration/kopa/till-money.js"
+        "test/integration/kopa/till-money.js",
+        "services/payments/order-authorization.js",
+        "utils/crons/order-capture-cron.js"
       ],
       "symbols": {
         "services/kopa/till-money.js": ["applyDiscount", "removeDiscount", "suggestDiscount", "setTip", "addRefund", "approveByManager", "standingDiscountOf", "verifyManagerPin", "clientRefundId", "discountLog"],
@@ -103,6 +105,14 @@
         ]
       },
       "patterns": [
+        {"file": "services/payments/order-authorization.js", "regex": "const HYP_CCODE_CANNOT_CANCEL = \"920\";", "desc": "CORE invariant 13: a 920 on a saved-card hold gets getToken + one more CancelTrans (attemptHoldRelease)"},
+        {"file": "services/payments/order-authorization.js", "regex": "\\$push: \\{ \"paymentAuth\\.releaseAttempts\": \\{ \\$each: attempts \\} \\}", "desc": "CORE invariant 13: every CancelTrans answer is kept in paymentAuth.releaseAttempts"},
+        {"file": "services/payments/order-authorization.js", "regex": "\"paymentAuth\\.status\": AUTH_STATUS\\.EXPIRED,", "desc": "CORE invariant 13: retryHoldRelease is the only writer of expired (refused hold past expiresAt + grace)"},
+        {"file": "services/payments/order-authorization.js", "regex": "const HOLD_LAPSE_GRACE_HOURS = 48;", "desc": "CORE invariant 13: a refused hold is called lapsed 48h after our own expiresAt"},
+        {"file": "utils/crons/order-capture-cron.js", "regex": "await retryRefusedReleases\\(db, appName, appDb\\);", "desc": "CORE invariant 13: the hourly capture sweep retries refused releases per store"},
+        {"file": "services/hq/money-audit/checks-money-in.js", "regex": "id: \"hold-release-refused\",", "desc": "CORE invariant 13: the HQ money audit lists refused releases as their own check"},
+        {"file": "services/hq/money-audit/checks-money-in.js", "regex": "\\.filter\\(\\(o\\) => !isRefusedRelease\\(o\\)\\)", "desc": "CORE invariant 13: refund-anomaly does not count a CancelTrans refusal as a failed refund"},
+        {"file": "routes/creditCard.js", "regex": "delete creditCardData\\.cvv;", "desc": "CORE Known status: an HYP card is saved with no cvv"},
         {
           "file": "services/kopa/till-orders.js",
           "regex": "const dueC = totalC \\+ tipC;",
@@ -416,9 +426,11 @@
     },
     "shoofi-delivery-web": {
       "files": [
-        "src/views/admin/schools/SchoolSettings.tsx"
+        "src/views/admin/schools/SchoolSettings.tsx",
+        "src/utils/money-summary.ts"
       ],
       "patterns": [
+        {"file": "src/utils/money-summary.ts", "regex": "הלקוח לא חויב · \\$\\{nis\\(s\\.heldAmount\\)\\} עדיין תפוסים בכרטיס", "desc": "CORE invariant 13: the refused-release chip says the customer was not charged and shows the held amount"},
         {
           "file": "src/views/admin/schools/SchoolSettings.tsx",
           "regex": "admin/school-settings",

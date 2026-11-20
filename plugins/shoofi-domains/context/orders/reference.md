@@ -533,7 +533,15 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   ticket-rejected attempt; `[PUSH_SLOW]` warn — any send over `PUSH_SLOW_WARN_MS`
   (default 3000), even a successful one.
 - **FRAUD**: `order-fraud-*`, `fraud-config-loader`, `fraud-check-storage` →
-  `shoofi.fraudChecks`/`deviceCustomers`/`ipCustomers`.
+  `shoofi.fraudChecks`/`deviceCustomers`/`ipCustomers`. `requiresReview` is the only field with
+  an effect (status 13, store alert withheld until admin approval); `shouldBlock` mirrors it and
+  is never read; `riskLevel` is display/filter only. Trusted customers
+  (`trustedCustomerMinOrders`, 5 in prod) pass every check except item-not-in-store and a
+  **high** location gap. `checkLocationDistance` (`routes/order-fraud-detector.js`) grades a gap:
+  ≤ `maxLocationDistanceMeters` (100 in prod) low; up to `LOCATION_DISTANCE_SOFT_MULTIPLIER`
+  (2)× the limit **medium/20, recorded only** (`details.softBand`); beyond it high/55, which
+  overrides trust (since 2026-11-20 — 3015-0479, a 71-order customer 115 m off, was held
+  critical; 30-day replay: 105 fewer holds, 95 of them completed).
 - **GROWTH/COINS (secondary)**: `coinsService`, `worldCupService`, attribution — must never fail the order.
   Coins admin routes (CORE invariant 19): `/api/admin/coins/{expire, customer/:customerId,
   customer/:customerId/earned, store/:storeAppName/stats}` in `routes/coins.js` (`COINS_ADMIN`) and
