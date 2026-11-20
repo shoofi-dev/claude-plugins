@@ -503,6 +503,26 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   `test/integration/order-number-ltr-in-notifications.js` fails on a raw one in those
   files. Not covered: Hebrew admin/HQ titles and coupon names (number after Hebrew or
   Latin text does not flip).
+  **The customer cancel push names the coupon that replaced the refund**
+  (shoofi-server `feat/cancel-push-coupon-details-HIGH-RISK`, `services/orders/cancel-push.js`,
+  called from `handleOrderUpdate` after the status switch). For statuses `4` / `7` / `8` / `9`
+  with `order.cancelCompensation`, the body carries amount, expiry and code, Hebrew or Arabic
+  by `order.app_language`. The coupon is there in the same request: `settleCancelledOrderMoney`
+  awaits `createCancelCompensation` before the status write and the push is built from the
+  re-read order. ⚠️ `cancelCompensation` is `{ couponCode, amount, compensationId, createdAt,
+  createdBy }` — **no expiry**; the expiry is the coupon's own `end` in `shoofi.coupons` (ISO
+  string, three calendar months from issue, to the minute — not end of day), read by code.
+  **The push names the Israel-calendar day BEFORE `end`** (the last full day; wording approved
+  by the service manager, ticket #60847b), and the amount is the coupon's current balance.
+  "In all stores" is said only when every `applicableTo` list redemption enforces (`stores`,
+  `categories`, `products`, `supportedAreas`, `supportedCities`) is empty or absent on the
+  coupon read. A coupon that is deleted, inactive, expired, used up, or whose day-before is
+  already behind today is not named and the old text is sent.
+  **Not named:** status `5`, a twin leg (the group coupon is not stamped on the order,
+  invariant 28), and a keep decision made later through `/api/money/change-decision` (no push
+  is sent on that request). Status `9` has a customer push since the same change, but nothing
+  writes order status `9` today (0 `status_change` rows in `orderFlowEvents`, 2026-11-20).
+  Every string is in `CANCEL_PUSH_TEXT`. `test/integration/order-cancel-push-coupon.js`.
   ⚠️ **The cutoff is deliberately not round.** `REMINDER_TICK_SKEW_MS = 5 * 1000`, and
   the query builds `cutoff` from `REMINDER_CUTOFF_AGE_MS` (= interval − skew), never
   `now - REMINDER_INTERVAL_MS`. Since the interval now *equals* the cron period, a flat
