@@ -1387,6 +1387,22 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests: shoofi-server `test/integration/feedback-eligibility.js` (22, incl. 6534-2091: `3` +
       `picked_up` → false), `customer-orders-feedback-eligible.js` (8),
       `order-update-actor-and-feedback-push.js` (11), `feedback-notification-eligibility.js` (4).
+34. **AN ORDER IS FOR THE TOKEN'S CUSTOMER, AND IS PAID WITH THAT CUSTOMER'S CARD** (HQ #d20f83,
+    `services/orders/order-customer-binding.js`). `/api/order/create` used
+    `body.customerId || req.auth.id`, so any signed-in customer could spend another customer's
+    coins, coupons and saved card, and place orders as them. `bindOrderCustomerId` runs first
+    in the handler. An absent or equal body id is bound to `req.auth.id`; anything else gets
+    403 `CUSTOMER_MISMATCH` before the card lookup, the idempotency and lock keys, coins,
+    coupons, any charge and the insert. A ZCredit / HYP_TOKEN `ccToken` must be in
+    `shoofi.creditCards` for that customer (`isActive` ignored: cards are only soft-deleted),
+    or the request gets 403 `CARD_NOT_OWNED`. **There is no on-behalf flow.** The customer
+    app's legacy "admin orders for a customer" mode (`customers.isAdmin`,
+    `hooks/checkout/use-checkout-submit.ts:228-236`) is the only sender of another customer's
+    id. 0 of 175,008 orders carry its `isAdmin: true`. An impersonation (`imp`) token
+    carries the subject's own id. Bringing on-behalf back needs a real admin token, never a
+    body field. ⚠️ Twin `/place` and `/digital-place-pending` (`routes/twin-order.js`) still
+    take `body.customerId || req.auth?.id`.
+    - Tests: shoofi-server `test/integration/order-create-customer-binding.js` (10).
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in

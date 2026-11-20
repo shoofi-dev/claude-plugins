@@ -177,6 +177,16 @@
       "patterns": [
         {
           "file": "routes/order.js",
+          "regex": "bindOrderCustomerId\\(parsedBodey\\.customerId, req\\.auth\\?\\.id\\)",
+          "desc": "CORE invariant 34: /api/order/create binds the customer to the token; a different body customerId is 403 CUSTOMER_MISMATCH"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "return res\\.status\\(403\\)\\.json\\(cardNotOwnedBody\\(\\)\\)",
+          "desc": "CORE invariant 34: a server-side token charge must use a card saved for that customer"
+        },
+        {
+          "file": "routes/order.js",
           "regex": "if \\(req\\.body\\.isNotPrinted\\) \\{\\s*filterBy\\.isPrinted = false;",
           "desc": "doc reference C3 Auto-print: isNotPrinted only adds isPrinted:false. The date window is built only `if (ordersDate)`, so a sweep that sends no date has no window at all; the partner sweep must send ordersDate"
         },
