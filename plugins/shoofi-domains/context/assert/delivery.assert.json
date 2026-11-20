@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -578,6 +578,16 @@
         },
         {
           "file": "routes/delivery/admin.js",
+          "regex": "(?:if \\(isCancelledStatus\\(delivery\\.status\\)\\) \\{\\s*return res\\.status\\(200\\)\\.json\\(null\\);|let delivery = await db\\.bookDelivery\\.findOne\\(\\s*withDeliveryScope\\(req, \\{ \"order\\._id\": \\{ \\$in: \\[getId\\(orderId\\), String\\(orderId\\)\\] \\} \\}\\))",
+          "desc": "CORE invariant 21: the partner's driver dialog answers null for a cancelled delivery (the row keeps `driver` as history) - valid-before leg is the bare findOne on main before shoofi-server fix/cancelled-delivery-hide-courier; drop it once that has merged"
+        },
+        {
+          "file": "services/delivery/courier-status.js",
+          "regex": "driverName: (?:NAMELESS_STATES\\.has\\(state\\)|state === COURIER_STATES\\.SEARCHING) \\? null : firstName\\(",
+          "desc": "CORE invariant 21: the courier summary names nobody while searching and once cancelled - valid-before leg (SEARCHING only) is main before shoofi-server fix/cancelled-delivery-hide-courier; drop it once that has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
           "regex": "router\\.post\\(\"/api/delivery/store/order/cancel\", \\.\\.\\.storeOwnerOrDashboard, async",
           "desc": "only the delivery's own store (or staff) may cancel it as the store (CORE invariant 19)"
         },
@@ -920,6 +930,24 @@
           "file": "components/delivery-driver/TwinOrderCard.tsx",
           "regex": "getLandmarkNote\\(primary\\.order\\?\\.order\\?\\.address\\)",
           "desc": "twins collapse into TwinOrderCard, so the landmark banner must be wired there too or it silently does not exist for twins"
+        },
+        {
+          "file": [
+            "utils/customer-notes.ts",
+            "components/delivery-driver/OrderCard.tsx"
+          ],
+          "regex": "(?:const raw = delivery\\?\\.order\\?\\.order\\?\\.commentToStore;|const raw = order\\?\\.order\\?\\.order\\?\\.commentToCourier;)",
+          "desc": "reference C1: the note to the restaurant is read from bookDelivery.order.order.commentToStore (2nd alternative = main before feat/driver-notes-visible; drop it once merged)"
+        },
+        {
+          "file": "components/delivery-driver/TwinOrderCard.tsx",
+          "regex": "(?:const sideCommentToStore = getCommentToStore\\(side\\);|const items = side\\.order\\?\\.order\\?\\.items \\|\\| \\[\\];)",
+          "desc": "reference C1: a twin shows each store's own note inside its pickup block, never in the shared header (2nd alternative = main before feat/driver-notes-visible)"
+        },
+        {
+          "file": "components/delivery-driver/OrderItemsModal.tsx",
+          "regex": "(?:getItemNote\\(item\\)|const OrderItemsModal: React\\.FC<OrderItemsModalProps> = \\(\\{)",
+          "desc": "reference C1: the courier's items list shows each meal's items[].note (2nd alternative = main before feat/driver-notes-visible)"
         }
       ]
     },
