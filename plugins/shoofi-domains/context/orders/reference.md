@@ -1441,6 +1441,16 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   - **No edit path and no `bookDelivery` mirror.** It is not «הערות לשליח» (`commentToCourier`),
     which is delivery-only and editable through `POST /api/order/comment-to-courier`.
 
+- **Customer note to the courier in the driver popup** (partner `feat/driver-notes-visible`,
+  2026-11-20). The «تفاصيل السائق» popup (`components/dialogs/driver-details.v3.tsx`, and the v1
+  `driver-details.tsx` behind `ORDER_DIALOGS_V3`) shows `order.order.commentToCourier` under the
+  phone, labelled «ملاحظات الزبون للمندوب» / «הערות הלקוח לשליח», in the v3 note colours, whether
+  or not a courier is assigned yet. Only the v3 orders list (`screens/admin/order/list/index.v3.tsx`)
+  passes it (`courierNote={getCourierNote(selectedOrderForDriverDetails)}`); the v1/v2/school lists
+  and the delivery-only lists do not. Reader: `helpers/order-courier-note.ts` `getCourierNote`,
+  which reuses `normalizeCustomerNote` (strings only, ≤ 200). Read-only: the store cannot edit it;
+  support edits it through `POST /api/order/comment-to-courier`.
+
 - **Combo lines on the admin order card** (CORE invariant 12 "Readers", branch
   `fix/admin-order-combo-picks`, 2026-11-17). Before it, `CardOrder` tested only
   `selectedExtras`, which is `{}` on a combo line, so it printed "תוספות: —" (order 5160-7994).
