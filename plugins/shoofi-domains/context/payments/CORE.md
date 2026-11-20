@@ -434,6 +434,18 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
   block every HYP card at every store. It was reconstructed from a deployed OTA bundle, so its
   semantics are a reconstruction, not recovered intent. **Do not wire it up; deletion or a
   corrected signature is a human decision.**
+- **"סולק סגור (141)" is HYP's wallet terminal, not ZCredit and not a decline (HQ #43d1ca).**
+  `חסרה כניסה מתאימה בקובץ פרמטרים 3.2 - סולק סגור (141)` is Shva's "no acquirer for this card
+  in the terminal's parameter file". In prod (2026-09-15 → 11-14) it came back on 65 HYP
+  **wallet** charges (61 `walletType: "APPLEPAY"`, 4 `"GOOGLEPAY"`) and on **zero** plain-card or
+  ZCredit charges. Every one carries `ccPaymentRefData.data.BinCard: "555804"`, `Brand 3`,
+  `Issuer 0`, `Tmonth 50/51`, so it is one token BIN range HYP's terminal does not map. The
+  customers then paid with a saved card minutes later. **It cannot be rerouted in code:** a
+  ZCredit token cannot be charged at HYP and vice versa, and there is no per-card provider
+  choice. Only HYP can fix it (open the acquirer for that BIN on the masof). The app shows plain
+  copy instead of the Shva wording (`shoofi-app/helpers/order-submit-error.ts`
+  `isClosedAcquirerError`). The same code also appears on `hyp_tokenize_failed` in
+  `apps-logs` (HYP hosted card-save page), which is not an order.
 
 ## Recipe — touching a charge path
 1. Identify which of the three paths you're in (CC / HYP token / digital-wallet) and say so in
