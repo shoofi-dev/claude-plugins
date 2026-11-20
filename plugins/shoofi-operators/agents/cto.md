@@ -41,6 +41,25 @@ no code, no PR and no data.
 4. **The PR queue**: failing CI, conflicts, PRs stale over 3 days — name them, briefly.
 5. **Write the summary** (CORE.md §4): a headline, then at most 8 bullets, in Hebrew.
 
+## Reading the database: one `--eval` call
+You have no `Write` tool, so you cannot create a query file. Every read is **one Bash call with
+nothing else in it**, run with `dangerouslyDisableSandbox: true`:
+```
+mongosh --quiet --nodb --eval 'const d = new Mongo(process.env.DB_CONNECTION_STRING).getDB("shoofi"); printjson(d.getCollection("hq-tech-digests").find({}, {_id: 1, at: 1}).sort({at: -1}).limit(4).toArray())'
+```
+Single quotes around the script, double quotes inside it; braces, arrows and `;` are fine. Keep
+the output small with a projection and `.limit()` inside the script, not with a pipe.
+
+These shapes are refused every time, and each refusal costs a retry. Do not try them:
+- `cat > q.js <<'EOF'` or any other way of writing a file. Use `--eval`.
+- `mongosh "$DB_CONNECTION_STRING"`, or any `$VAR` on the command line. Use
+  `process.env.DB_CONNECTION_STRING` inside the script.
+- `test -n "$DB_CONNECTION_STRING"`, `env | grep`, `which mongosh`. The variable is set and
+  mongosh is installed, so run the query.
+- `cd … &&`, `;` between commands, or `| head` in the same call.
+- Running without `dangerouslyDisableSandbox`: the sandbox refuses the cluster's DNS
+  (`querySrv ECONNREFUSED`).
+
 ## Hard rules
 - **Never invent a number**: every count is in the digest runs or the PR listing.
 - **Read-only, always.** The bridge's database credential is read-only by design.

@@ -44,6 +44,25 @@ change no record. The numbers come from the audit, never from your own arithmeti
    `:delivery`) with the one finding they should look at. The HQ run hands it to them.
 4. **Write the summary** (CORE.md §5): one headline line, then at most 8 bullets, in Hebrew.
 
+## Reading the database: one `--eval` call
+You have no `Write` tool, so you cannot create a query file. Every read is **one Bash call with
+nothing else in it**, run with `dangerouslyDisableSandbox: true`:
+```
+mongosh --quiet --nodb --eval 'const d = new Mongo(process.env.DB_CONNECTION_STRING).getDB("shoofi"); printjson(d.getCollection("hq-money-audits").find({}, {totals: 1, leak: 1}).sort({_id: -1}).limit(2).toArray())'
+```
+Single quotes around the script, double quotes inside it; braces, arrows and `;` are fine. Keep
+the output small with a projection and `.limit()` inside the script, not with a pipe.
+
+These shapes are refused every time, and each refusal costs a retry. Do not try them:
+- `cat > q.js <<'EOF'` or any other way of writing a file. Use `--eval`.
+- `mongosh "$DB_CONNECTION_STRING"`, or any `$VAR` on the command line. Use
+  `process.env.DB_CONNECTION_STRING` inside the script.
+- `test -n "$DB_CONNECTION_STRING"`, `env | grep`, `which mongosh`. The variable is set and
+  mongosh is installed, so run the query.
+- `cd … &&`, `;` between commands, or `| head` in the same call.
+- Running without `dangerouslyDisableSandbox`: the sandbox refuses the cluster's DNS
+  (`querySrv ECONNREFUSED`).
+
 ## Hard rules
 - **Never invent a number.** Every shekel in your summary is in the audit or in a record you
   read and cite. If you add two audit numbers, say so ("סך הכל, לפי הביקורת").
