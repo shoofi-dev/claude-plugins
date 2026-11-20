@@ -475,9 +475,19 @@ and stores it (`shoofi-server services/marketing/social-plan.js absorbPlan`):
   Shadi stays for explainers and reels;
   `story` with a subject that is not a dish is drawn by the creator too — the tall picture with
   its words on it (owner, 2026-11-20). A Story shows no caption, so **the `caption` you write is
-  the text on the picture: one short line**, and `pictureNote` describes the scene. A `story`
-  about a dish or with no subject, and every `reel`, is a file the owner uploads, so plan one
-  only when `pictureNote` says exactly what to film. A carousel is refused.
+  the text on the picture: one short line**, and `pictureNote` describes the scene;
+  `reel` with a subject is made by the creator too (owner, 2026-11-20, after scoring a hand-made
+  one 5): **12 seconds, three 4-second shots of the presenters in ONE small scene**, two short
+  lines of text on each shot, a music track, no voice; with a dish subject they eat that dish.
+  Write `pictureNote` as three beats — the hook (the feeling, or the order arriving in a Shoofi
+  bag), the middle (the dish or the idea in action), the close (they look at the camera) — one
+  place, small movements, nothing that must be counted from shot to shot. **It costs about as
+  much as 25 pictures** (≈3,000 Artlist credits for the video on top of three stills), and the
+  owner approves the three stills before the video is made: plan **at most one creator reel a
+  week**, for the week's strongest subject, and say in `why` what it should earn. It is 12 s,
+  below §4a's 30–90 s band — the same tested exception as the promo reel: read its skip rate
+  and shares. A `reel` or `story` with no subject is a file the owner uploads, so plan one only
+  when `pictureNote` says exactly what to film. A carousel is refused.
 - A slot outside the week, in the past, with a broken time or with no caption is **dropped**
   and listed to the owner; at most 12 slots are read. A new plan replaces only your own
   untouched suggestions — a slot the owner edited, drew, approved or added stays, and the job
