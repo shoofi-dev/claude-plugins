@@ -523,7 +523,16 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - **A failed print is shown, not just logged** (`utils/print-failures.ts`, in memory, the
       printing tablet only): «لم تُطبع» on the card + a bar under the dashboard / orders board (✕ hides the bar until a
       print succeeds, then the next failure shows it again — shoofi-partner#82);
-      cleared when the order is marked printed. The server still only knows `isPrinted:false`.
+      cleared when the order is marked printed, on «اطبع مرة ثانية», or when the tablet reads
+      the order back finished (`printFailures.forgetFinished`, fed by every orders read in
+      `stores/orders` `getOrdersFromServer` and by `updateOrderStatus`). Finished for print =
+      `PRINT_FINISHED_STATUSES`: cancelled `4,5,7,8,9` + left the store `10,11,12`. NOT `2`/`3`:
+      `ORDER_STATUS.COMPLETED` (`"2"`) means READY in the partner app. Only an order SEEN
+      finished is dropped, never one that is merely missing from a list. The one read of
+      cancelled orders on a tablet is the v3 cancel poll (`CancelledOrderAlertGlobal`, page 1
+      = 10 rows by `created`), so a v2 build clears handed-over orders only. A print that
+      failed while the order was already finished keeps its mark. The server still only
+      knows `isPrinted:false`.
 18. **THE STORE-CALENDAR AND ORDER-ADMIN READS ARE GATED PER AUDIENCE, AND THE PARTNER GATE IS
     STORE MEMBERSHIP, NOT "THE TOKEN'S OWN STORE"** (shoofi-server `services/orders/admin-access.js`).
     Until 2026-10-30, anyone who sent a store's `app-name` could close its hours, or read its
