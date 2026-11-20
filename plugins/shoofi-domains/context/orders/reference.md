@@ -489,6 +489,20 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   (`ALARM_SETTINGS.serverReminderCount` / `serverReminderIntervalMs` in shoofi-partner).
   Changing the cron schedule or either constant means changing that copy too, or the two
   start ringing on top of each other again.
+  ⚠️ **An order number inside Arabic or Hebrew push text goes through `ltr()`**
+  (`utils/ltr-text.js`), which wraps it in left-to-right marks (U+200E). Put in raw, the
+  phone swaps the two halves after an Arabic word: order `4186-3017` was shown as
+  `3017-4186` in the store reminder push while the orders screen was right (Cacao,
+  2026-11-17). Wrapped today: the new-order alert and its reminders
+  (`utils/persistent-alerts.js`), the overdue and future-order pushes
+  (`utils/crons/order-overdue-checker.js`, `future-order-reminder.js`), the feedback push
+  (`feedback-notification-cron.js`), and the delay / started-preparing / drive-in pushes
+  in `routes/order.js` (there the `#` is inside the wrap). Only the visible `title`/`body`
+  is wrapped — `data.orderNumber` / `data.orderId` stay plain, the apps match on them.
+  A new push text with an order number next to Arabic/Hebrew words must do the same;
+  `test/integration/order-number-ltr-in-notifications.js` fails on a raw one in those
+  files. Not covered: Hebrew admin/HQ titles and coupon names (number after Hebrew or
+  Latin text does not flip).
   ⚠️ **The cutoff is deliberately not round.** `REMINDER_TICK_SKEW_MS = 5 * 1000`, and
   the query builds `cutoff` from `REMINDER_CUTOFF_AGE_MS` (= interval − skew), never
   `now - REMINDER_INTERVAL_MS`. Since the interval now *equals* the cron period, a flat
