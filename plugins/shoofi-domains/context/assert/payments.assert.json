@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa till money + reference 6b: a till payment with a money method and every till refund need an open till session, 409 NO_OPEN_SESSION, checked before the manager PIN; sessionId on each entry); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@main 3acf0b66 + shoofi-app@main c7f8204 / 2026-11-19 (CORE invariant 10: wallet orders are unconditionally manual on the HYP path only; the ZCredit wallet session is built in the app with fixed VAT); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa till money + reference 6b: a till payment with a money method and every till refund need an open till session, 409 NO_OPEN_SESSION, checked before the manager PIN; sessionId on each entry); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -357,6 +357,21 @@
           "file": "services/coupons/public-coupon.js",
           "regex": "const UPCOMING_WINDOW_DAYS = 30;",
           "desc": "CORE: an upcoming coupon shows only within 30 days of its start"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "Apple Pay: Processing invoice for docId[\\s\\S]{0,200}?invoiceMailService\\.saveInvoice\\(docId, req\\)",
+          "desc": "CORE invariant 10: a ZCredit wallet order (finalizeApplePayOrder) only fetches the document ZCredit issued - it gets no manual documents, so it does not follow the store's VAT status"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "issueWalletOrderInvoices\\(\\{ db, orderId, req, appName \\}\\)\\.catch",
+          "desc": "CORE invariant 10: the unconditionally-manual wallet documents are issued on the HYP wallet path only"
+        },
+        {
+          "file": "services/payments/wallet-provider-config.js",
+          "regex": "async function resolveWalletProvider\\(appDb, storeDoc\\)",
+          "desc": "CORE invariant 10: which gateway a wallet order takes (hyp vs zcredit) is resolveWalletProvider"
         }
       ]
     },
@@ -411,6 +426,16 @@
           "file": "services/public-coupon.ts",
           "regex": "axiosInstance\\.get\\(`coupons/\\$\\{encodeURIComponent\\(couponId\\)\\}/public`, \\{ silent: true \\}",
           "desc": "CORE: the coupon page reads the public coupon silently (its own 404/error states, never the app-wide dialog)"
+        },
+        {
+          "file": "data/zcredit-config.ts",
+          "regex": "CreateInvoice: \"true\"",
+          "desc": "CORE invariant 10: the ZCredit wallet session is built in the app and asks ZCredit to issue the document"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "IsTaxFree: \"false\"",
+          "desc": "CORE invariant 10: the ZCredit wallet session's cart items are never tax-free, whatever the store's VAT status (the server is not in the CreateSession call)"
         }
       ]
     },
