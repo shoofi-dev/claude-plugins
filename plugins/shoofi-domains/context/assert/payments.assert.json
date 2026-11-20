@@ -104,6 +104,11 @@
       },
       "patterns": [
         {
+          "file": "routes/twin-order.js",
+          "regex": "async function verifyAndCaptureTwinSession\\(\\{ req, group \\}\\)",
+          "desc": "CORE invariant 9: the ZCredit WebCheckout twin session captures in verifyAndCaptureTwinSession, which issues no per-store documents (ZCredit's own session receipt is the only one)"
+        },
+        {
           "file": "services/kopa/till-orders.js",
           "regex": "const dueC = totalC \\+ tipC;",
           "desc": "CORE Kopa till money: the tip is NOT in total; amountDue = total + tip"
