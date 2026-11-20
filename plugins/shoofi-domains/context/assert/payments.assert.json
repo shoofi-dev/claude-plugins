@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa till money + reference 6b: a till payment with a money method and every till refund need an open till session, 409 NO_OPEN_SESSION, checked before the manager PIN; sessionId on each entry); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@main 3d7673ba / 2026-11-18 (CORE invariant 10: manual issuance through EZcount - the flag in invoice-config.js, document types 320 / 400 in order-invoices.js + utils/hyp.js, no gateway invoice params under the flag; routes/order.js:2758 replaced by an anchor); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa till money + reference 6b: a till payment with a money method and every till refund need an open till session, 409 NO_OPEN_SESSION, checked before the manager PIN; sessionId on each entry); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -127,6 +127,61 @@
           "file": "services/kopa/till-money.js",
           "regex": "if \\(amountC > refundableC\\) \\{",
           "desc": "CORE Kopa till money: total refunds never exceed paidAmount"
+        },
+        {
+          "file": "services/payments/invoice-config.js",
+          "regex": "!envKill\\(\"MANUAL_INVOICES_KILL\"\\) &&\\s*\\(stored\\.manualInvoicesEnabled \\?\\? DEFAULTS\\.manualInvoicesEnabled\\) === true",
+          "desc": "CORE invariant 10: manual issuance is switched by invoiceConfig.manualInvoicesEnabled on shoofi.store {id:1}; the env kill can only force it off; default off"
+        },
+        {
+          "file": "services/payments/invoice-config.js",
+          "regex": "if \\(storeDoc\\?\\.isManualInvoicesEnabled === false\\) return false;\\s*return config\\.enableForAllStores === true;",
+          "desc": "CORE invariant 10: the per-store isManualInvoicesEnabled is tri-state - false opts one store out, absent follows enableForAllStores"
+        },
+        {
+          "file": "services/payments/order-invoices.js",
+          "regex": "isExempt \\? hypService\\.DOC_TYPE\\.RECEIPT : hypService\\.DOC_TYPE\\.TAX_INVOICE_RECEIPT",
+          "desc": "CORE invariant 10 document types: customerDocType gives an exempt store's document RECEIPT (400), everyone else TAX_INVOICE_RECEIPT (320)"
+        },
+        {
+          "file": "utils/hyp.js",
+          "regex": "TAX_INVOICE_RECEIPT: 320,\\s*RECEIPT: 400,",
+          "desc": "CORE invariant 10 document types: the EZcount codes are 320 (invoice+receipt) and 400 (receipt)"
+        },
+        {
+          "file": "utils/hyp.js",
+          "regex": "const vatType = params\\.isExempt \\? 'NON' : 'INC';",
+          "desc": "CORE invariant 10 document types: an exempt customer document's lines carry vat_type NON, every other INC"
+        },
+        {
+          "file": "services/payments/order-invoices.js",
+          "regex": "kind: INVOICE_KIND\\.DELIVERY,\\s*appName,\\s*amount: shipping,[\\s\\S]{0,120}?docType: hypService\\.DOC_TYPE\\.TAX_INVOICE_RECEIPT,\\s*isExempt: false,",
+          "desc": "CORE invariant 10 document types: the delivery document is always 320 with VAT, whatever the store's status"
+        },
+        {
+          "file": "utils/vat.js",
+          "regex": "doc\\?\\.accounting\\?\\.bankAccount\\?\\.businessType === EXEMPT_BUSINESS_TYPE",
+          "desc": "CORE invariants 9 + 10: exempt is keyed on accounting.bankAccount.businessType === 'exempt' of the store doc"
+        },
+        {
+          "file": "utils/zcredit-invoice.js",
+          "regex": "params\\.manualInvoices \\? undefined : buildZCreditInvoiceReceipt\\(params\\)",
+          "desc": "CORE invariant 10: under manual issuance the ZCredit charge carries no ZCreditInvoiceReceipt block"
+        },
+        {
+          "file": "utils/hyp-pay.js",
+          "regex": "if \\(params\\.manualInvoices\\) return \\{\\};",
+          "desc": "CORE invariant 10: under manual issuance the HYP charge carries no SendHesh / EZ.* invoice params"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "if \\(!\\(await invoiceConfig\\.isManualInvoicingEnabled\\(req\\.app\\.db, storeDoc\\)\\)\\) return;",
+          "desc": "CORE invariant 10: a card order's documents are issued after the charge only when the flag is on (issueOrderInvoicesIfManual); wallet orders skip this gate"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "savedCard\\?\\.provider === \"HYP\"",
+          "desc": "CORE invariant 8 + Known status hyp_enabled: the saved-HYP-card provider lookup in /api/order/create (the anchor that replaced routes/order.js:2758)"
         },
         {
           "file": "services/payments/order-invoices.js",

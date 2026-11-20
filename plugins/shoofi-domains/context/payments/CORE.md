@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/coupon-draft-customer-area / 2026-11-17 (Who a coupon applies to: supportedCities = the store's pickup zone, supportedAreas = the customer's route); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@main 3d7673ba / 2026-11-18 (invariant 10: manual issuance through EZcount — document types 320 / 400 for an exempt store, where the flag is read, the ZCredit wallet session it does not reach, prod state; stale `routes/order.js:2758` references replaced by an anchor); shoofi-server@fix/coupon-draft-customer-area / 2026-11-17 (Who a coupon applies to: supportedCities = the store's pickup zone, supportedAreas = the customer's route); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -22,9 +22,12 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
 ## Scope
 **Yours:** `routes/payments.js`, `routes/payments/validate-card.js`, `routes/creditCard.js`,
 `routes/hyp-pay.js` (HYP charge/tokenize), `routes/payment-methods.js`, `utils/hyp-pay.js`,
-`utils/invoice-mail.js` (per-order receipt), and the payment functions inside `routes/order.js`
-(`processCreditCardPayment`, `processHypTokenPayment`, `finalizeApplePayOrder`,
-`updateCCPayment`). Client: the payment UI in `shoofi-app`.
+the per-order customer document — `services/payments/invoice-config.js`,
+`services/payments/order-invoices.js`, `utils/crons/invoice-retry-cron.js` (manual issuance
+through EZcount, invariant 10) and `utils/invoice-mail.js` (the Gmail fetch of a
+GATEWAY-issued document; only the old path feeds it) — and the payment functions inside
+`routes/order.js` (`processCreditCardPayment`, `processHypTokenPayment`,
+`processHypWalletPayment`, `finalizeApplePayOrder`). Client: the payment UI in `shoofi-app`.
 **Not yours:** settlement/reports/store invoices/MASAV = **`accountant`**; order lifecycle =
 `orders`. `lib/payments/calc.js` lives with accountant.
 
@@ -59,8 +62,9 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    (`captureCombined`) charges twin orders. `POST /api/twin-order/pay` never enters
    `routes/order.js` — twin child orders are inserted straight into each store DB — so every
    guard in the single-order charge path is *structurally unreachable* from the twin path.
-   Not theoretical: the saved-HYP-card provider routing added at `routes/order.js:2758` on
-   2026-07-29 left the twin path untouched, and every twin order paid with a saved HYP card
+   Not theoretical: the saved-HYP-card provider routing added to `/api/order/create` on
+   2026-07-29 (the `savedCard?.provider === "HYP"` lookup in `routes/order.js`) left the twin
+   path untouched, and every twin order paid with a saved HYP card
    failed with `"תאריך תוקף לא במבנה תקין ,expirationDate"` until the same lookup was ported
    into `twin-payment-service.js`. **When you change charge routing, provider selection or a
    charge guard, apply it in both places — or say in the PR why the twin path doesn't need it.**
@@ -103,6 +107,45 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    `createInvoiceOnBehalf` needs a store connected to HYP and none are — so the real seller
    is named as free text. Store documents follow invariant 9; the DELIVERY document is
    Shoofi's own revenue and always carries VAT.
+   **Document types** (EZcount `type`, `DOC_TYPE` in `utils/hyp.js`), chosen per document by
+   `customerDocType` in `order-invoices.js`:
+   | document | regular store | exempt store (עוסק פטור) |
+   |---|---|---|
+   | store | **320** חשבונית מס/קבלה, lines `vat_type: INC` | **400** קבלה, lines `vat_type: NON` |
+   | delivery | **320**, `INC` | **320**, `INC` — never 400 |
+   So an exempt store's delivery order is one 400 plus one 320. "Exempt" is invariant 9's
+   flag — `accounting.bankAccount.businessType === 'exempt'` on the per-tenant `store {id:1}`
+   doc — read once when the documents are planned (`loadStoreFacts`) and frozen on each
+   `order.invoices[]` entry as `docType` + `isExempt`; a later `businessType` edit changes
+   no document already recorded. 300 / 305 are the SETTLEMENT types (`routes/hyp.js`,
+   accountant) and are never a customer document.
+   **Where the flag is read** — `isManualInvoicingEnabled(appDb, storeDoc)`, at charge time
+   only, always with the per-tenant store doc: `processCreditCardPayment` (ZCredit: the
+   `ZCreditInvoiceReceipt` block is left out, `utils/zcredit-invoice.js`) and
+   `processHypTokenPayment` (HYP: `buildInvoiceParams` returns `{}`, `utils/hyp-pay.js`),
+   each followed by `issueOrderInvoicesIfManual` in `/api/order/create`; the J5 capture
+   (`services/payments/order-authorization.js`, documents issued at capture);
+   `captureCombined` (twin, the PRIMARY store's flag); and
+   `services/payments/order-recharge.js`, which suppresses the gateway document whenever the
+   order already has one. Per-store `isManualInvoicesEnabled` is tri-state: `true` in,
+   `false` out, absent follows `invoiceConfig.enableForAllStores`. Admin switch:
+   `GET|POST /api/admin/invoice-config` (`routes/admin/invoice-config.js`).
+   **Paths the flag does not decide:** HYP Apple/Google Pay (`processHypWalletPayment`,
+   twin `chargeCombinedWalletHyp`) is ALWAYS manual — `issueWalletOrderInvoices` runs
+   whatever the flag says. **ZCredit Apple/Google Pay sessions (`finalizeApplePayOrder`,
+   `order.payment_provider: "APPLEPAY"`) never consult it:** ZCredit still issues that
+   document itself and `utils/invoice-mail.js` fetches it, so those orders carry
+   `ccPaymentRefData.docId`/`url` and no `invoices[]`. Not checked: what type and VAT that
+   session document carries for an exempt store.
+   **In production the flag is ON for every store** (checked 2026-11-18, read-only):
+   `shoofi.store {id:1}.invoiceConfig` = `manualInvoicesEnabled: true`,
+   `enableForAllStores: true` since 2026-08-10, and no store doc carries
+   `isManualInvoicesEnabled: false`. `MANUAL_INVOICES_KILL` is env and was not readable, but
+   documents were issued the same day. 16,475 orders carry `invoices[]`, every entry
+   `issued`: store 320 × 15,879, store 400 × 566 (all on stores exempt today), delivery
+   320 × 10,502. Of 2,511 live card orders in the last 14 days, the only 21 without
+   `invoices[]` were ZCredit Apple Pay sessions (plus one twin leg). So "the gateway issues
+   the receipt" is today true only for that path and for a rollback.
    ⚠️ **The documents MUST sum to the amount charged** (`reconcileToCharge`). A customer
    adding up their documents and getting a different number than their card statement is
    the failure this whole module is shaped around; the planners are total-driven for that
@@ -407,12 +450,17 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
 - **Flagged, needs verdict:** `updateCCPayment` references an undefined `orderId` in its
   background block; `refundPartial`'s ZCredit field shape is unverified across terminals
   (sandbox first).
+  *Looks obsolete (checked 2026-11-18, for a human to close):* `POST /api/order/updateCCPayment`
+  and its handler were removed from `routes/order.js` on 2026-11-03 (shoofi-server e53d2a3d);
+  the name no longer exists on main. The `refundPartial` half still stands.
 - **RESOLVED by manual invoicing:** the exempt document's TITLE used to be unfixable —
   neither gateway publishes a per-transaction document-type parameter, so `EZ.type` and
   ZCredit's `Type` were guesses that could reject a live charge. Issuing the document
   ourselves makes it a documented `createDoc` field: 320 (חשבונית מס/קבלה) normally, 400
-  (קבלה) when exempt — `customerDocType` in `order-invoices.js`. The old gateway path still
-  cannot set it, which is one more reason the flag is the direction of travel.
+  (קבלה) when exempt — `customerDocType` in `order-invoices.js` (table in invariant 10;
+  566 type-400 documents issued in prod by 2026-11-18). The old gateway path still
+  cannot set it (`utils/exempt-document.js`, `CONFIRMED_BY_SPIKE = false`: VAT is zeroed,
+  the title is not), which is one more reason the flag is the direction of travel.
 - **UNVERIFIED against a real document:** the local HYP test masof (`0010332520`) has the
   EZcount **invoicing module disabled** — charges return no `Hesh` field and every
   `PrintHesh` link answers "קובץ PDF חתום עדיין לא הופק במערכת". Live local runs therefore
@@ -427,7 +475,8 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
   `openNewCreditCardDialog` in `shoofi-app/components/payment-method/index.tsx`, which uses it
   to pick the HYP hosted tokenization flow over the legacy ZCredit add-card form. Because
   credentials are central (invariant 1), **a saved HYP card is chargeable for any store**, and
-  `routes/order.js:2758` correctly routes such cards without checking this flag.
+  the `savedCard?.provider === "HYP"` lookup in `/api/order/create` (`routes/order.js`)
+  correctly routes such cards without checking this flag.
   ⚠️ A per-store `storeData` never carries `hyp_enabled`, so any per-store check against it
   evaluates falsy for every store. `shoofi-app/helpers/hyp-card.ts` `isCardUsable(card,
   storeData)` is written that way and has **zero call sites** — wiring it up as typed would
