@@ -1,6 +1,6 @@
 ---
 domain: customers
-last-verified: shoofi-server@feat/instagram-find-by-town / 2026-11-17 (invariant 17: list rows carry town; find-all appNames - search one town or one store); shoofi-server@feat/instagram-finder / 2026-11-17 (invariant 17: «חפש אינסטגרם» - a page found on the web is a suggestion in instagramSearch, never the handle; the scan waits for «אשר»; rejected pages never offered again; Brave searches counted per month); shoofi-delivery-web@main cf232134 (#404) / 2026-11-17 (CORE invariant 17: the approval queue is «קידומים» status pending, /admin/marketing?tab=promos&status=pending; /admin/marketing/drafts and ?tab=approve forward there; pin accepts the new forward); shoofi-server@feat/story-video-upfront / 2026-11-15 (invariant 17: the story as a video chosen up front - storyVideo on a creation set, started by the server once the story picture is ready, once, never a voice or Shadi); shoofi-server@feat/edit-opens-workspace / 2026-11-15 (invariant 17: «עריכה» opens a made picture in the creation workspace - POST …/sets/for-job/:jobId, the set that made it or a new one around the job, no drawing); shoofi-server@fix/placement-dish-photos / 2026-11-15 (invariant 16: the placement check judges wrong food against the dish photos, the menu name only a label); shoofi-server@feat/sets-by-item-archive-reuse / 2026-11-15 (invariant 17: a creation set can join an existing item - itemId, attached, never moves the item's timing; a set place can take a «יצירות» file - media, no job; item views carry setId; «יצירות» rows keep the reviewer score + latest vote); shoofi-server@feat/creation-sets / 2026-11-14 (invariants 16 + 17: creation sets - one «צור N יצירות» = one director plan, a draft per place through each place's own writer, the item's own approve; pickModel and targetForLink moved to services, unchanged); shoofi-server@feat/kopa-store-enabled / 2026-11-13 (invariant 22: Kopa per-store switch - shoofi.kopaStores, gate first on /api/kopa, same store name as each route, 403 KOPA_NOT_ENABLED / QR 404, fail closed; cacao ON); shoofi-server@feat/kopa-phase6 eb6ae840 / 2026-11-12 (reference 5h: Kopa customer profiles never read shoofi.customers - no by-phone name hint, no centralCustomerId); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 21 + reference 5g/5h: Kopa phase 4a own sessions and PINs - 6-digit code, 15 failed verifies per phone+store per 24h, 20 requests per IP per hour, verifyManagerPin always limited, never writing storeUsers; phase 6 per-store customer profiles, central record read-only); shoofi-server@feat/kopa-phase1 / 2026-11-11 (scope + reference 5f: Kopa read-only customers and staff routes, gates, spend definition, no-token staff projection); shoofi-server@fix/current-location-addresses + shoofi-app@fix/current-location-flow / 2026-11-10 (invariant 19: no saved address is a current-location pin - guard, confirm, default endpoint, support's fix, cleanup rules; scripts applied 2026-11-10; the app's pin is session-only for everyone); shoofi-server@fix/address-scripts-real-confirmed-city-conflict / 2026-11-10 (invariant 19: backfill confirms real addresses only, dedupe skips a city-text conflict); shoofi-server@feat/address-note-apartment-entrance / 2026-11-10 (invariant 20: saved-address notes / floor / apartment / entrance / street number cleaned on add and update, add keeps apartment + entrance, the note snapshots onto order.order.address.notes); shoofi-server@feat/confirmed-delivery-address / 2026-11-07 (invariant 19: the confirmed delivery address, the requireSavedDeliveryAddress guard, the first-address push saves only real addresses, the address cleanup / backfill / dedupe scripts); shoofi-delivery-web@feat/one-editor-for-places + shoofi-server@feat/coupon-by-id / 2026-11-07 (invariant 16: add/edit a place through the wizard step, ?stepContent= on edit); shoofi-server@feat/marketing-suggestions + shoofi-delivery-web@feat/marketing-suggestions / 2026-11-07 (invariant 11: «הצעות» GET /api/admin/marketing/suggestions); shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
+last-verified: shoofi-server@feat/create-upload-own / 2026-11-18 (invariant 17: «אעלה בעצמי» - a set place takes the person's own uploaded files, nothing drawn; a new picture reaches an approved / live banner, story or popup on save); shoofi-server@feat/instagram-find-by-town / 2026-11-17 (invariant 17: list rows carry town; find-all appNames - search one town or one store); shoofi-server@feat/instagram-finder / 2026-11-17 (invariant 17: «חפש אינסטגרם» - a page found on the web is a suggestion in instagramSearch, never the handle; the scan waits for «אשר»; rejected pages never offered again; Brave searches counted per month); shoofi-delivery-web@main cf232134 (#404) / 2026-11-17 (CORE invariant 17: the approval queue is «קידומים» status pending, /admin/marketing?tab=promos&status=pending; /admin/marketing/drafts and ?tab=approve forward there; pin accepts the new forward); shoofi-server@feat/story-video-upfront / 2026-11-15 (invariant 17: the story as a video chosen up front - storyVideo on a creation set, started by the server once the story picture is ready, once, never a voice or Shadi); shoofi-server@feat/edit-opens-workspace / 2026-11-15 (invariant 17: «עריכה» opens a made picture in the creation workspace - POST …/sets/for-job/:jobId, the set that made it or a new one around the job, no drawing); shoofi-server@fix/placement-dish-photos / 2026-11-15 (invariant 16: the placement check judges wrong food against the dish photos, the menu name only a label); shoofi-server@feat/sets-by-item-archive-reuse / 2026-11-15 (invariant 17: a creation set can join an existing item - itemId, attached, never moves the item's timing; a set place can take a «יצירות» file - media, no job; item views carry setId; «יצירות» rows keep the reviewer score + latest vote); shoofi-server@feat/creation-sets / 2026-11-14 (invariants 16 + 17: creation sets - one «צור N יצירות» = one director plan, a draft per place through each place's own writer, the item's own approve; pickModel and targetForLink moved to services, unchanged); shoofi-server@feat/kopa-store-enabled / 2026-11-13 (invariant 22: Kopa per-store switch - shoofi.kopaStores, gate first on /api/kopa, same store name as each route, 403 KOPA_NOT_ENABLED / QR 404, fail closed; cacao ON); shoofi-server@feat/kopa-phase6 eb6ae840 / 2026-11-12 (reference 5h: Kopa customer profiles never read shoofi.customers - no by-phone name hint, no centralCustomerId); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 21 + reference 5g/5h: Kopa phase 4a own sessions and PINs - 6-digit code, 15 failed verifies per phone+store per 24h, 20 requests per IP per hour, verifyManagerPin always limited, never writing storeUsers; phase 6 per-store customer profiles, central record read-only); shoofi-server@feat/kopa-phase1 / 2026-11-11 (scope + reference 5f: Kopa read-only customers and staff routes, gates, spend definition, no-token staff projection); shoofi-server@fix/current-location-addresses + shoofi-app@fix/current-location-flow / 2026-11-10 (invariant 19: no saved address is a current-location pin - guard, confirm, default endpoint, support's fix, cleanup rules; scripts applied 2026-11-10; the app's pin is session-only for everyone); shoofi-server@fix/address-scripts-real-confirmed-city-conflict / 2026-11-10 (invariant 19: backfill confirms real addresses only, dedupe skips a city-text conflict); shoofi-server@feat/address-note-apartment-entrance / 2026-11-10 (invariant 20: saved-address notes / floor / apartment / entrance / street number cleaned on add and update, add keeps apartment + entrance, the note snapshots onto order.order.address.notes); shoofi-server@feat/confirmed-delivery-address / 2026-11-07 (invariant 19: the confirmed delivery address, the requireSavedDeliveryAddress guard, the first-address push saves only real addresses, the address cleanup / backfill / dedupe scripts); shoofi-delivery-web@feat/one-editor-for-places + shoofi-server@feat/coupon-by-id / 2026-11-07 (invariant 16: add/edit a place through the wizard step, ?stepContent= on edit); shoofi-server@feat/marketing-suggestions + shoofi-delivery-web@feat/marketing-suggestions / 2026-11-07 (invariant 11: «הצעות» GET /api/admin/marketing/suggestions); shoofi-delivery-web@feat/marketing-ux-easy / 2026-11-07 (invariants 11 + 17: marketing glossary - one name per place / subject / action, הפסק להציג, the קידומים tab, a stopped place reads ended on the קידום page); shoofi-server@feat/marketing-end-remove + shoofi-delivery-web@feat/marketing-end-remove / 2026-11-03 (invariants 11 + 17: end through the channel's own field, remove = archive, nothing hard-deleted); shoofi-server@fix/delete-stuck-push + shoofi-delivery-web@fix/delete-stuck-push / 2026-11-02 (invariants 11 + 17: a push stuck sending is flagged on one rule and can be deleted); shoofi-server@feat/marketing-image-models + shoofi-delivery-web@feat/marketing-image-models + shoofi-bridge@feat/render-models / 2026-11-02 (invariant 16: the store logo + dishes as references, the model choice, two renders at once); shoofi-server@fix/push-approve-background-send + shoofi-delivery-web@fix/push-approve-background-send / 2026-11-01 (invariant 12: a click sends in the background, several at a time; invariant 17 push approve); shoofi-server@feat/marketing-approval + shoofi-delivery-web@feat/marketing-approval / 2026-10-30 (invariant 17 marketing approval); shoofi-server@feat/marketing-active + shoofi-delivery-web@feat/marketing-active / 2026-10-30 (invariant 11 active list); shoofi-server@feat/marketing-generate / 2026-10-30 (invariant 16 marketing content generation); shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (invariant 11 coupon page); shoofi-server@fix/customer-search-auth / 2026-10-30 (invariant 15 OTP code check, search and by-id gates); shoofi-server@fix/schools-auth / 2026-10-30 (invariant 14 school, teacher and admin-create gates); shoofi-server@feat/campaign-impact / 2026-10-29 (invariant 11 campaign impact); shoofi-server@feat/marketing-attribution + shoofi-app@feat/marketing-attribution / 2026-10-28 (invariant 11); shoofi-server@7185913e (feat/marketing-links) + shoofi-app@b31028da (feat/marketing-links) / 2026-10-28; shoofi-server@c1e495a8 (feat/push-cap-optout) / 2026-10-28; shoofi-server@30f1ce81 (feat/campaign-holdout) / 2026-10-28
 scope: full-stack (shoofi-server + all four apps)
 reference: ./reference.md   # endpoint tables, data model, referrals, per-repo client detail
 ---
@@ -559,8 +559,10 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       `hidden`, `not_new`. This is invariant 11's "promote existing offers only" at the content
       layer.
     - **The guard is the control, not the prompt.** `guard.js checkText` rejects any generated
-      percentage, ₪ amount, other number, date, time, Latin word (a code), month or weekday
-      name, "today only" / "tomorrow", "free" or "discount" that the facts do not allow
+      percentage, ₪ amount, other number, date, time, code (a Latin token with digits, or one
+      after "code" / "קוד" / "كود" — plain Latin words and names are NOT checked since 2026-11-18:
+      "GTA VI" was refused when the note said "gta 6"), month or weekday
+      name, "today only" / "tomorrow", "free" or "discount" (also English, whole words) that the facts do not allow
       (Arabic-Indic digits normalised first). One bad field drops the whole AR + HE idea; the
       retry is told why; none left → 422 `no_valid_copy`. Never "repair" a rejected token. The
       image job runs the same guard on its headline / caption before anything renders. It
@@ -580,8 +582,17 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       `docs/creative-engine.md`) draws banner / story / social pictures whenever a bridge
       heartbeats `compose` and `shoofi.store {id:1}.marketingCreativeEngine !== false` — else the
       one-shot path above. Its rules:
-      - The background is TEXT-FREE and drawn from the **dishes only** — the logo is NOT sent to
-        the model; the compositor places the real file. Default model GPT Image 2.6 (group 669).
+      - The background is TEXT-FREE and drawn from the **dishes only** — a store's logo is NOT sent
+        to the model; the compositor places the real file. Default model GPT Image 2.6 (group 669).
+      - **Shoofi's own logo is the exception** (`creative/own-brand.js`, 2026-11-18): a קידום with NO
+        store (a coupon for all stores, an occasion) is Shoofi's, so `references.chosenReferences`
+        gives it Shoofi's real logo (`assets/brand/logo/shoofi-logo.png`, uploaded once, reference id
+        `shoofi-logo`). The compositor sets it beside the words AND the generator gets it — only as
+        the print on Shoofi's packaging, in Shoofi's colours (lime #87EA5C, dark green #15330D),
+        "never invent another Shoofi mark". Before, such a picture had no logo reference and an
+        asked-for "Shoofi logo on the bag" came out as a made-up red "S" (WTS1LYMY). The picture
+        check answers `logoOk` for these jobs: a made-up logo rejects the picture even with the
+        text rule off (only «חופשי» lets it through). `references.logo: false` still drops it.
       - The layout is picked in code (`layouts.js`), **never one of the store's last two** for that
         channel (`marketingStoreProfiles.recent`).
       - The words on the picture (`kicker` / `tag` / `head` / `sub` per language) go through the
@@ -590,7 +601,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
         words where the picture is actually free and **rejects** stray lettering, wrong food or
         props out of scale. Wrong food is judged against the store's dish **photos** (the
         `subject` references), the menu name only as a label — a loose name («קוקיז קינדר» is a
-        drizzled slice) must not reject a faithful picture. Rejected: drawn once more (counts against `marketingImageDailyLimit`), then
+        drizzled slice) must not reject a faithful picture. A subject with NO dish (a Shoofi-wide
+        coupon / page) may have no food at all — only food that is shown is judged (`foodLine`;
+        before 2026-11-18 every such picture failed "no food is visible"). Rejected: drawn once more (counts against `marketingImageDailyLimit`), then
         the job fails `picture_rejected`.
       - The words are composed per language by the bridge's Chromium (`compose` task,
         `queue.js`), so a STORY now gets an Arabic and a Hebrew picture too (`mediaAR` /
@@ -659,7 +672,9 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       render is a `marketing image render` row (model `artlist:<id>`, backend `artlist`,
       `costUsd: 0`, `meta.credits` = that model's credits). A daily guard (`budget.js`) refuses with 429 past
       `shoofi.store {id:1}.marketingAiDailyBudgetUsd` (default $3) or
-      `marketingImageDailyLimit` (default 20 renders).
+      `marketingImageDailyLimit` (default 20 renders). Both are set in the admin, «היוצר» → «מכסה יומית»
+      (`GET/PUT /api/admin/marketing/creative/limits`, `budget.js todayUsage / saveLimits`; PUT is master /
+      admin only; images 1–500, $0.5–50). Prod was raised to 100 pictures on 2026-11-18.
     - **Revising a picture keeps every guarantee** (2026-10-31). `POST /:jobId/revise` with no
       notes ("עוד אפשרות") re-renders the same brief and words (`image.js rerender`, no Claude
       call) — with `model` ("צייר שוב עם…", 2026-11-02), drawn by that model, same references; with notes ("בקש שינוי") Claude gets the previous brief, its words and the fenced
@@ -755,9 +770,25 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
         (`createBanner` / `createStory` / `createNote`, the same functions the ads / stories / notes
         add routes call), the campaign controller's `createCampaign`, social.js `createSocial` —
         so the states are exactly the forms'. Link = the subject; areas = the store's areas, else
-        everyone. Saving again updates the same item and draft docs (a published one is left
-        alone); `approve: true` is the item's own approve (`item-approve.js approveItemNow`, also
+        everyone. Saving again updates the same item and draft docs. An approved / live one keeps
+        its timing, link and areas, but a NEW picture of a banner, story or popup reaches it (the
+        picture fields + a banner's title/description only, every story slot rewritten, no new
+        approval — what their own forms allow; the app is told `ads_updated` / `stories_updated`;
+        the place answers `replaced: true`, `replaceLivePicture`). A published post or a sent push
+        is left alone and, when something was changed for it, answers `note_he` (`LIVE_LOCKED_HE`);
+        `approve: true` is the item's own approve (`item-approve.js approveItemNow`, also
         behind `POST …/items/:id/approve`). Never fork a place's validation into the set.
+        - **A redraw gets what a new picture would** (2026-11-18, `syncJobWithSet` before the revise and
+          👎-fix redraws): the set's current `rules`, `occasionMarks`, «חופשי» prompt, and a missing logo
+          reference (Shoofi's own for a Shoofi-wide קידום) + `logoUrl`. Before it, a redraw kept what the
+          picture was made with — the generator invented a "Shoofi" logo with nothing to copy.
+        - **«צור שוב את כולם» plans again** (2026-11-18): `PUT …/sets/:id` `{ retry, replan: true }` runs
+          the director first with the set's CURRENT note, rules and occasion (`planFor`, which also learns
+          the occasion), then the retried places. A plain `retry` keeps the plan. Before this, a note or a
+          rule changed after «צור» never reached the picture. A redraw never throws a picture away: the
+          place's current picture goes to `places[].history` (≤ 12; the view shows the ready ones) and
+          `PUT {pick: {place, id}}` («השתמש בזו») swaps one back (404 `pick_bad`). The admin's «או רק:»
+          makes one place again.
         - **Joining an item** (2026-11-15): `POST …/sets` with `itemId` attaches the set to a קידום
           made elsewhere (`attached: true`): the subject is the ITEM's (a different one is 400
           `item_subject`), the timing starts as the item's (`items.freshPlan`), and save adds the
@@ -771,6 +802,44 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
           written for the place (`copies[place]`); a banner waits for them. Saving goes through the
           same writers and counts each file as used. «יצירות» rows also keep `review { score,
           verdict, vote }` (media-archive `withReviews`), copied from the job while it is kept.
+        - **A general קידום — the occasion** (2026-11-18, owner: "Black Friday, November sales, a
+          GTA 6 release — search the internet and learn about the promotion if it's not a store or
+          a meal"): a set whose subject is NOT a store / store_new / product, with a note, searches
+          the note on Brave first (`creative/occasion.js learnOccasion`, the finder's `braveSearch`
+          — same key, same monthly count) and gives the director the top titles + descriptions as
+          THE OCCASION section — context, never facts for the words. Kept on the set (`occasion`,
+          public: query + titles + urls + error). Never blocks: no key / no answer → planned from
+          the note. With NO dishes the set prompt says the occasion is the idea (knowledge.md "An
+          offer for all stores": no food, or takeaway in Shoofi's own packaging with the logo only from
+          the reference image — see "Shoofi's own logo" above; no other brand / logo / character / face). The words may name the occasion's Latin words and plain numbers the person typed
+          (`facts.allowOccasion`, applied at create / update and on later edits via
+          `factsForJob`); prices, percents and dates stay the subject's facts only. The Latin words of the
+          occasion's search result titles are allowed too (`allowOccasionNames`: "GTA VI" when the note said
+          "gta 6") — never their numbers. By default the
+          occasion's OWN marks (logo / title art, characters, signature look) are wanted in the picture
+          (job `occasionMarks`; the picture check and the reviewer allow them, no other brand's); the
+          set's `brandSafe: true` («זהירות משפטית») turns them off — owner's call, 2026-11-18.
+        - **«ערוך כללים»** (2026-11-18, `creative/rules.js`): `rules: { off, free, modelWords }` on a set —
+          12 switchable rules (faces, hands, text, brands, realDish, tooPerfect, photoReal, scale,
+          duplicates, alcoholPork, calmArea, safeZones) told to every AI step and dropped from the fixed
+          prompt lines / picture-check rejects; `free` = the note is the prompt as written (no director,
+          no reviewer; note required); `modelWords` = the model draws each language into the scene,
+          read back (`readWords`) and checked against the words asked for (`afterModelWords`, one
+          redraw, then `words_drawn_wrong`). **The words guard is never a switch.**
+        - **«אעלה בעצמי» — the person's own picture** (2026-11-18): `POST
+          /api/admin/marketing/media/upload` (multipart `file` + `place` banner|story|popup|social +
+          `lang` + the subject; `services/marketing/media-upload.js`, marketing roles) puts a JPEG /
+          PNG / WebP (≤ 15MB) on the CDN under `marketing-uploads/<channel>/` and adds a «יצירות» row
+          `source.type: "upload"`. The answer says the place's size (`SIZES`: banner 1920×1080, story
+          / popup 1080×1920, post 1080×1080 — the creator's own) and `fit: fits|crop`, `small`; a
+          shape is warned about, never refused. A set takes it as `media: { place: { ar?, he?, all? }
+          }` on POST or PUT (`uploadPick`): the place is `uploaded: true`, nothing drawn, reviewed or
+          budgeted, and **a set with nothing to draw makes no director call**. Words without writing
+          any (`uploadCopy`): a banner's title + description = the subject's name (the app draws no
+          words over a banner that has both); a story / popup has no caption; a post's caption IS
+          written (a post must have one). An uploaded story is never auto-made a video. `PUT retry`
+          on an uploaded place draws it again. In the admin: «התמונות» in the brief
+          (`create/PlaceUploads.tsx`), «היוצר יצור / אעלה בעצמי» per picture place.
         - **«עריכה» opens the workspace** (2026-11-15): `POST …/sets/for-job/:jobId` (`openForJob`)
           → `{ setId, place }`. A job a set made → that set (`job.creationSet`); any other v2
           picture → a NEW set around it (one place = the existing job, `plan: null`, `fromJob`, no
