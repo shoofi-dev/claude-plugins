@@ -355,7 +355,32 @@ Plus: **bonuses** (`drivers-bonuses`, read straight from Mongo by `deliveryCompa
 only by the dashboard-only `/api/shoofiAdmin/driver-bonuses*` routes, CORE invariant 17), **compensations** (`shoofi.compensations`, `compensationFor:'driver'`;
 `payingParty` decides direction), **min-hourly guarantee top-up** (`max(0, hours*minPerHour - earned)`,
 hours from `driverDailyHours` nightly cron w/ live fallback), exempt `÷1.18`.
-`netTotal = totalDriverPayment + bonuses + compensations + minGuaranteeTopUp - driverCharges`.
+`netTotal = totalDriverPayment + bonuses + compensations + minGuaranteeTopUp - driverCharges
+- deliveryBookingDriverFees (+ totalRuleBonuses when the ledger has rows for the report)`.
+
+**Courier RULE bonuses** (CORE invariant 21, shoofi-server `docs/courier-bonuses.md`, 2026-11). Off by
+default (`shoofi.store {id:1}.courierBonusesEnabled === true` is on). Rules in
+`delivery-company.courier-bonus-rules` (`type: "peak"`; `days` 0-6, `from`/`to` Israel HH:mm on the
+booking's CREATION time, `cityIds` = pickup zones on `area.cityId`, `peakShiftsOnly` = a booked
+`isPeakHour` shift at delivery time, `amountKind` multiplier (fee × (value − 1), 1–3) | fixed (₪0–100),
+`validFrom`/`validTo`, soft delete). The sweeper writes `delivery-company.drivers-rule-bonuses`
+`{ bookingId (unique), bookId, appName, driverId, companyId, cityId, ruleId, ruleType, ruleName_ar,
+ruleName_he, ruleAmountKind, ruleValue, fee, amount, bookingCreatedAt, bookingCreated (raw string),
+deliveredAt, createdAt }`. The report reads it through `loadReportRuleBonuses` and re-checks each row
+against `book-delivery` (status 4, not delivery-only, in the `created` range, `driver.companyId`).
+PDF: a «בונוס עומס משופי» summary row, a per-courier column and a per-courier-per-rule section, all only
+when there are rows. Routes:
+- admin (`settlementDashboard`): `GET|PUT /api/shoofiAdmin/courier-bonuses/settings` → `{ enabled }`;
+  `GET .../rules[?includeDeleted=1]` → `{ rules }`; `POST .../rules` → 201 `{ rule }`;
+  `PUT|DELETE .../rules/:id` → `{ rule }` (409 editing a deleted rule); `GET .../rules/:id/preview?days=30`
+  → `{ deliveries, amount, couriers, days }` (read-only, ignores the switch, the rule's dates and other
+  rules); `GET .../ledger?month=YYYY-MM[&driverId]` → `{ month, rows (+ driverName), total, count }`.
+- courier (`driverSelfAction`): `GET /api/delivery/driver/me/bonuses` → `{ enabled: false }` or
+  `{ enabled: true, rules: [{ id, type, name_ar, name_he, days, from, to, amountKind, value,
+  peakShiftsOnly, validFrom, validTo }] (active, started, not expired, cities ∩ company supportedCities),
+  month: { reportMonth, ruleBonuses, count, manualBonuses }, today: { date, ruleBonuses, count } }` —
+  `today` is `me/day-summary`'s business day: D = `businessDate(now)`, rows booked in `[D 09:00, D+1 02:00)`.
+**Not yet in the company invoice** (`routes/hyp.js` additions) — see CORE invariant 21, OPEN.
 Cash fees are reported as receipts but are **NOT** in the transfer (already in the driver's pocket).
 
 **Who a driver report and its invoices are sent to** (`delivery-company.store`, verified 2026-11-05):
@@ -528,9 +553,14 @@ documents **we issued** through HYP/EZcount, answered as JSON (`contentBase64` +
   allocationMissing}}`), `stepCategory`, `taxAuthority`, `companyReportPhone`, `companyInvoicePhone`, and
   `stepCounts` with `includeStepCounts=true`. `delivery-company.store` carries
   `hyp.taxAuthority` and `hyp.taxUrlSendLog[]` like a store.
+- **`delivery-company.courier-bonus-rules`** / **`delivery-company.drivers-rule-bonuses`** — courier
+  rule bonuses: the rules, and the frozen per-booking ledger (unique `bookingId`) only the sweeper writes
+  (§6, CORE invariant 21). Indexes built by the sweeper: `bookingId` unique, `{companyId, bookingCreated}`,
+  `{driverId, bookingCreatedAt}`, `{driverId, deliveredAt}`, `{bookingCreatedAt}`.
 - **`shoofi.driverReports`** (collection `driver-reports`) — `{deliveryCompanyId (string), dateRange, reportData{totalDeliveries,
   totalDriverPayment, earningsBy*, totalBonuses, totalCompensations, totalDriverCharges,
-  totalDeliveryBookingDriverFees, totalMinGuaranteeTopUp, netTotal, driverPayments[]}, status,
+  totalDeliveryBookingDriverFees, totalMinGuaranteeTopUp, [totalRuleBonuses, ruleBonusCount,
+  ruleBonusesList — only when non-zero, CORE invariant 21], netTotal, driverPayments[]}, status,
   transferPerformed, pdfUrl, hypCompanyInvoice{PdfLink,DocId,DocNumber,DocUuid,CreatedAt,Items},
   hypCompanyAdditionsInvoice{PdfLink,DocId,DocNumber,DocUuid,CreatedAt},
   hypCompanyInvoiceSent, hypCompanyInvoiceSentAt (set by `/api/hyp/admin/driver-reports/:id/send-invoice` even
