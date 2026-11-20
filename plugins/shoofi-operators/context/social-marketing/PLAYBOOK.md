@@ -463,8 +463,11 @@ and stores it (`shoofi-server services/marketing/social-plan.js absorbPlan`):
   and then the owner uploads the picture.
 - **What each format becomes:** `post` with a dish subject uses the dish's own menu photo
   (never drawn); `post` with any other subject is drawn by the creator from `pictureNote`;
-  `reel` and `story` are files the owner uploads, so plan one only when `pictureNote` says
-  exactly what to film. A carousel is refused.
+  `story` with a subject that is not a dish is drawn by the creator too — the tall picture with
+  its words on it (owner, 2026-11-20). A Story shows no caption, so **the `caption` you write is
+  the text on the picture: one short line**, and `pictureNote` describes the scene. A `story`
+  about a dish or with no subject, and every `reel`, is a file the owner uploads, so plan one
+  only when `pictureNote` says exactly what to film. A carousel is refused.
 - A slot outside the week, in the past, with a broken time or with no caption is **dropped**
   and listed to the owner; at most 12 slots are read. A new plan replaces only your own
   untouched suggestions — a slot the owner edited, drew, approved or added stays, and the job
