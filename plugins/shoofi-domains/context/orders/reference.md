@@ -511,8 +511,13 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   awaits `createCancelCompensation` before the status write and the push is built from the
   re-read order. ⚠️ `cancelCompensation` is `{ couponCode, amount, compensationId, createdAt,
   createdBy }` — **no expiry**; the expiry is the coupon's own `end` in `shoofi.coupons` (ISO
-  string, three calendar months from issue, to the minute — not end of day), read by code. A
-  coupon that is deleted, inactive, expired or used up is not named and the old text is sent.
+  string, three calendar months from issue, to the minute — not end of day), read by code.
+  **The push names the Israel-calendar day BEFORE `end`** (the last full day; wording approved
+  by the service manager, ticket #60847b), and the amount is the coupon's current balance.
+  "In all stores" is said only when every `applicableTo` list redemption enforces (`stores`,
+  `categories`, `products`, `supportedAreas`, `supportedCities`) is empty or absent on the
+  coupon read. A coupon that is deleted, inactive, expired, used up, or whose day-before is
+  already behind today is not named and the old text is sent.
   **Not named:** status `5`, a twin leg (the group coupon is not stamped on the order,
   invariant 28), and a keep decision made later through `/api/money/change-decision` (no push
   is sent on that request). Status `9` has a customer push since the same change, but nothing
