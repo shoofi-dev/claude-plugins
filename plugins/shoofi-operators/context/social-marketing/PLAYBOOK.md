@@ -461,8 +461,12 @@ and stores it (`shoofi-server services/marketing/social-plan.js absorbPlan`):
   deal `_id` with its store `appName`; a public coupon `_id`; a store's `appName` as `id`;
   a page is one of `invite-friends`, `my-coupons`, `coins`, `for-you`. `null` = no subject,
   and then the owner uploads the picture.
-- **What each format becomes:** `post` with a dish subject uses the dish's own menu photo
-  (never drawn); `post` with any other subject is made by the creator in the **people look** (owner's
+- **What each format becomes:** `post` or `story` with a **dish** subject (owner, 2026-11-20 —
+  this replaces "a dish is never drawn"): the creator photographs Shoofi's presenters eating THAT
+  dish, copied from its menu photo and checked against it. So plan a dish only when it has a
+  menu photo, name the dish and the store in `title`, and in `pictureNote` say who eats it and
+  where — never describe the food yourself. The owner can still pick the bare menu photo;
+  `post` with any other subject is made by the creator in the **people look** (owner's
   approval, 2026-11-20): a real-looking photo of Shoofi's two presenters — a man (short beard,
   broad build) and a woman (bob, round glasses), one of them or both — in an everyday moment,
   with two short lines of text set on it by code. So **name the occasion in `title`**, and in
