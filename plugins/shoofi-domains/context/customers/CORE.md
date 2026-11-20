@@ -158,9 +158,11 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
      `try`. The explicit `SMS_PROVIDER_FAILED` rejection preserves that until the SMS-fallback
      decision is made. It is not a bug to tidy away.
    - Not covered: rows written before the fix still hold codes (29,805 `whatsappAttempts`,
-     34,705 verify-code `smsHistory` rows on 2026-11-20), and the purchased-coupon SMS
-     (`routes/order.js`) still puts coupon codes in `smsHistory` — alphanumeric, so the digit
-     fallback misses them.
+     34,705 verify-code `smsHistory` rows on 2026-11-20). The purchased-coupon SMS
+     (`routes/order.js` `generateAndSendPurchasedCoupons`) names its code in the same PR — a
+     coupon code is alphanumeric, so only naming removes it. Two free-text senders have no code
+     variable to name and still store whatever is typed: `services/coupons/campaign-messaging.js`
+     and the SMS channel of `services/notification/notification-service.js`.
 7. **The authenticated user is `req.auth`, NEVER `req.user`.** `auth.required` is
    **express-jwt v8** (`package.json`) configured with `userProperty: "auth"`
    (`routes/auth.js`), so the verified payload lands on `req.auth` —
