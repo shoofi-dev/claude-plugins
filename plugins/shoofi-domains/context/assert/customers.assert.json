@@ -906,6 +906,11 @@
           "desc": "admin uses Bearer (RN apps use 'Token')"
         },
         {
+          "file": "src/utils/http-interceptor/index.ts",
+          "regex": "return response\\.data;",
+          "desc": "reference C4: the admin axios instance unwraps to the body, so the refresh result is {token, message}, not an axios response"
+        },
+        {
           "file": "src/views/admin/customer-campaigns/HoldoutField.tsx",
           "regex": "export const HOLDOUT_PCT_LIMITS: \\[number, number\\] = \\[0, 50\\];",
           "desc": "CORE invariant 12: the form refuses a holdout pct the server would 400"
