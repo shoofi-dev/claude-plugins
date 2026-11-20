@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa till money + reference 6b: a till payment with a money method and every till refund need an open till session, 409 NO_OPEN_SESSION, checked before the manager PIN; sessionId on each entry); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@main 27dac953 / 2026-11-17 (ref §6 addRefund-removed pin; refundData historical-only, refunds recorded as paymentAuth.refundedAmount); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa till money + reference 6b: a till payment with a money method and every till refund need an open till session, 409 NO_OPEN_SESSION, checked before the manager PIN; sessionId on each entry); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -30,7 +30,8 @@
         "services/kopa/till-money.js",
         "routes/kopa/till-money.js",
         "services/kopa/till-orders.js",
-        "test/integration/kopa/till-money.js"
+        "test/integration/kopa/till-money.js",
+        "test/integration/order-addrefund-route-removed.js"
       ],
       "symbols": {
         "services/kopa/till-money.js": ["applyDiscount", "removeDiscount", "suggestDiscount", "setTip", "addRefund", "approveByManager", "standingDiscountOf", "verifyManagerPin", "clientRefundId", "discountLog"],
@@ -103,6 +104,21 @@
         ]
       },
       "patterns": [
+        {
+          "file": "routes/order.js",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*addRefund)",
+          "desc": "reference §6: POST /api/order/addRefund is removed; routes/order.js mentions no addRefund"
+        },
+        {
+          "file": "services/payments/order-authorization.js",
+          "regex": "\"paymentAuth\\.refundedAmount\": amount,",
+          "desc": "reference §6: a real refund is recorded as paymentAuth.refundedAmount (refundOrderPayment's HYP success write, reached from the cancel flow)"
+        },
+        {
+          "file": "services/money/money-cancel.js",
+          "regex": "update\\.\\$inc = \\{ \"paymentAuth\\.refundedAmount\": recordedAmount \\}",
+          "desc": "reference §6 / CORE: a finance-recorded portal refund adds to paymentAuth.refundedAmount on a single order"
+        },
         {
           "file": "services/kopa/till-orders.js",
           "regex": "const dueC = totalC \\+ tipC;",
