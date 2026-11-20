@@ -768,6 +768,11 @@
           "desc": "CORE invariant 15: the store/Shoofi shares are re-resolved against the corrected discount from the coupon DOCUMENT"
         },
         {
+          "file": "services/coupons/delivery-price-enforcement.js",
+          "regex": "coupon\\.storeDiscount = split\\.storeDiscount;[\\s\\S]{0,120}appliedCoupon: \\{ \\.\\.\\.appliedCoupon, coupon, discountAmount: finalDiscount \\}",
+          "desc": "CORE invariant 15: the resolved shares are written NESTED on appliedCoupon.coupon, never on the root of appliedCoupon — a root-only reader sees no split on every order (HQ #608299)"
+        },
+        {
           "file": "routes/order.js",
           "regex": "const enforcedFixedPrice = await enforceDeliveryPriceCoupon\\(\\{",
           "desc": "CORE invariant 15: order creation runs the fixed-delivery-price guard"
