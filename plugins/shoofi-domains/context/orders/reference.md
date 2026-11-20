@@ -903,6 +903,12 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   body, header or token. Loop guards: the report is sent `silent` (no dialog, never reported,
   never retried), one per call + outcome per 5 minutes, 30 an hour, and failures with no
   connection wait (max 10) for the next request that succeeds.
+  **The failure that opened a dialog is always written** (2026-11-20; a test with the server
+  stopped wrote two rows, both `dialog: null`, because the popup's failure was the same call +
+  outcome as a quiet one 30s earlier and was dropped as a repeat): the repeat key is call +
+  outcome + `dialog`; dialog-opening failures have their own budget (`MAX_DIALOG_PER_HOUR`, 12)
+  that quiet failures cannot use up; in a full waiting list one replaces the oldest quiet row.
+  So after an outage `client-error` holds a `request-failed` row whose `dialog` names the popup.
   The server-error «retry» no longer restarts the app: it emits `SERVER_ERROR_RETRY` and
   `App.tsx` runs `prepare()` again. NetInfo: lost → no-internet dialog; back → it closes and
   `prepare()` reloads.
