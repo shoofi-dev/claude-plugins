@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -140,6 +140,12 @@ first in a blue «علامة مميزة:» banner (plus a floor / apartment / en
 the second in the amber «ملاحظات للمندوب» banner — never merge them. Both are **snapshots from
 booking time**: editing the saved address later changes nothing on a placed order. Detail:
 reference C1; the saved-address side is `customers` CORE invariant 20.
+Two more customer notes reach the courier (shoofir `feat/driver-notes-visible`, 2026-11-20), both
+about the FOOD, for checking the bag at pickup: `order.order.commentToStore` (the note to the
+restaurant, a light-blue «ملاحظة الزبون للمطعم» banner; one per store on a twin, inside that
+store's pickup block; needs the `'order.order.commentToStore'` key in the `/api/delivery/list`
+whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجبة» under the item in
+`OrderItemsModal`; items are projected whole).
 
 ## Invariants — never weaken
 1. **`DELIVERY_STATUS` is authoritative in `consts/consts.js`**: `1` waiting-approve → `2`
