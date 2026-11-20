@@ -847,7 +847,10 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   `showsDelayButton` / `showsAmendButton` / `showsCompensationButton`, `tabStatusList` /
   `tabCount` / `visibleTabs`, `isReadyTooEarly` (the `readyOrderUpdateStatusMinMinutes`
   guard), `prepTimeSlots` (the twin second-store window, below), `canAccept`,
-  `buildAcceptUpdateData` (the `update/viewd` body), `timeLeft` and `suggestPrepMinutes`.
+  `buildAcceptUpdateData` (the `update/viewd` body), `timeLeft` and `suggestPrepMinutes`,
+  and `timeRingNumber` / `timeRingFill` (the v3 card's countdown circle, `TimeRing` in
+  `components/orders-v3/ui.tsx`: minutes left, minus minutes once late — `-3` — with a full
+  red ring; it replaced the time chip and the progress line on a preparing card).
   The live v2 screens still carry their own inline copies of these rules and are untouched
   by that branch. A rule change has to land in the screen copy as well until they import
   the helper.
