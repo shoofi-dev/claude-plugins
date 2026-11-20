@@ -372,8 +372,8 @@
         },
         {
           "file": "routes/delivery/orders.js",
-          "regex": "status: DELIVERY_STATUS\\.DELIVERED,\\s*completedAt: new Date\\(\\),",
-          "desc": "driver complete stamps bookDelivery.completedAt and never writes orders.status - delivered = bookDelivery.completedAt (reference.md §2, C2)"
+          "regex": "(?:step: \"complete\",\\s*orderId,\\s*driverId,\\s*set: \\{ completedAt: new Date\\(\\) \\},|status: DELIVERY_STATUS\\.DELIVERED,\\s*completedAt: new Date\\(\\),)",
+          "desc": "driver complete stamps bookDelivery.completedAt and never writes orders.status - delivered = bookDelivery.completedAt (reference.md §2, C2) - first leg: the step goes through advanceDriverStep (shoofi-server feat/delivery-step-status-guards), which writes status 4 itself; the second leg is the code on main, drop it once that has merged"
         },
         {
           "file": "routes/order.js",

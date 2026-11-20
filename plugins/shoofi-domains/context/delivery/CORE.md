@@ -537,6 +537,21 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
       route has ever succeeded: 0 `delivery_status_update` events since 2025-07-24. **Nothing calls the loop over
       HTTP from the server.** Order creation, twin orders, the assignment scheduler and the crons
       call `services/delivery/*` in process. Keep it that way, or forward a token.
+    - **The forward steps move only from the status each follows (shoofi-server
+      `feat/delivery-step-status-guards`, verified 2026-11-14).** A cancel keeps `driver._id` on the
+      row, so the ownership filter alone let a late or retried step move a cancelled booking
+      (`-1/-2/-3`) back to `5/3/4`, or a delivered one back to `3`, and re-send the customer push.
+      shoofir's offline queue retries steps as a matter of course. `start`, `complete` and
+      `waiting-in-store` now go through `advanceDriverStep` (`services/delivery/driver-step.js`,
+      `STEP_TRANSITIONS`): waiting-in-store from `2`, start from `2` or `5`, complete from `3`.
+      The status is IN the update filter (`status: {$in: from}`), so the move is atomic. When the
+      row did not move: already at the target → 200 `{alreadyDone: true}`, no side effects; any
+      other status → 409 `{code: "STATUS_CONFLICT", status}`, nothing written; not this courier's →
+      404. The flow event, the customer push, the company-admin notice and the feedback schedule
+      run only when the row moved. `approve` keeps its own status-`1` guard and its
+      `ORDER_CANCELLED` 400; twin cascades are unchanged (only approve has one). The shoofir app on
+      main shows its generic "فشل في تحديث حالة الطلب" alert on a 409 and does not refresh the
+      list until the next pull or push.
     - **No `/api/delivery` response carries a session token or a company's payment keys.**
       `redactDeliveryResponses` is installed once, path-scoped, at the top of
       `routes/delivery.js`. It removes `token`, `authCode` and `notificationToken` from any
