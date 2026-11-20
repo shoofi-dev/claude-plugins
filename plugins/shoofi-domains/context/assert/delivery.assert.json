@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -117,6 +117,7 @@
           "DELIVERY_ONLY_REASONS",
           "resolveStoreContext",
           "listServiceableTowns",
+          "dropoffEntryFor",
           "resolveTownForBooking",
           "snapshotDeliveryOnlyFee",
           "isDeliveryOnlySupport",
@@ -354,6 +355,11 @@
           "file": "services/delivery/delivery-only.js",
           "regex": "deliveryOnlyStoreFee[\\s\\S]{0,120}deliveryOnlyDriverFee",
           "desc": "delivery-only fees are REGION (city-areas) values, not town values"
+        },
+        {
+          "file": "services/delivery/delivery-only.js",
+          "regex": "_id: `city:\\$\\{city\\._id\\}`[\\s\\S]{0,600}_id: `area:\\$\\{key\\}`",
+          "desc": "delivery-only /towns never drops a covered area for want of a town: it falls back to the city (\"city:<id>\") then the area polygon (\"area:<geometryId>\") (CORE delivery-only bullet)"
         },
         {
           "file": "services/delivery/delivery-only.js",

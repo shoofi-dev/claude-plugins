@@ -61,7 +61,7 @@ Transitions: driver `approve`/`start`/`complete`/`cancel`/`waiting-in-store`
 
 | Route | Returns | Refusal |
 |---|---|---|
-| `GET /api/delivery/delivery-only/towns` | towns reachable from this store's pickup zone, each with `priceFrom/priceTo`, ETA and the store fee | `{enabled:false, reason}` |
+| `GET /api/delivery/delivery-only/towns` | towns reachable from this store's pickup zone, each with `priceFrom/priceTo`, ETA, the store fee and `source` (`town`, or the `city` / `area` fallback for a covered place in no town — ids `"city:<id>"` / `"area:<geometryId>"`) | `{enabled:false, reason}` |
 | `POST /api/delivery/delivery-only/book` | `{success, bookId, storeFee}` | 403 gate / 400 `Town not serviceable` / 200 `{success:false, reason:"no_eligible_driver"}` |
 | `POST /api/delivery/delivery-only/list` | this store's bookings, newest 200 | — |
 
@@ -94,7 +94,7 @@ book duplicate-inflight|book replay|book errored`, and `[delivery-cancel] bookId
 driverId=…`. `/towns` refusals are deliberately **not** logged — the screen polls it on every
 open and focus, and every call is a refusal while the platform flag is off.
 
-**Tests:** `test/integration/delivery-only-region-fee.js`, `delivery-support-gate.js`,
+**Tests:** `test/integration/delivery-only-region-fee.js`, `delivery-only-towns-fallback.js`, `delivery-support-gate.js`,
 `store-delivery-only-expense.js`; `scripts/delivery-only-preflight.js` is a read-only prod
 pre-flight for stores/regions that would book at ₪0.
 
