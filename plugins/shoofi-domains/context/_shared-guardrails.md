@@ -74,8 +74,12 @@ documents backed up first — the filter must cover everything it touches or ins
 `plan()` (read-only: what would change, with counts and a small sample, no customer data)
 and `apply()`. After the merge HQ runs `plan()` on production and the owner sees it and
 presses Run; at autonomy `data` HQ runs it by itself. Every target is backed up before it
-runs and Undo restores it. A file runs once — a fix to one that ran is a new file. At most
-20,000 documents per change; split a bigger one. `migrations/` and `scripts/` hold older
+runs and Undo restores it, field by field, for 30 days (the backup collection has a TTL;
+undo is refused after). A change that deletes a secret (CVV, a terminal password) lists
+those paths in the target's `backupExclude`: they are never copied into the backup, Undo
+never writes them, and the record shows them as `notUndoable`. A file runs once — a fix to
+one that ran is a new file. At most 100,000 documents per change; split a bigger one.
+`migrations/` and `scripts/` hold older
 one-off scripts — nothing new goes there. These PRs are always red for auto-merge.
 
 ### Be proactive: report what you find
