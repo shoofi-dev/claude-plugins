@@ -140,6 +140,27 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    and a `+03:00` string share a `YYYY-MM-DDTHH:` prefix, so the range silently drops the
    evening hours instead of failing loudly.
 6. **Never log OTPs, tokens, or secrets** — including in debug output added "temporarily".
+   **Never store one outside the user document either**: a sign-in code has no expiry, so a
+   copy in a history collection is a login. *(Pending shoofi-server
+   `fix/HIGH-RISK-otp-codes-not-stored`, HQ #ff23ba; until it merges `main` still stores them.)*
+   - `sendSMS(phone, text, req, db, appNamex, { secrets })` (`utils/sms.js`) keeps
+     `maskSmsContent(text, secrets)` in `smsHistory`: every named secret and any free-standing
+     run of 4-8 digits is replaced. A caller sending a credential must name it — a temporary
+     password is not digits, so the fallback does not catch it. The text sent is never changed.
+   - A provider error is logged and stored only as `safeProviderError(err)`
+     (`utils/safe-provider-error.js`). A raw axios error carries the request body (the code)
+     and `config.headers.Authorization`.
+   - `shoofi.whatsappAttempts` rows carry no `authCode`. Nothing in any repo reads one.
+   - **A failed SMS provider call rejects on purpose.** The raw error was never writable to
+     Mongo (bson 1.1.6 throws on it; prod `smsHistory` held 0 failure rows of 145,573 on
+     2026-11-20), so `sendSMS` always rejected: `POST /api/customer/create` answers 400 for a new
+     phone and never tries WhatsApp; for an existing account the call sits outside the handler's
+     `try`. The explicit `SMS_PROVIDER_FAILED` rejection preserves that until the SMS-fallback
+     decision is made. It is not a bug to tidy away.
+   - Not covered: rows written before the fix still hold codes (29,805 `whatsappAttempts`,
+     34,705 verify-code `smsHistory` rows on 2026-11-20), and the purchased-coupon SMS
+     (`routes/order.js`) still puts coupon codes in `smsHistory` — alphanumeric, so the digit
+     fallback misses them.
 7. **The authenticated user is `req.auth`, NEVER `req.user`.** `auth.required` is
    **express-jwt v8** (`package.json`) configured with `userProperty: "auth"`
    (`routes/auth.js`), so the verified payload lands on `req.auth` —
