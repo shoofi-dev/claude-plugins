@@ -545,9 +545,28 @@ reference C1; the saved-address side is `customers` CORE invariant 20.
       a `bookId`) or in a person record. A **company document on its own keeps them**: the admin
       web's DriverPayments and company screens read `accounting` and `hyp` there. Driver records
       carry `token` too (235 of 258), and `company/:companyId/employees` used to return them raw
-      and unauthenticated. **82 routes in `geography.js`, `company.js` and `driver.js` are still
+      and unauthenticated. **74 routes in `geography.js`, `company.js` and `driver.js` are still
       ungated.** They are pinned as `NOT_YET_GATED` in
       `test/integration/delivery-driver-loop-admin-auth.js`, so the list can only shrink.
+    - **The driver's own records are gated too (2026-11-16).** Until then anyone could read any
+      driver's counts, earnings, notifications and full profile, write or delete a note on any
+      delivery as any driver, post a "support" reply, and push any driver any text. Callers
+      (grep of shoofir, partner, customer app, admin web, kopa) and gates:
+      `driver/stats`, `driver/earnings`, `driver/notifications`, `driver/order/note` take
+      `...driverSelfBody` (shoofir, own id; the body `driverId` is overwritten with the token's).
+      `DELETE driver/order/note/:orderId/:driverId` takes `...driverSelfPath` (a path id naming
+      anyone else is a 403; a path cannot be overwritten). `GET company/employee/:id` takes
+      `...driverProfileAccess`: the driver's own profile (shoofir `getProfile`, always
+      `userDetails.customerId`) or any profile for a dashboard role (the admin web's
+      `DeliveryCompanyEmployeeForm`). `driver/order/note/comment` (support's reply, admin web
+      `DriverNoteModal`) and `notifications/create` (no client at all) are
+      `...deliveryDashboardAdmin`. None of the four driver-own routes has a dashboard pass: no
+      admin screen calls them. **`driver/stats` answered all zeros until this change** - it
+      filtered `driver._id` with the body's string against the ObjectId on every booking. It now
+      matches both id shapes and both status shapes, counts earnings with
+      `effectiveDeliveryFee` minus delivery-only (as `/payments/driver/summary` does), and times
+      a delivery from `created` to `completedAt` (`deliveryTime`, which it used to read, is
+      written by nothing). Pinned by `test/integration/delivery-driver-own-records-auth.js`.
 
 20. **`bookId` is a short display number, not an identity. Locate an order's row by
     `originalBookId`, or the row by its `_id`.** `bookId` = the order's `orderId` = first4+last4

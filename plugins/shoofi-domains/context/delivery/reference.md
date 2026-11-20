@@ -421,6 +421,16 @@ the token: a different body `driverId` is a 403, and a delivery not assigned to 
 invariant 19). The order list is `POST delivery/list {customerId}` (own id; a company admin of an
 `isControlledByAdmin` company gets its company's rows). Order details are `GET delivery/order/:id`,
 for the driver's own deliveries and, for a company admin, its company's.
+**A plain driver never sees status `1` in that list**: for `role` `driver`/`employe` the server
+REPLACES the status filter with `{$ne: "1"}` (`routes/delivery/orders.js`, the `/delivery/list`
+handler), whatever `statusList` the app sends. An assigned-but-unapproved job reaches him only as
+the "تم تعيين طلب جديد" push, and tapping it approves (`notifications.tsx`).
+Own records, all gated to the signed-in driver since 2026-11-16 (CORE invariant 19):
+`delivery/company/employee/:id` (profile, own id), `delivery/driver/stats`,
+`delivery/driver/notifications`, `delivery/driver/earnings` (no screen calls it).
+**The driver note is unreachable from the app:** `components/delivery-driver/NoteModal.tsx` posts
+to `DELIVERY_DRIVER_API.ADD_NOTE` / `DELETE_NOTE`, which `consts/api.js` has never defined, so the
+request goes to `delivery/undefined` (404) and never reaches `delivery/driver/order/note`.
 `DELIVERY_STATUS` copy = `1..4` (`consts/shared.ts`). Key: `stores/delivery-driver/index.ts`,
 `screens/delivery-driver/*`, `hooks/{useDriverLocationTracking,use-websocket}.ts`.
 **Company-admin dispatch lives HERE, not in partner:** an admin of an `isControlledByAdmin`
