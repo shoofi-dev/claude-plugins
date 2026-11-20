@@ -105,7 +105,8 @@ row of `POST /api/order/admin/orders` carries:
 ```ts
 courier: null | {            // null = no booking for this order (not accepted / platform switch off)
   state: "searching" | "assigned" | "arriving" | "at_store" | "picked_up" | "delivered" | "cancelled";
-  driverName: string | null;        // first word of booking.driver.fullName
+  driverName: string | null;        // first word of booking.driver.fullName; null while searching
+                                    // AND once cancelled (the row keeps `driver` as history)
   etaToStoreMinutes: number | null; // engine estimate, current courier only, measured basis, not passed
   etaToStoreAt: string | null;      // ISO instant of that estimate (client-side countdown)
   cancelledBy: "driver" | "store" | "admin" | null;
@@ -459,6 +460,17 @@ cleaning those fields on the saved address (≤ 200 note / ≤ 20 others, add ke
 apartment + entrance) is `customers` CORE invariant 20. For a twin pair the values come from
 whichever leg carries them (one customer, one dropoff), rendered once in the shared header.
 A delivery-only booking has no `order`, so neither line ever renders there.
+**Restaurant note and meal notes (2026-11-20, shoofir + server `feat/driver-notes-visible`):**
+`OrderCard` renders `order.order.commentToStore` (the customer's note to the restaurant) in a
+light-blue banner labelled «ملاحظة الزبون للمطعم» / «הערת הלקוח למסעדה», right under the amber
+courier banner. `TwinOrderCard` renders each leg's own note inside that store's pickup block (one
+note per store, orders CORE invariant 25), never in the shared header. `OrderItemsModal` shows each
+item's `note` under the quantity, labelled «ملاحظة للوجبة» / «הערה למנה». Logic is the pure
+`utils/customer-notes.ts` (`getCommentToStore`, `getItemNote`, labels take the language), pinned by
+`utils/__tests__/customer-notes.test.ts`. Server side: `POST /api/delivery/list` needed
+`'order.order.commentToStore': 1` in its whitelist (pinned by
+`test/integration/delivery-comment-to-courier-projection.js`); `items[].note` already rode the
+whole `'order.order.items': 1`. Both are booking-time snapshots like the address.
 **Dead/inherited (leave alone):** `services/deliveryDriverService.ts` (legacy fetch dup,
 `app-name: shoofi-app`), `getNearbyOrders`/`getSchedule` (no UI callers), customer-app city/address remnants.
 
