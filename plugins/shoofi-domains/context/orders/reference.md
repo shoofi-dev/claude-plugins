@@ -1307,7 +1307,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   `nextActionLabel` (order-rules.ts) returns a **label key** (`partner-v3.action-*` in
   `components/orders-v3/labels.ts`), never text; the card renders it with `v3t` in the app
   language (he: «השליח אסף» / «הלקוח אסף» / «מוכנה» / «התחלת הכנה»). The status tabs and the
-  board's third column use `partner-v3.tab-picked-up` / `tab-future` / `iftar` the same way. A
+  board's third column use `partner-v3.tab-picked-up` / `tab-future` / `iftar` the same way; the
+  phone's first tab uses the short `partner-v3.tab-preparing` («בהכנה»), not the DB key
+  `in-progress` («ההזמנה בהכנה», cut with five tabs) — the iPad column title keeps `in-progress`. A
   literal Arabic string, or `t("<Arabic word>")` with no `defaultValue`, shows Arabic on a
   Hebrew tablet (the DB dictionary has no such keys) — the non-v3 screens still do this.
 - **Delay:** the sheet offers +5/+10/+15/+20, says the customer is notified, and keeps the
