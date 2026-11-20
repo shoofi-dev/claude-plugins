@@ -876,6 +876,23 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   The same function picks ONE dialog per failure (2026-11-17, owners: «stuck after the
   internet comes back»): network error → only the no-internet dialog (two native modals at
   once can leave iOS taking no taps); timeout → server error, unless already known offline.
+  **Background checks are quiet (2026-11-20, team member: the server-error dialog over a home
+  screen nobody was touching).** The polls pass axios config `background: true`
+  (`ordersStore.getNotViewdOrders*`, `getOrdersFromServer`'s last argument from the
+  cancelled-order alert, `getFutureOrdersReadyServer`, `storeAlertsStore.fetchStoresNewOrders`).
+  One failed poll opens nothing; the next tick is the retry. A dialog opens only when polls
+  have kept failing (timeout / network error) for `BACKGROUND_QUIET_MS` (60s) with no request
+  succeeding in between (`BackgroundFailureStreak`), or on the second 401 in a row. A 401 for
+  a token that was replaced while the request was in flight opens nothing. A request without
+  the flag is the owner's own action and behaves as before.
+  **Failed requests are written down** (`utils/request-failure-report.ts`): timeout, network
+  error, 401/402, 5xx, or anything that opened a dialog → one `type: "request-failed"` row in
+  the store's `client-error` collection (`error: "request-failed: GET <path> → <outcome>"`,
+  `kind`, `url` without its query, `method`, `status`, `durationMs`, `background`, `offline`,
+  `dialog`, `appName`, `customerId` from the token payload, `skipped`, `appVersion`). Never a
+  body, header or token. Loop guards: the report is sent `silent` (no dialog, never reported,
+  never retried), one per call + outcome per 5 minutes, 30 an hour, and failures with no
+  connection wait (max 10) for the next request that succeeds.
   The server-error «retry» no longer restarts the app: it emits `SERVER_ERROR_RETRY` and
   `App.tsx` runs `prepare()` again. NetInfo: lost → no-internet dialog; back → it closes and
   `prepare()` reloads.
