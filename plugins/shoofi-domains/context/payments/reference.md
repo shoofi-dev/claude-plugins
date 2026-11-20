@@ -262,8 +262,19 @@ reference C5.
 
 ## 7. Data model (central `shoofi` unless noted)
 - `store {id:1}.credentials` — the platform payment creds (§1).
-- `applePaySessions`, `hypPaySessions`, `hypTokenSessions` — session state machines
+- `applePaySessions`, `hypPaySessions` — session state machines
   (`pending` → `verified`/`order_created`/`payment_verified` → `completed`/`failed`).
+- `hypTokenSessions` (add-card) never reaches `completed`: `pending` → `verified` | `error` |
+  `failed` | `abandoned` (`abandonedBy: client|sweep`). The app intercepts HYP's result URL, so
+  `GET hyp-tokenize-failure` effectively never runs; a decline and a closed sheet are reported by
+  the app to `POST /api/payments/hyp-tokenize-session/:sessionId/result` (own session, only from
+  `pending`), and `utils/crons/hyp-token-session-sweep-cron.js` ends anything `pending` after 30
+  min (`services/payments/hyp-token-sessions.js`). The server's own dead ends end it too, through
+  `endPendingSession` (pending-only, never throws): a declining CCode on the success URL →
+  `failed` (`failureSource: server_success_url`), a `hyp-process-token` 400 → `failed`
+  (`server_process_token`), and any process-token failure after the ownership check → `error`.
+  The success writers have no status filter, so a late success still ends `verified` over
+  `abandoned`/`failed` — on purpose. Nothing reads this status; it is for measurement only.
 - `creditCards` (§4), `couponUsages`, `customerCoins`, `storeReports`,
   `amazonconfigs {app: hyp|invoiceProvider|greeninvoice|amazon}`, `stores` (has `hyp{}`).
 - Per-store `orders.ccPaymentRefData` — the union payment record (ZCredit vs HYP shapes) +
@@ -319,8 +330,10 @@ reference C5.
   - **Not enforced at order creation.** This control is UI-only (see CORE "Method resolution").
 - **CC tokenization (live)**: HYP hosted WebView (`hooks/checkout/use-hyp-tokenize.ts`,
   `components/credit-card/HypTokenizeWebView.tsx`) — card entered in the hosted page, never
-  in RN; result URL carrying `CCode` is intercepted (navigation blocked) and forwarded to
-  `payments/hyp-process-token`. Saved cards via `stores/creditCards` (`/credit-cards` CRUD).
+  in RN; result URL carrying `CCode` is intercepted (navigation blocked). A success is
+  forwarded to `payments/hyp-process-token`; a decline (`failed`) or a closed sheet
+  (`abandoned`) is reported fire-and-forget to `payments/hyp-tokenize-session/:id/result`
+  (`helpers/hyp-tokenize-outcome.ts`, `silent: true`). Saved cards via `stores/creditCards` (`/credit-cards` CRUD).
   - **Managing saved cards** (shoofi-app PR #99): `screens/credit-cards` (route `credit-cards`) opens
     from the profile row «بطاقات الدفع» (logged-in only) and is also rendered inside checkout's
     card sheet (`components/CreditCardModal`, with `onClose`). Expiry is shown from `tokef`

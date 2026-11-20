@@ -1,6 +1,6 @@
 {
   "doc": "payments",
-  "lastVerified": "shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa till money + reference 6b: a till payment with a money method and every till refund need an open till session, 409 NO_OPEN_SESSION, checked before the manager PIN; sessionId on each entry); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
+  "lastVerified": "shoofi-server@fix/HIGH-RISK-hyp-tokenize-session-outcome 39435f38 + shoofi-app@fix/HIGH-RISK-hyp-tokenize-session-outcome 8a1a140 / 2026-11-17 (reference §7 hypTokenSessions lifecycle: failed / abandoned reported by the app to an owner-scoped pending-only route, 30-min sweep, late success still wins; app client section); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa till money + reference 6b: a till payment with a money method and every till refund need an open till session, 409 NO_OPEN_SESSION, checked before the manager PIN; sessionId on each entry); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (CORE Kopa till money + reference §6b: bookkeeping-only discount / tip / refunds on kopaTillOrders, tip outside total, clientPaymentId / clientRefundId replay, CAS rev writes); shoofi-app@design/round-2 b581604 (#87, reference Coupons: couponSuppressed covers a delivery coupon on pickup / drive-in) / 2026-11-07; shoofi-server@feat/coupon-detail-link + shoofi-app@feat/coupon-detail-link / 2026-10-30 (CORE public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -30,7 +30,9 @@
         "services/kopa/till-money.js",
         "routes/kopa/till-money.js",
         "services/kopa/till-orders.js",
-        "test/integration/kopa/till-money.js"
+        "test/integration/kopa/till-money.js",
+        "services/payments/hyp-token-sessions.js",
+        "utils/crons/hyp-token-session-sweep-cron.js"
       ],
       "symbols": {
         "services/kopa/till-money.js": ["applyDiscount", "removeDiscount", "suggestDiscount", "setTip", "addRefund", "approveByManager", "standingDiscountOf", "verifyManagerPin", "clientRefundId", "discountLog"],
@@ -100,6 +102,12 @@
           "couponBenefit",
           "loadPublicCoupon",
           "business_visible"
+        ],
+        "services/payments/hyp-token-sessions.js": [
+          "recordClientOutcome",
+          "sweepAbandonedSessions",
+          "SWEEP_AFTER_MINUTES",
+          "endPendingSession"
         ]
       },
       "patterns": [
@@ -357,6 +365,21 @@
           "file": "services/coupons/public-coupon.js",
           "regex": "const UPCOMING_WINDOW_DAYS = 30;",
           "desc": "CORE: an upcoming coupon shows only within 30 days of its start"
+        },
+        {
+          "file": "services/payments/hyp-token-sessions.js",
+          "regex": "updateOne\\(\\{ sessionId, customerId, status: \"pending\" \\}",
+          "desc": "reference §7: the app's failed/abandoned report ends only the caller's own hypTokenSessions row, and only from pending"
+        },
+        {
+          "file": "services/payments/hyp-token-sessions.js",
+          "regex": "\\{ status: \"pending\", createdAt: \\{ \\$lt: cutoff \\} \\}",
+          "desc": "reference §7: the sweep marks only pending add-card sessions older than the cutoff as abandoned"
+        },
+        {
+          "file": "routes/hyp-pay.js",
+          "regex": "router\\.post\\('/api/payments/hyp-tokenize-session/:sessionId/result', auth\\.required",
+          "desc": "reference §7: the app reports a decline / closed sheet to an authenticated route, because it intercepts HYP's failure redirect"
         }
       ]
     },
