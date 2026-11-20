@@ -1,6 +1,6 @@
 ---
 operator: social-marketing (also read by competitive-intel and marketing-manager)
-last-verified: Instagram read through Meta's Business Discovery on 2026-11-20 (the two competitors, our own account, twelve big delivery brands — last 66–150 posts each); web study of the big brands read 2026-11-20 (research/2026-11-20-global-delivery-brands.md); shoofi-server@feat/social-watch / 2026-11-20 (§6 the daily watch)
+last-verified: Instagram read through Meta's Business Discovery on 2026-11-20 (the two competitors, our own account, twelve big delivery brands — last 66–150 posts each); web study of the big brands read 2026-11-20 (research/2026-11-20-global-delivery-brands.md); shoofi-server@main after #660 / 2026-11-20 (§6 the daily watch)
 scope: what OTHER delivery brands post — the two competitors in our towns and the big brands we learn from — and what we do about it. PLAYBOOK.md stays the rulebook; this file is the evidence from the field and the rules that follow from it.
 ---
 
