@@ -859,6 +859,11 @@ Driver profile via `delivery/company/employee/{driverId}`.
 change. Token in `localStorage['@storage_userToken']` + `adminUser`, sent as
 **`Authorization: Bearer`** (note: Bearer here, `Token` in the RN apps). A 401 triggers the
 **refresh-token flow** in the interceptor (guarded against loops) → retry, else logout+redirect.
+⚠️ `axiosInstance`'s success interceptor returns `response.data`
+(`src/utils/http-interceptor/index.ts`), so every caller — the refresh call inside the
+interceptor included — gets the server's **body**, not an axios response:
+`admin/users/refresh-token` yields `{token, message}`, read as `.token`. Reading `.data.token`
+there throws into the catch and logs the admin out on every expiry (HQ #bbcc78).
 Roles/permissions: `contexts/AdminAuthContext`, `ProtectedRoute`, `RoleBasedAccess`,
 `RestrictedRoleGuard` (e.g. `accountant` limited to invoice screens).
 **`/api/analytics/*` is admin-token only** (shoofi-server `utils/analytics-access.js`,
