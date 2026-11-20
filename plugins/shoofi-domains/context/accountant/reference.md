@@ -290,6 +290,21 @@ since then every `/api/hyp/admin` write is in `services/audit/admin-audit-routes
      153 stores) or `oauth-url` → `/general/oauth2/authorize` scope `CREATE_DOCS SSO` → callback
      stores the access token as `hyp.api_key` (18 stores; `refresh_token` stored, never used). The
      `ua_uuid` is NOT sent on settlement documents (see the bullet above).
+     **Delivery companies, option 1** (`POST /api/hyp/admin/delivery-companies/:id/create-account`,
+     rules in `services/invoicing/hyp-company-account.js`, 2026-11-19): the email sent is the
+     company's ACCOUNTING email (`accounting.bankAccount.email`, the "פרטי חשבון בנק" tab), which
+     wins over the one typed into the form; `status` returns it as `accountingEmail` /
+     `accountingPhone` and `CompanyHypConnection.tsx` shows it read-only. EZcount keeps **one user
+     per email** (and per company number), so a second create with a known email fails. The route
+     answers **409** with a `code` instead of the old bare 500: `email_in_use_by_company` (another
+     company's `hyp.api_email` matches, case-insensitive; found BEFORE calling HYP, named in
+     `otherCompanyName`), `same_business_connected` (that company has the same company number:
+     one owner with two company records; a new email is the wrong advice), `email_exists` /
+     `crn_exists` (EZcount refused with "exists"/"already"; an *invalid* CRN is not "exists").
+     Any other EZcount error stays 500 with the reason in `error`, which the screen now shows.
+     Never answer a clash with option 2 on the other company's email: the documents would be
+     issued under that other business. Prod 2026-11-19: four pairs of company records share one
+     accounting email (one pair is the same business on one EZcount user).
   2. *Tax Authority approval* by the OWNER: `taxMinistryURL` (…/front/auth/igniteTaxAuthorityOauth2/<u_uuid>,
      from the distributor list or `getBusinessData.taxAuthorityURL`), sent by `send-tax-url` /
      `bulk/send-tax-urls` / the renewal reminder through `sendConsentMessage`
