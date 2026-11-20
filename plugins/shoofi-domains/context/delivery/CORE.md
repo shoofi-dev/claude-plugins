@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -622,6 +622,15 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
       · `cancelled` (`-1/-2/-3`, with `cancelledBy`). `courier: null` = no booking; a non-delivery
       row has no key; a failed read serves the page without any key. Of several bookings for one
       order, the newest live one wins over a newer cancelled one.
+    - **A cancelled delivery names nobody to the store.** No cancel path clears `driver` on the
+      booking (admin web and reports read it as history), so the row still carries the courier
+      who held it. `summarizeCourier` sends `driverName: null` for `cancelled` as for
+      `searching`, and `GET /api/delivery/order/:orderId/driver` answers `200 null` (the
+      dialog's "no driver yet") when the booking it picked is cancelled. That route picks with
+      `pickBookingForOrder` too, so after a re-book the dialog shows the live courier, not the
+      cancelled row a bare `findOne` might return (order 7129-4235, 2026-11-19: the card read
+      «أُلغي التوصيل · <courier>» and the dialog offered his phone). Do not "fix" this by
+      unsetting `driver` on cancel.
     - **`book-delivery.order._id` is an ObjectId OR a 24-hex STRING.** Partner-accept spreads
       the order document in (ObjectId); `POST /api/delivery/book` takes it from a JSON body
       (string). Any lookup by order must ask for both (`idVariants`). `GET
