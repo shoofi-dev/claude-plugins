@@ -142,9 +142,21 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    their keys and never spread `params`; keep it that way rather than adding a generic
    pass-through. Note `createInvoice` accepts a `storeUaUuid` that four call sites pass and
    it has **never sent** — a dead parameter, not evidence the field already flows.
-   Reach: wallet orders always (unconditionally manual), card orders only where the flag is
+   Reach: HYP wallet orders always (unconditionally manual), card orders only where the flag is
    on — a gateway-issued document cannot take a `ua_uuid`, and `EZ.*` is an undocumented
    pass-through that can reject the whole charge, so do not try `EZ.ua_uuid`.
+   - **ZCredit Apple/Google Pay (`payment_provider: "APPLEPAY"`) is never manual — by
+     design until ZCredit is retired** (owner decision, HQ #18d1ff, 2026-11-18). The app
+     builds the WebCheckout session itself with `CreateInvoice: "true"`
+     (`shoofi-app/data/zcredit-config.ts`) and the cart item `IsTaxFree: "false"`
+     (`shoofi-app/screens/checkout/index.tsx`), so every charge gets one full-amount
+     gateway document with VAT, even on an exempt store. `finalizeApplePayOrder` and the
+     inline create path never call `issueOrderInvoicesIfManual`; adding it would
+     double-document. Do not flip `CreateInvoice` off either: the single-order path takes
+     `InvoiceRecieptNumber` as its proof of payment (`processApplePayVerification`, the
+     callback fallback, the create self-heal), so paid orders would stay at "0". The twin
+     path checks `ReferenceNumber`/`!HasError` instead. The flag itself is global:
+     `shoofi.store {id:1}.invoiceConfig` (`manualInvoicesEnabled`, `enableForAllStores`).
 11. **Only admin-dashboard users may call the per-order invoice queue routes, and only
    owners may write to the queue.** `/api/admin/invoices/{pending,retry,process-all,webhook}`
    (`routes/admin.js`) drive the `utils/invoice-mail.js` Gmail-fetch queue. No client, cron,
@@ -157,6 +169,10 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
      viewer, accountant and the other dashboard roles get 403. They never worked before, so
      the narrower list took nothing away from anyone.
    - The webhook also keeps its body `INVOICE_WEBHOOK_SECRET` check. No provider calls it.
+   - The queue writes to the store DB its caller passes as `appName`, never a header
+     default: the ZCredit Apple Pay callback has no `app-name` header. A success sets
+     `ccPaymentRefData.url` together with `invoiceStatus: "completed"`, and the filter
+     matches `docId` as a string or a number (`utils/invoice-mail.js` `docIdFilter`).
    - **Only a numeric docId may reach the Gmail fetch** (`isFetchableInvoiceDocId`):
      retry and webhook answer 400 otherwise, and process-all skips (`skippedNonNumericDocId`).
      HYP orders under manual invoicing carry `docId: "EZ"` (2,894 stuck at `pending` in prod,
