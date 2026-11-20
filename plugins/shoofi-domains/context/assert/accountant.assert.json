@@ -515,13 +515,13 @@
         },
         {
           "file": "backfill-invoices.js",
-          "regex": "Key:\\s*s3Key,\\s*[\\r\\n]+\\s*Body:\\s*pdfBuffer,\\s*[\\r\\n]+\\s*ACL:\\s*\"public-read\"",
-          "desc": "the bulk variant: one run republishes every historical invoice PDF world-readable. Listed in the doc because a grep of routes/ alone misses it"
+          "regex": "Key:\\s*s3Key,\\s*[\\r\\n]+\\s*Body:\\s*pdfBuffer,\\s*[\\r\\n]+\\s*ACL:\\s*\"public-read\"|await publishInvoicePdfOnce\\(\\{",
+          "desc": "the bulk variant: one run publishes every missing historical invoice PDF world-readable. Listed in the doc because a grep of routes/ alone misses it. Alternation: the first branch is main before HQ #d211e0 (own PutObject), the second is after (it uploads through utils/invoice-pdf-store.js publishInvoicePdfOnce, still public-read). Drop the first branch once shoofi-server fix/HIGH-RISK-invoice-pdf-key-per-order is on main"
         },
         {
           "file": "utils/invoice-mail.js",
-          "regex": "Key:\\s*`invoices/doc-\\$\\{searchString\\}\\.pdf`",
-          "desc": "the worst case for guessability in the doc's note — the customer invoice key is a short sequential provider document id, not an ObjectId"
+          "regex": "Key:\\s*`invoices/doc-\\$\\{searchString\\}\\.pdf`|await publishInvoicePdfOnce\\(\\{",
+          "desc": "the customer invoice key. Before HQ #d211e0 it was invoices/doc-<providerDocId>.pdf, a short sequential provider id: the worst case for guessability in the doc's note. After, the queue uploads through utils/invoice-pdf-store.js: invoices/<appName>/<order _id>-doc-<docId>-<32 hex random>.pdf, still public-read, protected by the 128 random bits. Drop the first branch once shoofi-server fix/HIGH-RISK-invoice-pdf-key-per-order is on main"
         },
         {
           "file": "routes/payments/admin-reports.js",
