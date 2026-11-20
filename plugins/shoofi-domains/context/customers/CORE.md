@@ -526,12 +526,32 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
       (the v3 driver writes `undefined` as null), and `null == undefined` is true. Until this
       fix, a request carrying only a phone logged into any customer, partner or driver account
       and overwrote the owner's session. Never compare a possibly-empty code with bare `==`.
-      This is not the planned hardening (expiry, attempts, lockout). That is still open.
+      The expiry, attempt cap and send limit are the next bullet.
+    - **Codes are rate-limited, attempt-capped and expire** (HQ #d20f83,
+      `services/customer/otp-guard.js`). All limits are keyed by app-type + phone, with phone
+      digits normalized (`972` reads as `0`). The same rules apply to all three audiences.
+      - **Send:** 1 per 30 s and 5 per hour. The check runs before any write, so a refused
+        send rotates no code, clears no token and sends no SMS.
+      - **Verify:** 5 wrong codes lock that login for 15 minutes, and the right code is
+        refused too while locked. A new code does not reset the count; a success clears it.
+      - **Expiry:** a code expires 10 minutes after `authCodeIssuedAt`, which `/create` stores
+        with every code. A code with no stamp (issued before this change) is expired.
+      - Refusals are 429 `OTP_RATE_LIMITED` / `OTP_LOCKED` with `retryAfter`.
+      - Counters live in Redis (`utils/redis-lock` client) and fall back to per-instance
+        memory.
+      - **There is no per-IP limit unless `OTP_TRUSTED_IP_HEADER` is set.** `app.js` runs
+        `trust proxy` for everyone, so `req.ip` is the caller-written left-most
+        X-Forwarded-For entry.
+      - The fixed test code `1234` (`config/test-phones.js`) still works and is still capped.
+      - ⚠️ The apps' verify screens have an empty `.catch`, so a 429 leaves the spinner
+        running until the app is fixed.
+      Pinned by `test/integration/otp-guard.js`.
     - **`POST /create` never echoes the code it just sent.** It used to, for a new phone, so
       anyone could register a number they don't own.
     - **`search-customer` is dashboard-only**, and `status.authCode` (the pending OTP, shown to
       support on purpose) is included only for a dashboard role (`mayReadPendingCode`). Never
-      `token`. OTPs never expire, so a readable code is a login. The RN apps' legacy screens
+      `token`. A live code is a login. Since `otp-guard`, search shows a code only while it
+      is unexpired. The RN apps' legacy screens
       are refused: they have mapped an object as an array since 2025-06 and never worked. Fix
       that screen and give it a code-free answer before opening the route to a mobile token.
     - **`GET /:customerId`, `/status`, `/whatsapp-summary` and
