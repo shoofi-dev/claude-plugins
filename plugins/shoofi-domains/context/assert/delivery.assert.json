@@ -845,6 +845,16 @@
           "desc": "CORE invariant 22: forceAssign clears the soft-block confirmations but never the same-courier refusal; only allowSameDriver (a resend) skips both - valid-before leg is main; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
         },
         {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:if \\(isCancelledStatus\\(deliveryRecord\\.status\\)\\) \\{\\s*return res\\.status\\(400\\)\\.json\\(\\{\\s*message: \"Delivery is already cancelled\",\\s*currentStatus: deliveryRecord\\.status\\s*\\}\\);\\s*\\}[\\s\\S]{0,400}?const confirmedDelivered = wasDelivered && req\\.body\\.confirmCancelDelivered === true;\\s*if \\(wasDelivered && !confirmedDelivered\\) \\{\\s*return res\\.status\\(409\\)\\.json\\(\\{[\\s\\S]{0,300}?code: \"delivered\",\\s*needsConfirmation: true,|deliveryRecord\\.status === DELIVERY_STATUS\\.CANCELLED_BY_CUSTOMER \\|\\|)",
+          "desc": "CORE invariant 22: admin cancel treats -1/-2/-3 (String-compared) as already cancelled and asks before cancelling a delivered 4 (409 code 'delivered', confirmCancelDelivered) - valid-before leg is main's CANCELLED_BY_CUSTOMER check; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:\\.\\.\\.\\(confirmedDelivered \\? \\{ cancelledAfterDelivered: true \\} : \\{\\}\\)[\\s\\S]{0,3000}?previousStatus: String\\(deliveryRecord\\.status\\),\\s*statusChange: `\\$\\{deliveryRecord\\.status\\} → \\$\\{DELIVERY_STATUS\\.CANCELLED_BY_ADMIN\\}`,[\\s\\S]{0,200}?\\.\\.\\.\\(confirmedDelivered \\? \\{ confirmedDelivered: true \\} : \\{\\}\\),|previousStatus: deliveryRecord\\.status,\\n\\s*statusChange: `\\$\\{deliveryRecord\\.status\\} → \\$\\{DELIVERY_STATUS\\.CANCELLED_BY_ADMIN\\}`,)",
+          "desc": "CORE invariant 22: a confirmed cancel of a delivered booking is recorded (cancelledAfterDelivered on the row, confirmedDelivered + string previousStatus on the flow event) - valid-before leg is main's raw previousStatus; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
+        },
+        {
           "file": [
             "services/delivery/delivery-row-locator.js",
             "services/delivery/book-delivery.js"

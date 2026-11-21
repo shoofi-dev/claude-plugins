@@ -691,6 +691,16 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
     `cancelReasonCode: "customer_pickup"`. The conversion (orders invariant 34) runs after the
     `-3` write and is wrapped: it reports in `pickupConversion` in the 200 body and never 500s the
     cancel. It is refused when the booking was delivered before the cancel.
+    The cancel answers 400 "Delivery is already cancelled" for any `-1`/`-2`/`-3` row
+    (`isCancelledStatus`, compared with `String()`). Before this it read the non-existent
+    `DELIVERY_STATUS.CANCELLED_BY_CUSTOMER`, so a store-cancelled or int-stored row was cancelled
+    again and the courier was pushed. A delivered `4` row answers **409 `{code: "delivered",
+    needsConfirmation: true}`** with a Hebrew `message`; nothing is written and nothing is pushed.
+    Only `confirmCancelDelivered: true` (a boolean) cancels it, because payouts and the store
+    report count `"4"` only. `forceAssign` is not a confirmation, since the reassign clients
+    auto-retry a 409 with it. A confirmed cancel stamps `cancelledAfterDelivered: true` on the
+    booking and `confirmedDelivered: true` + `previousStatus: "4"` on the flow event, and
+    `convertToPickup` is still refused.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
