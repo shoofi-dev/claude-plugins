@@ -1496,6 +1496,16 @@ Code: `routes/kopa/menu-write.js` (thin), `services/kopa/menu-write.js`; tests
     `imageUrl`; update does NOT read a JSON `img`. → `200 { message: "Successfully saved", product,
     lintIssues? }`; `400 "Failed to update product"` when the id is unknown. JSON bodies break here:
     `extras`/`supportedCategoryIds`/`price` go through `JSON.parse`, so they must be strings.
+    An `imageUrl` that fails saves NOTHING from that request (no partial update — names and price
+    in the same body are dropped too) and answers instead of hanging (a stalled download gives up after
+    30 s of socket silence per hop): download failed (HTTP error, timeout,
+    refused, HTML instead of an image) → `422 { code: "IMAGE_DOWNLOAD_FAILED", message: "Image
+    download failed: <reason>", imageUrl }`; Spaces upload failed → `502 { code:
+    "IMAGE_UPLOAD_FAILED", … }`. Any other throw → `500 { code: "PRODUCT_UPDATE_FAILED" }` (the
+    handler is wrapped; before server PR fix/product-update-image-error an image failure was
+    re-thrown out of the async handler, the request never answered and the Excel import hung on
+    that row). A failed reindex after a good save still answers `200`. The insert route is
+    different: a failed `imageUrl` there still saves the product with `img: []` and answers `200`.
   - `POST /api/admin/product/update/isInStore`, JSON `{ productId, isInStore: <boolean>,
     outOfStoreUntil? }` (ISO; only with `false`; `true` clears it). The raw value is `$set`, so send a
     real boolean.
