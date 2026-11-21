@@ -182,6 +182,14 @@
         {"file": "services/money/ledger.js", "regex": "heldAmount: state === \"held\" \\|\\| state === \"release_failed\" \\? round2\\(base\\.heldAmount\\) : 0,", "desc": "CORE invariant 28: summarize passes heldAmount for held AND release_failed"},
         {"file": "routes/order-fraud-detector.js", "regex": "const LOCATION_DISTANCE_SOFT_MULTIPLIER = 2;", "desc": "reference FRAUD: a location gap up to 2x the limit is medium and recorded only; beyond it high, overriding trust"},
         {
+          "file": [
+            "services/orders/convert-to-pickup.js",
+            "consts/consts.js"
+          ],
+          "regex": "(?:\"order\\.receipt_method\": TAKEAWAY, pickupConversion|PICKED_UP_BY_DRIVER: \"11\")",
+          "desc": "CORE invariant 34: convert-to-pickup writes receipt_method + the pickupConversion audit in one $set - valid-before leg (consts) holds on main; drop it once shoofi-server#605 has merged"
+        },
+        {
           "file": "routes/order.js",
           "regex": "if \\(req\\.body\\.isNotPrinted\\) \\{\\s*filterBy\\.isPrinted = false;",
           "desc": "doc reference C3 Auto-print: isNotPrinted only adds isPrinted:false. The date window is built only `if (ordersDate)`, so a sweep that sends no date has no window at all; the partner sweep must send ordersDate"

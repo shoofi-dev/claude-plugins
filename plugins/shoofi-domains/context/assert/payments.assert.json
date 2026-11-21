@@ -114,6 +114,14 @@
         {"file": "services/hq/money-audit/checks-money-in.js", "regex": "\\.filter\\(\\(o\\) => !isRefusedRelease\\(o\\)\\)", "desc": "CORE invariant 13: refund-anomaly does not count a CancelTrans refusal as a failed refund"},
         {"file": "routes/creditCard.js", "regex": "delete creditCardData\\.cvv;", "desc": "CORE Known status: an HYP card is saved with no cvv"},
         {
+          "file": [
+            "services/money/pickup-fee-owe.js",
+            "services/hq/money-audit/checks-money-in.js"
+          ],
+          "regex": "(?:PICKUP_OWE_REASON = \"converted_to_pickup_delivery_fee\"|refund-anomaly)",
+          "desc": "CORE invariant 14: a card order converted to pickup owes its fee with reason converted_to_pickup_delivery_fee - valid-before leg holds on main; drop it once shoofi-server#605 has merged"
+        },
+        {
           "file": "services/kopa/till-orders.js",
           "regex": "const dueC = totalC \\+ tipC;",
           "desc": "CORE Kopa till money: the tip is NOT in total; amountDue = total + tip"

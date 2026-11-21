@@ -190,7 +190,7 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
    the past at the moment the booking is created, so `assignedAt − assignDriverAt` reports a
    fake lag (≈5 min on a 10-minute order) that is pure window arithmetic. Measure
    `assignedAt − max(assignDriverAt, created)`. All three are offset strings — parse to
-   instants; and an admin reassign (`routes/delivery/driver.js`) overwrites `assignedAt`.
+   instants; and an admin reassign (`routes/delivery/admin.js`, pending branch) overwrites `assignedAt`.
    **Measuring how long a courier has not ANSWERED is a different clock again, and
    `created` is not a proxy for it.** The wait that matters is `now − assignedAt` while
    `status === "1"` and `isPendingAssignment !== true`; `created` is the partner-accept
@@ -615,8 +615,6 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
     - Tests: `test/integration/delivery-row-delivery-side.js`. A decoy from another store and
       an older same-store decoy are inserted first. On the old code 12 of 16 fail; the 4 that
       pass are the pure-module and unique-bookId compatibility pins.
-
-
 21. **The store sees its courier through ONE reader and ONE frame — and every new writer of
     `driver` or `status` on a booking must send the frame.** `services/delivery/courier-status.js`
     (shoofi-server#485):
@@ -670,6 +668,39 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
     - **Reach.** `sendToAppAdmins` iterates only the sending process's sockets — no Redis
       fan-out — and prod runs two instances, so a frame does not reach a tablet held by the other
       instance. True of every partner frame; the card must keep its focus/action refetch.
+22. **Every manual (re)assignment appends to `book-delivery.reassignmentHistory`**
+    (`services/delivery/reassignment-history.js`). Four writers push one entry in the SAME
+    write as the assignment: admin reassign and admin assign (pending branch) in
+    `routes/delivery/admin.js`, twin assign-driver (each side) in `routes/twin-order.js`, and
+    company-admin reassign in `routes/delivery/driver.js`. Entry: `{at: Date, source:'manual',
+    route, byUserId, byName, fromDriverId: ObjectId|null, toDriverId: ObjectId, previousStatus,
+    newStatus, wasPending, sameDriver, forced}`. It belongs to the BOOKING: a courier decline
+    must never clear it. Forward-only from deploy; before it, `reassignmentMetadata` was one
+    object the next reassignment overwrote, and the `order_reassigned_by_admin` flow event read
+    `actor: 'Admin'` on every row. Repeats are one query:
+    `countDocuments({"reassignmentHistory.1": {$exists: true}})`.
+    The admin reassign refuses a courier who already holds the booking at status 1/2/3/5 (409
+    `code: 'same_driver'`). `forceAssign` does NOT clear it, because both web clients auto-retry
+    any 409 with that flag; only `allowSameDriver: true` does, and it keeps the status (a
+    resend). A different courier still lands at `"1"`. `reassignmentMetadata.newDriverId` +
+    `assignmentMetadataDescribesPreviousDriver: true` mark the engine's `assignmentMetadata` as
+    describing someone else.
+    The four flow-tracking calls in the manual paths (admin assign pending, admin cancel,
+    `order/status/update`, company-admin reassign) are wrapped and run AFTER the pushes
+    (invariant 6). `POST /api/delivery/admin/cancel` also accepts `convertToPickup: true` /
+    `cancelReasonCode: "customer_pickup"`. The conversion (orders invariant 34) runs after the
+    `-3` write and is wrapped: it reports in `pickupConversion` in the 200 body and never 500s the
+    cancel. It is refused when the booking was delivered before the cancel.
+    The cancel answers 400 "Delivery is already cancelled" for any `-1`/`-2`/`-3` row
+    (`isCancelledStatus`, compared with `String()`). Before this it read the non-existent
+    `DELIVERY_STATUS.CANCELLED_BY_CUSTOMER`, so a store-cancelled or int-stored row was cancelled
+    again and the courier was pushed. A delivered `4` row answers **409 `{code: "delivered",
+    needsConfirmation: true}`** with a Hebrew `message`; nothing is written and nothing is pushed.
+    Only `confirmCancelDelivered: true` (a boolean) cancels it, because payouts and the store
+    report count `"4"` only. `forceAssign` is not a confirmation, since the reassign clients
+    auto-retry a 409 with it. A confirmed cancel stamps `cancelledAfterDelivered: true` on the
+    booking and `confirmedDelivered: true` + `previousStatus: "4"` on the flow event, and
+    `convertToPickup` is still refused.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
