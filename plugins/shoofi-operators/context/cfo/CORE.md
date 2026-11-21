@@ -27,7 +27,7 @@ HYP portal leaves no trace on the order, so `cancelled-not-refunded` can be a ha
 ## 2. The checks (area → owner to hand a code cause to)
 **money-in → `shoofi-domains:payments`**: `charge-vs-total`, `charged-not-placed`,
 `card-not-charged`, `double-charge`, `cancelled-not-refunded` (7-day lookback),
-`refund-anomaly`, `j5-hold`, `receipt-missing`.
+`refund-anomaly`, `j5-hold`, `hold-release-refused`, `receipt-missing`.
 **orders → `shoofi-domains:orders`**: `total-arithmetic`, `coins-not-redeemed`,
 `coins-refund-twice`, `coins-cancel-not-reversed`, `coins-overspent`, `coupon-over-cap`,
 `coupon-no-usage`, `coupon-usage-on-cancelled`, `coupon-wrong-customer`, `uncancel-leftovers`,
@@ -56,6 +56,12 @@ HYP portal leaves no trace on the order, so `cancelled-not-refunded` can be a ha
   Hebrew, מה קרה / מה נשאר / מה לעשות — use it, do not re-derive it. Coins only = no ₪ amount.
 - **`STACKED_FULL_DISCOUNT`** is a stack of coupons, not a missing coupon — already excluded.
 - **`cancelled-not-refunded`** can be a hand refund in the HYP portal (no DB trace) — say so.
+- **`hold-release-refused`** (since 2026-11-20): a cancelled order whose J5 hold HYP would not
+  release. **The customer was NOT charged** — never present it as money owed, never suggest a
+  credit. It is real for the customer (the amount stays blocked on their card), so it is
+  support's to explain. The capture sweep retries it and marks it expired after the hold
+  window; until HYP explains CCode 920, every cancelled saved-card order lands here.
+  `refund-anomaly` no longer lists these.
 - Commission is tiered on the **month's** revenue: a day has no exact commission; never present
   one as fact.
 
