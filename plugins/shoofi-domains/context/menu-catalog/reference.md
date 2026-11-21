@@ -222,6 +222,54 @@ take `extraName`/`productName` from the app event (Arabic), `groupName`/`optionN
 Resolution: `utils/catalog-lint.js` (`displayName`), copied by `toLintRow`; the write boundary passes
 the product's category ids so its rows get `categoryName` too.
 
+**The Excel product import — what it checks before, and reports after** (shoofi-delivery-web
+`src/views/admin/stores/ImportCategoriesProducts.tsx`, branch `feat/import-warnings`, 2026-11-22).
+Background: on candy-mix (2026-11-21) a first import saved 329 products with the Hebrew title as
+`nameAR`, `img: []` and price 0 and said nothing; a re-import with "update existing" off only linked
+them to categories (`setProductCategories`), also silently; a re-import with it on froze at "1 / 332"
+because the admin axios instance has no timeout and the loop is sequential.
+- **Before: the file against the template** — `checkImportFile` in `src/utils/import-file-check.ts`
+  (pure, tested). It reads the header row on its own (`sheet_to_json(ws, { header: 1 })[0]`):
+  `sheet_to_json` keys a row by the header's **exact** text, so `"Price "` or `"image url"` makes
+  `row["Price"]` undefined on every row, exactly like a missing column. It lists missing template
+  columns, unknown ones (with the template column a loose match points at), and counts the product
+  rows (v2: `PRODUCT` rows only) that left `Product Title (Arabic)`, `Image URL` or `Price` blank
+  (Price: `parseImportedPrice` → `null`, so unreadable text counts as blank). A required / counted /
+  expected column (`COLUMN_ROLE`) that is missing or blank on every product row gets the red banner
+  with what it does to the products. Subcategory, description and barcode columns are optional.
+- **No silent Hebrew-as-Arabic.** `ProductData.nameAR` is the raw Arabic cell (`""` when blank).
+  The import button stays disabled until the operator ticks "ייבא N מוצרים בלי שם בערבית (יוצג השם
+  בעברית)"; only then does **create** write `nameAR || nameHE` (an empty `nameAR` renders a nameless
+  card to Arabic customers). **Update** never sends a blank `nameAR` — the route writes only the keys
+  it receives, so an existing product keeps its own Arabic name.
+- **Per-request time limit.** `IMPORT_REQUEST_TIMEOUT_MS` (90 s, `src/utils/import-run-summary.ts`)
+  on product insert / update / `setProductCategories`; 30 s on the category writes and the read-back.
+  A request that never answers becomes a failed row and the loop goes on. A **Stop** button aborts
+  the request in flight (`AbortController`) and starts no new row. A timed-out or aborted **insert**
+  is registered in the run's product index with no id, so a later row for the same product is
+  reported (`PRODUCT_CATEGORY_NOT_LINKED`) instead of creating a second copy — no answer is not
+  "not created".
+- **After: a summary that stays on screen** (`ImportRunSummaryPanel`; the screen no longer navigates
+  to the stores list when the run ends): created / updated / failed; with "update existing" off,
+  "N products already existed — only linked to categories, not updated" (distinct product ids, plus
+  linked vs unchanged rows); failed rows by product title with `describeImportFailure` —
+  `IMAGE_DOWNLOAD_FAILED` (422 from `POST /api/admin/product/update`, §7) as "the image could not be
+  downloaded: <imageUrl>", `IMAGE_UPLOAD_FAILED`, a timeout as "may still have been saved — check
+  before importing again", anything else the server's own message and status. Products whose stored
+  price was left alone (blank cell / by-weight) are listed by name.
+- **The insert route's silent `img: []`** (§7: a failed `imageUrl` on insert still saves and answers
+  200) is caught client-side: every product created with a non-Spaces `imageUrl` is read back with
+  `GET /api/admin/product/:id`; an empty `img` lands in the summary as "created without image". The
+  read-back is a check, not a write — its failure never fails the row.
+- **Worklist rows** (`phase: "import"`, saved in the one `POST /api/admin/menu-import-issues` call
+  per run): `PRODUCT_IMPORT_FAILED` / `SUBCATEGORY_CREATE_FAILED` / `CATEGORY_CREATE_FAILED` (reason
+  from `failureToRecord`, which now uses the Hebrew of `describeImportFailure` for a timeout, a stop
+  and the two image codes), `PRICE_NOT_UPDATED_*`, and two new codes:
+  `PRODUCT_CREATED_WITHOUT_IMAGE` and `PRODUCT_CATEGORY_NOT_LINKED`.
+- A product created in the run is added to the "already refreshed" set, so with "update existing"
+  on its later rows (other categories) only link — they no longer re-send the same fields and
+  download the image a second time.
+
 ### central `shoofi.translations` — i18n labels, one flat key space for every app
 _Verified 2026-10-26 against shoofi-server `routes/translations.js` and the feat/coupon-drafts worktree,
 with local Mongo for the counts. These are not prod counts._
