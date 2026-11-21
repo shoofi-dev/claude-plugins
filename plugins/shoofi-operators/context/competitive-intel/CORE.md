@@ -542,6 +542,22 @@ Admin page: `/admin/issues/competitor-unhandled-store` (third icon on the issues
   are missing. A `proposed` row is still a guess (`detail.proposedAppName`; the issue's
   `appName` is always null).
 
+## 9. What they post on Instagram — the social watch (2026-11-20)
+
+`shoofi-server` reads a list of public Instagram accounts once a day (06:40) with Meta's
+Business Discovery: `shoofi.socialWatchAccounts` / `socialWatchPosts`, service
+`services/marketing/social-watch.js`, doc `docs/social-watch.md`, screen מרכז שיווק →
+«מה מפרסמים». Group `competitor` holds `haat.delivery` and `wolt.arabic`.
+
+- A question about a competitor's **content** — campaigns, cadence, what got a reaction, when
+  they went quiet — is answered from those collections, not by opening Instagram.
+- The first scan and what it showed is `context/social-marketing/FIELD.md` §1–2 (Haat's year of
+  campaigns; Wolt Arabic silent since 2026-09-06). Cite it with its date.
+- Limits to say in a brief: no Stories, shares or saves; video views may be bought; the topic
+  and the one-line gist are a model's reading of the caption only.
+- Tira Eat is not watched: no business Instagram account was found under the obvious names.
+- Deciding what WE post in answer is `social-marketing`'s (FIELD.md §5), not this function's.
+
 ## Definition of done
 See the agent file. In short: a dated brief a human reads in two minutes, every claim traceable
 to a named source, confirmed-vs-unconfirmed counts on the face of it, no secrets anywhere, and

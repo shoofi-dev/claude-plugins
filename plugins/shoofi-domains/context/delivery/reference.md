@@ -61,7 +61,7 @@ Transitions: driver `approve`/`start`/`complete`/`cancel`/`waiting-in-store`
 
 | Route | Returns | Refusal |
 |---|---|---|
-| `GET /api/delivery/delivery-only/towns` | towns reachable from this store's pickup zone, each with `priceFrom/priceTo`, ETA and the store fee | `{enabled:false, reason}` |
+| `GET /api/delivery/delivery-only/towns` | towns reachable from this store's pickup zone, each with `priceFrom/priceTo`, ETA, the store fee and `source` (`town`, or the `city` / `area` fallback for a covered place in no town — ids `"city:<id>"` / `"area:<geometryId>"`) | `{enabled:false, reason}` |
 | `POST /api/delivery/delivery-only/book` | `{success, bookId, storeFee}` | 403 gate / 400 `Town not serviceable` / 200 `{success:false, reason:"no_eligible_driver"}` |
 | `POST /api/delivery/delivery-only/list` | this store's bookings, newest 200 | — |
 
@@ -94,7 +94,7 @@ book duplicate-inflight|book replay|book errored`, and `[delivery-cancel] bookId
 driverId=…`. `/towns` refusals are deliberately **not** logged — the screen polls it on every
 open and focus, and every call is a refusal while the platform flag is off.
 
-**Tests:** `test/integration/delivery-only-region-fee.js`, `delivery-support-gate.js`,
+**Tests:** `test/integration/delivery-only-region-fee.js`, `delivery-only-towns-fallback.js`, `delivery-support-gate.js`,
 `store-delivery-only-expense.js`; `scripts/delivery-only-preflight.js` is a read-only prod
 pre-flight for stores/regions that would book at ₪0.
 
@@ -105,7 +105,8 @@ row of `POST /api/order/admin/orders` carries:
 ```ts
 courier: null | {            // null = no booking for this order (not accepted / platform switch off)
   state: "searching" | "assigned" | "arriving" | "at_store" | "picked_up" | "delivered" | "cancelled";
-  driverName: string | null;        // first word of booking.driver.fullName
+  driverName: string | null;        // first word of booking.driver.fullName; null while searching
+                                    // AND once cancelled (the row keeps `driver` as history)
   etaToStoreMinutes: number | null; // engine estimate, current courier only, measured basis, not passed
   etaToStoreAt: string | null;      // ISO instant of that estimate (client-side countdown)
   cancelledBy: "driver" | "store" | "admin" | null;
@@ -459,6 +460,17 @@ cleaning those fields on the saved address (≤ 200 note / ≤ 20 others, add ke
 apartment + entrance) is `customers` CORE invariant 20. For a twin pair the values come from
 whichever leg carries them (one customer, one dropoff), rendered once in the shared header.
 A delivery-only booking has no `order`, so neither line ever renders there.
+**Restaurant note and meal notes (2026-11-20, shoofir + server `feat/driver-notes-visible`):**
+`OrderCard` renders `order.order.commentToStore` (the customer's note to the restaurant) in a
+light-blue banner labelled «ملاحظة الزبون للمطعم» / «הערת הלקוח למסעדה», right under the amber
+courier banner. `TwinOrderCard` renders each leg's own note inside that store's pickup block (one
+note per store, orders CORE invariant 25), never in the shared header. `OrderItemsModal` shows each
+item's `note` under the quantity, labelled «ملاحظة للوجبة» / «הערה למנה». Logic is the pure
+`utils/customer-notes.ts` (`getCommentToStore`, `getItemNote`, labels take the language), pinned by
+`utils/__tests__/customer-notes.test.ts`. Server side: `POST /api/delivery/list` needed
+`'order.order.commentToStore': 1` in its whitelist (pinned by
+`test/integration/delivery-comment-to-courier-projection.js`); `items[].note` already rode the
+whole `'order.order.items': 1`. Both are booking-time snapshots like the address.
 **Dead/inherited (leave alone):** `services/deliveryDriverService.ts` (legacy fetch dup,
 `app-name: shoofi-app`), `getNearbyOrders`/`getSchedule` (no UI callers), customer-app city/address remnants.
 

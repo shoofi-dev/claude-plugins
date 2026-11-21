@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/j5-token-hold-release / 2026-11-20 (invariant 13: a J5 hold HYP refuses to release — getToken retry on 920, hourly retry, expired after the hold window, money summary carries the held amount, HQ check hold-release-refused; Known status: plaintext CVV also sat on orders + orderFlowEvents until 2026-08-13, scripts/scrub-stored-cvv.js); shoofi-server@fix/coupon-draft-customer-area / 2026-11-17 (Who a coupon applies to: supportedCities = the store's pickup zone, supportedAreas = the customer's route); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -204,8 +204,40 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    (idempotent: a compensation row with that `cancelDecisionKey` is reused) — one Shoofi-funded
    `COMP-<primary originalOrderId>[-n]` per twin decision; per-side calls still refuse twins.
    Invoices are untouched.
-13. **A card order converted to pickup OWES its delivery fee in the ledger; nothing on the
-    order changes** (`services/money/pickup-fee-owe.js`, shoofi-server#605, orders invariant 33).
+13. **A J5 hold HYP refuses to release is never captured, never credited — and is not
+   forgotten either** (shoofi-server `fix/j5-token-hold-release`, 2026-11-20).
+   - **What it is:** a cancelled order whose `CancelTrans` was refused →
+     `paymentAuth.status: "release_failed"` + `refundRequired`/`refundError`. The customer was
+     NOT charged; the amount stays blocked on the card until the bank drops it. **Never credit
+     it in the HYP portal** — that pays out money that never came in.
+   - **The pattern (prod, Aug → 2026-11-20):** every saved-card hold (`HYP_TOKEN`,
+     `Token=True`) was refused with **CCode 920** (21/21), every Apple/Google Pay hold released
+     (57/57), same terminal, minutes after the hold. HYP documents 920 as "can't be cancelled —
+     already transmitted or doesn't exist". **Unexplained by HYP** — ask them before changing
+     the call.
+   - **`attemptHoldRelease`** (`services/payments/order-authorization.js`): on a 920 for a
+     hold with no `walletType` it calls `getToken(transId)` (the one step the wallet path takes
+     after its hold) and `CancelTrans` once more. A hypothesis, harmless either way. Every try
+     is pushed to **`paymentAuth.releaseAttempts[]`** `{at, variant: cancel|getToken|
+     cancel_after_getToken|retry_error, ccode, errMsg, success}` — HYP's own answer, for the
+     conversation with HYP. `scripts/hyp-j5-spike.js --run --token` reproduces a token hold on
+     the TEST terminal (the original spike only ever held a raw card number).
+   - **`retryHoldRelease`**, run by the hourly capture sweep (`order-capture-cron.js`
+     `retryRefusedReleases`, count-first per store): up to `MAX_RELEASE_RETRIES` (3) more tries
+     (`paymentAuth.releaseRetries`, `lastReleaseRetryAt`, claimed before the call). Success →
+     `cancelled`, `refundRequired: false`, `releasedOnRetry`, `refundRequiredResolution:
+     "released_on_retry"`. Past **`expiresAt + HOLD_LAPSE_GRACE_HOURS` (48)** → **`expired`**,
+     `expiredAt`, `refundRequired: false`, `refundRequiredResolution: "hold_lapsed"` — this is
+     the only writer of `AUTH_STATUS.EXPIRED`. Both rewrite `moneySummary`. Every write is
+     conditional on the status still being `release_failed`; nothing here captures or refunds.
+   - **Admin:** `moneySummary` for `release_failed` carries `heldAmount` = the authorized
+     amount (it was 0 — the chip said "₪0"); `expired` (uncaptured) reads `released`. The chip:
+     «הלקוח לא חויב · ₪N עדיין תפוסים בכרטיס, הבנק משחרר תוך כמה ימים · לא לזכות ידנית».
+     `scripts/resummarize-refused-holds.js` (dry-run default) rewrites old summaries.
+   - **HQ money audit:** `hold-release-refused` (mismatch) lists what still stands;
+     `refund-anomaly` no longer counts a CancelTrans refusal as a failed refund.
+14. **A card order converted to pickup OWES its delivery fee in the ledger; nothing on the
+    order changes** (`services/money/pickup-fee-owe.js`, shoofi-server#605, orders invariant 34).
     - **Amount:** the fee paid, which is `shippingPrice` minus a delivery-coupon discount, never
       below 0.
     - **When it is owed:** only if `paymentAuth.status === "captured"`, or if there is no
@@ -290,6 +322,27 @@ coupon its total took off: TotalPrice is its only writer (reference.md, "Coupons
 converse holds too: a coupon the total did NOT use (`couponSuppressed`: it lost to a delivery
 deal, or it is a delivery coupon on a pickup / drive-in order) stays on the card as "not used" and
 is not sent.
+
+**Who a coupon applies to** — `applicableTo` (`routes/coupon.js`: `/api/coupons/apply` and
+the auto-apply scorer `GET /api/coupons/auto-apply/:customerId`). Every non-empty list is ANDed;
+an empty one is "all":
+- `stores` — the order's store `appName`.
+- `supportedCities` — **the STORE's pickup zone, never the customer's town.** It is compared
+  with `resolveCityIdsFromAreaIds(areaIds)` = each area's `cityId`, and an area is a
+  pickup→dropoff route whose `cityId` is the zone the store sits in (delivery CORE: `areas`).
+  The `areaId` the app sends is `availableDrivers.area._id` from `findBestAreaForLocation`
+  (shape holds the customer AND city holds the store). With no area, auto-apply falls back to
+  the store's own `supportedCities`. The admin form labels it «אזור החנות (איסוף)».
+- `supportedAreas` — the order's area id, one "store zone - customer town" route
+  («גלגוליה - כפר ברא»): **the only field that targets where the customer is**
+  («אזור הלקוח (מסלול משלוח)»).
+- So "Kfar Bara customers of a Jaljulia store" = `stores` + `supportedAreas`, cities empty.
+  Kfar Bara in `supportedCities` with a Jaljulia store matches no order (G0F8JG9Z,
+  2026-11-17); Jaljulia in `supportedCities` matches that store's orders to EVERY town.
+  Coupon drafts block the first shape (accountant CORE invariant 13).
+- Known gaps (open, 2026-11-17): `/api/coupons/available` and `/customer/:id/available` (the
+  store-page banner) skip the cities check; the app's typed-code path (`CouponInput`) sends no
+  `areaIds`, so a typed code limited by zone or area is always refused.
 
 **What is advertised** — `GET /api/coupons/active` feeds the store-page carousel AND the home
 store-card tag (shoofi-app `couponsStore.activeCoupons`, label `t(storeTagName)`). It lists public,
@@ -382,9 +435,18 @@ claimed, applied or recorded, and checkout applies coupons exactly as before.
     tampered or stale fee, or where the tariff ceiling disagrees with the app's area price.
 
 ## Known status (human-confirmed — do NOT "fix")
-- **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today.
-  HYP tokenization does not store CVV; this resolves as ZCredit is retired. **Do not
-  independently rip out CVV handling.**
+- **KNOWN, tied to the migration:** CVV is stored in plaintext on `shoofi.creditCards` today
+  (6,092 legacy ZCredit cards on 2026-11-20). The app replays it on every ZCredit charge
+  (`components/payment-method/index.tsx` `cvv: defaultCard.cvv`), so it resolves as ZCredit is
+  retired. **Do not independently rip out saved-card CVV handling.** An HYP card is no longer
+  saved with a `cvv` key at all (`routes/creditCard.js`; it was `''`).
+- **FOUND 2026-11-20 — orders and flow events (not a migration dependency):** before
+  `redactPaymentSecrets` (`routes/order.js`, ~2026-08-13) the order kept the request's
+  `paymentData.cvv`: **33,990 orders in 176 stores** (`<store>.orders.paymentData.cvv`, 3
+  digits, Jul 2025 → 13 Aug 2026) and **53,254 `shoofi.orderFlowEvents`**
+  (`metadata.paymentData.cvv`). Nothing reads them back. `scripts/scrub-stored-cvv.js`
+  (dry-run default, `--apply` needs Sari) replaces them with `<redacted>`; saved cards are only
+  counted. Newer orders show `paymentData.cvv: "<redacted>"` (10 chars) — the placeholder, not a CVV.
 - **CONFIRMED — remove (backlog):** `hyp-test-soft` debug endpoint in `routes/hyp-pay.js`
   (charges 1 NIS with a saved token) should not exist in prod. Money file → draft HIGH-RISK PR,
   confirm nothing calls it.

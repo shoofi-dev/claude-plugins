@@ -1,6 +1,6 @@
 {
   "doc": "accountant",
-  "lastVerified": "shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13 (CORE invariant 20: Kopa QR table orders - the classifier, the sales-row split, the details-only report keys, overview / exec readers filtered; invariant 17 legacy pin gains the table-orders leg); shoofi-server@fix/partner-summary-date-validation / 2026-11-12 (invariant 17 partner/summary + daily-orders validate their period before any read, 400 INVALID_PERIOD; shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa section + reference 12: no money without a shift - a money payment / refund needs an open till session (409 NO_OPEN_SESSION), money leases on the session doc, the close waits for them and ends the window past lastMoneyAt, openedAt never before the last Z, sessionId for tracing); shoofi-server@feat/kopa-phase1 / 2026-11-12 (CORE section + reference 12: Kopa till sessions & reports, phase 5 - till money separate from settlement, one open session via a fixed-_id lock, gapless Z on the shared close, the expected-cash formula, the drawer counted via drawerMovementIds, receipts built but off and refusing createInvoiceOnBehalf); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData in-process, OPT-IN via body figures: \"report\"; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's per-store body in services/payments/store-sales.js; ref §1/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
+  "lastVerified": "shoofi-server@fix/hyp-company-create-email-exists + shoofi-delivery-web@fix/hyp-company-create-error-reason / 2026-11-19 (ref §5 delivery-company create-account: accounting email wins and is shown, one EZcount user per email, 409 codes, the real reason shown); shoofi-server@feat/coupon-draft-edit / 2026-11-18 (invariant 13: editing a created coupon from its draft — reopen / cancel-edit routes, settle by comparison, carried-over fields); shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13 (CORE invariant 20: Kopa QR table orders - the classifier, the sales-row split, the details-only report keys, overview / exec readers filtered; invariant 17 legacy pin gains the table-orders leg); shoofi-server@fix/partner-summary-date-validation / 2026-11-12 (invariant 17 partner/summary + daily-orders validate their period before any read, 400 INVALID_PERIOD; shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (CORE Kopa section + reference 12: no money without a shift - a money payment / refund needs an open till session (409 NO_OPEN_SESSION), money leases on the session doc, the close waits for them and ends the window past lastMoneyAt, openedAt never before the last Z, sessionId for tracing); shoofi-server@feat/kopa-phase1 / 2026-11-12 (CORE section + reference 12: Kopa till sessions & reports, phase 5 - till money separate from settlement, one open session via a fixed-_id lock, gapless Z on the shared close, the expected-cash formula, the drawer counted via drawerMovementIds, receipts built but off and refusing createInvoiceOnBehalf); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData in-process, OPT-IN via body figures: \"report\"; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's per-store body in services/payments/store-sales.js; ref §1/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18/19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, ref §5/§8/§9/§10); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (ref §6/§8 driver send recipients, bulk invoice send); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -59,7 +59,8 @@
         "test/integration/kopa/till-sessions.js",
         "test/integration/kopa/till-orders.js",
         "test/integration/kopa/till-reports.js",
-        "test/integration/kopa/receipts.js"
+        "test/integration/kopa/receipts.js",
+        "services/invoicing/hyp-company-account.js"
       ],
       "symbols": {
         "lib/payments/calc.js": [
@@ -603,8 +604,33 @@
         },
         {
           "file": "routes/admin/coupon-drafts.js",
+          "regex": "router\\.post\\('/coupon-drafts/:id/reopen'[\\s\\S]*router\\.post\\('/coupon-drafts/:id/cancel-edit'",
+          "desc": "CORE invariant 13 (edit): a created draft is reopened to edit its coupon, and an unapplied edit is cancelled back to the snapshot"
+        },
+        {
+          "file": "routes/admin/coupon-drafts.js",
+          "regex": "drafts\\.couponDiffFromFields\\(coupon, draft\\.approval\\.fields\\)\\.length\\) return draft;",
+          "desc": "CORE invariant 13 (edit): an approved edit is settled only when the live coupon matches the approved fields — there is no reserved code to look up"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "isActive: String\\(coupon\\.isActive !== false\\),\\s*[\\r\\n]+\\s*color: coupon\\.color \\|\\| fields\\.color,\\s*[\\r\\n]+\\s*categories: JSON\\.stringify\\(applicableTo\\.categories \\|\\| \\[\\]\\),\\s*[\\r\\n]+\\s*products: JSON\\.stringify\\(applicableTo\\.products \\|\\| \\[\\]\\),",
+          "desc": "CORE invariant 13 (edit): buildUpdateFields carries on/off, colour, categories and products over from the live coupon — the update route $sets every field, so a switched-off coupon would be switched back on"
+        },
+        {
+          "file": "routes/admin/coupon-drafts.js",
           "regex": "shoofiDb\\.coupons\\.findOne\\(\\{ code: draft\\.approval\\.code \\}\\)",
           "desc": "CORE invariant 13: settle-on-read — an approving draft whose reserved code exists is marked created, so one draft can never create a second coupon"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "block\\(targetingConflictMessage\\(conflict, ctx\\), field\\)|'subNameForStore',\\s*[\\r\\n]+\\s*'supportedAreas',\\s*[\\r\\n]+\\s*'categories',\\s*[\\r\\n]+\\]\\);",
+          "desc": "CORE invariant 13 targeting: stores / store zones (supportedCities) / customer areas (supportedAreas) that share no pickup zone are a draft blocker («הקופון לא יחול על אף הזמנה», targetingConflict). Valid-before leg = main's DRAFT_MANAGED_FIELDS still holding supportedAreas before shoofi-server fix/coupon-draft-customer-area; drop the leg once that PR has merged"
+        },
+        {
+          "file": "services/coupons/coupon-draft-assistant.js",
+          "regex": "\\\"supportedCities\\\" is the STORE's pickup zone|4\\. STORES and CITIES — use appName values from the store list",
+          "desc": "CORE invariant 13 targeting: the draft assistant's rule 4a — supportedCities is the store's pickup zone, customer targeting is supportedAreas, never claim cities filters by the customer (the G0F8JG9Z reply, 2026-11-17). Valid-before leg = main's old rule 4; drop it once shoofi-server fix/coupon-draft-customer-area has merged"
         },
         {
           "file": "routes/admin/coupon-templates.js",
@@ -1506,6 +1532,26 @@
           "file": "services/kopa/receipts.js",
           "regex": "s\\.receipts\\.enabled === true",
           "desc": "CORE (Kopa phase 5): till receipts are off unless the store flag is exactly true"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "hypCompanyAccount\\.findOtherCompanyWithHypEmail\\(deliveryDb\\.store, getId\\(companyId\\), email, taxId\\)",
+          "desc": "ref §5: company create-account checks another company's hyp.api_email BEFORE calling EZcount (one EZcount user per email)"
+        },
+        {
+          "file": "routes/hyp.js",
+          "regex": "accountingEmail: company\\.accounting\\?\\.bankAccount\\?\\.email \\|\\| null",
+          "desc": "ref §5: company HYP status returns the accounting email that create-account sends"
+        },
+        {
+          "file": "services/invoicing/hyp-company-account.js",
+          "regex": "email: accountingEmail \\|\\| formEmail",
+          "desc": "ref §5: the accounting email wins over the one typed into the option-1 form"
+        },
+        {
+          "file": "services/invoicing/hyp-company-account.js",
+          "regex": "return \\{ status: 409, body \\}",
+          "desc": "ref §5: an email/CRN clash answers 409 with a code, not a bare 500"
         }
       ]
     },
@@ -1522,10 +1568,16 @@
         "src/views/admin/reports/invoice-steps/companyRowModel.ts",
         "src/views/admin/reports/invoice-steps/rowShared.ts",
         "src/components/tax-consent/TaxConsentBox.tsx",
-        "src/components/tax-consent/taxConsentView.ts"
+        "src/components/tax-consent/taxConsentView.ts",
+        "src/views/admin/driver-reports/CompanyHypConnection.tsx"
       ],
       "symbols": {},
       "patterns": [
+        {
+          "file": "src/views/admin/coupons/CouponForm.tsx",
+          "regex": "אזור החנות \\(איסוף\\)|ערים לחיפוש חנויות ואזורי משלוח",
+          "desc": "CORE invariant 13 targeting: the coupon form names supportedCities as the STORE's pickup zone («אזור החנות (איסוף)»), not a customer city. Valid-before leg = the old «ערים לחיפוש חנויות ואזורי משלוח» heading; drop it once shoofi-delivery-web fix/coupon-form-zone-labels has merged"
+        },
         {
           "file": "src/views/admin/reports/ReportsList.tsx",
           "regex": "(\"/hyp/admin/reports/\\$\\{report\\._id\\}/create-store-invoice\"|`/hyp/admin/reports/\\$\\{report\\._id\\}/create-store-invoice`)\\),\\s*\\n\\s*\\(done\\) =>",
@@ -1561,7 +1613,7 @@
         },
         {
           "file": "src/components/tax-consent/taxConsentView.ts",
-          "regex": "export const CONSENT_TITLE = 'אישור EZcount ברשות המסים — מתחדש כל 3 חודשים';",
+          "regex": "export const CONSENT_TITLE = (?:tr\\()?'אישור EZcount ברשות המסים — מתחדש כל 3 חודשים'[;,]",
           "desc": "CORE invariant 19: the admin names EZcount's 3-month consent, not the שופי שופינג permission"
         },
         {
@@ -1583,6 +1635,11 @@
           "file": "src/views/admin/reports/ReportsList.tsx",
           "regex": "reportDetails\\.filter\\(r => r && hasSendableInvoice\\(r\\)\\)",
           "desc": "CORE invariant 19: the bulk invoice send includes a store-only report (Shoofi owes the store)"
+        },
+        {
+          "file": "src/views/admin/driver-reports/CompanyHypConnection.tsx",
+          "regex": "toast\\.error\\(createAccountErrorText\\(error\\.response\\?\\.data\\)",
+          "desc": "ref §5: a failed company create-account shows the reason (code text, or HYP's error), not only the generic message"
         }
       ]
     }

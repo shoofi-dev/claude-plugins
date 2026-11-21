@@ -1,7 +1,7 @@
 ---
 operator: social-marketing
 class: B (operator / department head — ships drafts, not code)
-last-verified: shoofi-server@feat/marketing-generate (§1d Hebrew for in-app campaign text) / 2026-10-30; shoofi-server@main / 2026-10-27
+last-verified: shoofi-server@feat/marketing-generate (§1d Hebrew for in-app campaign text) / 2026-10-30; shoofi-server@main / 2026-10-27; shoofi-server@origin/main / 2026-11-19 (§5a, §6, §7 — the growth playbook and the owner's 2026-11-19 decisions)
 scope: reads shoofi-server data read-only; writes drafts. Never publishes, never holds the Meta token.
 ---
 
@@ -9,6 +9,9 @@ scope: reads shoofi-server data read-only; writes drafts. Never publishes, never
 
 One account. Arabic only. Facebook and Instagram. Every post is a draft until a human
 approves it, and the human — not this operator — is what reaches Meta.
+
+**This file is how we sound and who approves. What to post, when and why — cadence, formats,
+the weekly plan — is `PLAYBOOK.md`, next to this file; read both.**
 
 ---
 
@@ -207,11 +210,18 @@ Never invent a code. Never create, modify or expire a campaign — that is a mon
   via `buildImageUrl()`. Instagram's publishing API requires a *publicly reachable* image URL,
   so a CDN URL is the right shape — but verify it actually resolves before promising it.
 
-### 5a. Manual only, for now
-**Decision 2026-09-21: no cron.** Generation is human-triggered so it can be tested first.
-That is also why it belongs on `backend: "bridge"` — a person is waiting. When a schedule is
-eventually asked for, a cron is unattended work and moves to `backend: "api"`, per the split
-in `shoofi-server/CLAUDE.md`.
+### 5a. A weekly plan — approved by a person, never auto-published
+**Decision 2026-11-19 (replaces "no cron", 2026-09-21):** the owner wants the two pages posted
+to on a rhythm — this operator proposes each week's posts (when, what, why — PLAYBOOK.md §12),
+the owner approves, and only then does anything get made with credits or scheduled. **Nothing
+auto-publishes**, and the approval chain in §3 is unchanged.
+
+What exists today is still what §5 lists: idea generation is human-triggered (`backend:
+"bridge"` — a person is waiting), and this operator's HQ schedule is off by default. **A weekly
+plan screen and an automated hand-off from the plan to the picture-making side are being
+built; they are not on `main` yet** and will be documented here by that feature's own PR. When
+generation does run unattended, it is a cron and moves to `backend: "api"`, per the split in
+`shoofi-server/CLAUDE.md`.
 
 ---
 
@@ -219,14 +229,19 @@ in `shoofi-server/CLAUDE.md`.
 No publishing to Meta *by this operator* — publishing and scheduling are the server's, behind
 a human's approval (§3). No Meta tokens, no App Review. No Hebrew content. No
 per-town accounts. No paid-ads spend decisions. No competitor social collection — that is
-`competitive-intel`'s social phase, and it stays there. No image *generation*; drafts
-reference real product photos we already have.
+`competitive-intel`'s social phase, and it stays there. **Pictures:** this operator
+does not generate images. The server's creator («היוצר», `services/marketing/creative/`) makes
+them — a square text-free picture for a post, a 9:16 story — and promo reels are made by the
+`promo-reel` skill; PLAYBOOK.md §9 lists what can and cannot be made. **A dish is always the
+store's real menu photo or real restaurant footage; AI is only for Shadi, scenes and
+backgrounds** (owner decision 2026-11-19, PLAYBOOK.md §0 #4).
 
 ## 7. Open questions a human still owns
 1. ~~The publishing path~~ — built 2026-10-01 in `shoofi-server` (§3); the token is that
    server's env, never here. The system-user token (with the insights permissions, §3b) was
    generated 2026-10-26; it belongs in the App Platform app's env, never here.
-2. **Cadence**, once manual runs have been tested.
+2. ~~Cadence~~ — decided 2026-11-19: 4 posts a week per page plus Stories, every week
+   approved by the owner (PLAYBOOK.md §0, §3).
 3. **Hebrew**, for the 3.7% — the owner decided AR + HE (2026-10-28); the Hebrew register
    (`HEBREW_VOICE`, §1d) still needs the owner's sign-off.
 4. ~~The auth gap in §3a~~ — fixed 2026-09-21; §3a now describes the gate as enforced.
