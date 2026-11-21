@@ -1554,6 +1554,22 @@ Code: `routes/kopa/menu-write.js` (thin), `services/kopa/menu-write.js`; tests
     re-thrown out of the async handler, the request never answered and the Excel import hung on
     that row). A failed reindex after a good save still answers `200`. The insert route is
     different: a failed `imageUrl` there still saves the product with `img: []` and answers `200`.
+  - **Who downloads an import's images** (admin Excel import, `shoofi-delivery-web`
+    `views/admin/stores/ImportCategoriesProducts.tsx` + `utils/import-image-download.ts`, branch
+    `feat/import-browser-image-download`, stacked on `feat/import-warnings`): for every
+    non-Spaces `Image URL` — insert, "update existing" and "עדכן תמונות למוצרים קיימים" — the
+    admin's **browser** fetches the image first (`mode: "cors"`, no cookies, no referrer, 20 s,
+    `image/*` only, max 10 MB) and sends it as the `img` file; only when the browser cannot read it
+    (no CORS, network/HTTP error, not an image, too large) does it send `imageUrl` for the server
+    to download, as before. Why: the prod server's IP gets `HTTP 403` from Wix
+    (`static.wixstatic.com`, 2026-11-21) while Wix answers browsers with
+    `access-control-allow-origin: *`. Haat's `im.haat.delivery` (Azure blob behind Cloudflare) has
+    **no CORS rule**, so Haat rows still go through the server. Shoofi-Spaces URLs are unchanged
+    (`img` as JSON `[{ uri }]`). No third-party CORS proxy is used (the screen's old
+    `downloadImageViaProxy` is dead code). A fallback that the server then refuses names both
+    reasons in the run summary and the saved `menu-import-issues` row; the "created without image"
+    read-back runs only for rows the server downloaded. While a run is going the screen asks before
+    the admin leaves (`beforeunload` + a confirm on in-admin links, `hooks/useLeaveGuard.ts`).
   - `POST /api/admin/product/update/isInStore`, JSON `{ productId, isInStore: <boolean>,
     outOfStoreUntil? }` (ISO; only with `false`; `true` clears it). The raw value is `$set`, so send a
     real boolean.
