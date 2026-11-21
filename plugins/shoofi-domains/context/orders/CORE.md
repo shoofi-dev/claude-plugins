@@ -1432,6 +1432,25 @@ apart — always establish which is meant:
    `payment_method_invalid` is mostly friction, not loss — checkout starts with NO payment
    method (the cash default is commented out) and forgets the choice on remount, so ~94% of
    those customers pick one and order within 30 min.
+   `shipping_method_invalid` and `payment_method_invalid` carry **`reason`** ∈ {`missing`,
+   `card_data_missing` (payment only), `unknown_method`, `store_not_supported`} plus
+   **`store_app_name`** (the cart's store), and `support_key` (e.g. `cash_support`) when the
+   reason is `store_not_supported` (`shoofi-app/helpers/checkout-validation-reason.ts`). Rows
+   before that field shipped have no `reason`; read them by `payment_method` /
+   `shipping_method` being null — in 2026-11-08..15, 385 of 387 were exactly that (no method
+   picked), only 2 had a method set. "Unfinished form" vs "store doesn't take it" is
+   `reason: "missing"` vs `"store_not_supported"`.
+   **Checkout opens with NO shipping method, on purpose** (`screens/checkout/index.tsx`
+   "Shipping comes back from this visit's draft only — never from a past order"), while
+   payment falls back to the customer's last-used method — so a form that looks filled can
+   still block on shipping (2026-11-14..21: 147 of 148 shipping blocks had no tap this visit,
+   111 with payment restored `last_used`). It is not a lost draft. A missing shipping method
+   is marked inline on the tiles (`inline: true` on the event, no dialog) when the screen
+   passes `onShippingError`. The ONE exception to "no default": a store offering exactly one
+   method gets it pre-picked via `onlyOfferedShippingMethod`
+   (`helpers/checkout-choice-availability.ts`), logged as `shipping_method_changed`
+   `source: "auto_single_method"` — a tap carries no `source`. Never remember shipping across
+   orders: delivery vs pickup depends on the occasion.
 2. **Submitted and never paid** — status `"0"` order rows, per store DB. See the
    `FAILED_PAYMENT_STATUS` note; that is the only layer carrying an issuer reason.
 3. **Never reached checkout** — `page_viewed` with `properties.page_name` ∈
@@ -1480,7 +1499,9 @@ Traps that cost a day if you meet them cold:
   minute and re-filtered on `created`) — index-covered, and roughly 50× faster.
 - **No TTL and no retention job**, so history is complete back to the first event on
   **2026-02-06**. Anything earlier is *no data*, not zero — report it as null.
-- **No `appName` field on the document**, so a per-store split is impossible from this data.
+- **No `appName` field on the document**, so a per-store split is impossible from this data —
+  except where an event puts the store in `properties` (`checkout_validation_failed`
+  shipping/payment steps: `store_app_name`; `page_viewed Checkout`: `cart_store`).
   `app_type` is always `"shoofi-shopping"`: the partner and driver apps do not log at all.
 - **The launch event is not a usable "app open".** `ota_check_started` (`trigger: "launch"`,
   `shoofi-app/hooks/useOTAUpdates.ts`) fires before `userDetailsStore` hydrates, so ~99% of
