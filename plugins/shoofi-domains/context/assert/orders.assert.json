@@ -669,6 +669,16 @@
           "desc": "checkout_validation_failed reason separates an unfinished form (missing) from a store refusal (CORE: where an order that never happened lives)"
         },
         {
+          "file": "helpers/checkout-choice-availability.ts",
+          "regex": "export const onlyOfferedShippingMethod",
+          "desc": "the only shipping pre-pick: a store offering exactly one method (CORE: where an order that never happened lives)"
+        },
+        {
+          "file": "screens/checkout/index.tsx",
+          "regex": "\"auto_single_method\"",
+          "desc": "an auto pre-pick is logged with source auto_single_method, a tap with none (CORE: where an order that never happened lives)"
+        },
+        {
           "file": "screens/checkout/index.tsx",
           "regex": "\"checkout_left\"",
           "desc": "checkout abandonment snapshot, incl. the payment/timing choice that resets on remount (CORE: where an order that never happened lives)"
