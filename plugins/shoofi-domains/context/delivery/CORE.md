@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@fix/HIGH-RISK-delivery-logs-ids-only / 2026-11-21 (invariant 20: order and twin cancels skip a delivered or cancelled row; delivery admin cancel and the driver loop are not narrowed); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -574,7 +574,13 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
     `{originalBookId, bookId}`, or `{bookId, appName}` for a legacy order, never `bookId` alone.
     An order cancel then writes `-3` only through `orderCancelDeliveryRowFilter`, which skips a
     row already at `4`/`-1`/`-2`/`-3` (both types) inside the write filter, so a delivered
-    booking stays on the company driver report (orders CORE invariant 23).
+    booking stays on the company driver report (orders CORE invariant 23). The twin cascade and
+    degrade do the same through `orderCancelDeliveryWriteFilter` (the leg's filter plus that
+    status clause). Two writers are deliberately NOT narrowed: `POST /api/delivery/admin/cancel`
+    still lets a dashboard person cancel a `4` row (a human decision, reported 2026-11-21 rather
+    than blocked), and the driver `start` / `complete` / `waiting-in-store` filters carry no
+    status, so a courier can move a cancelled row to `3` / `4` (cacao 0741-9957, 2026-11-20: twin
+    degrade `2 → -3`, then the courier completed it; 7 such rows in the 60 days to 2026-11-21).
     - **The delivery-side writes use `locateDeliveryRow`**
       (`services/delivery/delivery-row-locator.js`). These are `POST /api/delivery/admin/cancel`
       and `POST /api/delivery/update` → `updateDelivery` (`services/delivery/book-delivery.js`).
