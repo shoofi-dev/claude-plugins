@@ -37,8 +37,11 @@ Primary files:
   minimized-chat bubble `components/for-you/{bubble-math.ts,ChatBubbleOverlay.tsx}` (§7g). The profile's
   owner and login merge (`taste-profile.js`, the other `/api/ai-helper/*` routes) are the
   customers domain's; the history facts are `facts.js` — all in `docs/ai-helper.md`.
+- `services/catalog/menu-copy.js` + `routes/admin/menu-copy.js` — copy one store's whole menu into
+  another (§7n, CORE invariant 35); `services/catalog/clone-from-template.js` — the template-store
+  product clone behind create-from-mock (keeps the template's `_id`s, stamps `mockProductId`)
 - Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/explore-cache-invalidation.md`,
-  `docs/combo-deals.md`, `docs/for-you.md`, `docs/ai-helper.md`
+  `docs/combo-deals.md`, `docs/for-you.md`, `docs/ai-helper.md`, `docs/menu-copy.md`
 
 **You must NOT touch without explicit human review** (per `CLAUDE.md` guardrails):
 - Order creation / status transitions (`routes/order.js`), payments, auth.
@@ -65,7 +68,10 @@ const shoofiDb = req.app.db['shoofi'];                         // central regist
   visibility and cache bypass (`menu.js`).
 - **Intentional cross-store reads** (verify carefully, they touch other tenants'
   DBs on purpose): `/api/menu/search` (all stores), `/api/menu/mock` &
-  create-from-mock (a mock store's DB), `store/copy-arabic-products` (source→dest).
+  create-from-mock (a mock store's DB), `store/copy-arabic-products` (source→dest), and the menu
+  copy `POST /api/admin/menu/copy` (§7n). The menu copy names BOTH stores in the body, never in
+  `app-name`. Each one is looked up in `shoofi.stores` (404 `STORE_NOT_FOUND`) before
+  `getOrInitializeDb` opens it. It reads the source and writes only the target.
 - **Existing non-lazy access to be aware of:** `category.js`
   (`req.app.db[appName || 'shoofi']`) skips `getOrInitializeDb` and can 500 for a
   store DB not yet in memory. Prefer the canonical pattern for anything new.
@@ -98,6 +104,10 @@ Accessors are defined in `services/database/DatabaseInitializationService.js`.
 - **Images:** `img` (array of `{ uri }`; size variants generated on upload).
 - **Barcode/mock:** `barcode`, `barcodeId` (store-prefixed unique), `mockStoreAppName`,
   `mockProductId`, `mockType`.
+- **Copy provenance:** `copiedFrom: { appName, id, runId, at }`. The menu copy (§7n) writes it on
+  every product, category and general category it inserts. `id` is the source `_id` as a string,
+  `runId` the `shoofi.menu-copy-runs` id as a string; a rollback deletes by `copiedFrom.runId`. A
+  copied doc never carries the `mock*` fields.
 
 ### `categories` (regular subcategories)
 `nameAR`, `nameHE`, `order`, `img[]`, `supportedGeneralCategoryIds` (array of
@@ -106,6 +116,8 @@ strings), `discountPercent` (**drives menu discounting**), `isSchoolProject`,
 Writers: the admin store-category routes (`routes/store.js`) and, since Kopa phase 2, the Kopa
 category routes (§7k), which write the admin's create shape key for key and otherwise only a
 targeted `$set` of `nameAR`/`nameHE`/`img`/`isHidden` (+ `updatedAt`), or `order` on reorder.
+The menu copy (§7n) also inserts categories, with `discountPercent: 0`, `isCampaign: false` and
+`copiedFrom`. Its general categories carry `copiedFrom` too.
 
 ### `general-categories` (`db.generalCategories`, top-level groups)
 `nameAR`, `nameHE`, `img`, `order`, `isSchoolProject`, `isHidden`. Enriched at
@@ -210,6 +222,54 @@ take `extraName`/`productName` from the app event (Arabic), `groupName`/`optionN
 Resolution: `utils/catalog-lint.js` (`displayName`), copied by `toLintRow`; the write boundary passes
 the product's category ids so its rows get `categoryName` too.
 
+**The Excel product import — what it checks before, and reports after** (shoofi-delivery-web
+`src/views/admin/stores/ImportCategoriesProducts.tsx`, branch `feat/import-warnings`, 2026-11-22).
+Background: on candy-mix (2026-11-21) a first import saved 329 products with the Hebrew title as
+`nameAR`, `img: []` and price 0 and said nothing; a re-import with "update existing" off only linked
+them to categories (`setProductCategories`), also silently; a re-import with it on froze at "1 / 332"
+because the admin axios instance has no timeout and the loop is sequential.
+- **Before: the file against the template** — `checkImportFile` in `src/utils/import-file-check.ts`
+  (pure, tested). It reads the header row on its own (`sheet_to_json(ws, { header: 1 })[0]`):
+  `sheet_to_json` keys a row by the header's **exact** text, so `"Price "` or `"image url"` makes
+  `row["Price"]` undefined on every row, exactly like a missing column. It lists missing template
+  columns, unknown ones (with the template column a loose match points at), and counts the product
+  rows (v2: `PRODUCT` rows only) that left `Product Title (Arabic)`, `Image URL` or `Price` blank
+  (Price: `parseImportedPrice` → `null`, so unreadable text counts as blank). A required / counted /
+  expected column (`COLUMN_ROLE`) that is missing or blank on every product row gets the red banner
+  with what it does to the products. Subcategory, description and barcode columns are optional.
+- **No silent Hebrew-as-Arabic.** `ProductData.nameAR` is the raw Arabic cell (`""` when blank).
+  The import button stays disabled until the operator ticks "ייבא N מוצרים בלי שם בערבית (יוצג השם
+  בעברית)"; only then does **create** write `nameAR || nameHE` (an empty `nameAR` renders a nameless
+  card to Arabic customers). **Update** never sends a blank `nameAR` — the route writes only the keys
+  it receives, so an existing product keeps its own Arabic name.
+- **Per-request time limit.** `IMPORT_REQUEST_TIMEOUT_MS` (90 s, `src/utils/import-run-summary.ts`)
+  on product insert / update / `setProductCategories`; 30 s on the category writes and the read-back.
+  A request that never answers becomes a failed row and the loop goes on. A **Stop** button aborts
+  the request in flight (`AbortController`) and starts no new row. A timed-out or aborted **insert**
+  is registered in the run's product index with no id, so a later row for the same product is
+  reported (`PRODUCT_CATEGORY_NOT_LINKED`) instead of creating a second copy — no answer is not
+  "not created".
+- **After: a summary that stays on screen** (`ImportRunSummaryPanel`; the screen no longer navigates
+  to the stores list when the run ends): created / updated / failed; with "update existing" off,
+  "N products already existed — only linked to categories, not updated" (distinct product ids, plus
+  linked vs unchanged rows); failed rows by product title with `describeImportFailure` —
+  `IMAGE_DOWNLOAD_FAILED` (422 from `POST /api/admin/product/update`, §7) as "the image could not be
+  downloaded: <imageUrl>", `IMAGE_UPLOAD_FAILED`, a timeout as "may still have been saved — check
+  before importing again", anything else the server's own message and status. Products whose stored
+  price was left alone (blank cell / by-weight) are listed by name.
+- **The insert route's silent `img: []`** (§7: a failed `imageUrl` on insert still saves and answers
+  200) is caught client-side: every product created with a non-Spaces `imageUrl` is read back with
+  `GET /api/admin/product/:id`; an empty `img` lands in the summary as "created without image". The
+  read-back is a check, not a write — its failure never fails the row.
+- **Worklist rows** (`phase: "import"`, saved in the one `POST /api/admin/menu-import-issues` call
+  per run): `PRODUCT_IMPORT_FAILED` / `SUBCATEGORY_CREATE_FAILED` / `CATEGORY_CREATE_FAILED` (reason
+  from `failureToRecord`, which now uses the Hebrew of `describeImportFailure` for a timeout, a stop
+  and the two image codes), `PRICE_NOT_UPDATED_*`, and two new codes:
+  `PRODUCT_CREATED_WITHOUT_IMAGE` and `PRODUCT_CATEGORY_NOT_LINKED`.
+- A product created in the run is added to the "already refreshed" set, so with "update existing"
+  on its later rows (other categories) only link — they no longer re-send the same fields and
+  download the image a second time.
+
 ### central `shoofi.translations` — i18n labels, one flat key space for every app
 _Verified 2026-10-26 against shoofi-server `routes/translations.js` and the feat/coupon-drafts worktree,
 with local Mongo for the counts. These are not prod counts._
@@ -264,6 +324,14 @@ with local Mongo for the counts. These are not prod counts._
       `LABEL_KEY_RE` in `services/coupons/coupon-drafts.js`), BEFORE the coupon is created, and
       a collision answers 409. Partner and driver labels are never generated: they stay
       `shoofi-will-pay`. Feature doc: shoofi-server `docs/coupon-drafts.md` "Labels and translations".
+    - **The auto store-page subtitle is the whole sentence** (`withBenefit` in
+      `services/coupons/coupon-drafts.js`, 2026-11-19): the store-page title, then the condition
+      ("توصيل بـ5₪ لطلب فوق 140₪"), per language. shoofi-app's store strip
+      (`components/shared/CouponCarousel.tsx`) prints `t(subNameForStore)` ALONE when a coupon has
+      one, so a `store-sub` row holding only the condition shows half a sentence (WTS1LYMY read
+      "لطلب فوق 140₪" beside a store deal from ₪200). A subtitle a person wrote is not touched, and
+      rows written before the change keep the bare condition until the coupon is reopened and
+      approved again. When you write or fix a `store-sub` row by hand, write the benefit too.
   - **Seed scripts** `scripts/seed-*-translations.js` write the central DB directly with a
     backup file; `scripts/rollback-translations.js` undoes a run.
 ### `images` — auxiliary image library: `{ data:{uri}, type, subType }`.
@@ -280,6 +348,22 @@ onetimePayments } }` (22 visible stores on prod, 2026-10-30). A public store car
 `toPublicStore` (`services/catalog/public-store.js`), which drops `accounting`, `hyp`, `credentials`
 and `fraudConfig`. Every customer-facing store list does: explore v1/v2, `available-stores` (and its
 delivery companies), `menu/search`, twin `eligible-stores`, For-you cards (CORE invariant 27).
+
+### central `shoofi.menu-copy-runs` + `shoofi.menu-copy-backups` — the menu copy's record and undo (§7n)
+`menu-copy-runs` holds one document per run. Its `_id` is the `runId`, and it holds:
+- `sourceAppName`, `targetAppName`, `mode: "copy"|"replace"`, `by {id, fullName}`;
+- `status: running|done|failed|rolling_back|rolled_back|rollback_failed`;
+- `startedAt`, `expiresAt` (+7 days), `finishedAt`;
+- the counts `backedUp`, `copied`, `removed`, `hidden {zeroPrice, brokenCombos}`, `labelsCopied`,
+  `lintIssues`;
+- `flags { before {store, central}, set }`, the `hasGeneralCategories` values to restore.
+
+It has no TTL: it is the audit record. Index `{targetAppName, startedAt: -1}`.
+
+`menu-copy-backups` holds `{ runId, collection, doc, at, expiresAt }`: one row per document of a
+REPLACED target, written before anything is inserted. A TTL index on `expiresAt`
+(`expireAfterSeconds: 0`) removes them after 7 days, and there is an index on `{runId}`. Both are
+declared in `DatabaseInitializationService.js` (`db.menuCopyRuns`, `db.menuCopyBackups`).
 
 ### central `shoofi.suggestProductIndex` — the "For you" candidate index (derived, disposable)
 One document per suggestible product of every food-service store (CORE invariant 11):
@@ -680,7 +764,9 @@ menuCache.clearStore(`${appName}_schoolProject`);   // school-project menus are 
 ```
 Missing this serves a stale menu for up to 5 minutes. Most product write
 endpoints also emit a websocket `menu_refresh` (`shoofi-shopping`) /
-`product_updated` (`shoofi-partner`) and re-run indexing.
+`product_updated` (`shoofi-partner`) and re-run indexing. The menu copy (§7n) clears both of the
+TARGET's keys after a copy, after a failed copy that wrote anything, and after a rollback. Then it
+sends `menu_refresh` with `action: "menu_copied"` or `"menu_copy_rolled_back"`.
 
 **Combo snapshots and the capability header sit on opposite sides of the cache.**
 `resolveComboSnapshots` (`services/menu/combo-snapshots.js`) runs BEFORE `menuCache.set` in
@@ -781,6 +867,10 @@ the cache read.
 - Kopa phase 3: `GET /api/kopa/meta`, `GET /api/kopa/kitchens` (`KOPA_TILL`);
   `PUT /api/kopa/meta/items/:productId`, `PUT /api/kopa/meta/categories/:categoryId`,
   `POST /api/kopa/kitchens`, `PATCH|DELETE /api/kopa/kitchens/:id` (`KOPA_OWNER`) (§7l).
+- `POST /api/admin/menu/copy` and `POST /api/admin/menu/copy/:runId/rollback`: `auth.required` +
+  `checkAdminRole(PRICE_EDIT_ROLES)`, i.e. every dashboard role except `accountant` (master passes),
+  with no partner path. This is NOT `PRODUCT_ADMIN`. Both are in the admin audit map. They copy one
+  store's whole menu into another, and undo it (§7n).
 
 ## 7b. Nightly catalog lint — the cron and the app event contract
 `utils/crons/catalog-lint-cron.js` — `30 4 * * *` Asia/Jerusalem, registered in `app.js` inside
@@ -1386,6 +1476,8 @@ Code: `routes/kopa/menu-write.js` (thin), `services/kopa/menu-write.js`; tests
     `updatedAt`, `createdBy` (= `req.auth.id`, the partner token's storeUsers id), the admin create's
     keys in the same order (the test runs `POST /api/admin/promotions` on the same fake DB and compares).
     `validatePromotion` errors → `400 { message, errors }` with the admin's messages. → `data` = doc + `_id`.
+    For an active deal those include the texts-vs-fields check (`utils/promotion-title-check.js`,
+    orders CORE invariant 13): a title saying "מעל 165₪" over a ₪20 minimum is refused.
   - `PATCH /api/kopa/promotions/:id` — any form fields; the doc is `sanitizePromotion({ ...stored,
     ...body })` + `updatedAt`, `updatedBy`, `$set` over the stored doc (top-level overlay: `config` and
     `scope` replace as whole objects). With the full form it writes exactly what
@@ -1393,6 +1485,8 @@ Code: `routes/kopa/menu-write.js` (thin), `services/kopa/menu-write.js`; tests
     re-sanitising a stored doc is idempotent. Empty or non-object body → `400`.
   - `POST /api/kopa/promotions/:id/active` — `{ isActive: <JSON boolean> }` (anything else `400`); the
     same re-sanitise with only `isActive` changed, as the admin's "post the doc back" update does.
+    Switching OFF is never refused over the deal's wording; switching ON a deal whose texts
+    contradict its fields is (`400`, the same lines).
   - Ids go through the admin's `getPromotionById` on the proven store's DB: another store's id or a
     malformed one → `404`, nothing written.
   - Side effects equal the admin's: both cache keys, then `syncCampaignCategoryForStore`, swallowed.
@@ -1450,6 +1544,32 @@ Code: `routes/kopa/menu-write.js` (thin), `services/kopa/menu-write.js`; tests
     `imageUrl`; update does NOT read a JSON `img`. → `200 { message: "Successfully saved", product,
     lintIssues? }`; `400 "Failed to update product"` when the id is unknown. JSON bodies break here:
     `extras`/`supportedCategoryIds`/`price` go through `JSON.parse`, so they must be strings.
+    An `imageUrl` that fails saves NOTHING from that request (no partial update — names and price
+    in the same body are dropped too) and answers instead of hanging (a stalled download gives up after
+    30 s of socket silence per hop): download failed (HTTP error, timeout,
+    refused, HTML instead of an image) → `422 { code: "IMAGE_DOWNLOAD_FAILED", message: "Image
+    download failed: <reason>", imageUrl }`; Spaces upload failed → `502 { code:
+    "IMAGE_UPLOAD_FAILED", … }`. Any other throw → `500 { code: "PRODUCT_UPDATE_FAILED" }` (the
+    handler is wrapped; before server PR fix/product-update-image-error an image failure was
+    re-thrown out of the async handler, the request never answered and the Excel import hung on
+    that row). A failed reindex after a good save still answers `200`. The insert route is
+    different: a failed `imageUrl` there still saves the product with `img: []` and answers `200`.
+  - **Who downloads an import's images** (admin Excel import, `shoofi-delivery-web`
+    `views/admin/stores/ImportCategoriesProducts.tsx` + `utils/import-image-download.ts`, branch
+    `feat/import-browser-image-download`, stacked on `feat/import-warnings`): for every
+    non-Spaces `Image URL` — insert, "update existing" and "עדכן תמונות למוצרים קיימים" — the
+    admin's **browser** fetches the image first (`mode: "cors"`, no cookies, no referrer, 20 s,
+    `image/*` only, max 10 MB) and sends it as the `img` file; only when the browser cannot read it
+    (no CORS, network/HTTP error, not an image, too large) does it send `imageUrl` for the server
+    to download, as before. Why: the prod server's IP gets `HTTP 403` from Wix
+    (`static.wixstatic.com`, 2026-11-21) while Wix answers browsers with
+    `access-control-allow-origin: *`. Haat's `im.haat.delivery` (Azure blob behind Cloudflare) has
+    **no CORS rule**, so Haat rows still go through the server. Shoofi-Spaces URLs are unchanged
+    (`img` as JSON `[{ uri }]`). No third-party CORS proxy is used (the screen's old
+    `downloadImageViaProxy` is dead code). A fallback that the server then refuses names both
+    reasons in the run summary and the saved `menu-import-issues` row; the "created without image"
+    read-back runs only for rows the server downloaded. While a run is going the screen asks before
+    the admin leaves (`beforeunload` + a confirm on in-admin links, `hooks/useLeaveGuard.ts`).
   - `POST /api/admin/product/update/isInStore`, JSON `{ productId, isInStore: <boolean>,
     outOfStoreUntil? }` (ISO; only with `false`; `true` clears it). The raw value is `$set`, so send a
     real boolean.
@@ -1549,6 +1669,85 @@ Code: `routes/kopa/qr-menu.js` (owner), `routes/kopa/qr-menu-public.js` (no auth
     unchanged.
 - **No menu cache key is cleared by any of this** (`products` / `categories` are never written).
 
+## 7n. Menu copy between stores (CORE invariant 35)
+`services/catalog/menu-copy.js` holds the logic; `routes/admin/menu-copy.js` is thin and mounted
+under `/api/admin`. Server doc: `docs/menu-copy.md`. Tests: `test/integration/menu-copy.js`
+(in-memory Mongo).
+
+**Gate** (`MENU_COPY_GATE` in the route): `auth.required` + `checkAdminRole(PRICE_EDIT_ROLES)` from
+`services/catalog/bulk-price-update.js`, i.e. master, admin, manager, senior, operator, editor,
+viewer. An `accountant`-only token gets 403, because a whole-menu replace is a bulk destructive write
+and accountant seats are not on the menu screens. It matches the admin web's `MENU_COPY_ROLES`
+(`src/components/Sidebar/menu-access.ts`) and copy-arabic-products. No token is 401; a customer,
+partner or driver token is 403.
+
+**`POST /api/admin/menu/copy`** `{ sourceAppName, targetAppName, dryRun: boolean, mode?: "replace", confirm?: string }`:
+- `dryRun: true` → `200 { dryRun: true, source: { appName, generalCategories, categories, products,
+  combos }, target: { appName, generalCategories, categories, products, isStockManagment },
+  targetHasMenu, warnings: [{ code, message, count? }] }`. It writes nothing.
+- The warning codes:
+  - `ZERO_PRICE_HIDDEN`, `GENERAL_CATEGORIES_FLAG_SET`, `TARGET_STOCK_MANAGED_STARTS_AT_ZERO`,
+    `REPLACE_ORPHANS_OLD_ORDERS` (`count` = the target's products), `COMBO_BROKEN` (checked in memory
+    against the source);
+  - `TARGET_GENERAL_CATEGORIES_KEPT`: the target has tiles on and the source has none. The flag is
+    not turned off.
+- `dryRun: false` → `200 { runId, copied: {generalCategories, categories, products}, removed: {…},
+  lintIssues }`. `lintIssues` is `lintStore(...).issues`, or `null` when the lint failed.
+
+**`POST /api/admin/menu/copy/:runId/rollback`** → `200 { restored: {…}, removed: {…} }`.
+
+**Errors** are `{ code, message }`:
+- 400 `INVALID_REQUEST` | `SAME_STORE` | `CONFIRM_MISMATCH`;
+- 404 `STORE_NOT_FOUND` | `RUN_NOT_FOUND`;
+- 409 `TARGET_HAS_MENU` | `COPY_IN_PROGRESS` | `RUN_NOT_ROLLBACKABLE`;
+- 410 `BACKUP_EXPIRED`;
+- 422 `SOURCE_EMPTY` (the source has no products);
+- 500 `COPY_FAILED` | `ROLLBACK_FAILED`, with `runId` in the body.
+
+**The pure plan.** `planCopy(source, target, { runId, now })` builds every new document and the
+warnings, and the dry run answers from it:
+- Three old→new maps, one per collection, keyed by the string `_id`.
+- `remapId` keeps an ObjectId an ObjectId and a string a string.
+- An array id or a `categoryOrders` key that is not in the source is dropped.
+- A legacy scalar that is not a source id is kept.
+- An unmapped combo `productId` is left as it was, so `validateComboReferences` refuses it and the
+  combo is hidden.
+
+**The run**, all inside the lock `menu-copy:<target>` (10 min TTL; `utils/redis-lock.js`):
+1. Re-read the target, and check `TARGET_HAS_MENU` / `CONFIRM_MISMATCH`.
+2. Insert the run doc.
+3. Replace mode: snapshot the target into `menu-copy-backups`.
+4. `insertMany` in batches of 500: general categories, then categories, then products.
+5. `validateComboReferences` per copied combo, and `isHidden: true` on a refusal.
+6. Delete the old documents by snapshotted id.
+7. Set `hasGeneralCategories`.
+
+A throw in 3–7 runs `undoPartial` (restore the deleted from the backup, delete by `copiedFrom.runId`,
+put the flag back), marks the run `failed`, clears both cache keys and throws `COPY_FAILED`.
+
+After success: `copyLabels`, then `afterWrite`. `afterWrite` clears both keys, sends the two
+websocket frames, and runs `syncCampaignCategoryForStore` and `lintStore`. Each step is caught and
+logged.
+
+**Rollback** answers:
+- 409 `RUN_NOT_ROLLBACKABLE` unless the status is `done` or `rollback_failed`, or when a later run
+  into the same target is `running`, `done` or `rollback_failed`;
+- 410 `BACKUP_EXPIRED` once `expiresAt` has passed, or when the backup rows are fewer than
+  `backedUp`.
+
+It runs `restoreDocs` (bulk `replaceOne` with upsert), then `deleteMany({"copiedFrom.runId"})`, the
+flag, `productLabels.deleteMany({appName: target, "copiedFrom.runId"})`, and then `afterWrite`.
+
+**Known limits:**
+- In replace mode the target briefly holds both menus, between the inserts and the delete.
+- The labels of a replaced target's old products are left in place. They are orphaned but
+  harmless, since the index joins labels to live products, and a rollback brings their products
+  back.
+- Products the store adds after a copy survive a rollback.
+- The `RUN_NOT_ROLLBACKABLE` / `COPY_FAILED` / `ROLLBACK_FAILED` / `INVALID_REQUEST` /
+  `TARGET_GENERAL_CATEGORIES_KEPT` codes go beyond the contract the admin web was first built
+  against. Its fallback text covers them.
+
 ## 8. Cross-repo consumers (inferred from endpoint surface — not verified against client repos)
 - **Customer app** (`shoofi-app`/`shoofi-shopping`): `GET /api/menu`, `/api/menu/mock`, `/api/menu/search`, `/api/category/general/all`, `/api/getTranslations`, `/api/global-search`; listens for `menu_refresh`; sends `x-client-features: combo` from the bundle that renders combos (§6b). "For you":
   `POST /api/for-you/suggest` from `components/for-you/` + `screens/for-you/`, gated on the
@@ -1591,7 +1790,7 @@ Code: `routes/kopa/qr-menu.js` (owner), `routes/kopa/qr-menu-public.js` (no auth
   still defines v1 explore, `explore/clear-cache` and `explore/cache-stats` calls, but nothing calls
   those methods.
 - **Partner app** (`shoofi-partner`): product write + ordering endpoints; sends `app-type: shoofi-partner` to see hidden products; listens for `product_updated`. The product calls are all in `stores/menu/index.ts`, made with `Authorization: Token` and `app-name` set to the current store (`@storage_storeDB`, set together with the token by `switchStore`). They are: `insert`/`update` (`screens/admin/product/add`), `delete` (`screens/menu/components/categoryItemsList.tsx`), `update/isInStore` (stock screen, product items, the order list), `update/isInStore/byCategory`, `update/quantity`, `update/activeTastes` (`screens/admin/stock-management`), `update/isHidden` (product items) and `update/order` (`screens/admin/products-order`). These are exactly the **[admin|own store]** routes (§7). `GET extras` is defined there but nothing calls it. Categories (verified 2026-10-30): only the two public reads, `POST shoofiAdmin/category/list` (`App.tsx` boot, `stores/shoofi-admin`) and `GET category/general/all` (`screens/explore.tsx`); it writes no category (CORE invariant 27).
-- **Admin web** (`shoofi-delivery-web`/`shoofi-admin`): category CRUD, product ordering/migration, translations CRUD, store config toggles (`isStockManagment`, `hasGeneralCategories`). "סוגי מנות (בשבילך)" at `/admin/dish-types` (`src/views/admin/dish-types/DishTypes.tsx`, API wrappers `src/apis/admin/dish-taxonomy.ts`): approve/reject/edit dish types, the "מוצרים לבדיקה" review list, run history with token counts, and a manual run. Platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled` / `isChatSuggestForAll` ("For You — Open To All Customers"; off = Shoofi employees only) under Settings → Shoofi, and the AI helper's `isAiHelperEnabled` / `isAiHelperForAll` / `isAiHelperOnboardingEnabled` / `isChatOrderingEnabled` beside them (`src/views/admin/settings/ShoofiSettings.tsx`, §7f), then the chat's `isChatMinimizeEnabled` / `isChatMinimizeForAll` (§7g). Product routes it calls, all through `utils/http-interceptor` (`Bearer`, `app-type: shoofi-admin`): `GET admin/product/:id`, `insert`, `update` (`views/admin/product.tsx`), the same three plus `import-index` (`views/admin/stores/ImportCategoriesProducts.tsx`), `delete`, `order/:categoryId`, `update/order-per-category`, `reset-order/:categoryId`, `migrate-orders` (`views/admin/Products.tsx`), and `product/mock-store/:x` + `product/create-from-mock` (`views/admin/stores/CreateProductFromMock.tsx`). It does NOT call `update/quantity` or the other availability toggles; those come from the partner app. `src/apis/admin/product/product-order.ts` (`bulk-reorder`, `update/order`) is imported by nothing. The store form's "تاريخ الافتتاح" (`launchDate`, `src/views/admin/stores/StoreForm.tsx`) and Settings → Shoofi → "New Stores" (`newStoreWindowDays`) drive the store card's "new" badge (CORE invariant 25). Category and explore routes (verified 2026-10-30, all through `axiosInstance`, the **[admin]** routes of CORE invariant 27): `views/admin/categories.tsx` + `AddCategory.tsx` (`shoofiAdmin/category/*`, `category/by-general/:id`), `CouponForm.tsx` / `CouponTemplatePicker.tsx` (`GET shoofiAdmin/category/list`), `general-categories/{GeneralCategoriesList,GeneralCategoryForm}.tsx` (`category/general/*`), `store-categories/{StoreCategoriesList,StoreCategoryForm}.tsx` (`store-category/*`), `stores/ImportCategoriesProducts.tsx` and `StoresList.tsx` (both families), `components/admin/MockProductSelector.tsx` (`all/by-store`), `ApiMonitor.tsx` (`explore/{cache-stats,clear-cache,clear-cache-keys}`). The exception: `apis/admin/category/get-categories.ts` (`GET admin/categories/:page`, `StoreForm.tsx`) uses plain `axios` with no token. `GET /api/store/get/:appName` (all through `axiosInstance`): `components/Navbars/AdminNavbar.js`, `DriverAvailabilityMonitor.tsx`, `settings/ShoofiSettings.tsx` (`shoofi`), `accounting/{AccountantFileNumber,BankAccountDetails,ContractDetails}.tsx`, `generate-stores-summaries.tsx`, `product.tsx`, `stores/StoreData.tsx`.
+- **Admin web** (`shoofi-delivery-web`/`shoofi-admin`): category CRUD, product ordering/migration, translations CRUD, store config toggles (`isStockManagment`, `hasGeneralCategories`). "סוגי מנות (בשבילך)" at `/admin/dish-types` (`src/views/admin/dish-types/DishTypes.tsx`, API wrappers `src/apis/admin/dish-taxonomy.ts`): approve/reject/edit dish types, the "מוצרים לבדיקה" review list, run history with token counts, and a manual run. Platform flags `isChatSuggestEnabled` / `isChatVoiceEnabled` / `isChatSuggestForAll` ("For You — Open To All Customers"; off = Shoofi employees only) under Settings → Shoofi, and the AI helper's `isAiHelperEnabled` / `isAiHelperForAll` / `isAiHelperOnboardingEnabled` / `isChatOrderingEnabled` beside them (`src/views/admin/settings/ShoofiSettings.tsx`, §7f), then the chat's `isChatMinimizeEnabled` / `isChatMinimizeForAll` (§7g). Product routes it calls, all through `utils/http-interceptor` (`Bearer`, `app-type: shoofi-admin`): `GET admin/product/:id`, `insert`, `update` (`views/admin/product.tsx`), the same three plus `import-index` (`views/admin/stores/ImportCategoriesProducts.tsx`), `delete`, `order/:categoryId`, `update/order-per-category`, `reset-order/:categoryId`, `migrate-orders` (`views/admin/Products.tsx`), and `product/mock-store/:x` + `product/create-from-mock` (`views/admin/stores/CreateProductFromMock.tsx`). The "העתקת תפריט" screen (`/admin/stores/menu-copy`, `src/apis/admin/menu-copy.ts`, shoofi-delivery-web branch `feat/admin-menu-copy`) is the only caller of `admin/menu/copy` and `admin/menu/copy/:runId/rollback` (§7n). It does NOT call `update/quantity` or the other availability toggles; those come from the partner app. `src/apis/admin/product/product-order.ts` (`bulk-reorder`, `update/order`) is imported by nothing. The store form's "تاريخ الافتتاح" (`launchDate`, `src/views/admin/stores/StoreForm.tsx`) and Settings → Shoofi → "New Stores" (`newStoreWindowDays`) drive the store card's "new" badge (CORE invariant 25). Category and explore routes (verified 2026-10-30, all through `axiosInstance`, the **[admin]** routes of CORE invariant 27): `views/admin/categories.tsx` + `AddCategory.tsx` (`shoofiAdmin/category/*`, `category/by-general/:id`), `CouponForm.tsx` / `CouponTemplatePicker.tsx` (`GET shoofiAdmin/category/list`), `general-categories/{GeneralCategoriesList,GeneralCategoryForm}.tsx` (`category/general/*`), `store-categories/{StoreCategoriesList,StoreCategoryForm}.tsx` (`store-category/*`), `stores/ImportCategoriesProducts.tsx` and `StoresList.tsx` (both families), `components/admin/MockProductSelector.tsx` (`all/by-store`), `ApiMonitor.tsx` (`explore/{cache-stats,clear-cache,clear-cache-keys}`). The exception: `apis/admin/category/get-categories.ts` (`GET admin/categories/:page`, `StoreForm.tsx`) uses plain `axios` with no token. `GET /api/store/get/:appName` (all through `axiosInstance`): `components/Navbars/AdminNavbar.js`, `DriverAvailabilityMonitor.tsx`, `settings/ShoofiSettings.tsx` (`shoofi`), `accounting/{AccountantFileNumber,BankAccountDetails,ContractDetails}.tsx`, `generate-stores-summaries.tsx`, `product.tsx`, `stores/StoreData.tsx`.
 
 ## 9. Known status (human-confirmed) — what's a bug vs. by-design
 Each item below was reviewed with the product owner. Respect these verdicts.

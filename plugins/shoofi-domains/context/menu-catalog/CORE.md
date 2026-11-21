@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@feat/kopa-qr-shared-menu / 2026-11-13 (invariant 34 + reference §7m: the QR menu SHARES the app menu - kopaQrProductRules / kopaQrCategoryRules, qrOnly needs isHidden, qrPrice on the base price with the category discount, 20 s public cache); shoofi-server@feat/kopa-phase8 (invariant 34 + reference §7m — Kopa phase 8 QR menu: its own catalog kopaQrCategories/kopaQrItems, copied once, public read; uncommitted worktree) / 2026-11-13; shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@feat/kopa-phase1 (invariant 33 — Kopa phase 2 category writes + phase 3 till-only meta, /api/kopa/{categories,meta,kitchens}; uncommitted worktree) / 2026-11-11; shoofi-server@feat/kopa-phase1 (invariant 32 — Kopa product and extras stats, /api/kopa/{products,extras}/stats; uncommitted worktree on origin/main cf25d5c2) / 2026-11-11; shoofi-app@design/round-2 67d4533 (invariant 29 — where the app draws option icons; the app files are committed) / 2026-11-08; shoofi-server@feat/store-closed-until (invariant 31 — special hours closedUntil / closedDays on isStoreClose, the same cron; invariant 28 partner fields; /api/store/holiday/* removed) / 2026-11-08; shoofi-server@feat/timed-busy-prep-extra (invariant 30 — timed busy busyUntil, extra prep time prepExtra, the expiry cron; invariant 28 partner fields) / 2026-11-07; shoofi-server@feat/prep-time-suggestion-field (invariant 28 — prepTimeSuggestion, a partner store field) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 — outOfStoreUntil, the 07:00 restore, store-wide outOfStockExtras) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@fix/coupon-strip-benefit-promo-audit 6c1a7770 / 2026-11-19 (reference §2 writers: the auto store-page subtitle of a coupon draft is the title plus the condition, withBenefit); shoofi-server@feat/admin-menu-copy (invariant 35 + reference §7n — copy one store's whole menu into another: new ids + full remap, availability and discounts reset, replace + 7-day rollback, gated by PRICE_EDIT_ROLES (no accountant); scope adds menu-copy.js and clone-from-template.js) / 2026-11-17; shoofi-server@feat/kopa-qr-shared-menu / 2026-11-13 (invariant 34 + reference §7m: the QR menu SHARES the app menu - kopaQrProductRules / kopaQrCategoryRules, qrOnly needs isHidden, qrPrice on the base price with the category discount, 20 s public cache); shoofi-server@feat/kopa-phase8 (invariant 34 + reference §7m — Kopa phase 8 QR menu: its own catalog kopaQrCategories/kopaQrItems, copied once, public read; uncommitted worktree) / 2026-11-13; shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@feat/kopa-phase1 (invariant 33 — Kopa phase 2 category writes + phase 3 till-only meta, /api/kopa/{categories,meta,kitchens}; uncommitted worktree) / 2026-11-11; shoofi-server@feat/kopa-phase1 (invariant 32 — Kopa product and extras stats, /api/kopa/{products,extras}/stats; uncommitted worktree on origin/main cf25d5c2) / 2026-11-11; shoofi-app@design/round-2 67d4533 (invariant 29 — where the app draws option icons; the app files are committed) / 2026-11-08; shoofi-server@feat/store-closed-until (invariant 31 — special hours closedUntil / closedDays on isStoreClose, the same cron; invariant 28 partner fields; /api/store/holiday/* removed) / 2026-11-08; shoofi-server@feat/timed-busy-prep-extra (invariant 30 — timed busy busyUntil, extra prep time prepExtra, the expiry cron; invariant 28 partner fields) / 2026-11-07; shoofi-server@feat/prep-time-suggestion-field (invariant 28 — prepTimeSuggestion, a partner store field) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 — outOfStoreUntil, the 07:00 restore, store-wide outOfStockExtras) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -26,6 +26,9 @@ and special hours on the same two files — invariant 31),
 written by code — invariant 24), `routes/global-search.js`, `utils/menu-cache.js`,
 `utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`,
 `utils/general-category-order.js` (tile order),
+the menu copy between stores `services/catalog/menu-copy.js` + `routes/admin/menu-copy.js`
+(invariant 35), the template-store product clone behind create-from-mock
+`services/catalog/clone-from-template.js` (`cloneProductForStore`; it KEEPS the template's `_id`s),
 `utils/catalog-lint.js` (the extras lint rules), `services/catalog/catalog-lint.js` (the
 worklist writer + nightly run), `routes/admin/catalog-lint.js`, `utils/crons/catalog-lint-cron.js`,
 the combo-deals trio `utils/combo-validation.js`, `services/menu/combo-snapshots.js`,
@@ -58,7 +61,7 @@ checkout are the orders domain's.
 Docs: `docs/stock-management.md`, `docs/menu-search.md`, `docs/sold-by-weight.md`,
 `docs/menu-import-issues.md` (the worklist — now also documents the `lint` phase),
 `docs/combo-deals.md`, `docs/store-launch-date.md`, `docs/for-you.md`, `docs/menu-spellcheck.md`, `docs/ai-helper.md`,
-`docs/extras-icons.md`.
+`docs/extras-icons.md`, `docs/menu-copy.md`.
 Mostly **server-first**: catalog data is server-owned and clients render it — but if a task
 needs a client change (partner product screens, customer menu display), do it full-stack,
 one PR per repo.
@@ -1085,8 +1088,12 @@ boundary and say so in the PR.
       raised for good. (The admin form loads `GET /api/store/get/:appName`, raw.) Every ready range
       the customer app shows reads `storeData.minReady/maxReady` (+ the delivery area's
       `minETA/maxETA`), and the order snapshot's `storeData.maxReady` drives the order timer, so the
-      raised range needs no app change. **Not covered:** twin orders compute `twinPrepRange` in
-      `routes/twin-order.js` from the raw store docs (orders domain), without the extra minutes.
+      raised range needs no app change. **Twin orders** (orders domain, `routes/twin-order.js`)
+      read the per-store docs raw and add the extra minutes themselves: `/quote`'s
+      `twinPrepRange` adds each side's `activePrepExtraMinutes` to that side's range, and
+      `/place` + `/digital-place-pending` embed `withPrepExtraReadyRange(store)` as each order's
+      `storeData` (orders reference §4). Twin dispatch sequencing (`avgPrepTime`) is a measured
+      average and does not include them.
     - **Expiry is a cron, not a read check in every reader.** `isBusy` is read raw by explore
       ranking (and its cache), twin eligibility, For you `open-stores.js`, the public coupon page,
       the store-status report and `RestaurantAvailabilityService`. The cron clears the stored flag
@@ -1246,6 +1253,62 @@ boundary and say so in the PR.
       - The partner app can un-hide a QR-only product, which puts it in the customer app.
       - Order creation accepts hidden ids (orders domain).
       - The zero-price cron hides a product priced 0.
+
+35. **A MENU COPY IS THE WHOLE MENU UNDER NEW IDS; IT RESETS AVAILABILITY AND DISCOUNTS, AND NEVER
+    COPIES A STORE'S PROMOTIONS OR STORE DOCUMENT** (`services/catalog/menu-copy.js`,
+    `routes/admin/menu-copy.js`, server `docs/menu-copy.md`, reference §7n; the owner's decisions,
+    2026-11-17). `POST /api/admin/menu/copy` copies one store's menu into another.
+    - **Whole menu only.** All of the source's `general-categories`, `categories` and `products`,
+      never part of them, so a combo always lands with its components (invariant 10). Images are
+      shared by URI, with no S3 copy. The source's `shoofi.productLabels` rows move onto the new
+      product ids with the same `contentHash`, so the weekly paid run does not label them again
+      (invariant 12).
+    - **Never copied:** promotions, coupons, the `store` document (hours, credentials, delivery,
+      `outOfStockExtras`), central `shoofi.stores.categoryIds`, competitor links,
+      `menu-import-issues`, Kopa meta and QR rules. The one store-level write is
+      `hasGeneralCategories: true` on the target's `store` doc and `shoofi.stores`, when the source
+      uses tiles.
+    - **New ObjectId for every document, and a full remap** that keeps each id's type (string ids stay
+      strings, invariant 5):
+      - `categories.supportedGeneralCategoryIds`;
+      - `products.supportedCategoryIds`, and the KEYS of `categoryOrders`;
+      - the legacy `categoryId` / `subCategoryId`, only when the value is a source category id
+        (old codes like `"2"` are kept);
+      - `combo.sections[].options[].productId`.
+
+      `mockStoreAppName` / `mockProductId` / `mockType` are removed, and
+      `copiedFrom: { appName, id, runId, at }` is stamped. **A new reference field on products or
+      categories must be added to `planCopy`**, or a copy points into the source store.
+      `clone-from-template.js` is the opposite design (it keeps the template's `_id`), so it is not
+      used here.
+    - **Reset in the copy:**
+      - every product is `isInStore: true`, with `outOfStoreUntil` and `outOfStockByQuantity` removed;
+      - a stock-managed TARGET starts every product at `quantity: 0`, `isInStore: false`,
+        `outOfStockByQuantity: true` (invariant 4);
+      - categories get `discountPercent: 0` and `isCampaign: false`;
+      - products get `hasDiscount: false`, `discountQuantity: 0` and `discountPrice: 0`;
+      - `isHidden` is kept, except that a product priced 0 (invariant 8) and a combo that fails
+        `validateComboReferences` in the target are hidden.
+    - **Writes:**
+      - Redis lock `menu-copy:<target>` (409 `COPY_IN_PROGRESS`).
+      - A target with any menu document is 409 `TARGET_HAS_MENU`, unless `mode: "replace"` AND
+        `confirm === targetAppName` (else 400 `CONFIRM_MISMATCH`).
+      - Replace snapshots the target into `shoofi.menu-copy-backups` (TTL `expiresAt`, 7 days)
+        BEFORE inserting, and deletes the old documents (by the snapshotted ids) only after the
+        inserts.
+      - A failure undoes itself and answers 500 `COPY_FAILED`, never success.
+      - Then BOTH of the target's cache keys are cleared (invariant 2), `menu_refresh` is sent,
+        `syncCampaignCategoryForStore` and `lintStore` run. These are logged, never failing the copy.
+    - **Rollback** (`POST /api/admin/menu/copy/:runId/rollback`): the newest run into that target
+      only, within 7 days. It restores the snapshot first, then deletes the `copiedFrom.runId`
+      documents, the flag and the copied labels.
+    - **Gate:** `auth.required` + `checkAdminRole(PRICE_EDIT_ROLES)` (`services/catalog/bulk-price-update.js`):
+      master, admin, manager, senior, operator, editor, viewer. That is every dashboard role EXCEPT
+      `accountant`: a whole-menu replace is a bulk destructive write, and accountant-only seats are not
+      on the menu screens. It is the same list as the bulk price file and copy-arabic-products, and the
+      admin web's `MENU_COPY_ROLES`. Master passes through `hasAdminRole`. Do not widen it to
+      `DASHBOARD_ROLES` / `PRODUCT_ADMIN` without the owner. There is no partner path. The only caller
+      is the admin web "העתקת תפריט" screen (`shoofi-delivery-web` `src/apis/admin/menu-copy.ts`).
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified

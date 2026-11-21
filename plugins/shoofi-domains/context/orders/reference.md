@@ -83,16 +83,39 @@ Buckets (`docs/customer-orders-snapshot.md`): **completed** `2,3,10,11,12` ·
   `start`/`complete`/`cancel` (`routes/delivery/orders.js`) update only
   `delivery-company.bookDelivery` (+ flow events / pushes); `complete` reads the store order
   only to schedule the feedback push. So "delivered" = `bookDelivery.status "4"` +
-  `bookDelivery.completedAt` — the order stays at `3`/`2`. `10`/`11` come from the
-  partner's `order/update`; no live client sends `9`/`12` (label-only), though
-  `/api/order/update` still handles a `9` if one arrives.
+  `bookDelivery.completedAt` — the order stays at `3`/`2`. `order.completedAt` is the STORE's
+  ready / waiting-for-driver stamp, not delivery: anything customer-facing that means "has the
+  food" reads `feedbackEligible` (CORE invariant 33). `10`/`11` come from the
+  partner's `order/update` (the admin web sends none: its dropdown offers 6/1/2/3/7/13/5);
+  no live client sends `9`/`12`
+  (label-only), though `/api/order/update` still handles a `9` if one arrives.
+- **Handed over** (`order/update`) → `2`→`10` (pickup / drive-in), `2`/`3`→`11` (delivery).
+  For a non-dashboard caller, those are the ONLY edges into `10`/`11` (guard below).
 - **Twin cascade** mutates the peer side **directly via services**, not routes (avoids recursion).
 
 **Transition guards you must not weaken:** PENDING(`6`) only from FRAUD_REVIEW
-(`order.js`); `/update/viewd` rejects already-cancelled `4,7,8,9` with a 400
-`ORDER_CANCELLED` (~order.js:6002-6025). That list omits REJECTED `5`, and no other status
-check follows it, so accepting a `5` order overwrites it to `1` (or `14`/`15`);
-`start-preparing` only from `14`. Fields: `status`, `statusUpdatedAt`,
+(`order.js`); `/update/viewd` rejects already-cancelled `4/5/7/8/9` (`isCancelStatus`,
+`String()`-normalised; REJECTED `5` included since shoofi-server#467) with a 400
+`ORDER_CANCELLED`; on `/api/order/update` and the legacy `/api/order/update/all` a
+cancelled order never moves to a non-cancel status (400
+`CANCELLED_ORDER_CANNOT_REACTIVATE`, every caller, CORE invariant 2);
+`start-preparing` only from `14`; **`10` only from `2` and `11` only from `2`/`3`** on
+`/api/order/update` for every caller without a dashboard role
+(`services/orders/picked-up-guard.js` `pickedUpAllowedFrom`, 2026-11-15). That guard is atomic:
+`handleOrderUpdate` puts the allowed statuses in the `updateOne` filter and checks
+`matchedCount`. When nothing matched it re-reads the status. At the target, it answers `200
+{message: "Order successfully updated", unchanged: true}` (an idempotent retry). An unknown
+order is a 404. Anything else is **`409 {message: "הסטטוס כבר עודכן", code:
+"STATUS_ALREADY_CHANGED", currentStatus}`**, the same body the PENDING guard returns with a
+400. None of these early answers runs a side effect (websocket, `status_change` flow event,
+feedback push, customer or driver push). It exists because a stale partner card could write
+`10`/`11` over a support cancel (`7`): an un-cancel that left the COMP coupon, the compensation,
+the coins refund and the `-3` booking in place. A dashboard token (`roles`) is exempt from
+this guard on purpose (a store that never pressed ready). **The exemption does not cover a
+cancelled order:** since shoofi-server#467, `4/5/7/8/9` → any non-cancel status is 400
+`CANCELLED_ORDER_CANNOT_REACTIVATE` for every caller, checked before this guard (CORE
+invariant 2), so a stale tap on an order already read as cancelled gets that 400 and the
+409 is left for the read/write race. Fields: `status`, `statusUpdatedAt`,
 `statusUpdateReason`, `completedAt`, `viewdAt`, `isViewd`, `isPrinted`, `orderDate`.
 **`readyMinutes` is NOT an order field** — accept takes it as a request param and does not
 persist it (~0% of prod orders carry it; only `/update-start-preparing` writes it, on future
@@ -108,11 +131,14 @@ default off: a DELIVERY order to an address that is not one of the customer's sa
 400 `DELIVERY_ADDRESS_REQUIRED`; APPLEPAY / HYP exempt — customers CORE invariant 19) →
 lock (Redis `SET NX` + in-mem fallback + 30s dup check) → fraud checks → generate
 `originalOrderId`/`orderId` → image upload → decide initial status → validate coins
-(no debit) → price corrections, in this order: coupon entitlement (`enforceCouponEntitlement`:
+(no debit; measured against the ITEMS price `orderPrice`, all-or-nothing; a refusal only logs
+and keeps the order with `usedCoins: null` and the client's `total`, CORE invariant 32) → price
+corrections, in this order: coupon entitlement (`enforceCouponEntitlement`:
 ownership + partial-use balance only) → store promotions + the delivery deal-vs-coupon
 conflict (`enforcePromotions`, `resolveDeliveryConflict`) → **fixed-delivery-price coupon
 recompute** (`enforceDeliveryPriceCoupon`, CORE invariant 14). Each one corrects `total`
-and never rejects → build `orderDoc` → **insert into store `orders`** (authoritative) →
+and never rejects → build `orderDoc` → shadow pricing (`serverPricing`) →
+**insert into store `orders`** (authoritative) →
 `[shippingPriceCheck]` fired and **never awaited** (log-only; a DELIVERY fee below the area
 tariff → one warn line + `order.shippingPriceCheck`, CORE invariant 20) →
 **stock decrement if status≠"0"** → first-order attribution → Apple Pay session
@@ -156,6 +182,16 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   Not handled: `degradeToSingle` with `keepSide:'secondary'` moves the FULL primary fee onto the
   kept order (`$inc total`) while the primary's coupon usage stays. This was already true for
   every delivery coupon before this change.
+- **Prep range (customer ETA)**: `/quote` returns `twinPrepRange` = the SLOWER side's
+  `minReady`/`maxReady` + `twinDeliveryBufferMin` (plus `primaryReady`/`secondaryReady`); the
+  app's checkout adds the primary's courier area ETA on top (`shoofi-app
+  components/address/index.tsx`). Each side's range includes that store's active extra prep time
+  (`activePrepExtraMinutes`, `prepExtra` — menu-catalog CORE invariant 30), read from the RAW
+  per-store doc. `/place` and `/digital-place-pending` embed each side's store doc as
+  `order.storeData` through `withPrepExtraReadyRange`, because the twin header's pending
+  countdown (`OrderTimer`, status `6`/`13`) reads `storeData.maxReady` — a single-store order's
+  snapshot is the client's already-raised copy from `POST /api/store`. The stored store doc is
+  never raised. Test: `test/integration/twin-prep-extra.js`.
 - **Customer notes**: `commentToCourier` is ONE note for the shared courier and is written on
   both legs. `commentToStore` is ONE NOTE PER STORE: `primary.commentToStore` goes on the primary
   leg and `secondary.commentToStore` on the secondary. `buildSkeletonOrder` cleans each value,
@@ -171,7 +207,9 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   (4/5/7/8/9, string or number), the group is `degraded_to_single`/`cancelled`, or the first
   order was accepted (`viewdAt`, any status after). Fail open. `twinPeerInfo` (the readyMinutes
   cap) only for a live, accepted peer. The peer is looked up by `peerOrderId` pinned to
-  `twinGroup.groupId` (the short number repeats), falling back to the group id.
+  `twinGroup.groupId` (the short number repeats), falling back to the group id. Which side is the longer-prep one comes from the measured 7-day
+  `avgPrepTime` (`twin-prep-time-service.js`, growth snapshots), not `minReady`/`maxReady`, so
+  extra prep time does not change the order.
   **The second store's persistent alert** (push + reminder cron) fires on the first store's accept
   (`order/update/viewd`) — and, since 2026-11-10, also when the first store is DROPPED
   (`degradeToSingle` → `releaseSecondStore`: kept order is pickupSequence 2, status 6/14, not
@@ -216,6 +254,13 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   server-side; `surcharge`, `extrasPrice` and the names are ticket snapshots. `comboIssues`
   is never persisted on an item (amend strips it); creation keeps them under
   `serverPricing.comboIssues`. CORE invariants 11–12.
+- **`orders.serverPricing`** = the create-time shadow (`utils/order-pricing-shadow.js`):
+  `{ computedAt, serverOrderPrice, serverOriginalOrderPrice, serverTotal, serverCouponDiscount,
+  clientOrderPrice, clientTotal, clientCouponDiscount, orderPriceDrift, totalDrift,
+  driftDetected, missingProductIds, comboIssues }`. `totalDrift = serverTotal − clientTotal`.
+  `serverTotal` subtracts the client's coupon amount and the coins the server ACCEPTED. Not
+  shown to anyone: `driftDetected` fires on any agora. A `totalDrift` equal to
+  `usedCoins.shekelValue` = coins debited but `total` not reduced. CORE invariants 11, 32.
 - **`orders.shippingPriceCheck`** = `{ expected, submitted, areaId, paused, checkedAt }`,
   `$set` after the insert ONLY when a DELIVERY order's posted `shippingPrice` is below its
   area's tariff (paused areas included). Absent on every other order, so
@@ -270,6 +315,15 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   admin order-monitoring + the `investigate-order` skill. Traps:
   - **No TTL, no retention.** `cleanupOldEvents` (`centralized-flow-monitor.js`) is never
     called; history runs back to 2025-07-24 (~11.8M docs, 2026-10-06).
+  - **`status_change` from `/api/order/update` names the token's person since 2026-11-17**
+    (CORE invariant 33, `resolveOrderUpdateActor`): `actorType` `store` (partner tablet, name from
+    `shoofi.storeUsers`), `admin` (admin token, or the admin behind an impersonation token, with
+    `metadata.viaImpersonation` + `impersonatedUserId`), `driver`, `customer`, `system`;
+    `metadata.actorSource` = `partner|admin|driver|customer|system`, `metadata.appType`. Older rows:
+    every partner press is `actor: "System"`, `actorType: "system"`, and support's are
+    `actorType: "shoofi_support"` (from the body). Readers handle both: the admin
+    `OrderFlowDashboard` labels admin/store/system, `services/kopa/orders.js` reads `admin` and
+    `shoofi_support` as support and treats `store admin` / `system` as unnamed.
   - **`order_viewed` `metadata.previousStatus` is always wrong** — `/update/viewd` reads it
     from the order re-fetched *after* its `$set`, so it equals the new status. Pre-accept
     status (normally `6`) is not recorded there; take it from the prior event.
@@ -425,7 +479,8 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   **keeps re-pushing it until the partner accepts the order**. `persistent-alerts-cron`
   runs on `*/1 * * * *`, and `sendReminders` throttles per alert on `MAX_REMINDERS = 5`
   + `REMINDER_INTERVAL_MS = 60 * 1000` (`utils/persistent-alerts.js`) — **5 reminders on
-  5 consecutive minutes, then permanent silence**, per store user. The every-minute
+  5 consecutive minutes**, per store user, **then the late reminders** (next paragraph;
+  until 2026-11-20 it was permanent silence after the five). The every-minute
   cadence is a **deliberate product decision, not an oversight** (see the comment on
   `REMINDER_INTERVAL_MS`): the store must approve ASAP, and an accept 25 minutes late is
   a bad outcome. Its cost — a still-pending order is never announced again after minute
@@ -433,7 +488,40 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   spacing**; that trade-off is a product call. Note the observable cadence is the same
   one the dead filter used to produce by accident (below) — the difference is that it is
   now explicit, pinned, and no longer an artefact of the cron period.
-  **The server's silence after minute 5 is no longer the whole story on the tablet.** Since
+  **Late reminders (shoofi-server `fix/alarm-sound-when-locked`, 2026-11-20).** After the
+  five, `sendLateReminders` (same file, called at the end of every `sendReminders` tick, never
+  throws) sends one more `order_reminder` every `LATE_REMINDER_INTERVAL_MS` (5 minutes, same
+  tick-skew slack) while the alert is younger than `LATE_REMINDER_WINDOW_MS` (1 hour from
+  `createdAt`), capped at `MAX_TOTAL_REMINDERS` (17). `data.lateReminder: true`. Why: the
+  tablet's own repeating alarm is scheduled by the app when it SEES the order, so an iPad
+  that was already locked when the order arrived heard only the five and then nothing; the
+  server is the only thing that can ring it. Two rules apply to the late ones only:
+  (1) the order must still be waiting — `isViewd: false` and status `"6"`, read from the
+  store db; if not, the alert is set to `status: "closed"` (`closedReason:
+  "order-not-waiting"`, deleted by the cleanup cron with the others) and nothing is sent; if
+  the order cannot be read the tick is skipped; (2) a store user whose device switched
+  «repeat until accepted» off (`storeUsers.alarmRepeat === false`, below) is skipped. The
+  five themselves are unchanged and still unguarded. The cadence copies the tablet's phase 3
+  (every 5 minutes, nothing after an hour); a late push may land near one of the tablet's
+  own phase-3 rings, which is accepted.
+  **The push rings with the tablet's chosen sound.** Every caller still passes
+  `soundType: 'store.wav'`; `sendNotification` (`services/notification/notification-service.js`)
+  swaps it through `pushSoundFor` (`utils/partner-alarm-device.js`, pure): only for
+  `appType: 'shoofi-partner'`, only when the caller asked for `store.wav`, only for
+  `data.type` `new_order_alert` / `order_reminder`, and only to a name in
+  `PARTNER_ALARM_SOUNDS` (the 8 files the partner build bundles) read from
+  `storeUsers.alarmSound`. Anything else keeps the caller's sound: the late-order alerts
+  (`storelate.wav`), drive-in, the future-order reminder, other apps. Why it lives on the
+  server: with the iPad LOCKED iOS plays the sound named in the push, and no app code runs
+  (Mohannad, 2026-11-18: «locked = the old sound»). `alarmSound` / `alarmRepeat` arrive with
+  the push token (`POST /api/customer/update-notification-token`, `alarmDeviceFields`
+  validates; customers reference, Push tokens) and are mirrored to the owner's other store
+  docs with it. Android ignores it (the channel's sound).
+  **The websocket copy names the device the push goes to.** When a notification is sent on
+  both channels, the frame carries `data.pushedTo` = the last 8 characters of the
+  recipient's push token (`pushTokenTail`); absent when no push is sent. The partner app
+  uses it to show one banner instead of two (C3, "One banner").
+  **The server's silence after minute 5 was never the whole story on the tablet.** Since
   2026-11-07 the partner app repeats the alarm itself, from local notifications, while the
   order waits (C3, "The new-order alarm repeats"). The server cadence above is unchanged,
   but the tablet now **depends on it**: it places its rings half-way between these
@@ -441,6 +529,20 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   (`ALARM_SETTINGS.serverReminderCount` / `serverReminderIntervalMs` in shoofi-partner).
   Changing the cron schedule or either constant means changing that copy too, or the two
   start ringing on top of each other again.
+  ⚠️ **An order number inside Arabic or Hebrew push text goes through `ltr()`**
+  (`utils/ltr-text.js`), which wraps it in left-to-right marks (U+200E). Put in raw, the
+  phone swaps the two halves after an Arabic word: order `4186-3017` was shown as
+  `3017-4186` in the store reminder push while the orders screen was right (Cacao,
+  2026-11-17). Wrapped today: the new-order alert and its reminders
+  (`utils/persistent-alerts.js`), the overdue and future-order pushes
+  (`utils/crons/order-overdue-checker.js`, `future-order-reminder.js`), the feedback push
+  (`feedback-notification-cron.js`), and the delay / started-preparing / drive-in pushes
+  in `routes/order.js` (there the `#` is inside the wrap). Only the visible `title`/`body`
+  is wrapped — `data.orderNumber` / `data.orderId` stay plain, the apps match on them.
+  A new push text with an order number next to Arabic/Hebrew words must do the same;
+  `test/integration/order-number-ltr-in-notifications.js` fails on a raw one in those
+  files. Not covered: Hebrew admin/HQ titles and coupon names (number after Hebrew or
+  Latin text does not flip).
   ⚠️ **The cutoff is deliberately not round.** `REMINDER_TICK_SKEW_MS = 5 * 1000`, and
   the query builds `cutoff` from `REMINDER_CUTOFF_AGE_MS` (= interval − skew), never
   `now - REMINDER_INTERVAL_MS`. Since the interval now *equals* the cron period, a flat
@@ -485,7 +587,15 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   ticket-rejected attempt; `[PUSH_SLOW]` warn — any send over `PUSH_SLOW_WARN_MS`
   (default 3000), even a successful one.
 - **FRAUD**: `order-fraud-*`, `fraud-config-loader`, `fraud-check-storage` →
-  `shoofi.fraudChecks`/`deviceCustomers`/`ipCustomers`.
+  `shoofi.fraudChecks`/`deviceCustomers`/`ipCustomers`. `requiresReview` is the only field with
+  an effect (status 13, store alert withheld until admin approval); `shouldBlock` mirrors it and
+  is never read; `riskLevel` is display/filter only. Trusted customers
+  (`trustedCustomerMinOrders`, 5 in prod) pass every check except item-not-in-store and a
+  **high** location gap. `checkLocationDistance` (`routes/order-fraud-detector.js`) grades a gap:
+  ≤ `maxLocationDistanceMeters` (100 in prod) low; up to `LOCATION_DISTANCE_SOFT_MULTIPLIER`
+  (2)× the limit **medium/20, recorded only** (`details.softBand`); beyond it high/55, which
+  overrides trust (since 2026-11-20 — 3015-0479, a 71-order customer 115 m off, was held
+  critical; 30-day replay: 105 fewer holds, 95 of them completed).
 - **GROWTH/COINS (secondary)**: `coinsService`, `worldCupService`, attribution — must never fail the order.
   Coins admin routes (CORE invariant 19): `/api/admin/coins/{expire, customer/:customerId,
   customer/:customerId/earned, store/:storeAppName/stats}` in `routes/coins.js` (`COINS_ADMIN`) and
@@ -502,6 +612,14 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 - `delivery-pickup-checker` (3 min) / `delivery-completion-delay-checker` (4 min): `bookDelivery` delay alerts.
 - `fix-stuck-orders` (daily 7am): iterates ALL store DBs; stale `1` → `3`/`2`. School variant separate.
 - `fraud-check-schedule`, `feedback-notification`, `persistent-alerts`, `growth-snapshots` (feeds twin prep-time).
+- `feedback-notification` (2 min, `utils/crons/feedback-notification-cron.js`) drains
+  `shoofi.pending-feedback-notifications` (`db.pendingFeedbackNotifications`; index `sendAt`
+  only) and DELETES each row once sent. Rows come from two writers: the courier's "delivered"
+  (`routes/delivery/orders.js`, `receiptMethod: "DELIVERY"`, `sendAt` +30 min) and the store's
+  status write for a non-delivery order (`handleOrderUpdate` → `planTakeawayFeedbackPush`, CORE
+  invariant 33). Before sending a NON-delivery row it re-reads the order (`stillEligibleAtSend`)
+  and drops it when `isFeedbackEligible` says no; unreadable → sent. Skips a row already rated
+  (by `orderObjectId`, or store + short number for old rows).
 
 ## 9. Where you may act freely vs. must stop
 **Safe zone — implement + PR normally (still inherit all gates):**
@@ -576,6 +694,28 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
 - **Twin (customer side)**: `stores/twin-order` + `stores/twin-cart` (second-store cart);
   combined checkout calls `twin-order/{eligible-stores, quote, place, pay,
   digital-place-pending, digital-finalize}`. Secondary side `shippingPrice:0` (combination fee covers it).
+  - **Twin tracking card** (`screens/order/active/components/twin-active-order-header.tsx`,
+    used by the ActiveOrders tab and `screens/order/item`): "where is the food" on a DELIVERY
+    side comes from that leg's `bookDelivery.status` (`delivery/book/{bookId}` per side, polled
+    every 30 s only while the side is at `"3"`/`"11"`), never from `order.status`: `"11"` is the
+    store's own «handed over» button and nothing writes it on courier pickup. The per-side mini
+    label and the group status `getGroupStatus(primary, secondary, deliveries)` both follow the
+    single-order rule in `helpers/customer-order-status.ts`. Group "השליח בדרך אליך"
+    (`twin_status_en_route`) = any delivery side's courier at COLLECTED_FROM_RESTAURANT/DELIVERED;
+    a delivery side at `10`/`11` that no courier collected reads as `"3"`. A pickup side keeps the
+    store's `10`/`11` (shoofi-app#139, 2026-11-15). **The group status badge is not rendered
+    today** (commented out in the header's status strip since the twin card landed); the timer,
+    the ETA line and the per-side labels are what the customer sees.
+- **«Rate order ⭐» button** (`screens/order/{active,history,item}`, the twin header) and its
+  `checkFeedbackStatus` → `POST customer-feedback/check` (already rated?). It used to show on
+  `order.completedAt` — the STORE's ready (`2`) / waiting-for-driver (`3`) stamp — so a delivery
+  order offered a rating while the courier was still driving (6534-2091). The server now sends
+  `feedbackEligible` on `customer-active-orders`, `customer-orders-history` and
+  `customer-last-completed-order` (CORE invariant 33). The customer-app change (a separate
+  shoofi-app PR) keys on it and falls back to `completedAt` only when the field is absent (older
+  server); until that update reaches phones, the `completedAt` rule still runs. `screens/order/item` finds its order
+  in those two lists, so it needs no endpoint of its own. The rating push (`feedback_request`) opens
+  the same modal (`hooks/use-notifications.ts`, `components/dialogs/feedback-modal-based-event.tsx`).
 - **Tracking = POLLING every 30s** — **no websocket for customer order status** (WS is only
   used for store/menu refresh elsewhere). Detail: `screens/order/item`, timer `order-timer.tsx`
   keyed on status, ETA via `delivery/book/{bookId}`.
@@ -619,6 +759,26 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
   `stores/twin-order/index.ts`,
   `hooks/checkout/use-checkout-submit.ts`, `screens/checkout/index.tsx`,
   `screens/order/{active,item,history}/*`, `consts/{api.js,shared.ts}`.
+- **Checkout coins** (CORE invariant 32; the rules below hold once shoofi-app#145 merges):
+  - **One writer.** Checkout's `TotalPriceCMP` (`components/total-price`, `isCheckCoupon`) is
+    the only writer of `coinsStore.coinsToUse` / `secondaryCoinsToUse`. It prices its total
+    from the store (a MobX `reaction`, after the balance clamp in `setCoinsToUse`), and submit
+    sends the same store (`use-checkout-submit.ts` → `getUsedCoinsForOrder`). So the coins the
+    total takes off are the coins the order carries. It zeroes both sides on mount.
+  - `CoinsSelector` (`components/coins-selector`) reports only through
+    `onCoinsDiscountChange` and never writes the coins in use. On a store switch it calls
+    `coinsStore.resetEarnPreview(side)`, which clears the earn preview only. The primary side
+    clears both previews. `resetCheckoutCoins` no longer exists. The cart's `TotalPriceCMP`
+    prices its own preview and never touches the store.
+  - **Cap = the items price.** `primaryOrderAmountForCoins = primaryAfterSale` (the side's items
+    after its store deal, before the coupon), i.e. the `orderPrice` the server validates
+    against. The selector clamps a choice that falls above a lowered cap. When the chosen coins
+    are AT the cap and the balance is bigger, it shows «ניתן לממש עד N מטבעות בהזמנה זו — עד
+    סכום המוצרים» (`coins-limit`); never before a press (owner, 2026-11-16).
+  - Before #145 (main until it merges): every mounted selector wrote the store, and
+    single-store coins were capped at items + delivery + drive-in − delivery deal − coupon. Both
+    failure directions are in prod: 3046-8991 (screen −39, store 0 → `usedCoins: null`,
+    `total` 16) and burger-house 9416-1116 (store 34 sent and debited, `total` not reduced). Test: `__tests__/components/total-price-coins-single-writer.test.tsx`.
 - **Gotchas**: `order/create` is **multipart** (twin / Apple-Pay / HYP calls are JSON);
   the client `ORDER_STATUS` enum **omits `"0"` and `"13"`** (used only as literals) — keep
   in mind when reasoning about pending-payment/fraud states on the customer side.
@@ -702,7 +862,9 @@ Role: executes the **delivery leg**; drives `bookDelivery` status only — never
 Role: receives orders, **accepts**, prepares, prints, and drives status forward.
 - **API client**: axios (`utils/http-interceptor/index.ts`), token `@storage_userToken`
   as `"Token …"`, `app-type: shoofi-partner`, `app-name` = `@storage_storeDB` (per-call overridable).
-- **Endpoints** (`stores/orders/index.tsx`, controller `order/`): `admin/orders` (list),
+- **Endpoints** (`stores/orders/index.tsx`, controller `order/`): `admin/orders` (list; each
+  DELIVERY row also carries `courier`, the delivery domain's summary — delivery
+  `reference.md` §2c),
   `admin/all/not-viewd` (incoming feed, when `isAdmin(ROLES.all)`, which is every prod store
   user: 394/394 carry `roles: ["all"]` on 2026-10-30), `admin/not-viewd` (the same feed for a
   store user without `all`, and before user details load), **`update/viewd` = ACCEPT** (→ `6→1`, future `14→1`,
@@ -715,20 +877,42 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   in shoofi-server 29ed5252, 2026-11-03.)
 - **Transition rule**: ACCEPT goes through **`order/update/viewd`** (NOT `order/update`);
   all other forward/back transitions use `order/update` with an explicit `status` the
-  client computes in `stores/orders/index.tsx`: forward `updateOrderStatus` (main ~259):
-  `1→3` delivery / `1→2` takeaway; `3→11`; `2→11` delivery / `2→10` takeaway; `10→4`;
-  `15→1`. Back `updateOrderToPrevStatus` (main ~396): `2`/`3`/`4` → `1`, without SMS. The
-  `10→4` arm is unreachable from the list: its collapsed and expanded rows both hide the next
-  button on `10`/`11` (`list/index.v2.tsx` ~2861, ~3145, `pickedUpStatuses`).
-- **Order rules helper** (shoofi-partner feat/orders-v3-rules, bf6dd52; not on main yet):
-  `helpers/orders/order-rules.ts`, pinned by `helpers/orders/__tests__/order-rules.test.ts`.
-  On that branch `updateOrderStatus` / `updateOrderToPrevStatus` call `nextStatusFor` /
-  `prevStatusFor` from it; the transitions above are unchanged. It also exports
-  `showsCollapsedNextButton` / `showsExpandedNextButton` / `showsBackToPreparing` /
+  client computes in `stores/orders/index.tsx`: forward `updateOrderStatus` →
+  `nextStatusFor`: `1→3` delivery / `1→2` takeaway; `3→11`; `2→11` delivery / `2→10`
+  takeaway; `15→1`. A picked-up order (`10`/`11`) has NO next step. The old `10→4` arm was
+  removed because status `4` refunds a card customer and the store is not paid for it. Back
+  `updateOrderToPrevStatus` → `prevStatusFor`: `2`/`3`/`4` → `1`, without SMS.
+  **The server enforces the two "handed over" edges** (reference §2 guard, CORE invariant 2): a
+  `10`/`11` tap on a card whose order has meanwhile moved (support cancelled it, another tablet
+  already handed it over) gets **`409 {message, code: "STATUS_ALREADY_CHANGED",
+  currentStatus}`** and nothing is written. A repeat of a tap that already landed gets `200
+  {unchanged: true}`. The partner interceptor reacts only to 401, so a screen that does not
+  catch the 409 shows nothing. It should refresh the card from `currentStatus`.
+  The v3 board does (shoofi-partner#86): `isStatusAlreadyChanged` (HTTP 409) in
+  `screens/admin/order/list/index.v3.tsx` `updateOrderStatus` reloads the board instead of
+  restoring the stale card. The same PR puts the one-tap «handed over» on the COLLAPSED ready
+  card (`showsCollapsedHandoverButton`: status `2`/`3`; a drive-in only once
+  `driveInArrival.arrivedAt` is set, because at `10` the customer's «I've arrived» button
+  disappears). Nothing but the store moves a delivery order to `11`.
+  **Cancelled delivery** (`isDeliveryCancelled`: a DELIVERY row whose `courier.state` is
+  `cancelled`, i.e. cancelled and not re-booked — delivery CORE invariant 21): the collapsed
+  ready card shows NO one-tap, and the expanded card's button reads «تم التسليم» instead of
+  «استلمها السائق» (`nextActionLabel(status, order)` returns the key
+  `partner-v3.action-handed-over`, he «נמסרה»). The transition is the same `3 → 11`; only
+  the one-tap and the wording change. Order 7129-4235 (2026-11-19): the store tapped «the driver
+  took it» under a red «delivery cancelled» line and a paid order with no courier left the board.
+- **Order rules helper** (on main since the v3 rules landed): `helpers/orders/order-rules.ts`,
+  pinned by `helpers/orders/__tests__/order-rules.test.ts`. `updateOrderStatus` /
+  `updateOrderToPrevStatus` call `nextStatusFor` / `prevStatusFor` from it. It also exports
+  `showsCollapsedNextButton` / `showsCollapsedHandoverButton` / `isStatusAlreadyChanged` /
+  `showsExpandedNextButton` / `showsBackToPreparing` /
   `showsDelayButton` / `showsAmendButton` / `showsCompensationButton`, `tabStatusList` /
   `tabCount` / `visibleTabs`, `isReadyTooEarly` (the `readyOrderUpdateStatusMinMinutes`
   guard), `prepTimeSlots` (the twin second-store window, below), `canAccept`,
-  `buildAcceptUpdateData` (the `update/viewd` body), `timeLeft` and `suggestPrepMinutes`.
+  `buildAcceptUpdateData` (the `update/viewd` body), `timeLeft` and `suggestPrepMinutes`,
+  and `timeRingNumber` / `timeRingFill` (the v3 card's countdown circle, `TimeRing` in
+  `components/orders-v3/ui.tsx`: minutes left, minus minutes once late — `-3` — with a full
+  red ring; it replaced the time chip and the progress line on a preparing card).
   The live v2 screens still carry their own inline copies of these rules and are untouched
   by that branch. A rule change has to land in the screen copy as well until they import
   the helper.
@@ -756,15 +940,48 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   store-analytics gate, `routes/order-history.js`), partner-only, and the `reports` role only
   decides whether `totals` is filled. A store user without it gets the list and `totals: null`,
   never a 403 (CORE invariant 21).
-  **Any 401 signs the store out** (`utils/http-interceptor` → `OPEN_GENERAL_SERVER_ERROR_DIALOG`
-  `isSignOut: true` → `resetAppState` + restart), so a partner-polled route must never 401 a
-  logged-in terminal.
+  **A 401 on a live session signs the store out** (`utils/http-interceptor` →
+  `dialogForRequestError` in `utils/request-error-dialog.ts` → `OPEN_GENERAL_SERVER_ERROR_DIALOG`
+  `isSignOut: true` → `resetAppState`; «retry» restarts into login), so a partner-polled route
+  must never 401 a logged-in terminal. A 401 on a request with no token, or one in flight while
+  the owner signs out (`authStore.logOut` sets `setSigningOut(true)`), opens nothing.
+  The same function picks ONE dialog per failure (2026-11-17, owners: «stuck after the
+  internet comes back»): network error → only the no-internet dialog (two native modals at
+  once can leave iOS taking no taps); timeout → server error, unless already known offline.
+  **Background checks are quiet (2026-11-20, team member: the server-error dialog over a home
+  screen nobody was touching).** The polls pass axios config `background: true`
+  (`ordersStore.getNotViewdOrders*`, `getOrdersFromServer`'s last argument from the
+  cancelled-order alert, `getFutureOrdersReadyServer`, `storeAlertsStore.fetchStoresNewOrders`).
+  One failed poll opens nothing; the next tick is the retry. A dialog opens only when polls
+  have kept failing (timeout / network error) for `BACKGROUND_QUIET_MS` (60s) with no request
+  succeeding in between (`BackgroundFailureStreak`), or on the second 401 in a row. A 401 for
+  a token that was replaced while the request was in flight opens nothing. A request without
+  the flag is the owner's own action and behaves as before.
+  **Failed requests are written down** (`utils/request-failure-report.ts`): timeout, network
+  error, 401/402, 5xx, or anything that opened a dialog → one `type: "request-failed"` row in
+  the store's `client-error` collection (`error: "request-failed: GET <path> → <outcome>"`,
+  `kind`, `url` without its query, `method`, `status`, `durationMs`, `background`, `offline`,
+  `dialog`, `appName`, `customerId` from the token payload, `skipped`, `appVersion`). Never a
+  body, header or token. Loop guards: the report is sent `silent` (no dialog, never reported,
+  never retried), one per call + outcome per 5 minutes, 30 an hour, and failures with no
+  connection wait (max 10) for the next request that succeeds.
+  **The failure that opened a dialog is always written** (2026-11-20; a test with the server
+  stopped wrote two rows, both `dialog: null`, because the popup's failure was the same call +
+  outcome as a quiet one 30s earlier and was dropped as a repeat): the repeat key is call +
+  outcome + `dialog`; dialog-opening failures have their own budget (`MAX_DIALOG_PER_HOUR`, 12)
+  that quiet failures cannot use up; in a full waiting list one replaces the oldest quiet row.
+  So after an outage `client-error` holds a `request-failed` row whose `dialog` names the popup.
+  The server-error «retry» no longer restarts the app: it emits `SERVER_ERROR_RETRY` and
+  `App.tsx` runs `prepare()` again. NetInfo: lost → no-internet dialog; back → it closes and
+  `prepare()` reloads.
 - **"New customer" badge source** (CORE invariant 24): `order.isFirstOrderAtStore` arrives
   on the whole documents of `admin/orders`, `admin/all/not-viewd` and `admin/not-viewd`. Badge
   only on `=== true`; absent (old orders, a failed lookup) = no badge. The v3 history endpoint
   (`admin/history`, shoofi-server#497, CORE invariant 21) projects its rows without it.
 - **Realtime**: WS `?appType=shoofi-partner`; handles `order_status_updated`,
-  `unviewed_orders_updated`, `future_order_*` (NOT `menu_refresh`). The `print_order` /
+  `unviewed_orders_updated`, `future_order_*` (NOT `menu_refresh`). The server also sends
+  `courier_updated` (delivery CORE invariant 21) on every courier event; only a list that shows
+  `courier` should refetch on it. The `print_order` /
   `print_not_printed` frames still arrive (the server sends `print_not_printed` when
   `/api/order/printed` sets `status:false`), but their `App.tsx` handlers are commented out.
   **Nothing prints from a websocket frame.**
@@ -867,7 +1084,8 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     «الطباعة», `components/store-settings-v3/AlarmSettingsV3.tsx`). Stored on the DEVICE (AsyncStorage
     `@new_order_alarm_prefs`), not the store. `repeat` (default on): off means the series
     never runs (`alarmRepeatEnabled` = store alerts on AND repeat) and switching it off clears
-    a scheduled series; the first alert of a new order and the server's reminders still come.
+    a scheduled series; the first alert of a new order and the server's five reminders still
+    come (its late reminders do not, see below).
     `sound`: one of `ALARM_SOUNDS` — `store.wav` (first, the default) and seven picked
     2026-11-14 (`order-phone-ring`, `-electric-bell`, `-service-bell`, `-delivery-tune`,
     `-digital-alert`, `-doorbell`, `-beeps` `.wav`: one 5–6.5 s phrase each, level-matched).
@@ -876,8 +1094,50 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     Resources (the iOS project is committed), so a new sound needs a native build, not OTA.
     Used by the series and by the first local alert (`schedulePushNotification`). The ▶
     preview is a local notification under one id (`ALARM_PREVIEW_ID`), removed before the
-    next preview and when the screen closes, so a new ▶ stops the one playing. iOS only:
-    Android plays the `default` channel's sound.
+    next preview and when the screen closes, so a new ▶ stops the one playing (it also stops
+    the app's own player, next bullet). iOS only: Android plays the `default` channel's sound.
+  - **The server holds a copy of the two settings** (shoofi-partner
+    `fix/alarm-sound-when-locked`, 2026-11-20). `alarmDevicePayload(token, prefs)`
+    (`utils/new-order-alarm-prefs.ts`, pure) is the body of the token registration:
+    `{ notificationToken, alarmSound, alarmRepeat }`. `hooks/use-notifications.ts` sends it at
+    login and again on every change (`setAlarmPrefsListener` in
+    `utils/notification/new-order-alarm.ts`; the token is kept at module scope because the
+    hook unmounts with the header). ALWAYS with the token: a server from before the field
+    writes whatever `notificationToken` it is given. The server uses the copy for what the
+    app cannot do: the LOCKED-screen ring (iOS plays the push's sound, so the server names
+    this tablet's) and skipping its late reminders when repeat is off (§ NOTIFICATIONS).
+    Limit: `storeUsers` holds one token per user, so two tablets on one login share the
+    last-registered token and sound.
+  - **One banner for a notification that arrives twice.** The server sends most partner
+    notifications as a push AND a websocket frame. The frame used to raise a second local
+    banner with `sound: "default"`, so with the app open a late-order alert rang
+    `storelate.wav` and the default ding together. `socketFrameNeedsBanner(frame.data,
+    devicePushToken)` (`utils/new-order-alarm-prefs.ts`, pure) now skips the local banner
+    when the frame's `pushedTo` is the end of THIS device's token. No `pushedTo` (no push
+    sent, older server), another device's token, or no token here: the frame keeps its banner.
+  - **How loud: in the foreground on iOS the APP plays the ring, at MEDIA volume**
+    (shoofi-dev/shoofi-partner, branch `feat/new-order-alarm-media-volume`, 2026-11-16; store
+    owners: "not loud enough"). iOS plays a notification sound at the "Ringtone and Alerts"
+    volume, and on an iPad the volume buttons change only the media volume unless Settings →
+    Sounds → "Change with Buttons" is on (off by default), so turning the tablet up did not
+    make the alarm louder. Now the foreground notification handler (`utils/notification/index.ts`
+    `setNotificationHandler`) asks `inAppAlarmSound` (`utils/in-app-alarm-sound.ts`, pure) whether
+    to play it itself: iOS only, and only for `ORDER_WAITING_NOTIFICATION_TYPES` (the server's
+    `new_order_alert` + `order_reminder` pushes, `new_order_local`, `new_order_alarm`) plus
+    `alarm_preview`. If so, `playAlarmInApp` (`utils/notification/alarm-player.ts`, expo-audio,
+    one player per sound, `playsInSilentMode`, `mixWithOthers`) plays it and the banner shows with
+    `shouldPlaySound: false`. Which sound: `data.sound` (the app's own rings and the preview put
+    it there, because iOS hides a notification's sound file name from JS; content.sound reads
+    `"custom"`), else this tablet's chosen sound, else `store.wav`. So the server's pushes also
+    ring with the tablet's choice in the foreground. A ring the app cannot start within 1.5 s
+    (or that throws) keeps the system sound, so the alarm is never silenced by the player.
+    `cancelAndDismiss` (accept / count 0 / logout) and `stopAlarmPreview` call `stopAlarmInApp`.
+    **Unchanged:** the background (iOS plays the notification's own sound at the alert volume;
+    the handler does not run there), Android, and every non-order notification (delivery delay,
+    future-order reminder, drive-in arrival). expo-audio is native: binaries from 1.0.15
+    (runtime 1.0.4) only. Its Android manifest's `RECORD_AUDIO` is removed
+    (`tools:node="remove"`) and an iOS `NSMicrophoneUsageDescription` is present only so App Store
+    processing accepts the binary; the app never records.
   - **Numbers** (`ALARM_SETTINGS`, `utils/new-order-alarm.ts`). Every time comes from one
     deterministic grid per cycle (`alarmCycleGrid`):
     1. **While the server's reminder window runs**, one local ring a minute at **:30
@@ -945,8 +1205,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   - Multi-store `goToStore` (switch store, then open the list) still navigates directly.
     Its race with the same redirect, which a store switch re-triggers through
     `storeData.id`, has not been verified on a device.
-  - The component sits behind `hideHHeaderScreens`, so a tap while the menu or cart screen
-    is open is not routed.
+  - The component sits behind `hideHHeaderScreens`, so a tap while the cart screen (and, in
+    the v2 shell only, the menu screen) is open is not routed. With `HEADER_V3` the menu
+    screen shows the header, see the v3 flags below.
 - ⚠️ **Never seed that ledger on the badge-refresh path — it silences the alarm entirely.**
   The badge refresh, not the poll, is what learns about a new order first — and it does so
   through the **push**, not a websocket frame. At creation the server sends each store user a
@@ -1006,16 +1267,55 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   - **Flags.** `ORDERS_LIST_V3` / `NEW_ORDERS_V3` / `HEADER_V3` (`consts/feature-flags.ts`
     ~23-44) are off in shipped builds. They turn on for one bundle when Metro/EAS runs with
     `EXPO_PUBLIC_PARTNER_ORDERS_V3=1`. When on, v3 wins over v2 in `MainStackNavigator.tsx`.
-    `HEADER_V3` restyles only the shared header.
+    `HEADER_V3` is the app's one top row (shoofi-partner feat/v3-shell-back-everywhere,
+    owner feedback 2026-11-17), not only a restyle:
+    - `components/layout/header/ShellBarV3.tsx` draws Back + the page name at the start edge
+      on every page except Home, the bell and the store-status pill, and the Shoofi logo at
+      the end edge. **The logo is Home; there is no Home icon.** `header.tsx` renders it for
+      store staff when `HEADER_V3` is on.
+    - A screen publishes its name (and, optionally, its own back) with
+      `useShellTitle(title, onBack?)` (`hooks/use-shell-title.ts`, store
+      `stores/shell-header`), and its component leaves its own back / title row out
+      (`shellTitle`). The orders list, new-order, school-orders, stock, sales, deliveries,
+      settings, products, reports and compensations screens all do. A screen that publishes
+      nothing still gets Back, with no name.
+    - The hook is a no-op without the flag, so the shipped (v2) screens are unchanged.
+    - The products list (`menuScreen`) is no longer in `hideHHeaderScreens` when `HEADER_V3`
+      is on, so the header (and `CrossStoreOrdersGlobal` under it) shows there too.
+    - **«سجل الطلبات» is a tile on Home** (`DashboardV3` key `order-history`): it opens
+      `admin-orders` with the route param `history: true`, and `list/index.v3.tsx` starts in
+      the history on today. The param is consumed once. The «السجل» switch on the orders
+      screen stays.
+    - The light / dark switch (☾) left the orders header, and the language row left Home:
+      both are in «إعدادات المحل» → «هذا الجهاز» (`StoreSettingsV3` `device`), per tablet,
+      applied at once and not part of the save bar.
   - **Rules** come from `helpers/orders/order-rules.ts` (above).
-  - **Money** is in `helpers/orders/order-money.ts`, and the two formulas differ on purpose:
-    - `orderMoneySummary` is the list's. It is built on `getPartnerPaymentSummary`, the
-      same math as the v2 list.
-    - `newOrderMoneySummary` is the new-order screen's own v2 inline formula, lifted
-      unchanged. It subtracts coins from a card order's bottom line too, takes the
-      `full_discount` coupon row from `appliedCoupon.breakdown`, and decides "full coupon"
-      without the drive-in price.
-    - Unifying the two is a money decision (accountant), not a layout one.
+  - **Money** is in `helpers/orders/order-money.ts` (branch `fix/order-money-settlement`; main
+    still has the two old formulas, `getPartnerPaymentSummary` for the list and the new-order
+    screen's own inline one, until it merges).
+    - **One formula.** `storeMoney(order)` is a per-order port of the settlement engine
+      (`services/payments/store-sales.js` + `lib/payments/calc.js`), before commission / VAT.
+      Card: Shoofi pays `P + D − C − S`. Cash: cash in hand `P + D − I − C`, and the monthly
+      account adds `H − S_delivery` (P items, D drive-in, C coins = the STORE's cost, I the
+      coupon's items part, S the store's coupon/deal share, H Shoofi's coupon credit). It shows
+      what the store SHOULD get: the engine double-charges the store's items share on a cash
+      order (accountant review 2026-11-11), the screen does not copy that.
+    - **What the store sees** is `storeView(storeMoney(order))`, the same lines on the
+      new-order screen, the order card (`components/orders-v3/MoneyBlock.tsx`) and the printed
+      ticket (`components/order-invoice` `SettlementMoney`, flag `ORDER_MONEY_SETTLEMENT`).
+      Product decision 2026-11-15: «المنتجات» · [«توصيل للسيارة»] · [«كوينز»] · [«خصم حملة»] ·
+      «شوفي ستدفع لك», then one box «السائق / الزبون يدفع لك نقداً ₪X», or «لا تحصّل شيئاً»
+      with NO amount.
+    - **No delivery lines, no card / coupon names, no breakdown toggle.** «خصم حملة» is
+      everything the store funds (its items deal, its share of a coupon and, on CARD only, its
+      share of a free-delivery coupon/deal) and never says who funds it.
+    - **Cash + a free-delivery coupon/deal the store shares shows nothing for that share**
+      (product, option أ, 2026-11-15): the courier hands over the full cash and `S_delivery` is
+      deducted on the monthly account only. The cash «شوفي ستدفع لك» is `H`, never negative, so
+      «يُخصم منك بالحساب الشهري» never shows on cash. Before this the same ₪ showed twice
+      («خصم حملة» AND «يُخصم منك», 2463-1101). The lines add up: products + drive-in − coins −
+      campaign = Shoofi + cash (49 real prod cases), and the cash box equals the driver app's
+      «السائق يدفع للمتجر».
   - **Order lines** are built by `helpers/orders/order-lines.ts` `buildOrderLines`. A line
     whose product is not in the menu is KEPT, with its own `nameAR`/`nameHE`, flagged
     `missingFromMenu` and sorted last. Its options cannot be decoded without the product's
@@ -1079,6 +1379,14 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   new-orders v1/v2 (above the items), item details and the school list. Tickets print a stacked
   label + text box after the items, directly above the staff «ملاحظة:» line, `textAlign: "left"`
   (the printed RIGHT edge under forced RTL; never a label/value row — the partner#41 clipping).
+  The school tickets (`components/order-invoice-school/*`, 80mm and Urovo) print the same box
+  through one component, `components/order-invoice-school/customer-note-box.tsx`: the student
+  ticket prints its order's note; the class distribution sheet and the combined prepare ticket
+  cover many orders, so they print each student's name with their note
+  (`getSchoolCustomerNotes`, orders with no note left out). The prepare ticket is given the
+  print response's `ordersList` for this: `combinedOrder` is the FIRST order with everyone's
+  items, so its own `order.commentToStore` is one student's note and must never be printed as
+  the ticket's note.
   On the v3 redesign (`components/orders-v3/*`, the unmerged partner stack #45–#64 and the PRs
   stacked on it) the same helper is read by `OrderCardV3` (board/list cards), `NewOrderViewV3`
   (above the lines) and, from partner#80, `SchoolOrderCardV3` (the v3 school list).
@@ -1118,7 +1426,17 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
   «السائق يدفع للمحل نقداً» on the ticket; pickup / drive-in: the customer. The ticket's «سعر الطلب»
   is the items (`orderPrice`); drive-in is its own row.
 - **«استلمت» labels only:** ready delivery (3) → 11 «استلمها السائق», ready pickup/drive-in (2) →
-  10 «استلمها الزبون»; the transitions are unchanged and only the store makes them.
+  10 «استلمها الزبون»; the transitions are unchanged and only the store makes them. With the
+  delivery cancelled the ready delivery's label is «تم التسليم» / «נמסרה»
+  (`partner-v3.action-handed-over`: no driver took it).
+  `nextActionLabel` (order-rules.ts) returns a **label key** (`partner-v3.action-*` in
+  `components/orders-v3/labels.ts`), never text; the card renders it with `v3t` in the app
+  language (he: «השליח אסף» / «הלקוח אסף» / «מוכנה» / «התחלת הכנה»). The status tabs and the
+  board's third column use `partner-v3.tab-picked-up` / `tab-future` / `iftar` the same way; the
+  phone's first tab uses the short `partner-v3.tab-preparing` («בהכנה»), not the DB key
+  `in-progress` («ההזמנה בהכנה», cut with five tabs) — the iPad column title keeps `in-progress`. A
+  literal Arabic string, or `t("<Arabic word>")` with no `defaultValue`, shows Arabic on a
+  Hebrew tablet (the DB dictionary has no such keys) — the non-v3 screens still do this.
 - **Delay:** the sheet offers +5/+10/+15/+20, says the customer is notified, and keeps the
   one-delay rule (client-side; the server stores only the LAST `delayMinutes`).
 
@@ -1155,7 +1473,8 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
 - **Cancel money (CORE invariant 28) — the admin side, shoofi-delivery-web#346:**
   - **A support cancel of one twin side leaves it `7`** (CANCELLED_BY_ADMIN), not `5`; the
     customer app's `twin-active-order-header.tsx` `getGroupStatus` checks the degraded pair before
-    "any side cancelled" (shoofi-app#96), else order history would read "ההזמנה בוטלה".
+    "any side cancelled" (shoofi-app#96), else the group status would read "ההזמנה בוטלה"
+    (that badge is not rendered today — see C1 "Twin tracking card").
   - **One cancel dialog** (`src/components/Modals/CancelMoneyDialog.tsx`, rules in
     `src/utils/cancel-dialog.ts`, calls in `src/apis/admin/money.ts`) for single orders and both
     twin cards: `money/cancel-preview` → scope choice (twin: this side / the other side by name /
@@ -1177,6 +1496,13 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
     `statusChangeNeedsCancelDialog`): an order with money at stake no longer offers the
     cancel/reject statuses there (they would be stamped `undecided` with nobody asked) — cancels go
     through "בטל הזמנה" and its dialog; "בטל הזמנה" is hidden on status 5.
+    It offers no `10`/`11` (labels `ORDER_STATUS_HEBREW_SHORT` in `useOrderActions.tsx`:
+    6/1/2/3/7/13/5), and no other admin screen sends them. An admin token (`roles`) is still
+    exempt from the server's "handed over only from ready" guard (CORE invariant 2). So if
+    `10`/`11` is ever added to the dropdown, support can correct an order from any LIVE status.
+    Not a cancelled one: since shoofi-server#467 the server answers 400
+    `CANCELLED_ORDER_CANNOT_REACTIVATE` to every caller, the dashboard included (CORE
+    invariant 2; no restore path, by decision, HQ #da002b).
   - **Undo guard** (`src/utils/twin-cancel.ts` `undoDegradeBlock`) mirrors the server's
     `undoDegradeBlockReason` and also reads `group.moneySummary` (a coupon, a refund or a refund in
     doubt since the degrade hides undo).
@@ -1270,6 +1596,44 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
     `DeliveryListAnalytics`. Those are courier-dispatch views.
   - **No edit path and no `bookDelivery` mirror.** It is not «הערות לשליח» (`commentToCourier`),
     which is delivery-only and editable through `POST /api/order/comment-to-courier`.
+
+- **Customer note to the courier in the driver popup** (partner `feat/driver-notes-visible`,
+  2026-11-20). The «تفاصيل السائق» popup (`components/dialogs/driver-details.v3.tsx`, and the v1
+  `driver-details.tsx` behind `ORDER_DIALOGS_V3`) shows `order.order.commentToCourier` under the
+  phone, labelled «ملاحظات الزبون للمندوب» / «הערות הלקוח לשליח», in the v3 note colours, whether
+  or not a courier is assigned yet. Only the v3 orders list (`screens/admin/order/list/index.v3.tsx`)
+  passes it (`courierNote={getCourierNote(selectedOrderForDriverDetails)}`); the v1/v2/school lists
+  and the delivery-only lists do not. Reader: `helpers/order-courier-note.ts` `getCourierNote`,
+  which reuses `normalizeCustomerNote` (strings only, ≤ 200). Read-only: the store cannot edit it;
+  support edits it through `POST /api/order/comment-to-courier`.
+
+- **Combo lines on the admin order card** (CORE invariant 12 "Readers", branch
+  `fix/admin-order-combo-picks`, 2026-11-17). Before it, `CardOrder` tested only
+  `selectedExtras`, which is `{}` on a combo line, so it printed "תוספות: —" (order 5160-7994).
+  - **Helpers:** `src/utils/combo-order-display.ts`, pure: `lineHasChoices`,
+    `comboSelectionsOf`, `findMenuProduct`, `resolveComboComponent`, `comboPickName`,
+    `comboPickSurcharge`, plus ports of the partner's `sortComboSelections` /
+    `comboSlotLabel` (`components/shared/ComboSelectionsDisplay.tsx`) and
+    `listComponentSelections` (`helpers/combo-summary.ts`). The admin is Hebrew, so names
+    read `nameHE || nameAR`.
+  - **Card (`OrderComboPicksWeb` in `CardOrder.tsx`):** under the line's "תוספות:" (mobile and
+    desktop share `renderLineChoices`), one row per pick: slot chip, the stored name, `+₪surcharge`
+    when > 0 (display snapshot, never charged). It shows without the menu. Before "הצג פרטי תוספות"
+    loads the menu (`GET /api/menu`, `app-type: shoofi-admin`: hidden products included, combo
+    options carry `option.product` snapshots), the chips read "בחירה n". After it, they read
+    "<section> n", and each pick's choices render through the existing `OrderExtrasDisplayWeb`.
+    The component's extras come from the menu product first, then the option snapshot. The "—"
+    and the "הצג פרטי תוספות" button both use `lineHasChoices`, which counts
+    `comboSelections` too. A plain line renders as before.
+  - **Amend sheet (`AmendOrderModal.tsx`):** a combo line's picks are listed read-only (name,
+    surcharge, a one-line summary of the choices). Amend stays qty/remove for a combo line
+    (CORE invariant 12). The sheet's `ExtrasEditor` still renders for the combo's OWN extras
+    definition. It renders nothing when that is empty, as on the 5160-7994 box. A combo with
+    its own extras would get an editor whose change the server refuses with
+    `400 COMBO_EXTRAS_NOT_AMENDABLE`. It is not hidden yet.
+  - **Tests:** `src/utils/__tests__/combo-order-display.test.ts`,
+    `tests/e2e/orders/order-combo-picks.spec.ts` (fixture: the real 5160-7994 line,
+    `tests/e2e/factories/combo-order-data.ts`), run folder `tests/e2e/runs/combo-order-picks/`.
 
 ## C5. shoofi-kopa — the store till back-office (web)
 Kopa (repo `shoofi-kopa`) is the store's back-office web app. It calls the server like the
