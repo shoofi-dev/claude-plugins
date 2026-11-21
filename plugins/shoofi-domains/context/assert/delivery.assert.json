@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server + shoofi-app + shoofi-delivery-web @feat/city-area-single-region-and-inactive-admin / 2026-11-21 (CORE 'Hiding a REGION'); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -857,6 +857,11 @@
           ],
           "regex": "(?:admin/cancel legacy \\{bookId\\} shared by 3 rows cancels the single live one|bookId: deliveryData\\.bookId  // Match by bookId)",
           "desc": "CORE invariant 20: the decoy-first tests (another store + same store older row inserted ahead of the real one) - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": "routes/delivery/geography.js",
+          "regex": "\\.find\\(includeInactive \\? \\{\\} : \\{ isActive: \\{ \\$ne: false \\} \\}\\)",
+          "desc": "CORE 'Hiding a REGION': GET /delivery/city-areas is active-only unless ?includeInactive=true"
         }
       ]
     },
@@ -864,7 +869,10 @@
       "files": [
         "hooks/checkout/use-checkout-validate.ts",
         "helpers/delivery-availability.ts",
-        "screens/checkout/index.tsx"
+        "screens/checkout/index.tsx",
+        "components/dialogs/city-areas-modal-based-event.tsx",
+        "components/address/CityAreasList.tsx",
+        "utils/city-areas.ts"
       ],
       "patterns": [
         {
@@ -881,6 +889,16 @@
           "file": "screens/checkout/index.tsx",
           "regex": "availableDrivers\\?\\.area\\?\\.price \\|\\| 0",
           "desc": "CORE 'Paused ≠ out of zone': the delivery fee posted as shippingPrice is the quoted area's price, 0 when the quote has no area"
+        },
+        {
+          "file": "components/dialogs/city-areas-modal-based-event.tsx",
+          "regex": "if \\(!payload\\?\\.browse\\) \\{[\\s\\S]*?areas\\.length === 1",
+          "desc": "CORE 'Hiding a REGION': the region sheet picks the only region itself unless opened with { browse: true }"
+        },
+        {
+          "file": "components/address/CityAreasList.tsx",
+          "regex": "autoSelectSingle && res\\.length === 1",
+          "desc": "CORE 'Hiding a REGION': the home no-location list auto-picks a single region"
         }
       ]
     },
@@ -1072,6 +1090,11 @@
           "file": "src/components/Modals/CancelDeliveryModal.tsx",
           "regex": "(?:await onCancel\\(buildCancelDeliveryData\\(deliveryOrder, cancelReason\\.trim\\(\\), \"admin\"\\)\\);|bookId: deliveryOrder\\.bookId \\|\\| deliveryOrder\\._id,)",
           "desc": "CORE invariant 20: CancelDeliveryModal builds its body with buildCancelDeliveryData (never bookId alone) - valid-before leg is the old bookId-only payload on main before the code PR; drop it once shoofi-delivery-web fix/admin-cancel-delivery-by-original-id has merged"
+        },
+        {
+          "file": "src/views/admin/delivery-areas/CityAreasList.tsx",
+          "regex": "params: \\{ includeInactive: true \\}",
+          "desc": "CORE 'Hiding a REGION': the admin city-areas page lists inactive regions so they can be turned back on"
         }
       ]
     }

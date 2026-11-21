@@ -516,7 +516,8 @@ availability trace and the admin audit row are unchanged. That endpoint takes **
 duration** (the server hard-codes the trace reason) and has **no role check**. Zones are re-read at
 most every 30 s, because `company/employees` counts every courier's open bookDelivery rows per call.
 **The area/coverage CONTROL PANEL**
-lives here: `views/admin/delivery-areas/*` — full CRUD for cities, parent-cities, city-areas,
+lives here: `views/admin/delivery-areas/*` (its city-areas page reads `GET delivery/city-areas?includeInactive=true`
+so a region switched off with "פעיל" stays listed; see CORE "Hiding a REGION") — full CRUD for cities, parent-cities, city-areas,
 delivery-areas, company-areas, geometries (draw/fill-gaps/suggest). **Config**:
 `views/admin/settings/DeliverySettings.tsx` (`admin/delivery-config`, `admin/twin-order-config`).
 Shift admin: `apis/admin/driver-shift-manager.ts`. `DELIVERY_STATUS` copy = **all eight**
