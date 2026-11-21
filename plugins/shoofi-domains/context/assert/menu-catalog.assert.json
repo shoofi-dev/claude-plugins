@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-server@fix/product-update-image-error / 2026-11-21 (reference §7: a failed imageUrl on product/update answers 422/502, any other throw 500, nothing saved); shoofi-server@475b0cb5 (#633 merged) / 2026-11-17 (invariant 35 + reference 7n: menu copy between stores, new ids + full remap, resets, replace + rollback, PRICE_EDIT_ROLES gate (no accountant); menu-copy pins single-path since server#633 merged); shoofi-server@feat/kopa-qr-shared-menu / 2026-11-13 (invariant 34 + reference 7m: the QR menu shares the app menu, rule collections, qrOnly needs isHidden, 20 s cache); shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@fix/pizza-free-topping-count (#479) + shoofi-app@design/round-2 b581604 (reference §4 free pizza-topping slots) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 outOfStoreUntil admin-only projection + 07:00 restore) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 misheard dish name, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-delivery-web@feat/import-warnings / 2026-11-22 (reference §2: the Excel product import checks the file against the template, needs an explicit OK for rows without Arabic, a 90 s per-request limit and an on-screen summary; two new import-issue codes); shoofi-server@fix/product-update-image-error / 2026-11-21 (reference §7: a failed imageUrl on product/update answers 422/502, any other throw 500, nothing saved); shoofi-server@475b0cb5 (#633 merged) / 2026-11-17 (invariant 35 + reference 7n: menu copy between stores, new ids + full remap, resets, replace + rollback, PRICE_EDIT_ROLES gate (no accountant); menu-copy pins single-path since server#633 merged); shoofi-server@feat/kopa-qr-shared-menu / 2026-11-13 (invariant 34 + reference 7m: the QR menu shares the app menu, rule collections, qrOnly needs isHidden, 20 s cache); shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@fix/pizza-free-topping-count (#479) + shoofi-app@design/round-2 b581604 (reference §4 free pizza-topping slots) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 outOfStoreUntil admin-only projection + 07:00 restore) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 misheard dish name, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -3325,10 +3325,43 @@
         "src/apis/admin/menu-spellcheck.ts",
         "src/views/admin/settings/ShoofiSettings.tsx",
         "src/views/admin/for-you-quality/ForYouQuality.tsx",
-        "src/apis/admin/for-you-quality.ts"
+        "src/apis/admin/for-you-quality.ts",
+        "src/views/admin/stores/ImportCategoriesProducts.tsx",
+        "src/utils/import-file-check.ts",
+        "src/utils/import-run-summary.ts"
       ],
       "symbols": {},
       "patterns": [
+        {
+          "file": "src/utils/import-run-summary.ts",
+          "regex": "export const IMPORT_REQUEST_TIMEOUT_MS = 90_000;",
+          "desc": "doc reference §2 (Excel product import): every product write has a 90 s limit, so a request that never answers becomes a failed row"
+        },
+        {
+          "file": "src/utils/import-run-summary.ts",
+          "regex": "code === \"IMAGE_DOWNLOAD_FAILED\"",
+          "desc": "doc reference §2: the import summary names the image link of a 422 IMAGE_DOWNLOAD_FAILED from product/update"
+        },
+        {
+          "file": "src/utils/import-file-check.ts",
+          "regex": "export const checkImportFile = \\(",
+          "desc": "doc reference §2: the pre-import column check (missing / unknown / blank per column)"
+        },
+        {
+          "file": "src/views/admin/stores/ImportCategoriesProducts.tsx",
+          "regex": "nameAR: cellText\\(row\\[\"Product Title \\(Arabic\\)\"\\]\\)",
+          "desc": "doc reference §2: no Hebrew fallback at parse time; nameAR is the raw Arabic cell"
+        },
+        {
+          "file": "src/views/admin/stores/ImportCategoriesProducts.tsx",
+          "regex": "formData\\.append\\('nameAR', productData\\.nameAR \\|\\| productData\\.nameHE\\)",
+          "desc": "doc reference §2: the Hebrew stands in for Arabic only on create, after the operator's explicit OK"
+        },
+        {
+          "file": "src/views/admin/stores/ImportCategoriesProducts.tsx",
+          "regex": "if \\(productData\\.nameAR\\) \\{\\n\\s+formData\\.append\\('nameAR', productData\\.nameAR\\);",
+          "desc": "doc reference §2: update never sends a blank nameAR, so an existing product keeps its Arabic name"
+        },
         {
           "file": "src/views/admin/stores/StoreForm.tsx",
           "regex": "name=\"launchDate\"",
