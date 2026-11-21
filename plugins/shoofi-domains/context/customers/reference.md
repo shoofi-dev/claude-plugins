@@ -299,7 +299,13 @@ identity doc `req.auth.id` names, and **for a partner then mirrors it onto every
 `storeUsers` doc sharing that phone** (`updateMany`, self excluded). The mirror exists
 because a new-order push is addressed to the token on the doc of *the store that got the
 order*, while the app only ever registers the doc it is logged into — without it, a store
-the owner hasn't opened on this device never pushes at all. Only `notificationToken` is
+the owner hasn't opened on this device never pushes at all. A partner registration may also carry the
+tablet's alarm settings, `alarmSound` (one of the 8 bundled sound files) and `alarmRepeat`
+(boolean): `alarmDeviceFields` (`utils/partner-alarm-device.js`) keeps only valid values,
+they are `$set` next to the token on the same doc AND in the mirror (they belong to the
+device, like the token), and an old app that sends neither leaves what is stored alone.
+Other app types never store them. Readers: the new-order push sound and the late
+reminders (orders reference, NOTIFICATIONS). Only the token and those two fields are
 shared; each doc keeps its own `_id`, `token` and `roles`, so the per-store `recipientId`
 addressing is unchanged. Guarded on a truthy token (an empty registration can't wipe the
 siblings) and on the phone read off the *authenticated* doc, never the request body; a

@@ -473,7 +473,8 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   **keeps re-pushing it until the partner accepts the order**. `persistent-alerts-cron`
   runs on `*/1 * * * *`, and `sendReminders` throttles per alert on `MAX_REMINDERS = 5`
   + `REMINDER_INTERVAL_MS = 60 * 1000` (`utils/persistent-alerts.js`) — **5 reminders on
-  5 consecutive minutes, then permanent silence**, per store user. The every-minute
+  5 consecutive minutes**, per store user, **then the late reminders** (next paragraph;
+  until 2026-11-20 it was permanent silence after the five). The every-minute
   cadence is a **deliberate product decision, not an oversight** (see the comment on
   `REMINDER_INTERVAL_MS`): the store must approve ASAP, and an accept 25 minutes late is
   a bad outcome. Its cost — a still-pending order is never announced again after minute
@@ -481,7 +482,40 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   spacing**; that trade-off is a product call. Note the observable cadence is the same
   one the dead filter used to produce by accident (below) — the difference is that it is
   now explicit, pinned, and no longer an artefact of the cron period.
-  **The server's silence after minute 5 is no longer the whole story on the tablet.** Since
+  **Late reminders (shoofi-server `fix/alarm-sound-when-locked`, 2026-11-20).** After the
+  five, `sendLateReminders` (same file, called at the end of every `sendReminders` tick, never
+  throws) sends one more `order_reminder` every `LATE_REMINDER_INTERVAL_MS` (5 minutes, same
+  tick-skew slack) while the alert is younger than `LATE_REMINDER_WINDOW_MS` (1 hour from
+  `createdAt`), capped at `MAX_TOTAL_REMINDERS` (17). `data.lateReminder: true`. Why: the
+  tablet's own repeating alarm is scheduled by the app when it SEES the order, so an iPad
+  that was already locked when the order arrived heard only the five and then nothing; the
+  server is the only thing that can ring it. Two rules apply to the late ones only:
+  (1) the order must still be waiting — `isViewd: false` and status `"6"`, read from the
+  store db; if not, the alert is set to `status: "closed"` (`closedReason:
+  "order-not-waiting"`, deleted by the cleanup cron with the others) and nothing is sent; if
+  the order cannot be read the tick is skipped; (2) a store user whose device switched
+  «repeat until accepted» off (`storeUsers.alarmRepeat === false`, below) is skipped. The
+  five themselves are unchanged and still unguarded. The cadence copies the tablet's phase 3
+  (every 5 minutes, nothing after an hour); a late push may land near one of the tablet's
+  own phase-3 rings, which is accepted.
+  **The push rings with the tablet's chosen sound.** Every caller still passes
+  `soundType: 'store.wav'`; `sendNotification` (`services/notification/notification-service.js`)
+  swaps it through `pushSoundFor` (`utils/partner-alarm-device.js`, pure): only for
+  `appType: 'shoofi-partner'`, only when the caller asked for `store.wav`, only for
+  `data.type` `new_order_alert` / `order_reminder`, and only to a name in
+  `PARTNER_ALARM_SOUNDS` (the 8 files the partner build bundles) read from
+  `storeUsers.alarmSound`. Anything else keeps the caller's sound: the late-order alerts
+  (`storelate.wav`), drive-in, the future-order reminder, other apps. Why it lives on the
+  server: with the iPad LOCKED iOS plays the sound named in the push, and no app code runs
+  (Mohannad, 2026-11-18: «locked = the old sound»). `alarmSound` / `alarmRepeat` arrive with
+  the push token (`POST /api/customer/update-notification-token`, `alarmDeviceFields`
+  validates; customers reference, Push tokens) and are mirrored to the owner's other store
+  docs with it. Android ignores it (the channel's sound).
+  **The websocket copy names the device the push goes to.** When a notification is sent on
+  both channels, the frame carries `data.pushedTo` = the last 8 characters of the
+  recipient's push token (`pushTokenTail`); absent when no push is sent. The partner app
+  uses it to show one banner instead of two (C3, "One banner").
+  **The server's silence after minute 5 was never the whole story on the tablet.** Since
   2026-11-07 the partner app repeats the alarm itself, from local notifications, while the
   order waits (C3, "The new-order alarm repeats"). The server cadence above is unchanged,
   but the tablet now **depends on it**: it places its rings half-way between these
@@ -1044,7 +1078,8 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     «الطباعة», `components/store-settings-v3/AlarmSettingsV3.tsx`). Stored on the DEVICE (AsyncStorage
     `@new_order_alarm_prefs`), not the store. `repeat` (default on): off means the series
     never runs (`alarmRepeatEnabled` = store alerts on AND repeat) and switching it off clears
-    a scheduled series; the first alert of a new order and the server's reminders still come.
+    a scheduled series; the first alert of a new order and the server's five reminders still
+    come (its late reminders do not, see below).
     `sound`: one of `ALARM_SOUNDS` — `store.wav` (first, the default) and seven picked
     2026-11-14 (`order-phone-ring`, `-electric-bell`, `-service-bell`, `-delivery-tune`,
     `-digital-alert`, `-doorbell`, `-beeps` `.wav`: one 5–6.5 s phrase each, level-matched).
@@ -1055,6 +1090,25 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     preview is a local notification under one id (`ALARM_PREVIEW_ID`), removed before the
     next preview and when the screen closes, so a new ▶ stops the one playing (it also stops
     the app's own player, next bullet). iOS only: Android plays the `default` channel's sound.
+  - **The server holds a copy of the two settings** (shoofi-partner
+    `fix/alarm-sound-when-locked`, 2026-11-20). `alarmDevicePayload(token, prefs)`
+    (`utils/new-order-alarm-prefs.ts`, pure) is the body of the token registration:
+    `{ notificationToken, alarmSound, alarmRepeat }`. `hooks/use-notifications.ts` sends it at
+    login and again on every change (`setAlarmPrefsListener` in
+    `utils/notification/new-order-alarm.ts`; the token is kept at module scope because the
+    hook unmounts with the header). ALWAYS with the token: a server from before the field
+    writes whatever `notificationToken` it is given. The server uses the copy for what the
+    app cannot do: the LOCKED-screen ring (iOS plays the push's sound, so the server names
+    this tablet's) and skipping its late reminders when repeat is off (§ NOTIFICATIONS).
+    Limit: `storeUsers` holds one token per user, so two tablets on one login share the
+    last-registered token and sound.
+  - **One banner for a notification that arrives twice.** The server sends most partner
+    notifications as a push AND a websocket frame. The frame used to raise a second local
+    banner with `sound: "default"`, so with the app open a late-order alert rang
+    `storelate.wav` and the default ding together. `socketFrameNeedsBanner(frame.data,
+    devicePushToken)` (`utils/new-order-alarm-prefs.ts`, pure) now skips the local banner
+    when the frame's `pushedTo` is the end of THIS device's token. No `pushedTo` (no push
+    sent, older server), another device's token, or no token here: the frame keeps its banner.
   - **How loud: in the foreground on iOS the APP plays the ring, at MEDIA volume**
     (shoofi-dev/shoofi-partner, branch `feat/new-order-alarm-media-volume`, 2026-11-16; store
     owners: "not loud enough"). iOS plays a notification sound at the "Ringtone and Alerts"
