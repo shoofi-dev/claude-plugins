@@ -94,10 +94,14 @@ Buckets (`docs/customer-orders-snapshot.md`): **completed** `2,3,10,11,12` ·
 - **Twin cascade** mutates the peer side **directly via services**, not routes (avoids recursion).
 
 **Transition guards you must not weaken:** PENDING(`6`) only from FRAUD_REVIEW
-(`order.js`); `/update/viewd` rejects already-cancelled `4,7,8,9` with a 400
-`ORDER_CANCELLED` (~order.js:6002-6025). That list omits REJECTED `5`, and no other status
-check follows it, so accepting a `5` order overwrites it to `1` (or `14`/`15`);
-`start-preparing` only from `14`; **`10` only from `2` and `11` only from `2`/`3`** on
+(`order.js`); `/update/viewd` writes only over `6` or `14`: `ACCEPT_ALLOWED_FROM`
+(`services/orders/accept-guard.js`, 2026-11-22) is in its `updateOne` filter and it checks
+`matchedCount` before any side effect. The older pre-read 400 `ORDER_CANCELLED` for `4,7,8,9`
+is still there (it omits `5`), but the filter is what holds: when nothing matched,
+`acceptRefusal(currentStatus)` answers 400 `ORDER_CANCELLED` for `4,5,7,8,9`, `200 {unchanged:
+true}` for an order already accepted (`1,2,3,10,11,12,15`: a double tap no longer rewrites
+`orderDate` or books a second delivery), and 409 `STATUS_ALREADY_CHANGED` for anything else;
+`start-preparing` only from `14` (a pre-read check only, not atomic); **`10` only from `2` and `11` only from `2`/`3`** on
 `/api/order/update` for every caller without a dashboard role
 (`services/orders/picked-up-guard.js` `pickedUpAllowedFrom`, 2026-11-15). That guard is atomic:
 `handleOrderUpdate` puts the allowed statuses in the `updateOne` filter and checks
