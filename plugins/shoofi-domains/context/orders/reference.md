@@ -1301,8 +1301,25 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
       Card: Shoofi pays `P + D − C − S`. Cash: cash in hand `P + D − I − C`, and the monthly
       account adds `H − S_delivery` (P items, D drive-in, C coins = the STORE's cost, I the
       coupon's items part, S the store's coupon/deal share, H Shoofi's coupon credit). It shows
-      what the store SHOULD get: the engine double-charges the store's items share on a cash
-      order (accountant review 2026-11-11), the screen does not copy that.
+      what the store SHOULD get: the engine double-charged the store's items share on a cash
+      order (accountant review 2026-11-11), the screen does not copy that. Settlement stops it for
+      CASH orders created from 2026-12-01 (shoofi-server `services/payments/cash-coupon-settlement.js`,
+      accountant CORE invariant 7); `full_discount` on cash already showed the fixed figure
+      (`P − storeItems − storeDelivery`), before and after.
+    - **Cash + a PUBLIC `order_items` coupon from the cutoff** (`helpers/orders/cash-coupon-settlement.ts`,
+      a port with the same `CASH_COUPON_SETTLEMENT_FROM = "2026-12-01T00:00:00+02:00"`; one helper
+      `cashItemsCoupon(order)` in `order-money.ts` for both formulas): `H += max(0, I − S)` and a
+      nominal share above the discount, `max(0, S − I)`, is deducted monthly, so the store ends at
+      `P − S` as on card (₪55, ₪11 off, store 70% → «شوفي ستدفع لك» ₪3.30, ₪47.30 in all;
+      Shoofi-funded → ₪55). The rule is `payment_method === "CASH"` and the order's
+      `created || createdAt || orderDate` ≥ the cutoff, as on the server; card, customer-specific and
+      delivery coupons, older orders and an order with no readable date print what they did (H = 0
+      for a public coupon, ₪44). The shipped v2 list and both tickets get it through
+      `getPartnerPaymentSummary` `shoofiTotal` (their existing «شوفي ستدفع» row on a cash coupon
+      order, which read ₪0); the v2 new-order screen prints only the cash to collect, unchanged.
+      The server can move its cutoff with an env var (`CASH_COUPON_SETTLEMENT_FROM`); the app
+      cannot read it, so a server override needs this constant moved too. Tests:
+      `helpers/orders/__tests__/cash-coupon-settlement.test.ts`.
     - **What the store sees** is `storeView(storeMoney(order))`, the same lines on the
       new-order screen, the order card (`components/orders-v3/MoneyBlock.tsx`) and the printed
       ticket (`components/order-invoice` `SettlementMoney`, flag `ORDER_MONEY_SETTLEMENT`).
@@ -1315,7 +1332,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     - **Cash + a free-delivery coupon/deal the store shares shows nothing for that share**
       (product, option أ, 2026-11-15): the courier hands over the full cash and `S_delivery` is
       deducted on the monthly account only. The cash «شوفي ستدفع لك» is `H`, never negative, so
-      «يُخصم منك بالحساب الشهري» never shows on cash. Before this the same ₪ showed twice
+      «يُخصم منك بالحساب الشهري» never shows on cash — except a public items coupon from the
+      cash-coupon cutoff whose nominal share exceeds the discount (the over-bill; «خصم حملة» is then
+      the whole share S, so the lines still add up). Before this the same ₪ showed twice
       («خصم حملة» AND «يُخصم منك», 2463-1101). The lines add up: products + drive-in − coins −
       campaign = Shoofi + cash (49 real prod cases), and the cash box equals the driver app's
       «السائق يدفع للمتجر».
