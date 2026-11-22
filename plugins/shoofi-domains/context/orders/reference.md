@@ -178,7 +178,9 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   primary's tariff-capped fee, and a claim on the secondary (fee 0) is removed (CORE invariant 14).
   Right after it, `enforceTwinCouponSides` (CORE invariant 34) moves a store-scoped items coupon's
   share off a leg whose store the coupon does not name, onto the peer (sum of totals unchanged,
-  peer total ≥ 0). It then resolves each leg's percent-split shares on that leg's discount. Both
+  peer total ≥ 0). It then resolves each leg's percent-split shares on that leg's discount, and
+  last computes each full_discount leg's `breakdown` on the server (`resolveTwinFullDiscountBreakdowns`,
+  CORE invariant 35 "Twin legs"); the app's posted per-leg breakdown is never kept. Both
   stores in the coupon = one combined cap, split over the legs. Each leg with a coupon writes its
   own `couponUsages` row (cash: the route; card: `applyCaptureSuccess`), so a twin with the coupon
   on both legs spends two uses.
@@ -1301,8 +1303,45 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
       Card: Shoofi pays `P + D − C − S`. Cash: cash in hand `P + D − I − C`, and the monthly
       account adds `H − S_delivery` (P items, D drive-in, C coins = the STORE's cost, I the
       coupon's items part, S the store's coupon/deal share, H Shoofi's coupon credit). It shows
-      what the store SHOULD get: the engine double-charges the store's items share on a cash
-      order (accountant review 2026-11-11), the screen does not copy that.
+      what the store SHOULD get: the engine double-charged the store's items share on a cash
+      order (accountant review 2026-11-11), the screen does not copy that. Settlement stops it for
+      CASH orders created from 2026-12-01 (shoofi-server `services/payments/cash-coupon-settlement.js`,
+      accountant CORE invariant 7); `full_discount` on cash already showed the fixed figure
+      (`P − storeItems − storeDelivery`), before and after.
+    - **Cash + a PUBLIC `order_items` coupon from the cutoff** (`helpers/orders/cash-coupon-settlement.ts`,
+      a port with the same `CASH_COUPON_SETTLEMENT_FROM = "2026-12-01T00:00:00+02:00"`; one helper
+      `cashItemsCoupon(order)` in `order-money.ts` for both formulas): `H += max(0, I − S)` and a
+      nominal share above the discount, `max(0, S − I)`, is deducted monthly, so the store ends at
+      `P − S` as on card (₪55, ₪11 off, store 70% → «شوفي ستدفع لك» ₪3.30, ₪47.30 in all;
+      Shoofi-funded → ₪55). The rule is `payment_method === "CASH"` and the order's
+      `created || createdAt || orderDate` ≥ the cutoff, as on the server; card, customer-specific and
+      delivery coupons, older orders and an order with no readable date print what they did (H = 0
+      for a public coupon, ₪44). The shipped v2 list and both tickets get it through
+      `getPartnerPaymentSummary` `shoofiTotal` (their existing «شوفي ستدفع» row on a cash coupon
+      order, which read ₪0). The v2 new-order screen's cash box takes it from `storeView` (below).
+      The server can move its cutoff with an env var (`CASH_COUPON_SETTLEMENT_FROM`); the app
+      cannot read it, so a server override needs this constant moved too. Tests:
+      `helpers/orders/__tests__/cash-coupon-settlement.test.ts`.
+    - **The shipped v2 new-order screen's bottom block** (`new-orders/list/index.v2.tsx`, the
+      default while `NEW_ORDERS_V3` is off) comes from `helpers/orders/new-order-v2-money.ts`
+      `newOrderV2BottomLine(order)`. CARD, or a coupon that covers the whole order: «شوفي ستدفع»
+      with the screen's own figure, moved unchanged (full_discount: `P − storeItemsAmount`).
+      CASH: the box from `storeView(storeMoney(order))`, the same as v3 and the ticket: «السائق
+      يدفع لك نقداً» with what the courier hands over on a delivery (`P + D − I − C`), «الزبون
+      يدفع لك نقداً» with the order total on a pickup, or «لا تحصّل شيئاً». Shoofi's monthly line
+      («شوفي ستدفع لك» / «يُخصم منك بالحساب الشهري») is a row of its own above it, never folded
+      into the cash. Until 2026-11-22 a cash full_discount printed «الزبون سيدفع نقداً» =
+      `orderPrice − storeItemsAmount`, the store's whole result labelled as cash (₪55, ₪40 off
+      split 28/12: ₪27, where the courier hands over ₪15 and Shoofi adds ₪12). Tests:
+      `helpers/orders/__tests__/new-order-v2-money.test.ts`.
+    - **Twin full_discount legs** carry the server's breakdown from shoofi-server#693 (CORE
+      invariant 35), so `storeMoney`, `getPartnerPaymentSummary` and the v2 bottom block bill the
+      store its share of the leg. No twin special case exists in the money helpers: they read the
+      leg's `breakdown`. A leg stored before shows the app's ₪0 split, which is also what it
+      settled. A leg with no breakdown (the server's computation failed) falls back, like the
+      server's `getFullDiscountMatrix`, to `min(storeDiscount, D)`. That is the WHOLE coupon's
+      share capped at the leg's discount, so the tablet can show more than settlement bills on
+      that rare leg.
     - **What the store sees** is `storeView(storeMoney(order))`, the same lines on the
       new-order screen, the order card (`components/orders-v3/MoneyBlock.tsx`) and the printed
       ticket (`components/order-invoice` `SettlementMoney`, flag `ORDER_MONEY_SETTLEMENT`).
@@ -1315,7 +1354,9 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
     - **Cash + a free-delivery coupon/deal the store shares shows nothing for that share**
       (product, option أ, 2026-11-15): the courier hands over the full cash and `S_delivery` is
       deducted on the monthly account only. The cash «شوفي ستدفع لك» is `H`, never negative, so
-      «يُخصم منك بالحساب الشهري» never shows on cash. Before this the same ₪ showed twice
+      «يُخصم منك بالحساب الشهري» never shows on cash — except a public items coupon from the
+      cash-coupon cutoff whose nominal share exceeds the discount (the over-bill; «خصم حملة» is then
+      the whole share S, so the lines still add up). Before this the same ₪ showed twice
       («خصم حملة» AND «يُخصم منك», 2463-1101). The lines add up: products + drive-in − coins −
       campaign = Shoofi + cash (49 real prod cases), and the cash box equals the driver app's
       «السائق يدفع للمتجر».
