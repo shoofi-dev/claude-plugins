@@ -1412,6 +1412,48 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests: shoofi-server `test/integration/feedback-eligibility.js` (22, incl. 6534-2091: `3` +
       `picked_up` → false), `customer-orders-feedback-eligible.js` (8),
       `order-update-actor-and-feedback-push.js` (11), `feedback-notification-eligibility.js` (4).
+34. **AN UN-CANCELLED ORDER DOES NOT KEEP A SPENDABLE CANCEL COUPON, AND A COUPON DELETE LEAVES A
+    TRAIL** (shoofi-server `fix/HIGH-RISK-uncancel-deactivates-compensation-coupon`, HQ #08f6a0;
+    **not on main until that branch merges**). Before it, moving an order out of 4/5/7/8/9 wrote
+    only the status: greg 0476-5261, passiflora 9410-2717 and shoofi-coupons 4739-7811 got the
+    order AND spent the `COMP-…` coupon (₪236).
+    - `services/orders/uncancel-compensation.js` `onOrderStatusWritten` runs AFTER the status
+      write of `/api/order/update` (`handleOrderUpdate`, so `/api/money/cancel` too) and of
+      `/api/order/update/viewd` (accept still lets REJECTED `5` through). It never throws and
+      never blocks the status change: whether an order MAY be un-cancelled is not its question.
+    - Leaving a cancel status with `cancelCompensation.couponCode`: no `shoofi.couponUsages` row
+      for the code → the coupon is switched off (`isActive: false`, `deactivatedAt`,
+      `deactivatedReason: "order_uncancelled"`, `deactivatedByOrder`), never deleted; usages are
+      read again after the switch. Used (fully / partly), missing, a twin leg, or a failed read →
+      the coupon is NOT touched and the order gets `cancelCompensationUncancelFlag { reason,
+      couponCode, amount, couponValue, at, by, resolvedAt: null }` (`reason`:
+      `coupon_fully_used | coupon_partly_used | coupon_used_during_uncancel | coupon_missing |
+      twin_group_coupon | check_failed`). Either way: `cancelCompensation.uncancel { outcome,
+      couponDeactivated, usedAmount, remainingAmount, usageOrderIds, at, by }` and a flow event
+      `uncancel_coupon_deactivated` / `uncancel_coupon_flagged`.
+    - Cancelled again → a coupon this rule switched off (still off, still stamped with this
+      order) is switched back on (`recancel_coupon_reactivated`). The second cancel settles
+      nothing (invariant 27, `prior_cancel_compensation`), so without it the customer would hold
+      no order, no refund and no coupon. Keep the two halves together.
+    - Order creation refuses a coupon carrying that stamp (`isSwitchedOffByUncancel` in
+      `enforceCouponEntitlement`, `services/coupons/coupon-usage.js`); any other inactive coupon
+      is still the quote step's business.
+    - **A COMP coupon is a balance, not a one-use coupon:** `usageLimit: 1` +
+      `allowPartialUse: true`, and `usageLimit` counts redemptions only for a coupon WITHOUT
+      `allowPartialUse` (`routes/coupon.js` apply). Two usage rows adding up to its value are the
+      design (149 COMP coupons in prod on 2026-11-21), not a limit breach. Do not "enforce" it.
+    - **Not hooked:** twin `undoDegrade` (already refused when either order has
+      `cancelCompensation`), and the status crons in `utils/crons/orders.js`.
+    - `DELETE /api/admin/coupon/delete` is the only code that deletes a coupon
+      (`services/coupons/coupon-delete.js`). It writes one `shoofi.admin-audit-log` row
+      (`delete_coupon`, the whole coupon in `requestBody.coupon`, `linkedOrders`) BEFORE the
+      delete - no row, no delete - and answers 409 `COUPON_LINKED_TO_CANCELLED_ORDER` +
+      `linkedOrders` unless `confirm: true` when an order's `cancelCompensation.couponCode` is
+      that coupon; the order is then stamped `cancelCompensation.couponDeleted`. A delete before
+      this branch left nothing: cremerie-de-leclair 2814-3385 and flora-boutique 4892-8916 point
+      at coupons with no record of who removed them.
+    - Tests: shoofi-server `test/integration/order-uncancel-compensation-coupon.js`,
+      `coupon-delete-audit.js`.
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
