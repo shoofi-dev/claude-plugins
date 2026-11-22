@@ -93,6 +93,12 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
    as `order.driveInPrice || order.driveInPricing?.price` (`routes/payments/admin.js`
    `stores-export-new`), the fallback chain older documents need. Coins are commissioned
    separately at `coinsCommissionPercent`.
+   **Coins are the STORE's cost (owner ruling, Sari 2026-11-22, confirming 2026-11-11).** The
+   transfer is right as it is: card revenue is the charged price minus coins, and coins never
+   enter `totalForTransfer`. «מטבעות» listed under incomes in the store report (and inside
+   `totalIncomes`, shown by the partner sales screen) is **for information only**: it tells the
+   store where the sale's money came from (card / cash / coins). It is not money Shoofi owes.
+   The commission on coins is intended. Do NOT flag this as a report/transfer mismatch.
    **Outside it: Kopa QR table orders** (`source: "kopa-qr"`), whole: they are in no revenue
    line at all (invariant 20).
    **Outside it: `shippingPrice`.** The delivery fee is the courier's money — it is
