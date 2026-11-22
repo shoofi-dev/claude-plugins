@@ -135,14 +135,30 @@ This recipient rule is the STORE path only. Driver reports pick their recipients
   twin **single-mode primary** adds `combinationFeeBase` once (one driver, both pickups); split/secondary = base only.
 - **`couponDeliveryPortion`**  peels coupon-covered delivery out of cash/CC buckets.
 - **Fixed delivery price coupons** (`type: 'delivery_price'`) flow through `couponDeliveryPortion` /
-  `couponDeliverySplit` unchanged: `discountType: 'delivery'`, a non-`percentage` type, and shares
+  `couponDeliverySplit` unchanged: `discountType: 'delivery'`, never a points share, and shares
   already resolved in shekels on the order. The discount math is `computeDeliveryPriceDiscount`
   (`utils/coupon-discount.js`). The split is `resolveCouponSplit`, which moved from `routes/coupon.js`
   to the same file. The creation guard is `services/coupons/delivery-price-enforcement.js`.
   Worked numbers and the rules are in CORE invariant 15.
-- **`shoofiCouponCredit({shoofiDiscount, couponType, orderPrice, appliedAmount})`** (`calc.js`)
+- **The unit of a coupon share — one rule** (owner ruling 2026-11-22, CORE invariant 7; `calc.js`):
+  `couponShareIsPercentPoints({couponType, splitType})` = `type === 'percentage'` WITHOUT a percent
+  split → percentage points of `orderPrice`; a percent split is shekels whatever its type.
+  `couponShareAmount(share, {couponType, splitType, orderPrice})` applies it;
+  `couponSplitOf(appliedCoupon, couponDoc?)` = the split a share is in (the snapshot's, or the
+  document's when the share was read from it); `percentSplitStoreShare({storeDiscount, storePercent,
+  appliedAmount})` = a percent split's store share, the carried shekels bounded by
+  `round2(applied × storePercent/100)` and derived that way when absent;
+  `storeCouponShare({...})` = what `campaigns` bills (percent split → `percentSplitStoreShare`, else
+  `couponShareAmount`). Readers: `services/payments/store-sales.js`, `couponDeliverySplit` /
+  `isPercentageStoreDeliveryCoupon`, `shoofiCouponCredit`, `services/exec-dashboard/coupon-funding.js`
+  (→ HQ money audit), `services/payments/partner-summary-legacy.js`, legacy `/stores-export` and the
+  admin coupon-orders list (`routes/order.js`). The last two read only the top-level share. For a
+  percent split they take `percentSplitOrderStoreShare(appliedCoupon, couponDoc)` instead: the order's
+  own share as store-sales reads it, or `null` when the share is not in a percent split, in which case
+  their old reading applies unchanged.
+- **`shoofiCouponCredit({shoofiDiscount, couponType, splitType, orderPrice, appliedAmount})`** (`calc.js`)
   = the per-order `couponsFromShoofi` credit for a customer-specific `order_items` coupon:
-  `min(nominal, applied)`, nominal = `shoofiDiscount` (percentage → `/100 * orderPrice`),
+  `min(nominal, applied)`, nominal = `couponShareAmount(shoofiDiscount)` (points → `/100 * orderPrice`),
   applied = **`appliedCouponAmount(appliedCoupon)`** (`discountAmount ?? coupon.discountAmount`);
   applied missing → nominal (legacy). `stores-export-new` pushes the row as
   `{amount, itemsAmount: amount, deliveryAmount: 0}`. An empty `shoofiDiscount` on a
@@ -660,10 +676,13 @@ approves, sends reports, and exports the MASAV Excel. (Full-stack: server comput
    10580, both ₪545.04). Our DB knows only the later one. Unless cancelled at HYP, those stores were
    invoiced twice for June. Found 2026-09-27 — needs a human to check HYP and decide.
 
-9. **Percentage-split percentage coupons are billed as percent points** (`services/payments/store-sales.js:198-199`,
-   CORE invariant 7 + Known status). Found 2026-10-26 while designing coupon drafts; ₪0 exposure in prod
-   today (2 coupons, both `storePercent: 0`). Drafts exclude `store_percentage_off`; the ordinary form
-   does not. Needs an owner ruling before either path makes one with a store share.
+9. **RULED 2026-11-22 (owner) — percentage-split percentage coupons were billed as percent points**
+   (CORE invariant 7 + Known status). Found 2026-10-26 while designing coupon drafts; ₪0 exposure in prod
+   (2 coupons, both `storePercent: 0`). Ruling: a percent split's shares are shekels whatever the `type`;
+   `couponShareIsPercentPoints` / `storeCouponShare` in `lib/payments/calc.js` decide it for every reader,
+   a percent split is bounded by its own order's `applied × storePercent` (twin legs) and derived that way
+   when the order carries no share. Drafts now offer `store_percentage_off` and ask its cap. Prod replay
+   of 23,754 coupon orders through main and the patch: 0 differences.
 10. **The #320 template picker's fixed default split** (`services/coupons/coupon-templates.js`
     `SPLIT_FIELDS`) does not follow the amount. Too low → 422 (`COUPON_TEMPLATE_INVARIANT`); too high →
     silently leaves part of the value unassigned (CORE invariant 13). Drafts replace it with a percent

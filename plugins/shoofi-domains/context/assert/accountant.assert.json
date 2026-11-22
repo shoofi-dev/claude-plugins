@@ -339,11 +339,11 @@
         },
         {
           "file": [
-            "services/payments/store-sales.js",
-            "routes/payments/admin.js"
+            "lib/payments/calc.js",
+            "services/payments/store-sales.js"
           ],
-          "regex": "discountAmount\\s*=\\s*\\(storeDiscount\\s*/\\s*100\\)\\s*\\*\\s*orderPrice",
-          "desc": "CORE invariant 7: a percentage-type coupon bills the store a percentage of the ITEMS subtotal even when its discountType is 'delivery' — couponDeliverySplit deliberately diverges and takes the share off order.shippingPrice instead (owner ruling 2026-08-12) — stores-export-new's per-store body lives in services/payments/store-sales.js since shoofi-server fix/partner-summary-figures; valid-before leg is routes/payments/admin.js on main before that PR (drop it once it has merged)"
+          "regex": "(?:\\? \\(value / 100\\) \\* \\(Number\\(orderPrice\\) \\|\\| 0\\)|discountAmount\\s*=\\s*\\(storeDiscount\\s*/\\s*100\\)\\s*\\*\\s*orderPrice)",
+          "desc": "CORE invariant 7: a share in percentage POINTS (couponShareAmount in lib/payments/calc.js: a type 'percentage' coupon WITHOUT a percent split) bills the store a percentage of the ITEMS subtotal even when its discountType is 'delivery' — couponDeliverySplit deliberately diverges and takes the share off order.shippingPrice instead (owner ruling 2026-08-12) — valid-before leg is the inline line in services/payments/store-sales.js on main before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
         },
         {
           "file": "lib/payments/calc.js",
@@ -551,16 +551,51 @@
         },
         {
           "file": [
-            "services/payments/store-sales.js",
-            "routes/payments/admin.js"
+            "lib/payments/calc.js",
+            "services/payments/store-sales.js"
           ],
-          "regex": "if\\s*\\(couponType === 'percentage'\\)\\s*\\{\\s*[\\r\\n]+\\s*discountAmount\\s*=\\s*\\(storeDiscount\\s*/\\s*100\\)\\s*\\*\\s*orderPrice;",
-          "desc": "CORE invariant 7 / Known status OPEN: stores-export-new checks only `type`, never `splitType`, so a percentage-split percentage coupon's already-in-shekels storeDiscount is billed as percent points. If this line gains a splitType guard, the OPEN item is resolved — update CORE and lift DRAFT_EXCLUDED_TEMPLATES deliberately — stores-export-new's per-store body lives in services/payments/store-sales.js since shoofi-server fix/partner-summary-figures; valid-before leg is routes/payments/admin.js on main before that PR (drop it once it has merged)"
+          "regex": "(?:return couponType === 'percentage' && splitType !== 'percentage';|if\\s*\\(couponType === 'percentage'\\)\\s*\\{\\s*[\\r\\n]+\\s*discountAmount\\s*=\\s*\\(storeDiscount\\s*/\\s*100\\)\\s*\\*\\s*orderPrice;)",
+          "desc": "CORE invariant 7 / Known status RULED 2026-11-22 (owner): couponShareIsPercentPoints is THE one unit decision — percentage points only for a type 'percentage' coupon WITHOUT a percent split; a percent split (splitType 'percentage') is shekels whatever its type. Every settlement reader asks it, never `type` alone — valid-before leg is store-sales.js's type-only check on main before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
+        },
+        {
+          "file": "services/payments/store-sales.js",
+          "regex": "(?:const discountAmount = storeCouponShare\\(\\{|if\\s*\\(couponType === 'percentage'\\)\\s*\\{\\s*[\\r\\n]+\\s*discountAmount\\s*=\\s*\\(storeDiscount\\s*/\\s*100\\)\\s*\\*\\s*orderPrice;)",
+          "desc": "CORE invariant 7: stores-export-new bills a store's coupon share through storeCouponShare (lib/payments/calc.js), never an inline unit decision — valid-before leg is the inline type-only line on main before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
+        },
+        {
+          "file": "lib/payments/calc.js",
+          "regex": "(?:function percentSplitOrderStoreShare\\(appliedCoupon, couponDoc = null\\) \\{|function shoofiCouponCredit\\(\\{ shoofiDiscount, couponType, orderPrice, appliedAmount \\}\\))",
+          "desc": "CORE invariant 13 (store_percentage_off, FIXED reader gap): percentSplitOrderStoreShare reads a percent split's store share the way store-sales does (the order's own share, document only when absent, storeCouponShare) and returns null for any other shape — valid-before leg is main's shoofiCouponCredit signature (no splitType) before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "(?:const percentSplitShare = percentSplitOrderStoreShare\\(appliedCoupon, originalCoupon\\);|discountAmount = \\(storeDiscount / 100\\) \\* \\(order\\.orderPrice \\|\\| 0\\);)",
+          "desc": "CORE invariant 13 (FIXED reader gap): the legacy /stores-export shows a percent split's share via percentSplitOrderStoreShare instead of ₪0 from the top-level-only read — valid-before leg is main's inline type-only line before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "(?:const percentSplitShare = percentSplitOrderStoreShare\\(order\\.appliedCoupon, originalCoupon\\);|discountAmount = \\(storeDiscount / 100\\) \\* \\(order\\.orderPrice \\|\\| 0\\);)",
+          "desc": "CORE invariant 13 (FIXED reader gap): the admin coupon-orders list shows a percent split's share via percentSplitOrderStoreShare instead of ₪0 from the top-level-only read — valid-before leg is main's inline type-only line before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
+        },
+        {
+          "file": "lib/payments/calc.js",
+          "regex": "(?:return carried === null \\? ceiling : Math\\.min\\(carried, ceiling\\);|!!storeDiscount && !isCustomerSpecific && couponType !== 'percentage';)",
+          "desc": "CORE invariant 7: percentSplitStoreShare — a percent split's store share is the carried shekels bounded by THIS order's round2(applied × storePercent / 100) (a twin leg carries the whole cart's share; each store is billed its own leg once), and derived that way when the order carries none — valid-before leg is couponDeliverySplit's type-only gate on main before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
+        },
+        {
+          "file": "services/exec-dashboard/coupon-funding.js",
+          "regex": "(?:const amount = storeCouponShare\\(storeShareArgs\\(\\)\\);|const amount = discountValue\\(storeDiscount, type, basePrice\\);)",
+          "desc": "CORE invariant 7: the exec-dashboard / HQ money-audit mirror bills the store share with the SAME storeCouponShare settlement uses, so it cannot drift on the unit — valid-before leg is its own discountValue on main before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
         },
         {
           "file": "services/coupons/coupon-drafts.js",
-          "regex": "const DRAFT_EXCLUDED_TEMPLATES = \\{\\s*[\\r\\n]+\\s*store_percentage_off:",
-          "desc": "CORE invariant 13: drafts refuse store_percentage_off until the owner rules on the percentage-split billing at routes/payments/admin.js:1190-1191"
+          "regex": "const DRAFT_EXCLUDED_TEMPLATES = \\{(?:\\};|\\s*[\\r\\n]+\\s*store_percentage_off:)",
+          "desc": "CORE invariant 13: DRAFT_EXCLUDED_TEMPLATES is EMPTY since the 2026-11-22 ruling let store_percentage_off in; the mechanism stays for the next template that must wait — valid-before leg is the store_percentage_off entry on main before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
+        },
+        {
+          "file": "services/coupons/coupon-drafts.js",
+          "regex": "(?:store_percentage_off: \\{\\s*[\\r\\n]+\\s*maxDiscount: 'מה תקרת ההנחה|const DRAFT_EXCLUDED_TEMPLATES = \\{\\s*[\\r\\n]+\\s*store_percentage_off:)",
+          "desc": "CORE invariant 13: a store_percentage_off draft ASKS its cap (DRAFT_ASKED_FIELDS blocks maxDiscount until the draft carries one) — never the template's ₪30 default; the cap is the most one order can cost the store — valid-before leg is the exclusion on main before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
         },
         {
           "file": "services/coupons/coupon-drafts.js",

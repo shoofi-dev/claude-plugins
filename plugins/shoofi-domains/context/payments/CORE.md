@@ -1,6 +1,6 @@
 ---
 domain: payments
-last-verified: shoofi-server@fix/j5-token-hold-release / 2026-11-20 (invariant 13: a J5 hold HYP refuses to release — getToken retry on 920, hourly retry, expired after the hold window, money summary carries the held amount, HQ check hold-release-refused; Known status: plaintext CVV also sat on orders + orderFlowEvents until 2026-08-13, scripts/scrub-stored-cvv.js); shoofi-server@fix/coupon-draft-customer-area / 2026-11-17 (Who a coupon applies to: supportedCities = the store's pickup zone, supportedAreas = the customer's route); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
+last-verified: shoofi-server@fix/HIGH-RISK-percentage-coupon-store-billing / 2026-11-22 (Who a coupon applies to → stores: resolveCartStores, typed store-scoped codes now apply, twin legs); shoofi-server@fix/j5-token-hold-release / 2026-11-20 (invariant 13: a J5 hold HYP refuses to release — getToken retry on 920, hourly retry, expired after the hold window, money summary carries the held amount, HQ check hold-release-refused; Known status: plaintext CVV also sat on orders + orderFlowEvents until 2026-08-13, scripts/scrub-stored-cvv.js); shoofi-server@fix/coupon-draft-customer-area / 2026-11-17 (Who a coupon applies to: supportedCities = the store's pickup zone, supportedAreas = the customer's route); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till money: payments / refunds need an open till session, ref §6b); shoofi-server@feat/kopa-phase1 (phase 4d, uncommitted) / 2026-11-12 (Kopa till money section — bookkeeping only; ref §6b); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 10 — documents fixed at capture, twin-aware retry, `invoicesHeld`; ref §6 addRefund removed); shoofi-server@fix/remove-twin-mixed-vat-guard / 2026-11-02 (invariant 9 — twin mixed VAT pairs allowed, accounting only on the store doc); shoofi-server@feat/coupon-detail-link / 2026-10-30 (public coupon page); shoofi-server@fed9fee3 (feat/coupon-fixed-delivery-price) / 2026-10-26
 scope: shoofi-server + shoofi-app (customer checkout)
 reference: ./reference.md   # provider details, flows, data model, client payment UI
 ---
@@ -300,7 +300,11 @@ back in `appliedCoupon` with a client-computed `total` (`components/total-price`
 formula module, `utils/coupon-discount.js` (`computeCouponDiscount`), used by
 `/api/coupons/apply`, the auto-apply scorer (`routes/coupon.js`), amend and shadow pricing
 (`utils/order-pricing.js`). Creation re-checks ownership and partial-use balances only
-(`enforceCouponEntitlement`) — **except** for the fixed-delivery-price type.
+(`enforceCouponEntitlement`) — **except** for the fixed-delivery-price type. It also re-resolves a
+percent-split coupon's store/Shoofi SHARES on the order's own discount (`enforcePercentSplit`; a
+store the coupon does not list pays 0%) and, in a twin, moves a store-scoped items coupon to its own
+store's leg (`enforceTwinCouponSides`) — attribution only: no leg's `discountAmount` changes the
+combined `total`, so the charge never moves (orders CORE invariant 34).
 Creation does NOT notice a total lower than items + fee − coupon − deals − coins with nothing to
 explain it (shadow pricing records the drift and the order is kept), so the app must send the
 coupon its total took off: TotalPrice is its only writer (reference.md, "Coupons"). The
@@ -311,7 +315,14 @@ is not sent.
 **Who a coupon applies to** — `applicableTo` (`routes/coupon.js`: `/api/coupons/apply` and
 the auto-apply scorer `GET /api/coupons/auto-apply/:customerId`). Every non-empty list is ANDed;
 an empty one is "all":
-- `stores` — the order's store `appName`.
+- `stores` — the cart's store(s), from `resolveCartStores` (`routes/coupon.js`): the keys of a
+  twin cart's `storeAmounts` (a coupon of EITHER store applies, measured on that store's items
+  only), else the body's `appName`, then `storeId` — never the `app-name` header (the store last
+  browsed can differ from the cart's; the app sends the cart's store as `storeId`, shoofi-app#163).
+  Before 2026-11-22 `/apply` read `body.appName` alone, which no app sends, so every TYPED
+  store-scoped code was refused (prod: all 9,443 store-scoped uses were auto-applied). A twin
+  leg whose store is not in the list carries no share of an items coupon
+  (`enforceTwinCouponSides`, orders CORE invariant 34).
 - `supportedCities` — **the STORE's pickup zone, never the customer's town.** It is compared
   with `resolveCityIdsFromAreaIds(areaIds)` = each area's `cityId`, and an area is a
   pickup→dropoff route whose `cityId` is the zone the store sits in (delivery CORE: `areas`).

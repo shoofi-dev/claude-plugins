@@ -1,6 +1,6 @@
 ---
 domain: orders
-last-verified: shoofi-server@fix/alarm-sound-when-locked + shoofi-partner@fix/alarm-sound-when-locked / 2026-11-20 (reference NOTIFICATIONS: late reminders every 5 minutes to 1 hour, the new-order push rings with the tablet's chosen sound, pushedTo on the websocket copy; ref C3: the server holds a copy of the per-tablet alarm settings, one banner); shoofi-server@fix/order-number-ltr-in-arabic-push / 2026-11-18 (reference NOTIFICATIONS: an order number in Arabic/Hebrew push text goes through ltr(), utils/ltr-text.js); shoofi-server@fix/j5-token-hold-release / 2026-11-20 (invariant 28: moneySummary of a refused J5 release carries heldAmount = the hold; a lapsed one reads released; reference FRAUD: location soft band); shoofi-server@fix/promotion-audit-dotted-keys / 2026-11-20 (invariant 13: a deal edit's audit changes are a list of { field, from, to }; dotted keys made Mongo refuse the row); shoofi-partner@fix/failure-report-records-dialog / 2026-11-20 (reference C3: the request-failed row of the failure that opened a dialog is never dropped as a repeat, own hourly budget); shoofi-server@fix/coupon-strip-benefit-promo-audit 6c1a7770 / 2026-11-19 (invariant 13: store deal create / update / delete are in the admin audit log with the value before the edit, promotion-audit.js); shoofi-partner@fix/cancelled-delivery-hide-courier / 2026-11-20 (reference: a ready delivery whose delivery is cancelled has no collapsed one-tap and its button reads «تم التسليم»); shoofi-server + shoofi-shoofir + shoofi-partner @feat/driver-notes-visible / 2026-11-20 (invariant 25: the courier list whitelists commentToStore and the courier app shows it; reference C3 partner driver popup shows commentToCourier); shoofi-partner@fix/quiet-background-request-errors c9f1458 / 2026-11-20 (invariant 18: a 401 for a replaced token opens nothing, a background poll signs out on the second 401 in a row; reference C3: background checks are quiet, failed requests are written to client-error); shoofi-partner@feat/v3-shell-back-everywhere / 2026-11-18 (reference C3 v3 flags: HEADER_V3 is the one top row — Back + page name on every page, the logo is Home, useShellTitle; «سجل الطلبات» Home tile opens admin-orders with history: true; language + light/dark moved to the store settings); shoofi-partner@fix/connection-dialogs c762fef / 2026-11-17 (invariant 18: which 401 signs the partner out — a token was sent and no sign-out is under way; reference C3 request-error dialogs); shoofi-server@fix/rate-after-delivery / 2026-11-17 (invariant 33: «rate order» = feedbackEligible on the customer reads, isFeedbackEligible one rule, takeaway keeps ready from prod data, takeaway push timing + send-time re-check, status_change actor from the token; invariant 29 cancel-log note; reference §2, §8, orderFlowEvents, C1); shoofi-delivery-web@fix/admin-order-combo-picks / 2026-11-17 (invariant 12 readers: a combo line's choices are in comboSelections, the admin order card lists them; reference C4); shoofi-server@fix/deal-title-matches-fields / 2026-11-16 (invariant 13: a deal's texts must match its fields on save, promotion-title-check); shoofi-partner@feat/new-order-alarm-media-volume 1a0d0c3 / 2026-11-16 (ref C3: foreground new-order rings on iOS play through the app at media volume, inAppAlarmSound + alarm-player; background and Android unchanged); shoofi-server@fix/twin-prep-range-prep-extra / 2026-11-07 (reference §4 twin prep range + prepExtra); shoofi-app@fix/checkout-coins-single-writer 02086937 (#145) + shoofi-server@b0129caa (main) / 2026-11-16 (invariant 32: coins pay for the items only, the app blocks more, the server refuses silently and stays as is; TotalPriceCMP the one writer of checkout coins; limit line only at the cap; reference §3, §5, C1); shoofi-server@fix/HIGH-RISK-picked-up-only-from-ready / 2026-11-15 (invariant 2: 10/11 only from ready, atomic, dashboard exempt; reference §2, C3, C4); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (invariants 2, 9; reference §2, C3); shoofi-partner@fix/owner-walkthrough / 2026-11-11 (invariant 17: printer per tablet, print failures shown; cancel alert); shoofi-partner@fix/partner-print-failure-log-once-notice / 2026-11-08 (invariant 17: one error row per failed copy; the pop-up was dropped before merge); shoofi-partner@fix/owner-walkthrough + feat/school-orders-v3 / 2026-11-14 (reference C3 customer note: v3 readers OrderCardV3, NewOrderViewV3, SchoolOrderCardV3); shoofi-partner@feat/order-alert-arrival-log / 2026-11-14 (reference C3 "Measuring how a new order reaches the tablet": apps-logs partner_order_alert_received / partner_new_order_seen; listener pin accepts the ref call); shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
+last-verified: shoofi-server@fix/HIGH-RISK-percentage-coupon-store-billing / 2026-11-22 (invariant 34: a percent-split coupon's shares re-resolved at creation, per twin leg and at amend; a store-scoped items coupon sits on its own store's twin leg; typed store-scoped codes resolve the cart's store; invariant 14 lines that referenced them; reference §3, §4); shoofi-server@fix/alarm-sound-when-locked + shoofi-partner@fix/alarm-sound-when-locked / 2026-11-20 (reference NOTIFICATIONS: late reminders every 5 minutes to 1 hour, the new-order push rings with the tablet's chosen sound, pushedTo on the websocket copy; ref C3: the server holds a copy of the per-tablet alarm settings, one banner); shoofi-server@fix/order-number-ltr-in-arabic-push / 2026-11-18 (reference NOTIFICATIONS: an order number in Arabic/Hebrew push text goes through ltr(), utils/ltr-text.js); shoofi-server@fix/j5-token-hold-release / 2026-11-20 (invariant 28: moneySummary of a refused J5 release carries heldAmount = the hold; a lapsed one reads released; reference FRAUD: location soft band); shoofi-server@fix/promotion-audit-dotted-keys / 2026-11-20 (invariant 13: a deal edit's audit changes are a list of { field, from, to }; dotted keys made Mongo refuse the row); shoofi-partner@fix/failure-report-records-dialog / 2026-11-20 (reference C3: the request-failed row of the failure that opened a dialog is never dropped as a repeat, own hourly budget); shoofi-server@fix/coupon-strip-benefit-promo-audit 6c1a7770 / 2026-11-19 (invariant 13: store deal create / update / delete are in the admin audit log with the value before the edit, promotion-audit.js); shoofi-partner@fix/cancelled-delivery-hide-courier / 2026-11-20 (reference: a ready delivery whose delivery is cancelled has no collapsed one-tap and its button reads «تم التسليم»); shoofi-server + shoofi-shoofir + shoofi-partner @feat/driver-notes-visible / 2026-11-20 (invariant 25: the courier list whitelists commentToStore and the courier app shows it; reference C3 partner driver popup shows commentToCourier); shoofi-partner@fix/quiet-background-request-errors c9f1458 / 2026-11-20 (invariant 18: a 401 for a replaced token opens nothing, a background poll signs out on the second 401 in a row; reference C3: background checks are quiet, failed requests are written to client-error); shoofi-partner@feat/v3-shell-back-everywhere / 2026-11-18 (reference C3 v3 flags: HEADER_V3 is the one top row — Back + page name on every page, the logo is Home, useShellTitle; «سجل الطلبات» Home tile opens admin-orders with history: true; language + light/dark moved to the store settings); shoofi-partner@fix/connection-dialogs c762fef / 2026-11-17 (invariant 18: which 401 signs the partner out — a token was sent and no sign-out is under way; reference C3 request-error dialogs); shoofi-server@fix/rate-after-delivery / 2026-11-17 (invariant 33: «rate order» = feedbackEligible on the customer reads, isFeedbackEligible one rule, takeaway keeps ready from prod data, takeaway push timing + send-time re-check, status_change actor from the token; invariant 29 cancel-log note; reference §2, §8, orderFlowEvents, C1); shoofi-delivery-web@fix/admin-order-combo-picks / 2026-11-17 (invariant 12 readers: a combo line's choices are in comboSelections, the admin order card lists them; reference C4); shoofi-server@fix/deal-title-matches-fields / 2026-11-16 (invariant 13: a deal's texts must match its fields on save, promotion-title-check); shoofi-partner@feat/new-order-alarm-media-volume 1a0d0c3 / 2026-11-16 (ref C3: foreground new-order rings on iOS play through the app at media volume, inAppAlarmSound + alarm-player; background and Android unchanged); shoofi-server@fix/twin-prep-range-prep-extra / 2026-11-07 (reference §4 twin prep range + prepExtra); shoofi-app@fix/checkout-coins-single-writer 02086937 (#145) + shoofi-server@b0129caa (main) / 2026-11-16 (invariant 32: coins pay for the items only, the app blocks more, the server refuses silently and stays as is; TotalPriceCMP the one writer of checkout coins; limit line only at the cap; reference §3, §5, C1); shoofi-server@fix/HIGH-RISK-picked-up-only-from-ready / 2026-11-15 (invariant 2: 10/11 only from ready, atomic, dashboard exempt; reference §2, C3, C4); shoofi-server@64350b2a (main) + shoofi-partner@87de0a4 (main) + shoofi-partner@bf6dd52 (feat/orders-v3-rules) + shoofi-partner@2a10861 (feat/orders-v3-screens) / 2026-11-07 (invariants 2, 9; reference §2, C3); shoofi-partner@fix/owner-walkthrough / 2026-11-11 (invariant 17: printer per tablet, print failures shown; cancel alert); shoofi-partner@fix/partner-print-failure-log-once-notice / 2026-11-08 (invariant 17: one error row per failed copy; the pop-up was dropped before merge); shoofi-partner@fix/owner-walkthrough + feat/school-orders-v3 / 2026-11-14 (reference C3 customer note: v3 readers OrderCardV3, NewOrderViewV3, SchoolOrderCardV3); shoofi-partner@feat/order-alert-arrival-log / 2026-11-14 (reference C3 "Measuring how a new order reaches the tablet": apps-logs partner_order_alert_received / partner_new_order_seen; listener pin accepts the ref call); shoofi-partner@feat/table-order-label / 2026-11-13 (reference C3 table orders: helpers/order-table.ts, order-table-badge, both tickets, storeData guard); shoofi-server@feat/HIGH-RISK-kopa-table-orders 4f3ae1f4 / 2026-11-13 (invariant 31 + reference C5 "Kopa QR table orders": a diner's table order is an `orders` doc, `source: "kopa-qr"`; invariant 30 exception note); shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (invariant 30 + reference C5: till payments need an open till session); shoofi-server@feat/kopa-phase1 (phases 3/4/6, uncommitted) / 2026-11-11 (invariant 30, reference C5 Kopa phases 3/4/6); shoofi-server@feat/kopa-phase1 / 2026-11-11 (invariant 29, reference C5 Kopa); shoofi-server@fix/twin-cancel-safety / 2026-11-10 (invariants 27-28; invariant 18 addRefund note); shoofi-app@fix/active-orders-visible-and-errors / 2026-11-08 (invariant 26, reference C1 Tracking); shoofi-server@fix/delivery-side-row-by-original-id / 2026-11-08 (invariant 23 delivery-side writes); shoofi-server@fix/HIGH-RISK-comment-to-store / 2026-11-10 (invariant 25); shoofi-server@59cd5fdd + shoofi-delivery-web@feat/admin-order-address-note / 2026-11-10 (reference §5 `orders.order.address` snapshot incl. `notes` landmark + floor/apartment/entrance; C4 admin CardOrder + delivery board show them); shoofi-server@feat/first-order-at-store / 2026-11-08 (invariant 24); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 21 tie-out: partner/summary is the store report only with `figures: "report"` (totalRevenue = totalIncomes); without it the legacy answer, unchanged); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 23); shoofi-server@fix/active-orders-delivered-filter-per-store / 2026-11-08 (invariant 22, originalOrderId match); shoofi-server@feat/partner-order-history / 2026-11-08 (invariant 21, invariant 18 exception list); shoofi-server@feat/shipping-price-check-log / 2026-11-03 (invariant 20); shoofi-server@fix/orders-admin-auth / 2026-10-30 (invariant 18); shoofi-server@fix/coins-admin-auth / 2026-10-30 (invariant 19); shoofi-partner@fix/print-loop-timeout / 2026-10-29 (invariant 17); shoofi-server@feat/marketing-attribution / 2026-10-28 (invariants 15-16); shoofi-server@964d45ac (feat/order-marketing-touch) / 2026-10-28 (invariant 15); shoofi-server@3ede94f5 (feat/coupon-fixed-delivery-price) / 2026-10-26 (invariant 14); rest shoofi-server@a62db9f7 (fix/for-you-pilot-readiness) / 2026-10-18
 scope: full-stack (shoofi-server + app + partner + shoofir + delivery-web)
 reference: ./reference.md   # data model, endpoint tables, flows, per-repo client detail
 ---
@@ -20,7 +20,10 @@ Server: `routes/order.js`, `routes/twin-order.js`, `routes/money.js`, `services/
 `utils/order-pricing.js` + `utils/order-pricing-shadow.js`, `routes/order-amend.js`,
 `utils/delivery-row.js` (how an order finds its delivery row, invariant 23),
 `services/coupons/delivery-price-enforcement.js` + `services/twin-order/twin-delivery-price.js`
-(the order-side guard for fixed-delivery-price coupons, invariant 14), `utils/marketing-touch.js`
+(the order-side guard for fixed-delivery-price coupons, invariant 14),
+`services/coupons/percent-split-enforcement.js` + `services/twin-order/twin-coupon-sides.js` (a
+percent-split coupon's shares on the order, and which twin leg carries a store-scoped coupon —
+invariant 34), `utils/marketing-touch.js`
 (order-side marketing attribution, invariant 15), `services/marketing/order-facts.js` +
 `services/marketing/reconcile.js` (one marketing fact per checkout, kept true by a cron —
 invariant 16), who may call the coins admin routes (`routes/coins.js` `/api/admin/coins/*` and the
@@ -355,18 +358,22 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       never discounted. A fixed-price coupon on the secondary (fee forced to 0) comes off.
       `enforceTwinSideDeliveryPrice` (`services/twin-order/twin-delivery-price.js`) runs in BOTH
       `/place` and `/digital-place-pending`, right after the two `enforceTwinSidePromotions` calls.
-      Twin placement still re-validates nothing else about coupons.
+      Twin placement re-validates no other coupon AMOUNT; which leg carries a store-scoped items
+      coupon and each leg's Shoofi/store shares are invariant 34 (`enforceTwinCouponSides`, right
+      after these two calls).
     - **Amend** (`amendedDeliveryPriceDiscount`, `utils/order-pricing.js`) **never grows it**.
       Amend keeps the fee, so the creation discount is the ceiling: a well-formed snapshot gives
       `min(kept, recomputed)`, and a snapshot missing `deliveryPrice`/`maxDiscount` keeps
-      `min(kept, fee after deal)`. For this type, `routes/order-amend.js` writes the re-split
+      `min(kept, fee after deal)`. For this type — and for every `splitType: 'percentage'` coupon
+      (invariant 34) — `routes/order-amend.js` writes the re-split
       `appliedCoupon.coupon.{shoofiDiscount,storeDiscount}` in the same `$set` as `discountAmount`.
       For ANY order, a non-finite `pricing.total` is `409 AMEND_UNPRICEABLE` and is never written.
-    - **Unchanged for every other coupon type:** `discountAmount` and the snapshot stay
-      client-trusted at creation, except `enforceCouponEntitlement` (ownership + partial-use
-      balance). `shippingPrice` is still never corrected or rejected (the tariff ceiling only
+    - **Unchanged for every other coupon type:** `discountAmount` stays client-trusted at
+      creation, except `enforceCouponEntitlement` (ownership + partial-use balance); of the
+      snapshot, only a percent split's Shoofi/store SHARES are re-resolved (invariant 34). `shippingPrice` is still never corrected or rejected (the tariff ceiling only
       BOUNDS a derived discount; a fee BELOW the area tariff is only logged and flagged —
-      invariant 20). Twin side coupons are still stored as posted.
+      invariant 20). Twin side coupons are stored as posted, except invariant 34's scope move and
+      per-leg shares.
     - Readers on the order side need no change: the partner invoice, shoofir `order-payment.ts`,
       admin `CardOrder`/`CardTwinOrder` and the app's `order-header` all read `discountAmount`,
       so a delivery coupon prints `shippingPrice − discountAmount` = ₪X.
@@ -1412,6 +1419,84 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests: shoofi-server `test/integration/feedback-eligibility.js` (22, incl. 6534-2091: `3` +
       `picked_up` → false), `customer-orders-feedback-eligible.js` (8),
       `order-update-actor-and-feedback-push.js` (11), `feedback-notification-eligibility.js` (4).
+
+34. **A PERCENT-SPLIT COUPON'S SHARES ARE SHEKELS OF THE DISCOUNT ON *THAT* ORDER — the server
+    resolves them at creation, per twin leg and at amend.** (shoofi-server
+    `services/coupons/percent-split-enforcement.js`, `services/twin-order/twin-coupon-sides.js`,
+    `withResolvedPercentSplit` in `utils/coupon-discount.js`.) The coupon: "X% off the items, up to
+    ₪Y, for the stores that joined" (`store_percentage_off` template: `type: 'percentage'`,
+    `discountType: 'order_items'`, `maxDiscount`, `splitType: 'percentage'`, `applicableTo.stores`).
+    - **The field path settlement reads:** `orders.appliedCoupon.coupon.splitType` (+ `.storePercent`,
+      `.shoofiPercent`, `.storeDiscount`, `.shoofiDiscount`), beside `orders.appliedCoupon.discountAmount`;
+      each twin leg carries its own; the delivery row's `appliedCoupon` (`book-delivery`, written by
+      `services/delivery/book-delivery.js` at store-accept) is copied from it.
+      With `splitType: 'percentage'`, `storeDiscount = round2(discountAmount × storePercent / 100)` and
+      `shoofiDiscount = round2(discountAmount − storeDiscount)`: SHEKELS that add up to THIS order's
+      `discountAmount`. The percentages come from the coupon DOCUMENT (the snapshot's only when the
+      document is gone) and are stamped on the snapshot.
+    - **Why:** `/api/coupons/apply` (and auto-apply) resolve the shares on the QUOTE's discount, and
+      the app posts them back untouched. A cart changed after the quote, an amend, and every twin
+      order (the app spreads the WHOLE coupon's shares onto each leg and splits only
+      `discountAmount`, so both stores were billed the whole store share) left shares describing
+      another discount.
+    - **Creation:** `enforcePercentSplit` in `/api/order/create`, after the fixed-delivery-price block
+      and before `const orderDoc = {`. Attribution only: `discountAmount` and `total` never move. A
+      fixed split, a stack or an unknown code is stored as posted; a failed lookup keeps the snapshot.
+    - **Twin:** `enforceTwinCouponSides` in BOTH `/place` and `/digital-place-pending`, right after the
+      two `enforceTwinSideDeliveryPrice` calls, before coins.
+      (1) A store-scoped ITEMS coupon (`discountType: 'order_items'`, `percentage` | `fixed_amount`,
+      non-empty `applicableTo.stores` on the document) sits on the leg of a store it names. A leg
+      outside the list has its share moved onto the peer leg that is in it: peer `total −= m`, leg
+      `total += m`, so the sum (the one combined capture) never moves. `m` is capped so the peer total
+      stays ≥ 0; the rest stays where it was. The log line `[twin] store-scoped coupon moved to the
+      leg of its own store` is the only record; the order carries no field for it. Delivery and
+      full_discount coupons are never moved.
+      (2) Each leg's percent split is resolved on that leg's own discount.
+      **Both stores joined = ONE combined cap:** `/apply` computes `min(% × (A + B items), maxDiscount)`
+      once (`resolveScopedOrderAmount` over `storeAmounts`). The app splits it over the legs by
+      after-deal price, and each leg bills its own store its own share.
+    - **Amend:** `routes/order-amend.js` writes the re-split shares for every `splitType: 'percentage'`
+      coupon (before, only `delivery_price`) in the same `$set` as `discountAmount`.
+    - **Quote:** a `percentage` discount is rounded to agorot in `computeCouponDiscount`. The
+      auto-apply scorer now calls that function, where before it had its own unrounded copy, so a typed
+      code and an auto-applied one quote the same amount and the shares add up exactly.
+    - **Store identity at the quote** (`routes/coupon.js`, payments domain; order-side context):
+      `resolveCartStores` checks `applicableTo.stores` against the twin's `storeAmounts` keys, else
+      the body's `appName`, then `storeId` — **never the `app-name` header**: that is the store last
+      browsed, which can differ from the cart's, and a typed auto-apply coupon is not re-quoted, so
+      the header let a code stick to a store that did not join (payments review 2026-11-22). A body
+      with no store refuses a store-limited code; the app sends the cart's store as `storeId`
+      (`CouponInput` ← TotalPrice `primaryAppName`, shoofi-app#163). Before, `/apply` read
+      `appName` only, which no app sends, so EVERY typed store-scoped code was refused (prod
+      2026-11-22: 123 store-scoped coupons with 9,443 uses, all of them auto-apply; the 2 typed-only
+      ones were never used). Auto-apply reads the twin's `storeAmounts` too, so a coupon of the twin
+      SECONDARY's store now applies, on that store's items only.
+    - **The app's half (shoofi-app#163):** `components/total-price` used to pass the BROWSED store
+      (`storeDataStore.storeData?.appName`) as `twinSplit`'s `primaryAppName`; twin checkout keeps it
+      on the secondary on purpose, so `scopedToSide` (`utils/coupon-split.ts`) split a one-store
+      coupon over both legs. It now passes the cart's store (`primaryAppName`), and the same name
+      goes to `CouponInput` as `storeId`. The server move above still corrects older app versions.
+    - **A store that did not join never pays** (`withResolvedPercentSplit(applied, doc,
+      { storeAppName })`, `utils/coupon-discount.js`): at `/api/order/create` (store = the `app-name`
+      header of the ORDER, which is the store whose DB it is written to) and per twin leg
+      (`enforceTwinCouponSides`, leg app name), a percent-split coupon whose document lists stores
+      without this one resolves to `storePercent 0 / shoofiPercent 100` — Shoofi carries it, the
+      store is billed nothing. Covers a twin leftover the move could not carry and any stale quote.
+      `discountAmount` / `total` never move.
+    - **Known gaps, not fixed here:**
+      - A FIXED split's shares are not prorated per twin leg. In prod, group tg_1784987571799_ppbosy
+        split a ₪5 coupon 2.51/2.49, and both legs carry `shoofiDiscount: 5` — settlement bounds each
+        leg by its own discount (`min(5, 2.51) + min(5, 2.49)`), so Shoofi is credited ₪5 once, not
+        twice (accountant review 2026-11-22).
+      - A twin with the coupon on both legs writes TWO `couponUsages` rows, so it spends two of
+        `usageLimit` / `usagePerUser`.
+      - Creation still does not DROP a coupon whose `applicableTo.stores` excludes the order's store
+        (dropping it would raise `total`; the entitlement decision is still open) — but that store
+        is billed 0% of it (above).
+    - Tests: shoofi-server `test/integration/coupon-percentage-items-multi-store.js` (21, through the
+      real `/apply`, `/auto-apply`, `/api/order/create`, `/place`, `/digital-place-pending`), and
+      `order-amend.js` "a percent-split items coupon: the Shoofi/store shares follow the amended
+      discount".
 
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
