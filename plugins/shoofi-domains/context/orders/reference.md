@@ -178,7 +178,9 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   primary's tariff-capped fee, and a claim on the secondary (fee 0) is removed (CORE invariant 14).
   Right after it, `enforceTwinCouponSides` (CORE invariant 34) moves a store-scoped items coupon's
   share off a leg whose store the coupon does not name, onto the peer (sum of totals unchanged,
-  peer total ≥ 0). It then resolves each leg's percent-split shares on that leg's discount. Both
+  peer total ≥ 0). It then resolves each leg's percent-split shares on that leg's discount, and
+  last computes each full_discount leg's `breakdown` on the server (`resolveTwinFullDiscountBreakdowns`,
+  CORE invariant 35 "Twin legs"); the app's posted per-leg breakdown is never kept. Both
   stores in the coupon = one combined cap, split over the legs. Each leg with a coupon writes its
   own `couponUsages` row (cash: the route; card: `applyCaptureSuccess`), so a twin with the coupon
   on both legs spends two uses.
@@ -1316,10 +1318,30 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
       delivery coupons, older orders and an order with no readable date print what they did (H = 0
       for a public coupon, ₪44). The shipped v2 list and both tickets get it through
       `getPartnerPaymentSummary` `shoofiTotal` (their existing «شوفي ستدفع» row on a cash coupon
-      order, which read ₪0); the v2 new-order screen prints only the cash to collect, unchanged.
+      order, which read ₪0). The v2 new-order screen's cash box takes it from `storeView` (below).
       The server can move its cutoff with an env var (`CASH_COUPON_SETTLEMENT_FROM`); the app
       cannot read it, so a server override needs this constant moved too. Tests:
       `helpers/orders/__tests__/cash-coupon-settlement.test.ts`.
+    - **The shipped v2 new-order screen's bottom block** (`new-orders/list/index.v2.tsx`, the
+      default while `NEW_ORDERS_V3` is off) comes from `helpers/orders/new-order-v2-money.ts`
+      `newOrderV2BottomLine(order)`. CARD, or a coupon that covers the whole order: «شوفي ستدفع»
+      with the screen's own figure, moved unchanged (full_discount: `P − storeItemsAmount`).
+      CASH: the box from `storeView(storeMoney(order))`, the same as v3 and the ticket: «السائق
+      يدفع لك نقداً» with what the courier hands over on a delivery (`P + D − I − C`), «الزبون
+      يدفع لك نقداً» with the order total on a pickup, or «لا تحصّل شيئاً». Shoofi's monthly line
+      («شوفي ستدفع لك» / «يُخصم منك بالحساب الشهري») is a row of its own above it, never folded
+      into the cash. Until 2026-11-22 a cash full_discount printed «الزبون سيدفع نقداً» =
+      `orderPrice − storeItemsAmount`, the store's whole result labelled as cash (₪55, ₪40 off
+      split 28/12: ₪27, where the courier hands over ₪15 and Shoofi adds ₪12). Tests:
+      `helpers/orders/__tests__/new-order-v2-money.test.ts`.
+    - **Twin full_discount legs** carry the server's breakdown from shoofi-server#693 (CORE
+      invariant 35), so `storeMoney`, `getPartnerPaymentSummary` and the v2 bottom block bill the
+      store its share of the leg. No twin special case exists in the money helpers: they read the
+      leg's `breakdown`. A leg stored before shows the app's ₪0 split, which is also what it
+      settled. A leg with no breakdown (the server's computation failed) falls back, like the
+      server's `getFullDiscountMatrix`, to `min(storeDiscount, D)`. That is the WHOLE coupon's
+      share capped at the leg's discount, so the tablet can show more than settlement bills on
+      that rare leg.
     - **What the store sees** is `storeView(storeMoney(order))`, the same lines on the
       new-order screen, the order card (`components/orders-v3/MoneyBlock.tsx`) and the printed
       ticket (`components/order-invoice` `SettlementMoney`, flag `ORDER_MONEY_SETTLEMENT`).
