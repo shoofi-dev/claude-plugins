@@ -459,8 +459,9 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     - **`store_percentage_off` — "X% off items, up to ₪Y, at one store or several"** — is a
       normal FUNDING template: `type: 'percentage'`, `discountType: 'order_items'`, `value` =
       X, `maxDiscount` = the cap, percent split from the funding answer, `applicableTo.stores`
-      = every store that joins (`stores` is a multi-pick), not auto-applied (the customer types
-      the code). Its cap is **asked**, never the template's ₪30 default (`DRAFT_ASKED_FIELDS`:
+      = every store that joins (`stores` is a multi-pick), **auto-applied** (`isAutoApply: true`,
+      owner default 2026-11-22: the cart applies it at the joined stores, on their items; nobody
+      types a code — and, as an auto-apply coupon, it sits in a funder bucket, invariant 14). Its cap is **asked**, never the template's ₪30 default (`DRAFT_ASKED_FIELDS`:
       a blocker on `maxDiscount` until the draft's params carry one): the cap is the most one
       order can cost, and so the store's exposure. With a store share and other than exactly
       one store the summary adds «כל חנות מממנת את חלקה רק בהזמנות שלה» — true by settlement:
