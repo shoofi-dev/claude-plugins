@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@fix/HIGH-RISK-percentage-coupon-store-billing c6020ade / 2026-11-22 (invariants 7, 13: percent split billed in shekels; the legacy /stores-export and the admin coupon-orders list read a percent split via percentSplitOrderStoreShare); shoofi-server@fix/hyp-company-create-email-exists + shoofi-delivery-web@fix/hyp-company-create-error-reason / 2026-11-19 (ref §5 delivery-company create-account: accounting email wins and is shown, one EZcount user per email, 409 codes, real reason shown); shoofi-server@feat/coupon-draft-edit + shoofi-delivery-web@feat/coupon-draft-edit / 2026-11-18 (invariant 13: a created coupon is edited from its draft — reopen / cancel-edit, update-mode approval through the unchanged update route, carried-over fields, settle by comparison, past orders not re-billed); shoofi-server@fix/coupon-draft-customer-area + shoofi-delivery-web@fix/coupon-form-zone-labels / 2026-11-17 (invariant 13 targeting: supportedCities = the store's pickup zone, customer targeting = supportedAreas, the never-matches draft blocker, assistant rule 4a); shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13 (invariant 20: Kopa QR table orders, `source: "kopa-qr"`, shown as tableOrdersCount / tableOrdersRevenue and in no settlement figure; invariant 3 + 17 pointers); shoofi-server@fix/partner-summary-date-validation / 2026-11-12 (invariant 17 partner/summary + daily-orders validate period/month/startDate/endDate/date before any read, 400 INVALID_PERIOD; shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till sessions: no money without a shift, ref §12); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 6 — cancelled excluded from settlement, keep → Shoofi COMP credited at redemption, customer documents fixed at capture); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData run in-process, OPT-IN via body `figures: "report"`; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's body moved to services/payments/store-sales.js — invariant 7/13/14/15 line refs repointed; ref §4); shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08 (invariant 17 partner/details deleted with admin/partners + admin/analytics, the flat-15% routes; ref §3/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@feat/code-coupons-filter + shoofi-delivery-web@feat/code-coupons-filter / 2026-11-07 (invariant 14 code coupons out of funder buckets, kind=code, ref); shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@fix/HIGH-RISK-cash-coupon-settlement / 2026-11-22 (invariants 7, 13, 14 + mental model + Known status: CASH orders from CASH_COUPON_SETTLEMENT_FROM — a public order_items coupon is credited Shoofi's share and not billed the store's; full_discount bills only the store's delivery share; services/payments/cash-coupon-settlement.js); shoofi-server@fix/HIGH-RISK-percentage-coupon-store-billing c6020ade / 2026-11-22 (invariants 7, 13: percent split billed in shekels; the legacy /stores-export and the admin coupon-orders list read a percent split via percentSplitOrderStoreShare); shoofi-server@fix/hyp-company-create-email-exists + shoofi-delivery-web@fix/hyp-company-create-error-reason / 2026-11-19 (ref §5 delivery-company create-account: accounting email wins and is shown, one EZcount user per email, 409 codes, real reason shown); shoofi-server@feat/coupon-draft-edit + shoofi-delivery-web@feat/coupon-draft-edit / 2026-11-18 (invariant 13: a created coupon is edited from its draft — reopen / cancel-edit, update-mode approval through the unchanged update route, carried-over fields, settle by comparison, past orders not re-billed); shoofi-server@fix/coupon-draft-customer-area + shoofi-delivery-web@fix/coupon-form-zone-labels / 2026-11-17 (invariant 13 targeting: supportedCities = the store's pickup zone, customer targeting = supportedAreas, the never-matches draft blocker, assistant rule 4a); shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13 (invariant 20: Kopa QR table orders, `source: "kopa-qr"`, shown as tableOrdersCount / tableOrdersRevenue and in no settlement figure; invariant 3 + 17 pointers); shoofi-server@fix/partner-summary-date-validation / 2026-11-12 (invariant 17 partner/summary + daily-orders validate period/month/startDate/endDate/date before any read, 400 INVALID_PERIOD; shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till sessions: no money without a shift, ref §12); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 6 — cancelled excluded from settlement, keep → Shoofi COMP credited at redemption, customer documents fixed at capture); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData run in-process, OPT-IN via body `figures: "report"`; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's body moved to services/payments/store-sales.js — invariant 7/13/14/15 line refs repointed; ref §4); shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08 (invariant 17 partner/details deleted with admin/partners + admin/analytics, the flat-15% routes; ref §3/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@feat/code-coupons-filter + shoofi-delivery-web@feat/code-coupons-filter / 2026-11-07 (invariant 14 code coupons out of funder buckets, kind=code, ref); shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -48,6 +48,12 @@ collected the money**:
   **keeps the delivery fee in cash** (`actualDriverPayment = 0` from Shoofi) and **owes the
   store the items money**. Shoofi still earns commission on cash orders — it recovers that by
   **deducting it from the store's card-based bank transfer**.
+  **A coupon on a CASH order:** the courier keeps the fee minus the coupon's DELIVERY part
+  (Shoofi repays him that part) and hands the store the items minus the coupon's ITEMS part.
+  So the store's result is `(P − items part) − campaigns + couponsFromShoofi`, against
+  `totalRevenueCreditCard − campaigns + couponsFromShoofi` on card. Orders created from
+  `CASH_COUPON_SETTLEMENT_FROM` (2026-12-01) settle that way end to end; older ones do not
+  (invariant 7, "CASH from the cutoff").
 
 **Consequence:** a store's transfer is computed from **credit-card revenue only, minus ALL
 outcomes** (including commission on cash orders). A mostly-cash store can have a **negative
@@ -238,8 +244,9 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
        store billed **₪12** (before the ruling: 12% × 200 = ₪24). ₪500 order → capped at ₪40
        → ₪12. ₪60 order → ₪12 off → ₪3.60 (before: 3.6% × 60 = ₪2.16). Twin ₪150 + ₪50 with
        the cart's ₪12 on both legs, applied 30 / 10 → ₪9 + ₪3 = ₪12 (without the bound:
-       ₪12 + ₪12). CARD or CASH alike: `campaigns` is an outcome, so it comes off the
-       store's card-based transfer.
+       ₪12 + ₪12). `campaigns` is an outcome, so it comes off the store's card-based
+       transfer — on CARD; on a CASH order created from the cutoff a public items coupon's
+       share is not billed at all (next bullet).
      - **Prod, 2026-11-22 (read-only):** 4 `type: 'percentage'` coupons — P147T5LK
        (full_discount) and OTWX1AR6 (order_items), both percent split at `storePercent: 0`;
        QZABIYDH (`splitType: 'fixed'`, `storeDiscount: 80` points, no orders); one
@@ -266,6 +273,62 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
        `remainingStoreDiscount`).
      - Pinned by shoofi-server `test/integration/percentage-coupon-settlement.js` (every prod
        shape above, the twin legs, the fallback, every reader).
+   - **CASH from the cutoff — the store's coupon share is not billed twice** (owner ruling,
+     Sari 2026-11-22, "only from now"; shoofi-server `fix/HIGH-RISK-cash-coupon-settlement`,
+     `services/payments/cash-coupon-settlement.js`). The oracle for every coupon order, before
+     commission/VAT/fees (P = items, D = discount, S/H = the store's/Shoofi's share): the store
+     ends at P − S, the courier at the full fee, Shoofi at −H. CARD always did. CASH did not,
+     because the store had already given the discount at the door:
+     - **A PUBLIC `order_items` coupon** (any funding, percent split included): the store was
+       billed S again as `campaigns`, and Shoofi's H was never credited (the credit was
+       customer-specific only). ₪55 of items, 20% = ₪11, store 70%: the store ended at ₪36.30
+       instead of ₪47.30.
+     - **`full_discount` with a store share:** the store's ITEMS share was billed again.
+       ₪40 split 28/12 on ₪55 of items: −₪1 instead of +₪27.
+
+     **From the cutoff, CASH only:** a public `order_items` coupon is billed `max(0, S − D)`
+     (0 unless a shekel share is nominally above the discount, so cash still ends where card
+     does) and credited `max(0, D − S)` as a `couponsFromShoofi` row (`itemsAmount = amount`,
+     `deliveryAmount: 0`) plus a `cashCouponsPassed` entry, exactly like a customer-specific
+     coupon. S is `storeCouponShare` (the card bill), D is `appliedCouponAmount`; with no D the
+     order keeps today's path. A `full_discount` bills only `storeDeliveryAmount` (in both the
+     `couponUsages` and the `getFullDiscountMatrix` branch), because Shoofi repays the courier
+     the delivery part. That includes a customer-specific `full_discount` with a store share
+     (prod: cacao 1706-1681), which the `full_discount` branch bills whatever the audience.
+     **Unchanged:** every CARD order; delivery coupons, `delivery_price` and store delivery deals
+     (Shoofi repays the courier, so the store's delivery share is owed); customer-specific
+     `order_items` coupons; Shoofi-only `full_discount` and gift vouchers; every order before
+     the cutoff.
+     - **The cutoff** is `CASH_COUPON_SETTLEMENT_FROM`, default `2026-12-01T00:00:00+02:00`,
+       overridable by that env var (an unreadable value falls back to the default). It is
+       compared with the ORDER's creation time (`created || createdAt || orderDate`, the date
+       on each coupon row); an order with none keeps today's path. **Never move it earlier
+       than a period whose report has gone out** — a regenerated report would differ from the
+       one the store holds. Rollback without a deploy: set it far in the future and restart.
+     - **Commission does not move.** The credit enters `revenueForCommission` through
+       `totalCustomerSpecificCoupons` (the code's own rule: "coupon money Shoofi reimburses to
+       the store" is inside the base, invariant 3) and leaves `cashRevenue` by the same amount
+       (`cashCouponsPassed`), so the base stays P — as it was, and as on card. `totalIncomes`
+       does not move either; `totalOutcomes` falls by D, so the transfer rises by D;
+       `totalForInvoice` is unchanged.
+     - **Mirrors that follow it:** the exec-dashboard / HQ money-audit split
+       (`orderCouponFunding`): such an order's `shoofiItems` is the credit, its `storeItems`
+       stays S (the store still funds its share, at the door); `full_discount` was already a
+       2×2 and does not move. The money audit's «במזומן החנות משלמת עליו פעמיים» finding
+       (`checks-settlement.js`, `coupon-funding`) fires only before the cutoff.
+       `partner-summary-legacy.js` is frozen by design and does not follow; the partner app's
+       `helpers/orders/order-money.ts` is the partner domain's.
+     - **Prod replay 2026-11-22 (read-only, 23,771 coupon orders, 185 stores):** with the default
+       cutoff, **0 differences** in any store-sales row or funding split. With the cutoff moved to
+       2025-01-01: 50 orders change, all CASH; 47 are settled (45 in a sent report, 1 in an approved
+       one, 1 — test-store-a — in none), stores +₪1,316.59 in total — 26 `STACKED_FULL_DISCOUNT` orders +₪906.79, 21 public items
+       orders +₪409.80 (brixta OTWX1AR6 at `storePercent: 0` ₪169.80, greg UNX26RLC 6 × ₪20,
+       pizza-bella-vitta 0K6GTLVC 2 × ₪20, o-studio 2 × ₪20, afndena-taibe WELCOME30 ₪30,
+       test-store-a ₪30), commission base drift 0. Past reports are not changed.
+     - Pinned by shoofi-server `test/integration/cash-coupon-settlement.js`: 35 shapes × CARD/CASH ×
+       before/after through `buildStoreSalesRow` and `generateStoreReportData`. Every order before
+       the cutoff, and every CARD order, equals the parent branch's golden output; every order
+       after it meets the oracle and equals its card twin.
    - **The `appliedCouponsData` row the storeDiscount gate pushes carries no items/delivery
      split** (unlike the `full_discount` rows), so `campaignsList` is not splittable for
      `delivery`/`order_items` coupons. `full_discount` is the **only** coupon type with a
@@ -482,7 +545,9 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
         is ALSO billed its share as campaigns (`store-sales.js`), and Shoofi's share of a PUBLIC
         coupon is never credited back (only customer-specific). Pre-existing
         (found 2026-11-11); auto-apply makes every cash order at a joined
-        store hit it. Needs an owner ruling.
+        store hit it. **RULED 2026-11-22 (Sari), fixed for orders created from
+        `CASH_COUPON_SETTLEMENT_FROM` (2026-12-01) only** — invariant 7, "CASH from the cutoff".
+        Orders before the cutoff keep the double charge; their reports are not regenerated.
       - Prod replay 2026-11-22 (all 10 readers incl. legacy export, partner-summary-legacy, the
         coupon-orders list and 21,122 book-delivery rows; 23,755 orders / 185 stores): 0 differences
         from main, before the reader fix below.
@@ -597,6 +662,11 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     **It is a display/filter rule, NOT a billing path.** Settlement never
     calls it. It restates what `stores-export-new` already does, so if settlement changes,
     this file follows; never the other way round.
+    - **The CASH cutoff rule (invariant 7) needs no change here.** On a CASH order from
+      2026-12-01 the store's share of a public items coupon is given at the door instead of
+      billed, and Shoofi credits the rest, but who funds what is the same split: the store
+      still bears its share, Shoofi the remainder. The bucket follows the share, not the
+      payment method.
     - **Share:** `storePercent` out of 100 for `splitType: 'percentage'` (resolved per order by
       `resolveCouponSplit`, `utils/coupon-discount.js`); otherwise `storeDiscount` out of `value`. The bucket is
       `shoofi` when the share is null or 0, `store` when it covers the whole value (or 100%),
@@ -1300,6 +1370,15 @@ keeps them out of settlement by their `source`.)
   that the owner should know (invariant 7): a percent split's share is bounded by its own
   order's `applied × storePercent` (twin legs), and a missing share is derived the same way
   rather than billed ₪0. Prod replay: 0 billed differences on 23,754 coupon orders.
+- **RULED by the owner (Sari, 2026-11-22), "only from now":** on a CASH order the store's coupon
+  share was billed although the store had already given it at the door — a public `order_items`
+  coupon (and Shoofi's share never credited), and the items share of a `full_discount`. Fixed
+  for orders created from `CASH_COUPON_SETTLEMENT_FROM` (default 2026-12-01T00:00:00+02:00)
+  only (invariant 7, "CASH from the cutoff"; HIGH-RISK PR
+  `fix/HIGH-RISK-cash-coupon-settlement`). **Do NOT move the cutoff back to correct older
+  months**: every prod order before it keeps today's numbers, including the ones in sent
+  reports (replay: 50 orders / ₪1,316.59 would move with a 2025-01-01 cutoff). Correcting a
+  past month is a compensation, decided by a human.
 - **OPEN — flagged, needs a decision:** `reset-invoice` only clears the *local* invoice fields;
   it does **not** cancel the document at GreenInvoice/HYP, so a following `create-invoice`
   issues a **second** invoice. Do not silently change behavior — ask.
