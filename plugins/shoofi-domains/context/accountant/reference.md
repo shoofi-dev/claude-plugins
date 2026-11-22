@@ -151,7 +151,11 @@ This recipient rule is the STORE path only. Driver reports pick their recipients
   `storeCouponShare({...})` = what `campaigns` bills (percent split → `percentSplitStoreShare`, else
   `couponShareAmount`). Readers: `services/payments/store-sales.js`, `couponDeliverySplit` /
   `isPercentageStoreDeliveryCoupon`, `shoofiCouponCredit`, `services/exec-dashboard/coupon-funding.js`
-  (→ HQ money audit), `services/payments/partner-summary-legacy.js`, legacy `/stores-export`.
+  (→ HQ money audit), `services/payments/partner-summary-legacy.js`, legacy `/stores-export` and the
+  admin coupon-orders list (`routes/order.js`). The last two read only the top-level share. For a
+  percent split they take `percentSplitOrderStoreShare(appliedCoupon, couponDoc)` instead: the order's
+  own share as store-sales reads it, or `null` when the share is not in a percent split, in which case
+  their old reading applies unchanged.
 - **`shoofiCouponCredit({shoofiDiscount, couponType, splitType, orderPrice, appliedAmount})`** (`calc.js`)
   = the per-order `couponsFromShoofi` credit for a customer-specific `order_items` coupon:
   `min(nominal, applied)`, nominal = `couponShareAmount(shoofiDiscount)` (points → `/100 * orderPrice`),

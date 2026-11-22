@@ -564,6 +564,21 @@
         },
         {
           "file": "lib/payments/calc.js",
+          "regex": "(?:function percentSplitOrderStoreShare\\(appliedCoupon, couponDoc = null\\) \\{|function shoofiCouponCredit\\(\\{ shoofiDiscount, couponType, orderPrice, appliedAmount \\}\\))",
+          "desc": "CORE invariant 13 (store_percentage_off, FIXED reader gap): percentSplitOrderStoreShare reads a percent split's store share the way store-sales does (the order's own share, document only when absent, storeCouponShare) and returns null for any other shape — valid-before leg is main's shoofiCouponCredit signature (no splitType) before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
+        },
+        {
+          "file": "routes/payments/admin.js",
+          "regex": "(?:const percentSplitShare = percentSplitOrderStoreShare\\(appliedCoupon, originalCoupon\\);|discountAmount = \\(storeDiscount / 100\\) \\* \\(order\\.orderPrice \\|\\| 0\\);)",
+          "desc": "CORE invariant 13 (FIXED reader gap): the legacy /stores-export shows a percent split's share via percentSplitOrderStoreShare instead of ₪0 from the top-level-only read — valid-before leg is main's inline type-only line before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "(?:const percentSplitShare = percentSplitOrderStoreShare\\(order\\.appliedCoupon, originalCoupon\\);|discountAmount = \\(storeDiscount / 100\\) \\* \\(order\\.orderPrice \\|\\| 0\\);)",
+          "desc": "CORE invariant 13 (FIXED reader gap): the admin coupon-orders list shows a percent split's share via percentSplitOrderStoreShare instead of ₪0 from the top-level-only read — valid-before leg is main's inline type-only line before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
+        },
+        {
+          "file": "lib/payments/calc.js",
           "regex": "(?:return carried === null \\? ceiling : Math\\.min\\(carried, ceiling\\);|!!storeDiscount && !isCustomerSpecific && couponType !== 'percentage';)",
           "desc": "CORE invariant 7: percentSplitStoreShare — a percent split's store share is the carried shekels bounded by THIS order's round2(applied × storePercent / 100) (a twin leg carries the whole cart's share; each store is billed its own leg once), and derived that way when the order carries none — valid-before leg is couponDeliverySplit's type-only gate on main before shoofi-server fix/HIGH-RISK-percentage-coupon-store-billing (drop it once that has merged)"
         },
