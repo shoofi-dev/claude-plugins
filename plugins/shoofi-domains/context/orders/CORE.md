@@ -1413,6 +1413,19 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `picked_up` → false), `customer-orders-feedback-eligible.js` (8),
       `order-update-actor-and-feedback-push.js` (11), `feedback-notification-eligibility.js` (4).
 
+## Delivery or pickup is decided in checkout, not in the cart store
+**The order's `receipt_method` comes only from checkout's own state** — `useState(null)` in
+`shoofi-app/screens/checkout/index.tsx` (~207), sent as `order.shippingMethod` →
+`receipt_method` (`shoofi-app/stores/cart/index.ts` ~664). It is set by the customer's pick
+(`ShippingMethodPickSquare` in `components/address/index.tsx`, the only live picker, reporting
+through `onChange`), by the per-store checkout draft and the twin snapshot on restore, and by
+three forced overrides (school-project user and coupon store → TAKEAWAY, twin checkout →
+DELIVERY). **`cartStore.shippingMethod` / AsyncStorage `@storage_shippingMethod` is a dead
+parallel field**: its only reader is `screens/menu/menu-new.tsx`, which nothing imports, and
+checkout's read of it is commented out. So a `cartStore.setShippingMethod(...)` call changes
+nothing a customer or an order sees — do not "fix" a pickup/delivery bug there, and do not
+add a writer (the home banner's TAKEAWAY write was removed in shoofi-app#150 for that reason).
+
 ## Where an order that never happened lives
 **There is no server-side cart.** The cart is MobX + AsyncStorage in
 `shoofi-app/stores/cart/index.ts` and nothing about it reaches the server until submit, so
