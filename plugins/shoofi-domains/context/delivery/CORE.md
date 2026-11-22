@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@fix/HIGH-RISK-block-cancelled-to-active / 2026-11-18 (invariant 11 readyForPickupAt: never on a -1/-2/-3 row since #467; older -3 rows can carry one stamped after cancel); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -330,7 +330,11 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
       `readyForPickupAt` (offset string) when the store presses ready **only if a driver is
       already assigned** at that moment (`if (deliveryRecord && deliveryRecord.driver?._id)`,
       ~`:5634-5652`); a booking still in the queue never gets it. The complete source is the
-      flow event above.
+      flow event above. Since shoofi-server#467 (HQ #d20f42) it is also never written to a
+      cancelled (`-1/-2/-3`) row: the lookup is orders' `findActiveDeliveryRowForOrder` (orders
+      CORE invariant 23). Before that, 38 `-3` rows in the 90 days to 2026-11-18 got it AFTER
+      `cancelledAt` (booking cancelled by an admin, order left open, store pressed ready) — so on
+      older `-3` rows a `readyForPickupAt` does not mean the courier was still on the job.
     - **`company.storeName` and `driver.name` are never populated** on the embedded copies —
       read `company.nameHE`/`nameAR` and `driver.fullName`. So the flow events'
       `metadata.companyInfo.name` (`book-delivery.js`, reads `company.storeName`) is always

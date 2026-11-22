@@ -94,9 +94,11 @@ Buckets (`docs/customer-orders-snapshot.md`): **completed** `2,3,10,11,12` ·
 - **Twin cascade** mutates the peer side **directly via services**, not routes (avoids recursion).
 
 **Transition guards you must not weaken:** PENDING(`6`) only from FRAUD_REVIEW
-(`order.js`); `/update/viewd` rejects already-cancelled `4,7,8,9` with a 400
-`ORDER_CANCELLED` (~order.js:6002-6025). That list omits REJECTED `5`, and no other status
-check follows it, so accepting a `5` order overwrites it to `1` (or `14`/`15`);
+(`order.js`); `/update/viewd` rejects already-cancelled `4/5/7/8/9` (`isCancelStatus`,
+`String()`-normalised; REJECTED `5` included since shoofi-server#467) with a 400
+`ORDER_CANCELLED`; on `/api/order/update` and the legacy `/api/order/update/all` a
+cancelled order never moves to a non-cancel status (400
+`CANCELLED_ORDER_CANNOT_REACTIVATE`, every caller, CORE invariant 2);
 `start-preparing` only from `14`; **`10` only from `2` and `11` only from `2`/`3`** on
 `/api/order/update` for every caller without a dashboard role
 (`services/orders/picked-up-guard.js` `pickedUpAllowedFrom`, 2026-11-15). That guard is atomic:
@@ -108,8 +110,12 @@ order is a 404. Anything else is **`409 {message: "הסטטוס כבר עודכ�
 400. None of these early answers runs a side effect (websocket, `status_change` flow event,
 feedback push, customer or driver push). It exists because a stale partner card could write
 `10`/`11` over a support cancel (`7`): an un-cancel that left the COMP coupon, the compensation,
-the coins refund and the `-3` booking in place. A dashboard token (`roles`) is exempt on
-purpose, so support's behaviour is unchanged. Fields: `status`, `statusUpdatedAt`,
+the coins refund and the `-3` booking in place. A dashboard token (`roles`) is exempt from
+this guard on purpose (a store that never pressed ready). **The exemption does not cover a
+cancelled order:** since shoofi-server#467, `4/5/7/8/9` → any non-cancel status is 400
+`CANCELLED_ORDER_CANNOT_REACTIVATE` for every caller, checked before this guard (CORE
+invariant 2), so a stale tap on an order already read as cancelled gets that 400 and the
+409 is left for the read/write race. Fields: `status`, `statusUpdatedAt`,
 `statusUpdateReason`, `completedAt`, `viewdAt`, `isViewd`, `isPrinted`, `orderDate`.
 **`readyMinutes` is NOT an order field** — accept takes it as a request param and does not
 persist it (~0% of prod orders carry it; only `/update-start-preparing` writes it, on future
@@ -1493,9 +1499,10 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
     It offers no `10`/`11` (labels `ORDER_STATUS_HEBREW_SHORT` in `useOrderActions.tsx`:
     6/1/2/3/7/13/5), and no other admin screen sends them. An admin token (`roles`) is still
     exempt from the server's "handed over only from ready" guard (CORE invariant 2). So if
-    `10`/`11` is ever added to the dropdown, support can correct an order from any status. Doing
-    that on a cancelled order is still an un-cancel, and it reverses none of the cancel's side
-    effects.
+    `10`/`11` is ever added to the dropdown, support can correct an order from any LIVE status.
+    Not a cancelled one: since shoofi-server#467 the server answers 400
+    `CANCELLED_ORDER_CANNOT_REACTIVATE` to every caller, the dashboard included (CORE
+    invariant 2; no restore path, by decision, HQ #da002b).
   - **Undo guard** (`src/utils/twin-cancel.ts` `undoDegradeBlock`) mirrors the server's
     `undoDegradeBlockReason` and also reads `group.moneySummary` (a coupon, a refund or a refund in
     doubt since the degrade hides undo).
