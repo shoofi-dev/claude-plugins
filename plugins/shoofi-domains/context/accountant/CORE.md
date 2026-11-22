@@ -463,11 +463,30 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
       owner default 2026-11-22: the cart applies it at the joined stores, on their items; nobody
       types a code — and, as an auto-apply coupon, it sits in a funder bucket, invariant 14). Its cap is **asked**, never the template's ₪30 default (`DRAFT_ASKED_FIELDS`:
       a blocker on `maxDiscount` until the draft's params carry one): the cap is the most one
-      order can cost, and so the store's exposure. With a store share and other than exactly
-      one store the summary adds «כל חנות מממנת את חלקה רק בהזמנות שלה» — true by settlement:
+      order can cost, and so the store's exposure. With a store share and two or more stores
+      the summary adds «כל חנות מממנת את חלקה רק בהזמנות שלה» — true by settlement:
       each order bills its own resolved shekels, bounded by its own discount (invariant 7).
+      **A store share with NO stores is a blocker** (field `stores`, once funding is answered and
+      Shoofi's percent < 100): an empty list is every store on the platform, auto-applied, each
+      billed without having joined. Shoofi alone may fund an all-stores one.
+      **A store the coupon does not list is billed 0%**: at creation and per twin leg the split
+      resolves with `storeAppName` (`withResolvedPercentSplit`, orders CORE invariant 34), so a
+      coupon that reaches another store's order (a twin leftover, a stale quote) is Shoofi's.
       The assistant's rule 4c maps "X% off" to it, asks the cap with options, and never calls
       it excluded.
+    - **Known gaps (accountant review 2026-11-22, not fixed):**
+      - **A public items coupon on a CASH order** — the store takes the discount less at the door,
+        is ALSO billed its share as campaigns (`store-sales.js`), and Shoofi's share of a PUBLIC
+        coupon is never credited back (only customer-specific). Pre-existing
+        (found 2026-11-11); auto-apply makes every cash order at a joined
+        store hit it. Needs an owner ruling.
+      - **Two readers show ₪0 for any percent split** (same as main): legacy `/stores-export`
+        (`routes/payments/admin.js`, PaymentManagement "סך קופונים שהוחלו") and the admin
+        coupon-orders list (`routes/order.js`) read the top-level `appliedCoupon.storeDiscount`,
+        which percent-split orders do not have (the share is under `appliedCoupon.coupon`), and
+        fall back to the document, which holds null. Display only; settlement (store-sales) is right.
+      - Prod replay 2026-11-22 (all 10 readers incl. legacy export, partner-summary-legacy, the
+        coupon-orders list and 21,122 book-delivery rows; 23,755 orders / 185 stores): 0 differences.
     - **A created coupon can be edited from its draft** (`POST …/:id/reopen` → chat / manual edits →
       `approve` returns `mode: 'update'` fields → the admin web posts them to the unchanged
       `POST /api/admin/coupon/update` → `confirm`; `cancel-edit` restores the draft). The router still

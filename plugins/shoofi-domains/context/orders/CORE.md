@@ -1462,24 +1462,37 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       code and an auto-applied one quote the same amount and the shares add up exactly.
     - **Store identity at the quote** (`routes/coupon.js`, payments domain; order-side context):
       `resolveCartStores` checks `applicableTo.stores` against the twin's `storeAmounts` keys, else
-      the body's `appName`, then `storeId`, then the `app-name` header. Before, `/apply` read
+      the body's `appName`, then `storeId` — **never the `app-name` header**: that is the store last
+      browsed, which can differ from the cart's, and a typed auto-apply coupon is not re-quoted, so
+      the header let a code stick to a store that did not join (payments review 2026-11-22). A body
+      with no store refuses a store-limited code; the app sends the cart's store as `storeId`
+      (`CouponInput` ← TotalPrice `primaryAppName`, shoofi-app#163). Before, `/apply` read
       `appName` only, which no app sends, so EVERY typed store-scoped code was refused (prod
       2026-11-22: 123 store-scoped coupons with 9,443 uses, all of them auto-apply; the 2 typed-only
       ones were never used). Auto-apply reads the twin's `storeAmounts` too, so a coupon of the twin
       SECONDARY's store now applies, on that store's items only.
-    - **The app's half (not changed):** `shoofi-app components/total-price` `twinSplit` passes
-      `primaryAppName: storeDataStore.storeData?.appName || appName`. That is the BROWSED store, and
-      twin checkout keeps it on the secondary on purpose, so `scopedToSide` (`utils/coupon-split.ts`)
-      sees the secondary under both names and splits a one-store coupon over both legs. The server
-      move above corrects it at placement. The app fix is to read the cart store first.
+    - **The app's half (shoofi-app#163):** `components/total-price` used to pass the BROWSED store
+      (`storeDataStore.storeData?.appName`) as `twinSplit`'s `primaryAppName`; twin checkout keeps it
+      on the secondary on purpose, so `scopedToSide` (`utils/coupon-split.ts`) split a one-store
+      coupon over both legs. It now passes the cart's store (`primaryAppName`), and the same name
+      goes to `CouponInput` as `storeId`. The server move above still corrects older app versions.
+    - **A store that did not join never pays** (`withResolvedPercentSplit(applied, doc,
+      { storeAppName })`, `utils/coupon-discount.js`): at `/api/order/create` (store = the `app-name`
+      header of the ORDER, which is the store whose DB it is written to) and per twin leg
+      (`enforceTwinCouponSides`, leg app name), a percent-split coupon whose document lists stores
+      without this one resolves to `storePercent 0 / shoofiPercent 100` — Shoofi carries it, the
+      store is billed nothing. Covers a twin leftover the move could not carry and any stale quote.
+      `discountAmount` / `total` never move.
     - **Known gaps, not fixed here:**
       - A FIXED split's shares are not prorated per twin leg. In prod, group tg_1784987571799_ppbosy
-        split a ₪5 coupon 2.51/2.49, and both legs carry `shoofiDiscount: 5`.
+        split a ₪5 coupon 2.51/2.49, and both legs carry `shoofiDiscount: 5` — settlement bounds each
+        leg by its own discount (`min(5, 2.51) + min(5, 2.49)`), so Shoofi is credited ₪5 once, not
+        twice (accountant review 2026-11-22).
       - A twin with the coupon on both legs writes TWO `couponUsages` rows, so it spends two of
         `usageLimit` / `usagePerUser`.
-      - Creation still does not re-check `applicableTo.stores`. A stale or hand-made order for a store
-        outside the list is stored as posted, because dropping the coupon would raise `total` (the
-        entitlement decision is still open).
+      - Creation still does not DROP a coupon whose `applicableTo.stores` excludes the order's store
+        (dropping it would raise `total`; the entitlement decision is still open) — but that store
+        is billed 0% of it (above).
     - Tests: shoofi-server `test/integration/coupon-percentage-items-multi-store.js` (21, through the
       real `/apply`, `/auto-apply`, `/api/order/create`, `/place`, `/digital-place-pending`), and
       `order-amend.js` "a percent-split items coupon: the Shoofi/store shares follow the amended

@@ -300,7 +300,11 @@ back in `appliedCoupon` with a client-computed `total` (`components/total-price`
 formula module, `utils/coupon-discount.js` (`computeCouponDiscount`), used by
 `/api/coupons/apply`, the auto-apply scorer (`routes/coupon.js`), amend and shadow pricing
 (`utils/order-pricing.js`). Creation re-checks ownership and partial-use balances only
-(`enforceCouponEntitlement`) — **except** for the fixed-delivery-price type.
+(`enforceCouponEntitlement`) — **except** for the fixed-delivery-price type. It also re-resolves a
+percent-split coupon's store/Shoofi SHARES on the order's own discount (`enforcePercentSplit`; a
+store the coupon does not list pays 0%) and, in a twin, moves a store-scoped items coupon to its own
+store's leg (`enforceTwinCouponSides`) — attribution only: no leg's `discountAmount` changes the
+combined `total`, so the charge never moves (orders CORE invariant 34).
 Creation does NOT notice a total lower than items + fee − coupon − deals − coins with nothing to
 explain it (shadow pricing records the drift and the order is kept), so the app must send the
 coupon its total took off: TotalPrice is its only writer (reference.md, "Coupons"). The
@@ -313,8 +317,9 @@ the auto-apply scorer `GET /api/coupons/auto-apply/:customerId`). Every non-empt
 an empty one is "all":
 - `stores` — the cart's store(s), from `resolveCartStores` (`routes/coupon.js`): the keys of a
   twin cart's `storeAmounts` (a coupon of EITHER store applies, measured on that store's items
-  only), else the body's `appName`, then `storeId`, then the `app-name` header. Before
-  2026-11-22 `/apply` read `body.appName` alone, which no app sends, so every TYPED
+  only), else the body's `appName`, then `storeId` — never the `app-name` header (the store last
+  browsed can differ from the cart's; the app sends the cart's store as `storeId`, shoofi-app#163).
+  Before 2026-11-22 `/apply` read `body.appName` alone, which no app sends, so every TYPED
   store-scoped code was refused (prod: all 9,443 store-scoped uses were auto-applied). A twin
   leg whose store is not in the list carries no share of an items coupon
   (`enforceTwinCouponSides`, orders CORE invariant 34).
