@@ -131,7 +131,8 @@ corrections, in this order: coupon entitlement (`enforceCouponEntitlement`:
 ownership + partial-use balance only) → store promotions + the delivery deal-vs-coupon
 conflict (`enforcePromotions`, `resolveDeliveryConflict`) → **fixed-delivery-price coupon
 recompute** (`enforceDeliveryPriceCoupon`, CORE invariant 14). Each one corrects `total`
-and never rejects → build `orderDoc` → shadow pricing (`serverPricing`) →
+and never rejects → **percent-split shares re-resolved on the posted discount**
+(`enforcePercentSplit`, CORE invariant 34; attribution only, `total` untouched) → build `orderDoc` → shadow pricing (`serverPricing`) →
 **insert into store `orders`** (authoritative) →
 `[shippingPriceCheck]` fired and **never awaited** (log-only; a DELIVERY fee below the area
 tariff → one warn line + `order.shippingPriceCheck`, CORE invariant 20) →
@@ -169,10 +170,18 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   the combination fee (`twin-fee-service.js`).
 - **Coupons**: each side's `appliedCoupon` is the client's split (`shoofi-app
   utils/coupon-split.ts`). A delivery coupon goes 100% to the primary, the only side with
-  `shippingPrice`, and the sides are stored as posted. The one server re-price is the
+  `shippingPrice`. Other items coupons are split by after-deal price, or go wholly to the one side
+  `scopedToSide` finds in `applicableTo.stores`. The app spreads the WHOLE coupon (its Shoofi/store
+  shares included) onto each side and changes only `discountAmount`. The one server re-price is the
   fixed-delivery-price coupon: `enforceTwinSideDeliveryPrice` runs after
   `enforceTwinSidePromotions` in `/place` and `/digital-place-pending`. It gives one ₪X on the
   primary's tariff-capped fee, and a claim on the secondary (fee 0) is removed (CORE invariant 14).
+  Right after it, `enforceTwinCouponSides` (CORE invariant 34) moves a store-scoped items coupon's
+  share off a leg whose store the coupon does not name, onto the peer (sum of totals unchanged,
+  peer total ≥ 0). It then resolves each leg's percent-split shares on that leg's discount. Both
+  stores in the coupon = one combined cap, split over the legs. Each leg with a coupon writes its
+  own `couponUsages` row (cash: the route; card: `applyCaptureSuccess`), so a twin with the coupon
+  on both legs spends two uses.
   Not handled: `degradeToSingle` with `keepSide:'secondary'` moves the FULL primary fee onto the
   kept order (`$inc total`) while the primary's coupon usage stays. This was already true for
   every delivery coupon before this change.
