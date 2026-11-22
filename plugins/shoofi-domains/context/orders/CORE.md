@@ -530,6 +530,22 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     2026-11-14): the v3 board's red printer bar is the store's signal. `isPrinted:true` with
     no `printer-testPrint` rows can mean the store has no printer address: check
     `printerTarget` first.
+    - **A failed connect says why** (HQ #087106, `utils/printer-connect-failure.ts`).
+      `getPrinterFromPool` keeps each failed try and throws `connectFailureError`: the same
+      message as before ("Failed to connect to printer after N attempts…", HQ's digest
+      fingerprints on it) plus `connectReason` = `unreachable` (off, out of range, wrong
+      address; fails in under a second) | `timed_out` | `busy` (held by another device) |
+      `unknown`. The once-per-outage row carries `error.reason`, `error.connectStatus`,
+      `error.connectMessage`, `error.connectMs`; rows from before this have none of them.
+      `printFailures.setPrinterProblem` feeds the red bar and the settings status line, which
+      show a sentence per reason. The bar exists on v3 screens only, so a tablet with the v3
+      flags off shows no print-failure signal at all.
+    - **Read the build before the count.** A `printer-testPrint` row with no
+      `allErrorBody.appVersion` (and no `stage`/`target`) comes from a build older than
+      2026-11-14: it logs every try, not one row per outage, and still dials the fallback
+      address when the store has no `printerTarget`. On 2026-11-21/22, 824 of 827 "Failed to
+      connect" rows were such builds and 654 of them were 27 stores with no `printerTarget`.
+      A spike in that cluster is first a question of which builds are installed.
     - **Which printer is per tablet, and "none" is a real answer** (behind `PRINTER_SETUP_V3`,
       shoofi-partner `helpers/printer/tablet-printer.ts`, 2026-11-11). No `all`+`print` role →
       no printer: no capture, no Bluetooth, no printer warnings. Otherwise: the store's built-in
