@@ -173,6 +173,13 @@ This recipient rule is the STORE path only. Driver reports pick their recipients
   shoofiCredit: max(0, D − S)}`, or null when D is unknown (today's path). store-sales uses it for a
   public `order_items` coupon, and bills a `full_discount`'s `storeItemsAmount` as 0 on such an order;
   `orderCouponFunding` reports the credit as `shoofiItems`.
+  `cashItemsCouponRuleApplies(order)` = `isItemsOnlyCoupon(appliedCoupon.coupon)` (`utils/coupon-discount.js`)
+  and `cashCouponRuleApplies(order)`. It is the gate for both ITEMS rules, so a `type: 'free_delivery'`
+  snapshot (D = the fee) or one with no `type` keeps today's path. The money audit's «פעמיים» finding
+  is gated on it too. The `full_discount` rule stays on `cashCouponRuleApplies`.
+  `cashCustomerSpecificItemsCredit({appliedAmount})` → `max(0, D)`, or null when D is unknown. It is the
+  credit for a CUSTOMER-SPECIFIC `order_items` coupon on such an order (follow-up ruling 2026-11-22),
+  replacing `shoofiCouponCredit`'s `min(H, D)`, and `orderCouponFunding` reports it as `shoofiItems`.
 - **`getDateRange`**  — business-day boundaries via `store.openHours` (March-2026 transition fix).
 - **Cost-bearers:** store bears commission+VAT+fees+its coupon share+store-paid comps; Shoofi
   bears customer coupons (reimburses store), Shoofi comps, driver min-guarantee, drive-in cut;
