@@ -1284,9 +1284,23 @@ Role: receives orders, **accepts**, prepares, prints, and drives status forward.
       both are in «إعدادات المحل» → «هذا الجهاز» (`StoreSettingsV3` `device`), per tablet,
       applied at once and not part of the save bar.
   - **Rules** come from `helpers/orders/order-rules.ts` (above).
-  - **Money** is in `helpers/orders/order-money.ts` (branch `fix/order-money-settlement`; main
-    still has the two old formulas, `getPartnerPaymentSummary` for the list and the new-order
-    screen's own inline one, until it merges).
+  - **Money** is in `helpers/orders/order-money.ts`, read by the v3 screens and the ticket
+    (flags above / `ORDER_MONEY_SETTLEMENT`). The shipped v2 screens keep their two old formulas,
+    `getPartnerPaymentSummary` (`utils/order-payment.ts`: the v2 list, the legacy and Urovo
+    tickets) and the v2 new-order screen's own inline one.
+    - **A coupon share's unit** (CORE invariant 34, accountant invariant 7): a PERCENT split
+      (`splitType: 'percentage'`, e.g. the "% off items" coupon for several stores, server#687) is
+      SHEKELS on the order's coupon copy (`appliedCoupon.coupon.storeDiscount`, no top-level one),
+      whatever the coupon's `type`. `percentSplitOrderStoreShare` (`helpers/orders/order-money.ts`)
+      is a port of server `lib/payments/calc.js` `percentSplitOrderStoreShare`: the carried share,
+      capped at this order's `discountAmount × storePercent / 100`, derived when absent, null when
+      the coupon is not a percent split. Only a `type: 'percentage'` coupon WITHOUT a percent split
+      keeps percentage points of the list price. `storeMoney` uses it for `S`; the two v2 formulas
+      use it on a CARD order only, through `getPercentSplitCardShoofiTotal` (`utils/order-payment.ts`:
+      items + drive-in − the store's share − coins; null for anything else, so every other coupon
+      keeps the old v2 rule). Cash is unchanged: the store gave the whole discount at the door.
+      Change the server function, change this port and the admin web's
+      (`src/utils/order-coupon-shares.ts`). Tests: `helpers/orders/__tests__/percent-split-coupon.test.ts`.
     - **One formula.** `storeMoney(order)` is a per-order port of the settlement engine
       (`services/payments/store-sales.js` + `lib/payments/calc.js`), before commission / VAT.
       Card: Shoofi pays `P + D − C − S`. Cash: cash in hand `P + D − I − C`, and the monthly
@@ -1515,6 +1529,22 @@ Role: oversight — list/monitor, manual intervention, fraud queue, **twin group
   its own badge; an undecided cancelled twin leg names no per-leg amount.
 - **Twin admin**: full lifecycle control (degrade / undo / cancel / assign single|split)
   + the twin-order-config screen (`degradeAutoRefund`, timeouts, enable switch).
+- **Coupon money on the admin order screens** (`src/utils/order-coupon-shares.ts`):
+  - The single order card (`CardOrder`) and the twin card's price list print each leg's
+    `appliedCoupon.discountAmount` (₪ actually off), never `coupon.value` / `maxDiscount`. A twin
+    leg with `appliedCoupon: null` prints no coupon.
+  - The twin side tile's «יועבר למסעדה» on a CARD leg is `cardStorePayout`: items − the store's
+    own coupon share − coins. The share is the `full_discount` breakdown's `storeItemsAmount`, or
+    a percent split's shekel share (`percentSplitOrderStoreShare`, the same port as the partner
+    app's — C3 Money). Any other coupon keeps the tile's old rule, nothing taken back.
+  - The driver payments screen (`DriverPayments`) counts the COURIER's part of a coupon through
+    `couponDriverPortion`. A delivery coupon counts in full, a `full_discount` its
+    `breakdown.deliveryAmount`, an items coupon (`order_items`) nothing. That last case printed the
+    whole items discount as the courier's before.
+  - `AppliedCoupons` (`order/admin/coupon-orders`) prints the `appliedCoupon.storeDiscount`
+    the server resolves in shekels. Its amount cells are `dir="ltr"` + `text-right`, so the ₪
+    reads in order and still sits on the right edge. Proof:
+    `tests/e2e/coupons/applied-coupons-pct.spec.ts`.
 - **State**: not centralized — component-local `useState`; MobX only for store open/close.
 - **Key files**: `src/apis/admin/order/*`, `src/views/admin/orders.tsx`,
   `src/components/Cards/{CardOrder,CardTwinOrder}.tsx`,
