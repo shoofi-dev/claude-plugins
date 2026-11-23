@@ -296,7 +296,18 @@ with local Mongo for the counts. These are not prod counts._
   unrelated.
 - **When apps see a change: at boot.**
   - Customer app (`stores/translations`): fetches in `prepare()` at cold start and on the
-    offline-dialog path. It has no AsyncStorage copy and does not refetch on foreground.
+    offline-dialog path. It has no AsyncStorage copy. Since shoofi-app `fix/coupon-badge-raw-key`
+    it also refetches (`refreshTranslations`, at most once a minute, merged with
+    `addResourceBundle`, bumps `translationsStore.version`) when the app returns to the front
+    (`App.tsx` AppState listener) and when `/coupons/active` on home brings a `storeTagName` the
+    loaded copy lacks (`screens/explore.tsx`, `helpers/coupon-store-tag.ts`
+    `isUnresolvedCouponTag`). Before that, a coupon approved while a phone had the app open
+    showed its raw `coupon.<draftId>.store` key on the home card until a full restart
+    (Alam Al-Bahr, 2026-11-23).
+  - The home store card's coupon tag (`screens/stores/components/item.tsx`) goes through
+    `couponTagLabel`: a key-shaped tag with no loaded text prints a generic «عرض» / «מבצע»
+    (panel key `store-offer-tag`), free text is shown as typed, and with several running coupons
+    for one store `pickStoreCoupon` takes the newest one whose tag has text.
   - Partner and driver apps (identical `utils/translations-boot.ts`): apply the AsyncStorage
     `@storage_translations` copy first, then the server payload, retrying on backoff up to 6
     times. They reload at boot and on `PREPARE_APP` / NetInfo.
@@ -833,7 +844,7 @@ the cache read.
 - `POST /api/admin/catalog-lint/run` — `{ appName }` for one store, else every store; admin token; returns the run stats
 - Menu spellcheck (`routes/admin/menu-spellcheck.js`; `auth.required` + `checkAdminRole(["master","admin","manager"])`, POSTs in the audit route map): `GET /api/admin/menu-spellcheck/issues?status=open|accepted|dismissed|resolved|stale&appName=&lang=ar|he` → `{ issues (≤2000), truncated, counts, lastRun }`; `POST /api/admin/menu-spellcheck/run [{ appName }]` → `202 { started, runId }` / `409 locked` / `503 no-api-key`; `POST /api/admin/menu-spellcheck/accept { ids, fixes? }` → `{ accepted, stale, failed, outOfStockKept, rows[] }`; `POST /api/admin/menu-spellcheck/dismiss { ids }` → `{ dismissed }` (§7e)
 - `GET  /api/getTranslations` → `{ arTranslations, heTranslations }`. It reads the central DB through a header literally named `shoofi` that no client sends, so it is always `shoofi` (§9).
-- `POST /api/translations/{update,add,delete}` — the admin Translations panel (`shoofi-delivery-web` `src/views/admin/translations/TranslationsList.tsx`, body `{ key, ar, he }`, sends `app-name: 'shoofi'`). Every write answers with the whole re-read map.
+- `POST /api/translations/{update,add,delete}` — the admin Translations panel (`shoofi-delivery-web` `src/views/admin/translations/TranslationsList.tsx`, body `{ key, ar, he }`, sends `app-name: 'shoofi'`). Every write answers with the whole re-read map. Each write with an admin token is in the admin audit log (`services/audit/admin-audit-routes.js`, actions `add_translation` / `update_translation` / `delete_translation`, category `settings`, resource id = `key`) since shoofi-server `fix/audit-coupon-translation-routes`.
   - **These pick the DB from the `app-name` header** (default `shoofi`), not the `shoofi` header the read uses.
   - **No auth** on any of the four routes, and they are not in the admin audit route map.
   - `update` is `updateOne({ key }, { $set: { ar, he, updatedAt } })` with no upsert: a missing key is a silent no-op, and only one row of a duplicated key changes.
