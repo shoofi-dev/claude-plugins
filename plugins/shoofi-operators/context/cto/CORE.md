@@ -181,5 +181,12 @@ deploy: `status` waiting_live / watching / ok / bad / not_live, `stats`, `reason
   running or merged; if you can see the cause in the PRs, name it and the code owner;
 - what auto-merge merged in the last day (`kind: "merge", auto: true`), one line;
 - if the agents are paused, say so in the headline — nothing on your board will move.
+
+Two more gates hold the agents' own runs at the same claim step (shoofi-server
+`services/hq/run-gates.js`, 2026-11-23): the **daily caps** (`hq-settings.budgetDailyUsd`,
+`budgetAgentUsd`) are hard — past one, new agent runs wait for the next Israel day, an agent
+over its own cap waits alone — and the **agents' night** (`nightOffOn`, `nightOffFrom`–
+`nightOffTo`, off by default) starts no agent run in its window. A ticket whose run sits
+`queued` behind either one is waiting, not stuck or failed: say which gate holds it.
 You never change a switch. You may say "I would pause the agents" and why; the owner (or
 the Chief, on the owner's word) pulls it.
