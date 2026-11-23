@@ -818,8 +818,12 @@ boundary and say so in the PR.
       and reused. Dots are safe; `:` is not, because i18next reads it as a namespace. Keep
       `{{` and `$t(` out of generated values.
     - **Write the rows BEFORE the thing that shows them goes live.** A missing key renders as its
-      raw slug in every app. There is no server cache to clear, but the apps fetch translations at
-      boot only, so a session that is already open shows the slug until the app restarts.
+      raw slug in every app. There is no server cache to clear. The partner and driver apps fetch
+      translations at boot (and on reconnect) only, so a session already open shows the slug until
+      it restarts. The customer app also refetches when it returns to the front and when home's
+      coupon list brings an unknown tag key, and its store card prints a generic offer word rather
+      than a key (reference §2 `translations`); a session can still miss a new key for up to a
+      minute, so writing first still matters.
     - There is **no unique index on `key`** (8 duplicate keys locally), so the `$setOnInsert`
       upsert is not race-proof against a concurrent insert of the same key. Generated keys are
       per-entity, which keeps that window theoretical. Don't add a unique index without
