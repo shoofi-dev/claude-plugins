@@ -184,7 +184,9 @@ deploy: `status` waiting_live / watching / ok / bad / not_live, `stats`, `reason
 
 Two more gates hold the agents' own runs at the same claim step (shoofi-server
 `services/hq/run-gates.js`, 2026-11-23): the **daily caps** (`hq-settings.budgetDailyUsd`,
-`budgetAgentUsd`) are hard — past one, new agent runs wait for the next Israel day, an agent
+`budgetAgentUsd`, and the same in % of the weekly limit: `budgetDailyPct` = how far the plan's
+weekly % may rise today, counting every use of the login; `budgetAgentPct` = an agent's
+estimated share today) are hard — past one, new agent runs wait for the next Israel day, an agent
 over its own cap waits alone — and the **agents' night** (`nightOffOn`, `nightOffFrom`–
 `nightOffTo`, off by default) starts no agent run in its window. A ticket whose run sits
 `queued` behind either one is waiting, not stuck or failed: say which gate holds it.
