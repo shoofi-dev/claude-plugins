@@ -1059,6 +1059,16 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       persistent alert (`twin_second_store_released`); `secondStoreWaiting` tells the admin while
       it is still hidden. Prod before: 17 groups' kept store opened 8-45 min after the degrade;
       the 3 failed-undo groups' kept orders were never seen.
+    - **A twin group at `status: "pending_payment"` may already be paid** (HQ #663dec,
+      2026-11-23). Capture sets `paymentStatus: "both_captured"` and moves both legs `0 → 6`
+      but never touches the group `status`; it leaves `pending_payment` only when the
+      first-dispatch store accepts (`/api/order/update/viewd`, and only if `group.dispatch`
+      exists). A cash twin never captures (`paymentStatus` stays `pending`, legs at `6`). So
+      the expiry sweep (`services/twin-order/twin-overdue-sweeper.js`
+      `sweepPendingPaymentExpiry`) cancels only `paymentStatus` in `UNPAID_PAYMENT_STATUSES`
+      (`pending`, `failed`) AND every leg still at `"0"` with no successful receipt
+      (`expiryCancelBlockReason`). Never read "unpaid" off the group status. Test:
+      `twin-expiry-sweep-paid-group.js`.
     - Tests (shoofi-server): `twin-cancel-safety.js`, `twin-admin-auth.js`,
       `order-cancel-undecided.js`, `order-cancel-settle-money.js`,
       `order-cancel-money-before-status.js`, `hq-money-audit.js`, `money-cancel.js`.
