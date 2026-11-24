@@ -176,6 +176,14 @@ Everyone logs in with **phone + 4-digit OTP** (admins use a password). **The `ap
    - The login checks that would reject a deleted account are **commented out**
      (`routes/customer.js`) — deletion is a *request* a human works, not an enforced state.
    Anything that reports deletion must carry **both** fields end to end.
+   - **A customer block is enforced only on the device.** `POST /api/customer/create`
+     sends the OTP *before* it answers `{ phone, isBlocked }`, and `validateAuthCode`
+     never reads `isBlocked`; at order time a blocked customer is only scored high-risk
+     (`routes/order-fraud-detector.js`), not refused. The apps latch `@storage_user_b`.
+     The customer app (`shoofi-app helpers/blocked-customer.ts`, HQ #ce3186) shows an
+     "account restricted" dialog (WhatsApp to `waSupportPhone` when set) and **clears**
+     the latch on a not-blocked answer; an admin's device is never latched. Partner and
+     driver apps still latch for good — never set `customers.isBlocked` on a driver.
    (`GET /api/customer/:customerId` gained `deletedAt` in shoofi-server
    `fix/HIGH-RISK-churn-360-account-status`; add the matching assert once that merges.)
 9. **An AI-helper taste profile (`shoofi.tasteProfiles`) has ONE owner — a customer OR a
