@@ -1069,6 +1069,21 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       (`pending`, `failed`) AND every leg still at `"0"` with no successful receipt
       (`expiryCancelBlockReason`). Never read "unpaid" off the group status. Test:
       `twin-expiry-sweep-paid-group.js`.
+    - **A twin charge and the expiry sweep exclude each other by two markers on the group**,
+      each set by ONE conditional update that checks the other (`twin-group-service.js`):
+      `paymentInFlight { startedAt, attemptId }` (`acquirePaymentInFlight`, set by
+      `captureCombined` before the provider call, cleared on outcome + in a `finally`, stale
+      after `PAYMENT_IN_FLIGHT_STALE_MS` = 10 min) and `expirySweepClaim { token, at }`
+      (`claimExpiryCancel`, refused while a fresh marker stands). `validateGroupForCharge`
+      refuses past `expiresAt`: `/pay` and `/pay-wallet` answer 409 `code:
+      "TWIN_GROUP_EXPIRED"` (a second concurrent attempt: `TWIN_PAYMENT_IN_PROGRESS`), the
+      provider is never called, and the app shows its generic order-failed dialog.
+      `applyCaptureSuccess` writes the GROUP first, conditionally (`markCapturedUnlessCancelled`);
+      a capture landing on a cancelled/claimed group becomes `paymentStatus:
+      "captured_after_cancel"` + `refundRequired*` on the group, receipts on the legs (status
+      untouched) and a capture + undecided `owe` (reason `captured_after_cancel`) on the twin
+      ledger — no refund sent. `verifyAndCaptureTwinSession` asks ZCredit before skipping a
+      cancelled group. Test: `twin-charge-in-flight.js` (HQ #663dec, 2026-11-24).
     - Tests (shoofi-server): `twin-cancel-safety.js`, `twin-admin-auth.js`,
       `order-cancel-undecided.js`, `order-cancel-settle-money.js`,
       `order-cancel-money-before-status.js`, `hq-money-audit.js`, `money-cancel.js`.
