@@ -365,7 +365,10 @@ booking's CREATION time, `cityIds` = pickup zones on `area.cityId`, `peakShiftsO
 `validFrom`/`validTo`, soft delete). The sweeper writes the ledger `delivery-company.drivers-rule-bonuses`
 `{ bookingId (unique), bookId, appName, driverId, companyId, cityId, ruleId, ruleType, ruleName_ar,
 ruleName_he, ruleAmountKind, ruleValue, fee, amount, bookingCreatedAt, bookingCreated, deliveredAt,
-createdAt, paidToBonusesAt, [twinGroupId, twinKey (unique), twinBookingIds | coveredBy, amount 0] }` —
+createdAt, paidToBonusesAt, [twinGroupId, twinKey (unique), twinBookingIds | coveredBy, amount 0],
+[voidedAt, voidedAmount, voidReason "order-cancelled" | cancelHold { at, reportId, reportStatus,
+cancelledBookingIds } | movedFrom, amountBefore, recomputedAt, staleDraftReportId] }` (the second
+bracket: a delivery cancelled after earning, CORE invariant 21) —
 a same-courier twin is one unit paid once on the sum of its fees — and PAYS it as `drivers-bonuses` rows
 (`source: "courier-bonus-rules"`, one per courier/company/Israel calendar day of booking creation,
 amount recomputed from the ledger, unique partial index), which this report reads as `totalBonuses` —
@@ -375,13 +378,18 @@ no new report key, no invoice change. Routes:
   `PUT|DELETE .../rules/:id` → `{ rule }` (409 editing a deleted rule); `GET .../rules/:id/preview?days=30`
   → `{ deliveries, amount, couriers, days }` (read-only, earning units, ignores the switch, the rule's
   dates and other rules); `GET .../ledger?month=YYYY-MM[&driverId]` → `{ month, rows (+ driverName,
-  payment: paid|pending|missing|differs|covered), total, count (paying rows) }`.
+  payment: paid|pending|missing|differs|covered|voided|cancelled-after-report), total, count (paying
+  rows) }`; `GET .../by-booking/:bookingId` → `{ bonus: null | ledger row + payment, driverName,
+  coveredByBookId }` (the order card; historic rows with the switch off too).
 - courier (`driverSelfAction`): `GET /api/delivery/driver/me/bonuses` → `{ enabled: false }` or
   `{ enabled: true, rules: [{ id, type, name_ar, name_he, days, from, to, amountKind, value,
   peakShiftsOnly, validFrom, validTo }] (active, started, not expired, cities ∩ company supportedCities),
   month: { reportMonth, ruleBonuses, count, manualBonuses (without the source rows) }, today: { date,
   ruleBonuses, count } }` — `today` is `me/day-summary`'s business day: D = `businessDate(now)`, rows
-  booked in `[D 09:00, D+1 02:00)`.
+  booked in `[D 09:00, D+1 02:00)`. `GET .../me/bonuses/by-booking?ids=a,b` (max 50) → `{ enabled: false }`
+  or `{ enabled: true, bonuses: { [bookingId]: { amount, state: paid|pending|covered|voided|cancelled-after-report,
+  ruleName_ar, ruleName_he, ruleAmountKind, ruleValue, fee, voidedAmount, coveredByBookId, isTwin } } }` —
+  the token's own rows only.
 Cash fees are reported as receipts but are **NOT** in the transfer (already in the driver's pocket).
 
 **Who a driver report and its invoices are sent to** (`delivery-company.store`, verified 2026-11-05):
