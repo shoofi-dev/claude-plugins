@@ -326,7 +326,20 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
   `{websocket, push, email, sms}` and no WhatsApp channel; respond.io is customer-only), so
   any such link is client-side.
 - **Location**: `POST /api/delivery/driver/location` writes `currentLocation` (GeoJSON) +
-  `driverLocationHistory` (TTL) + broadcasts to admin/tracking. Driver app sends fg (10s) + background.
+  `driverLocationHistory` (30-day TTL on `expiresAt`, ensured at startup by
+  `services/delivery/driver-location-indexes.js`) + broadcasts to the **admin** map only. Driver
+  app sends fg (10s) + background. **The driver is the token's** (`driverLocationPost` =
+  `auth.optional` + `driverLocationIdentity`, `services/delivery/admin-access.js`): a body
+  naming another driver is 403; a token-less post is still accepted but stored
+  `lastFixVerified: false` and logged once per driver per 10 min; `DRIVER_LOCATION_REQUIRE_AUTH=1`
+  turns that into 401. Callers (2026-11-25): shoofir only — `hooks/useDriverLocationTracking.ts`,
+  `utils/locationBackgroundTask.ts`, `stores/delivery-driver/index.ts`, all `Token` +
+  `shoofi-shoofir` with `driverId = userDetails.customerId`. The fetch-based
+  `deliveryDriverService.updateDriverLocation` copied into partner/customer has no importer.
+- **Who reads positions:** `GET /api/delivery/drivers/locations` — dashboard roles, or a shoofir
+  company admin for its own company (`driverLocationsAccess`); and the customer's staff-pilot map
+  `GET /api/delivery/customer/order/:orderId/driver-location` (CORE invariant 22), which shows
+  only a `lastFixVerified` fix under 2 minutes old.
 - **Shifts** (`routes/driver-shift-manager.js`, `driverShifts` collection): booking system
   gated by `useBookingSystem`; peak-hours per `cityArea`; permanent-drivers; block/unblock.
 
@@ -336,7 +349,10 @@ constants are overridable per-deployment as `promiseBaseMinutes` / `promiseSpeed
 **`delivery-coverage-alerts`**; `db.deliveryCoverageAlerts` is only the property binding,
 `DatabaseInitializationService.js`) · `store-delivery-availability` · `driver-shift` (hourly
 deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
-`driver-inactivate` (**currently disabled** — commented out in app.js).
+`driver-inactivate` (**currently disabled** — commented out in app.js) · `customer-eta`
+(every minute, lock `cron:customer-eta` — raises `customerEtaAt` on the four delay signals and
+sends the neutral delay push, max 3 per order; never writes `expectedDeliveryAt`; CORE invariant
+22, shoofi-server `docs/order-tracking-delivery.md`).
 
 **`store-delivery-availability`: the alerts are noisy on the hour.**
 - It runs every 30 minutes, around the clock, with no business-day gate, and writes `shoofi.store-delivery-availability-alerts`.
@@ -356,7 +372,10 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   originalBookId, appName, customerLocation, order(snapshot), twinGroupId,
   twinPickupSequence, twinAssignmentMode, twinPeer, twinDegraded, *DelayNotified*,
   assignedAt, approvedAt, waitingInStoreAt(Date), startedAt, completedAt(Date), cancelledAt,
-  isReadyForPickup, readyForPickupAt}`.
+  isReadyForPickup, readyForPickupAt, customerEtaAt(Date), customerEtaHistory[],
+  delayNotice{count,lastToldEtaAt,lastNoticeAt}, deliveredAt(Date)}`.
+  `customerEtaAt` is the customer's forward-only estimate — never confuse it with, or copy it
+  into, `expectedDeliveryAt` (CORE invariant 22). Absent on bookings made before 2026-11.
   ⚠️ `order._id` is an ObjectId on partner-accept bookings and a 24-hex **string** on bookings
   made over `POST /api/delivery/book` — query both forms (CORE invariant 21).
   ⚠️ Fields that are not what they look like (CORE invariant 11): `readyForPickupAt` exists
@@ -381,6 +400,8 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   personalSupportedAreas[areaId], maxOrdersByAdmin,
   storeAssignmentMode, assignedStoreAppNames[]`.
   ⚠️ `isOnline` is on the documents but means nothing, and
+  `lastFixVerified` (bool, since feat/order-tracking) says whether a driver token signed the
+  last fix; only a verified fix reaches a customer.
   `isAvailable`/`availabilityReason`/`lastAvailabilityUpdate` are populated on **0** drivers
   — which is why they are not in the list above at all. `isActive` is the only availability
   flag; see §5 and CORE invariant 4. Matching a driver: `role:'driver'` is 242 docs and
@@ -393,6 +414,10 @@ deactivate off-shift / remind) · `driver-daily-hours` (precompute hours) ·
   be dispatchable yet invisible to the `$or`.
 - Geo: `cities, parentCities, cityAreas, areas, areasGeometry`. Ops: `driverStatusHistory,
   driverLocationHistory(30-day TTL on `expiresAt`), driverShifts, driverDailyHours, deliveryConfig`.
+  `deliveryConfig` (collection `delivery-config`) documents by `type`: `driver-assignment`,
+  `twin-order`, and `customer-tracking` = `{mapPilotPhones: [...]}`, the staff map pilot
+  allowlist (digits compared, leading 972 = 0; absent/empty = map off; re-read at most once a
+  minute per server; edit with `$addToSet` / `$pull`, no deploy).
 
 ## 8. Cross-domain edges (hand off, don't reach in)
 - **ORDERS (you're the callee)**: at partner-accept `routes/order.js` builds `deliveryData`
@@ -582,6 +607,15 @@ the `order-timer.tsx` in `screens/order/{active,history,item}` and by
 which the twin header already treats as "no booking yet". A 401 opens the app's sign-out
 dialog, but every screen that polls this route already sits behind the auth-gated
 `order/customer-active-orders`. The app never calls `delivery/order/:orderId/driver`.
+**Since order tracking (CORE invariant 22)** a customer token gets `customerBookingView`, not
+the snapshot: `{_id, bookId, appName, status, created, pickupTime, expectedDeliveryAt,
+customerEtaAt, isDelayed, deliveredAt, startedAt, mapAvailable, driver: {firstName}|null,
+order: {_id, orderId}, twinGroupId}` — `driver` only at status 3, never a phone or an id. The app
+should send the order's Mongo `_id` (unique; both stored forms match) and count down from
+`customerEtaAt`. With `mapAvailable` it polls
+`GET delivery/customer/order/:orderId/driver-location` every 10 s
+(`{available:false}` | `{available:true, lat, lng, at}`). The delay push arrives as
+`type: "order_delay"` with `data {type, orderId, orderNumber, appName}`.
 
 ## 10. Known status / flagged for verdict (do NOT silently "fix")
 1. **CONFIRMED BUG — FIXED** (partner PR #4): partner `DELIVERY_STATUS` was `0..3`, off by one
