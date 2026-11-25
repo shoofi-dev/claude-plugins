@@ -1,6 +1,6 @@
 ---
 domain: accountant
-last-verified: shoofi-server@feat/courier-bonus-rules / 2026-11-20 (invariant 21: courier rule bonuses — off-by-default switch, sweeper-written frozen ledger, Shoofi-paid report line, byte-identical without rows, the open company-invoice blocker; ref §6/§8); shoofi-server@feat/coupon-draft-edit + shoofi-delivery-web@feat/coupon-draft-edit / 2026-11-18 (invariant 13: a created coupon is edited from its draft — reopen / cancel-edit, update-mode approval through the unchanged update route, carried-over fields, settle by comparison, past orders not re-billed); shoofi-server@fix/coupon-draft-customer-area + shoofi-delivery-web@fix/coupon-form-zone-labels / 2026-11-17 (invariant 13 targeting: supportedCities = the store's pickup zone, customer targeting = supportedAreas, the never-matches draft blocker, assistant rule 4a); shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13 (invariant 20: Kopa QR table orders, `source: "kopa-qr"`, shown as tableOrdersCount / tableOrdersRevenue and in no settlement figure; invariant 3 + 17 pointers); shoofi-server@fix/partner-summary-date-validation / 2026-11-12 (invariant 17 partner/summary + daily-orders validate period/month/startDate/endDate/date before any read, 400 INVALID_PERIOD; shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till sessions: no money without a shift, ref §12); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 6 — cancelled excluded from settlement, keep → Shoofi COMP credited at redemption, customer documents fixed at capture); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData run in-process, OPT-IN via body `figures: "report"`; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's body moved to services/payments/store-sales.js — invariant 7/13/14/15 line refs repointed; ref §4); shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08 (invariant 17 partner/details deleted with admin/partners + admin/analytics, the flat-15% routes; ref §3/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@feat/code-coupons-filter + shoofi-delivery-web@feat/code-coupons-filter / 2026-11-07 (invariant 14 code coupons out of funder buckets, kind=code, ref); shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
+last-verified: shoofi-server@feat/courier-bonus-rules / 2026-11-25 (invariant 21: courier rule bonuses — off-by-default switch, sweeper-written frozen ledger, paid through drivers-bonuses → totalBonuses (report and invoices unchanged), a twin pays once; ref §6/§8); shoofi-server@feat/coupon-draft-edit + shoofi-delivery-web@feat/coupon-draft-edit / 2026-11-18 (invariant 13: a created coupon is edited from its draft — reopen / cancel-edit, update-mode approval through the unchanged update route, carried-over fields, settle by comparison, past orders not re-billed); shoofi-server@fix/coupon-draft-customer-area + shoofi-delivery-web@fix/coupon-form-zone-labels / 2026-11-17 (invariant 13 targeting: supportedCities = the store's pickup zone, customer targeting = supportedAreas, the never-matches draft blocker, assistant rule 4a); shoofi-server@fix/HIGH-RISK-table-orders-no-commission / 2026-11-13 (invariant 20: Kopa QR table orders, `source: "kopa-qr"`, shown as tableOrdersCount / tableOrdersRevenue and in no settlement figure; invariant 3 + 17 pointers); shoofi-server@fix/partner-summary-date-validation / 2026-11-12 (invariant 17 partner/summary + daily-orders validate period/month/startDate/endDate/date before any read, 400 INVALID_PERIOD; shoofi-server@feat/kopa-phase5 407a0533 / 2026-11-12 (Kopa till sessions: no money without a shift, ref §12); shoofi-server@fix/invoice-retry-twin-aware / 2026-11-06 (invariant 6 — cancelled excluded from settlement, keep → Shoofi COMP credited at redemption, customer documents fixed at capture); shoofi-server@fix/partner-summary-figures / 2026-11-09 (invariant 17 partner/summary = the store report's figures from generateStoreReportData run in-process, OPT-IN via body `figures: "report"`; without it the legacy answer, main's handlers verbatim in services/payments/partner-summary-legacy.js; stores-export-new's body moved to services/payments/store-sales.js — invariant 7/13/14/15 line refs repointed; ref §4); shoofi-server@chore/remove-flat-15-commission-routes / 2026-11-08 (invariant 17 partner/details deleted with admin/partners + admin/analytics, the flat-15% routes; ref §3/§4); shoofi-server@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK + shoofi-delivery-web@fix/send-store-invoice-no-shoofi-doc-HIGH-RISK / 2026-11-08 (invariant 19 when Shoofi owes the store, the store's invoice goes out alone; ref §5); shoofi-server@fix/send-invoice-no-store-doc + shoofi-delivery-web@fix/send-invoice-no-store-doc / 2026-11-08 (invariant 19 an all-cash store's Shoofi invoice goes out alone; ref §5); shoofi-server@feat/tax-consent-renewal + shoofi-delivery-web@feat/tax-consent-renewal / 2026-11-07 (invariant 19 the owner's EZcount consent: two grants, live check, instructions message, send log, renewal reminder off by default; ref §5/§8/§9); shoofi-server@feat/code-coupons-filter + shoofi-delivery-web@feat/code-coupons-filter / 2026-11-07 (invariant 14 code coupons out of funder buckets, kind=code, ref); shoofi-server@feat/gift-coupons-filter + shoofi-delivery-web@feat/gift-coupons-filter / 2026-11-07 (invariant 14 gift cards out of funder buckets, kind filter, gift balance, ref); shoofi-server@fix/coupons-active-hides-expired + shoofi-delivery-web@fix/coupons-active-hides-expired / 2026-11-07 (invariant 14 isActive=live/expired, ref); shoofi-server@fix/report-problems-from-facts + shoofi-delivery-web@fix/report-problems-from-facts / 2026-11-06 (invariant 19 one derivation from the facts + bounded period, ref §6/§8/§9/§10); shoofi-server@feat/company-invoice-steps + shoofi-delivery-web@feat/company-invoice-steps / 2026-11-06 (invariants 18 sending + 19 companies, ref §6/§8/§9/§10); shoofi-server@feat/reports-row-redesign + shoofi-delivery-web@feat/reports-row-redesign / 2026-11-06 (invariant 19 filter chips, ref §8/§9); shoofi-server@feat/invoice-allocation-guard + shoofi-delivery-web@feat/invoice-allocation-guard / 2026-11-05 (invariant 19, invariant 17 audit note, Known status); shoofi-server@3396b09b + shoofi-delivery-web@6449ee8 (feat/driver-reports-bulk-invoice-send) / 2026-11-05 (invariant 18 sending bullet, ref §6/§8/§9); shoofi-server@58e5406b (fix/company-invoice-negative-additions) / 2026-11-03 (invariant 18, ref §7b/§8); shoofi-server@5fee4df2 (fix/financial-overview-cash-net) / 2026-11-02 (invariant 2 name trap, ref §4/§6); shoofi-server@ca73c7d8 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@c27add49 (fix/payments-open-auth) / 2026-10-30 (invariant 17); shoofi-server@7d8c3ebc (fix/accountant-admin-auth) / 2026-10-30 (invariant 17); shoofi-server@cba297cd (fix/compensations-auth) / 2026-10-29
 scope: shoofi-server (computation) + shoofi-delivery-web (the admin cockpit)
 reference: ./reference.md   # report internals, invoice types, MASAV format, data model
 ---
@@ -1112,49 +1112,55 @@ balance** (owes Shoofi) → settled via a credit note (docType 330).
     without table orders; with them only `tableOrders*` changes; no tier move; the PDF line; the
     HTTP readers), and the unchanged `test/integration/partner-summary-legacy.js` golden.
 
-21. **Courier RULE bonuses are a separate, frozen, Shoofi-paid line — off by default, and the
-    switch never removes money** (owner decisions 2026-11-20; shoofi-server `feat/courier-bonus-rules`,
-    `docs/courier-bonuses.md`). **The money:** Shoofi pays it, on top of everything else, whatever
-    the payment method. On a CASH delivery the courier kept the fee at the door (invariant 2) and the
-    bonus is still owed by Shoofi; the company's share, the fees, the cash/card split, the manual
-    bonuses, the compensations and the hourly top-up do not move.
+21. **Courier RULE bonuses are paid through the EXISTING bonuses row — off by default, frozen per
+    booking in a ledger, and the switch never removes money** (owner decisions 2026-11-20 and
+    2026-11-25; shoofi-server `feat/courier-bonus-rules`, `docs/courier-bonuses.md`). **The money:**
+    Shoofi pays it, on top of everything else, whatever the payment method. On a CASH delivery the
+    courier kept the fee at the door (invariant 2) and the bonus is still owed by Shoofi.
+    - **Payment = `delivery-company.drivers-bonuses`**, the manual-bonus collection: the report pays it
+      as `totalBonuses`, so `routes/driver-reports.js` is unchanged (byte-identical to main) and the
+      company's additions invoice (`routes/hyp.js`, invariant 18) and its mirrors already carry it —
+      invoice 1 + invoice 2 still tile `netTotal`. There is no separate report line and no invoice
+      change. No VAT step for any business type (like every `totalBonuses` row). Not in the hourly
+      minimum's `earned` base.
     - **The switch:** `shoofi.store {id:1}.courierBonusesEnabled`, only a literal `true` is on
-      (`services/courier-bonuses/store.js loadSettings`). Off → the sweeper earns nothing and the
-      courier route answers `{ enabled: false }`. **Off never removes money:** manual bonuses
-      (`drivers-bonuses`) and rows already in the ledger are paid with it off.
-    - **Earning = the ledger** `delivery-company.drivers-rule-bonuses`, one row per booking
-      (unique `bookingId`), written ONLY by the background sweeper
-      (`services/courier-bonuses/sweeper.js`, every 5 min, Redis lock `courier-bonuses:sweep`,
-      started in the `shouldRunCrons` block) — never in the delivery completion route. The amount is
-      frozen: no code updates or deletes a row; editing or deleting a rule changes no past money.
-      The unique index is built before any insert of a run, and a run whose index build fails writes
-      nothing. Only `status "4"`, non-delivery-only bookings, delivered in the last 48h, after the
-      switch went on and after the rule was created.
+      (`services/courier-bonuses/store.js loadSettings`). Off → nothing new is earned and the courier
+      route answers `{ enabled: false }`. **Off never removes money:** manual bonuses, the rule-bonus
+      rows already written, and earned-but-unwritten ledger rows (the pay step runs with it off) are
+      all paid. Gate on the admin routes: `settlementDashboard` (owner ruling: keep it).
+    - **Earning = the ledger** `delivery-company.drivers-rule-bonuses`, written ONLY by the background
+      sweeper (`services/courier-bonuses/sweeper.js`, every 5 min, Redis lock `courier-bonuses:sweep`,
+      started in the `shouldRunCrons` block) — never in the delivery completion route. One row per
+      earning unit, unique `bookingId`; the amount is frozen (no code changes it; the only later write
+      is the `paidToBonusesAt` stamp). Unique index before any insert; a run whose index build fails
+      writes nothing. Only `status "4"`, non-delivery-only bookings, delivered in the last 48h, after
+      the switch went on and after the rule was created.
+    - **A twin pays ONCE** (owner ruling 2026-11-25, `evaluate.js buildUnits`): the sides of one twin
+      group carried by the same courier are one unit, evaluated once all of them are delivered, on the
+      sum of their fees (both shipping prices + the twin fee; a fixed rule pays once). One paying row
+      (unique `twinKey` = `twinGroupId:driverId`) + a covered row (`amount: 0`) per other side, so a
+      side never earns alone later. A twin split between two couriers earns per courier.
     - **The window is decided by the booking's CREATION time** (`book-delivery.created`, Israel wall
-      clock); a window crossing midnight keeps its tail on the day it started. The multiplier's fee is
-      `effectiveDeliveryFee` of THAT booking (each twin side on its own). Pickup zone = `area.cityId`.
-      At most one rule per delivery, highest wins.
-    - **The report line** (`routes/driver-reports.js` → `services/courier-bonuses/report-line.js
-      loadReportRuleBonuses`): `totalRuleBonuses` / `ruleBonusCount` / `ruleBonusesList`, added to
-      `netTotal` after every other term, and in `recomputeMinGuarantee`. A row counts only if its
-      booking is, at report time, delivered, not delivery-only, in the report's `created` range and
-      carried by this company's courier. **No rows → no key at all**: the report is byte-identical
-      (prod, origin/main vs branch, 10/2026: 190/190 companies, JSON and PDF HTML). **No VAT step**
-      for any business type (like `totalBonuses`; recipe rule "never introduce a new VAT point").
-      Not in the hourly minimum's `earned` base.
-    - **⚠ OPEN — blocks switching it on: the company invoice.** `create-company-invoice`
-      (`routes/hyp.js`, do-not-touch) does not add `totalRuleBonuses` to `additionsAmount`, so a
-      report carrying it fails the invariant-18 reconcile guard (400 `RECONCILE_MISMATCH`): fail-closed,
-      but no invoice. The follow-up adds the term + an `additionsItems` row there and to
-      `utils/driver-invoice-status.js`, `services/invoicing/company-invoice-precheck.js`,
-      `services/accountant-export/movein.js`, `services/exec-dashboard/spend-metrics.js` and the driver
-      aggregation in `routes/payments/admin-reports.js`. Until then: keep the switch off in prod.
-    - **Readers of `netTotal` follow automatically:** the financial overview and the courier's
-      next-payout route (shoofi-server #624). MASAV is built from an uploaded Excel (decoupled).
+      clock); a window crossing midnight keeps its tail on the day it started. Pickup zone =
+      `area.cityId`. At most one rule per unit, highest wins.
+    - **The payable row** (`services/courier-bonuses/payout.js`): one `drivers-bonuses` row per courier,
+      company and Israel CALENDAR day of the booking's creation (so it lands in the delivery's report
+      month), with the add route's fields + `source: "courier-bonus-rules"`, `createdBy` the same,
+      reason «בונוס שעות שיא – <rule>», `date` = that day 12:00 Israel. **Idempotent:** the amount is
+      RECOMPUTED from the ledger and `$set` (never `$inc`), under a unique partial index
+      `{source, driverId, deliveryCompanyId, date}` built before the first write. An admin may delete a
+      generated row in the bonus screen; the ledger route then shows `payment: "missing"`.
+    - **Known limit:** a booking cancelled after its bonus was paid keeps the bonus row — adjust it in
+      the bonus screen.
+    - **Readers:** the courier route's `manualBonuses` EXCLUDES the `source` rows (they are its
+      `ruleBonuses`); the admin bonus list shows them as stored. Everything reading `netTotal` /
+      `totalBonuses` follows: the financial overview, the courier next-payout route (#624), the
+      spend dashboards. MASAV is built from an uploaded Excel (decoupled).
     - **Routes:** `/api/shoofiAdmin/courier-bonuses/{settings,rules,rules/:id,rules/:id/preview,ledger}`
-      behind `settlementDashboard` (same gate as `driver-bonuses/*`, audit-logged writes);
-      `GET /api/delivery/driver/me/bonuses` behind `driverSelfAction`. Shapes: reference §6.
-    Tests: shoofi-server `test/integration/courier-bonus-{rules,sweeper,report,routes}.js`.
+      behind `settlementDashboard` (audit-logged writes); `GET /api/delivery/driver/me/bonuses` behind
+      `driverSelfAction`. Shapes: reference §6.
+    Tests: shoofi-server `test/integration/courier-bonus-{rules,sweeper,report,routes}.js` (the report
+    suite runs ledger → drivers-bonuses → the real engine → `companyDocumentAmounts`).
 
 ## Kopa till sessions & reports (phase 5)
 *(shoofi-server@feat/kopa-phase1, 2026-11-12; "no money without a shift": shoofi-server@feat/kopa-phase5 407a0533, 2026-11-12. Detail: reference §12.)*
