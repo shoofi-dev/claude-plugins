@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@feat/order-tracking / 2026-11-25 (invariant 22: customerEtaAt forward-only, expectedDeliveryAt never written for the customer; the customer-eta cron + delay push; the customer book view; the staff map pilot; POST driver/location takes the driver from the token, GET drivers/locations dashboard / own-company admin only; invariant 21 book/:bookId matches both order._id forms); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -90,6 +90,10 @@ never an error.
 - Its projection whitelists `fullName`/`name`/`phone` inline, but `PUBLIC_DRIVER_FIELDS`
   (`lib/delivery/helpers.js`) has **neither `name` nor `phone`**. Refactoring this route onto
   `sanitizeAvailableCompanies` would silently delete the phone from the map and its search.
+- **It is gated (`driverLocationsAccess`, `services/delivery/admin-access.js`) since
+  feat/order-tracking.** Dashboard roles as before; a shoofir **company admin** for its own
+  `companyId` only (forced; naming another company is 403) — that is shoofir's
+  `drivers-map.tsx`, shown to `role: "admin"`. A plain driver, a store and a customer are 403.
 
 ## Delivery-only — a courier with no order behind it
 A store can book a driver for goods **Shoofi never sold**: owner picks a town, gives a phone
@@ -644,9 +648,10 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
       (string). Any lookup by order must ask for both (`idVariants`). `GET
       /api/delivery/order/:orderId/driver` asked for the ObjectId only, so the partner's driver
       dialog 404ed on a string-stored booking; it matches both since shoofi-server PR 486.
-      Still ObjectId-only, unreached today: the `order._id` branch of `GET delivery/book/:bookId`
-      (every client passes the short `orderId`, which its `bookId` branch matches) and the
-      support location update in `routes/customer.js` (it also matches on `bookId`).
+      `GET delivery/book/:bookId` and `GET /api/delivery/customer/order/:orderId/driver-location`
+      match both forms since feat/order-tracking (the customer app moves to sending the order
+      `_id`, invariant 22). Still ObjectId-only, unreached today: the support location update in
+      `routes/customer.js` (it also matches on `bookId`).
     - **ETA = the engine's assignment-time `estimatedArrivalAtStore`; there is no live ETA.**
       It is quoted only for the courier who holds the row NOW: after a reassignment only
       `reassignmentMetadata.pickupFeasibility` (the reassign routes leave the previous courier's
@@ -670,6 +675,52 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
     - **Reach.** `sendToAppAdmins` iterates only the sending process's sockets — no Redis
       fan-out — and prod runs two instances, so a frame does not reach a tablet held by the other
       instance. True of every partner frame; the card must keep its focus/action refetch.
+
+22. **The customer's estimate is `customerEtaAt`, a separate forward-only field —
+    `expectedDeliveryAt` is NEVER written for the customer.** `expectedDeliveryAt` is the
+    courier's lateness KPI (`late-delivery.js`) and a dispatch input (overdue + headroom terms);
+    only the store's `POST /api/order/update-delay` moves it. Order tracking (shoofi-server
+    `docs/order-tracking-delivery.md`, `services/delivery/customer-eta.js`):
+    - **Fields on `book-delivery`:** `customerEtaAt` (Date; written at booking by
+      `customerEtaAtFrom(expectedDeliveryAt)` in both writers, absent on older rows),
+      `customerEtaHistory [{at, etaAt, reason}]` (internal, newest 50; reasons `store_delay` ·
+      `missed_pickup` · `no_driver` · `past_promise`), `delayNotice {count, lastToldEtaAt,
+      lastNoticeAt}`, `deliveredAt` (Date beside `completedAt` at status 4; readers fall back to
+      `completedAt`). Read it through `effectiveCustomerEtaOf` = stored value, never earlier than
+      the current `expectedDeliveryAt`, and `expectedDeliveryAt` when absent.
+    - **Forward-only is in the write FILTER** (`customerEtaAt: {$lt: new}` or absent), not only
+      in the arithmetic — a racing writer can never lower it. Never `$set` it unfiltered.
+    - **The cron** `utils/crons/customer-eta-cron.js` (every minute, lock `cron:customer-eta`)
+      evaluates four signals on active bookings (1/2/3/5, not delivery-only, with an
+      `order.customerId`, promise not more than 4 h past): store delay → the new promise;
+      missed pickup (`currentPickupInstantOf`, never the pickup-checker's `set({hour})`) →
+      now + 5 + travel; no courier 10 min past `assignDriverAt` → max(now + 10, pickup) +
+      travel; past our own estimate → now + 10. Travel = the transit term of
+      `computeDeliveryPromise` (not the `maxETA`-floored promise). Constants: `CUSTOMER_ETA`.
+    - **Delay push (F1):** first when the estimate is > 5 min past the booking promise
+      (`originalExpectedDeliveryAt || expectedDeliveryAt`), then only > 5 min past
+      `lastToldEtaAt`, max 3 per order; claimed by a CAS on `delayNotice.count` BEFORE sending
+      (at-most-once). A twin group is one customer: one push, state mirrored on the halves,
+      single mode aligns both estimates. Sent with the orders domain's `sendCustomerOrderPush`
+      (`services/order-tracking/customer-push.js`: D4 text, the order's language then the
+      customer's, `appType: "shoofi-shopping"`, `type: "order_delay"`).
+    - **A customer never sees the courier's phone or id (D3/F2).** `GET delivery/book/:bookId`
+      and `GET delivery/order/:id` answer a customer token (`req.deliveryAudience ===
+      "customer"`) with `customerBookingView` — a whitelist with `driver: {firstName}` only at
+      status 3, else `null`, plus `customerEtaAt`, `isDelayed`, `deliveredAt`, `mapAvailable`.
+      Store, courier and dashboard tokens keep the full redacted document. Customer pushes from
+      `routes/delivery/admin.js` go through `sendCustomerOrderPush` too: no courier name/phone,
+      `appType: "shoofi-shopping"` (the customer socket's registered type; the old
+      `"shoofi-app"` never matched it, so those live frames were dropped).
+    - **The live map is a staff pilot.** `GET /api/delivery/customer/order/:orderId/driver-location`
+      (`routes/delivery/customer-tracking.js`) is available only for a phone on
+      `delivery-config {type: "customer-tracking"}.mapPilotPhones`, status 3, this order the
+      courier's **next drop** (every status-3 booking he holds belongs to this customer), and a
+      fix < 2 min old with `lastFixVerified: true`. Edit the list in the DB; no deploy.
+    - **`POST /api/delivery/driver/location` takes the driver from the TOKEN**
+      (`driverLocationPost`). A token-less post is still accepted for now, stored
+      `lastFixVerified: false` and logged; `DRIVER_LOCATION_REQUIRE_AUTH=1` refuses it. There is
+      no per-ping customer broadcast (the old one read a top-level `customerId` and never sent).
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**

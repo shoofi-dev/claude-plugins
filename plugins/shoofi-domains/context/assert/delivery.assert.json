@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@feat/order-tracking / 2026-11-25 (CORE invariant 22: customerEtaAt forward-only + expectedDeliveryAt never written for the customer, customer-eta cron, customer book view, staff map pilot, driver location token auth, drivers/locations gate; invariant 21 book/:bookId both order._id forms); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -857,6 +857,69 @@
           ],
           "regex": "(?:admin/cancel legacy \\{bookId\\} shared by 3 rows cancels the single live one|bookId: deliveryData\\.bookId  // Match by bookId)",
           "desc": "CORE invariant 20: the decoy-first tests (another store + same store older row inserted ahead of the real one) - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": [
+            "services/delivery/customer-eta.js",
+            "services/delivery/delivery-promise.js"
+          ],
+          "regex": "(?:\\$or: \\[\\{ customerEtaAt: \\{ \\$exists: false \\} \\}, \\{ customerEtaAt: null \\}, \\{ customerEtaAt: \\{ \\$lt: eta \\} \\}\\],\\s*\\},\\s*\\{\\s*\\$set: \\{ customerEtaAt: eta \\},|function expectedDeliveryAtFrom\\(pickupTimeDate, minutes, offsetHours\\))",
+          "desc": "CORE invariant 22: customerEtaAt is raised only through a $lt-filtered write, and the write sets customerEtaAt alone (never expectedDeliveryAt) - valid-before leg matches shoofi-server main before the code PR; drop it once shoofi-server feat/order-tracking has merged"
+        },
+        {
+          "file": [
+            "services/delivery/customer-eta.js",
+            "services/delivery/delivery-promise.js"
+          ],
+          "regex": "(?:NOTICE_THRESHOLD_MIN: 5,[\\s\\S]*?MAX_NOTICES: 3,[\\s\\S]*?COLLECT_BUFFER_MIN: 5,[\\s\\S]*?OVERRUN_BUFFER_MIN: 10,[\\s\\S]*?REACH_MIN: 10,[\\s\\S]*?NO_DRIVER_GRACE_MIN: 10,|function expectedDeliveryAtFrom\\(pickupTimeDate, minutes, offsetHours\\))",
+          "desc": "CORE invariant 22: the CUSTOMER_ETA constants (5 min notice threshold, max 3 notices, 5/10/10/10 min buffers) - valid-before leg matches shoofi-server main before the code PR; drop it once shoofi-server feat/order-tracking has merged"
+        },
+        {
+          "file": [
+            "services/delivery/customer-eta.js",
+            "services/delivery/delivery-promise.js"
+          ],
+          "regex": "(?:const pickup = currentPickupInstantOf\\(booking\\);|function expectedDeliveryAtFrom\\(pickupTimeDate, minutes, offsetHours\\))",
+          "desc": "CORE invariant 22: the missed-pickup signal reads late-delivery.currentPickupInstantOf, never a set({hour}) rebuild - valid-before leg matches shoofi-server main before the code PR; drop it once shoofi-server feat/order-tracking has merged"
+        },
+        {
+          "file": [
+            "services/delivery/customer-eta.js",
+            "services/delivery/delivery-promise.js"
+          ],
+          "regex": "(?:const firstName = status === DELIVERY_STATUS\\.COLLECTED_FROM_RESTAURANT \\? firstNameOf\\(booking\\?\\.driver\\?\\.fullName\\) : null;|function expectedDeliveryAtFrom\\(pickupTimeDate, minutes, offsetHours\\))",
+          "desc": "CORE invariant 22: a customer sees the courier as { firstName } only at status 3 - valid-before leg matches shoofi-server main before the code PR; drop it once shoofi-server feat/order-tracking has merged"
+        },
+        {
+          "file": [
+            "utils/crons/customer-eta-cron.js",
+            "utils/crons/delivery-pickup-checker.js"
+          ],
+          "regex": "(?:const LOCK_KEY = \"cron:customer-eta\";|const lockKey = 'cron:delivery-pickup-checker';)",
+          "desc": "reference §6: the customer-eta cron's Redis lock - valid-before leg matches shoofi-server main before the code PR; drop it once shoofi-server feat/order-tracking has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "router\\.get\\(\"/api/delivery/book/:bookId\", \\.\\.\\.deliveryOwnerOrDashboard,[\\s\\S]*?(?:if \\(req\\.deliveryAudience === \"customer\"\\) \\{[\\s\\S]*?customerBookingView\\(delivery, \\{ mapAvailable \\}\\)|res\\.status\\(200\\)\\.json\\(redactDeliveryCredentials\\(delivery\\)\\);)",
+          "desc": "CORE invariant 22: book/:bookId answers a customer token with customerBookingView - valid-before leg matches shoofi-server main before the code PR; drop it once shoofi-server feat/order-tracking has merged"
+        },
+        {
+          "file": [
+            "services/delivery/customer-tracking.js",
+            "services/delivery/delivery-promise.js"
+          ],
+          "regex": "(?:const PILOT_CONFIG_TYPE = \"customer-tracking\";[\\s\\S]*?const MAP_FIX_MAX_AGE_MS = 2 \\* 60 \\* 1000;|function expectedDeliveryAtFrom\\(pickupTimeDate, minutes, offsetHours\\))",
+          "desc": "CORE invariant 22 + reference §7: the map pilot allowlist is delivery-config {type: customer-tracking}, fixes under 2 minutes - valid-before leg matches shoofi-server main before the code PR; drop it once shoofi-server feat/order-tracking has merged"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "router\\.post\\(\"/api/delivery/driver/location\", (?:\\.\\.\\.driverLocationPost, )?async",
+          "desc": "reference §5: POST driver/location runs driverLocationPost (driver from the token) - the optional group is the valid-before leg; make it mandatory once shoofi-server feat/order-tracking has merged"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "router\\.get\\(\"/api/delivery/drivers/locations\", (?:\\.\\.\\.driverLocationsAccess, )?async",
+          "desc": "CORE driver identity + reference §5: GET drivers/locations is dashboard / own-company admin only (driverLocationsAccess) - the optional group is the valid-before leg; make it mandatory once shoofi-server feat/order-tracking has merged"
         }
       ]
     },

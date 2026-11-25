@@ -245,6 +245,17 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   Before 2026-11-06 undo's group write went to `db.twinOrderGroups`, aliased to the empty
   `twin-order-groups`, so it never restored a group. All three write `orderFlowEvents` on both
   legs (`twin_cascade_cancel`, `twin_degrade`, `twin_undo_degrade`) with the admin as actor.
+- **The customer is told about a degrade (D6, CORE invariant 36, 2026-11-25).** The dropped leg is
+  cancelled directly by the service, never through `/api/order/update`, so no status push ever
+  reached the customer for it and the dropped order simply left the active list.
+  `degradeToSingle` now starts `notifyCustomerTwinPartCancelled` (not awaited, never throws): push
+  `type: twin_part_cancelled`, `data.orderId` = the KEPT order's `_id`, `data.cancelledAppName`,
+  `data.groupId`, product's text «تم إلغاء جزء من طلبك. لن تدفع ثمن الجزء الملغي من الطلب.» /
+  «חלק מההזמנה שלך בוטל. לא תחויב על החלק שבוטל.» in the kept order's language. Skipped when
+  the kept order is itself cancelled; nothing is sent on `undoDegrade`. The customer's active list
+  shows `twinPartCancelled { storeName, at }` on the kept order (§5). The `twin_group_degraded`
+  websocket frame carries `cancelledAppName` + `keptAppName` beside `cancelledSide`/`keepSide`,
+  and now reaches the customer app (`shoofi-shopping`; it was sent to `"shoofi-app"` and dropped).
 - Never route twin peer transitions through `/api/order/update` — use the services (recursion).
 
 ## 5. Data model — the join map (memorize the snapshot trap)
@@ -363,7 +374,19 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   - **Matched correctly:** `filterOutDeliveredOrders` (`utils/active-orders.js`, behind
     `GET /api/order/customer-active-orders`).
     - It reads delivered rows by `bookId ∈ …, appName ∈ …` (indexed) and projects `bookId`,
-      `appName`, `originalBookId` and `created`. It groups the rows by exact `appName|bookId`,
+      `appName`, `originalBookId`, `created`, and (since order tracking) `completedAt` +
+      `deliveredAt`.
+    - **The delivered card (D8, CORE invariant 36):** the endpoint passes
+      `keepDeliveredWithinMinutes: DELIVERED_CARD_WINDOW_MINUTES` (15). A delivered order whose
+      own row landed less than 15 min ago (`deliveredAt`, else `completedAt`; the later of two
+      rows) is KEPT and gets `order.deliveredAt` (ISO), set in place so the endpoint's
+      `storeOfOrder` Map still finds it. Older, or no readable instant: dropped as before. Default
+      window 0 = the old rule.
+    - **`twinPartCancelled`** (`attachTwinPartCancelled`, `services/order-tracking/twin-part-cancelled.js`,
+      after `attachFeedbackEligibility`): on an order with `twinGroup.degraded === true`,
+      `{ storeName: {ar, he} from shoofi.stores of twinGroup.peerAppName | null, at:
+      twinGroup.degradedAt ISO }`. One `shoofi.stores` read per page, only when needed; a failed
+      read gives null (the app hides the store line; the raw appName slug never reaches the card). It groups the rows by exact `appName|bookId`,
       because the two `$in`s are a cross product.
     - A row is the order's delivery (`isDeliveryOfOrder`) when `originalBookId ===
       order.originalOrderId`.
@@ -478,6 +501,19 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
 - **STOCK / menu**: `utils/order-stock.js` (shared with menu-catalog) — stock
   semantics only; coordinate on changes.
 - **NOTIFICATIONS**: `services/notification/*`, websocket, persistent-alerts, SMS.
+  **Customer order pushes (CORE invariant 36, `docs/order-tracking.md` in shoofi-server).** Every
+  push to the customer about an order carries `data = { type, orderId: <order _id>, orderNumber:
+  <short number>, appName: <store> }` (+ the sender's old keys, never overriding these four),
+  `type` ∈ `order_status` · `order_delay` · `twin_part_cancelled` · `order_delivered`, and is sent
+  with `appType: "shoofi-shopping"`. `sendCustomerOrderPush` (`services/order-tracking/customer-push.js`)
+  does both and never throws; `customerOrderPushData` builds the data for a caller that sends
+  itself. `sendNotification` takes optional `localized: { ar: {title, body}, he: {title, body} }` +
+  `language` and picks the text by `language`, then the recipient's `customers.language`
+  (`"0"`/`"1"`), then Arabic. **appType:** `websocketService.sendToUser` matches the client's
+  registered appType exactly, and the customer app registers as `shoofi-shopping`; a sender
+  passing `"shoofi-app"` loses the websocket copy silently (the push still goes, because
+  `getCustomerByAppType` reads `shoofi.customers` for any appType but partner/driver). The rating
+  push (`feedback_request`) keeps its own data (`orderId` = short number, `orderObjectId`).
   ⚠️ The store-owner new-order alert does **not** come from `services/notification/*`
   directly — `sendStoreOwnerNotifications` (`routes/order.js`) delegates to
   `utils/persistent-alerts.js`, which inserts a `shoofi.persistentAlerts` doc and
@@ -724,6 +760,15 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
 - **Tracking = POLLING every 30s** — **no websocket for customer order status** (WS is only
   used for store/menu refresh elsewhere). Detail: `screens/order/item`, timer `order-timer.tsx`
   keyed on status, ETA via `delivery/book/{bookId}`.
+  - **What the server gives the app for order tracking (CORE invariant 36, server
+    `feat/order-tracking`; the app half is a separate shoofi-app PR):** order pushes carry
+    `data { type, orderId (_id), orderNumber, appName }` to open the order on tap (today
+    `hooks/use-notifications.ts` acts only on `feedback_request` and push campaigns); the
+    `notification` websocket frames now arrive (they were sent to `"shoofi-app"` and dropped), and
+    the app deliberately raises no banner for them; `customer-active-orders` keeps an order 15 min
+    after delivery with `deliveredAt`, and puts `twinPartCancelled { storeName, at }` on the
+    surviving half of a degraded twin. The delivery-side fields (`customerEtaAt`, `isDelayed`,
+    the driver's first name, the map) come from `delivery/book/{bookId}` — delivery CORE.
   - **One list, one poll** (`stores/orders/index.tsx`): `ordersStore.activeOrders` is what the
     ActiveOrders tab (`screens/order/active/index.tsx`), the tab-bar order bubble
     (`components/layout/footer-tabs/BottomTabBar.tsx`) and the For-you chips all render.
