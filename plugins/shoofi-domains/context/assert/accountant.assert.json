@@ -273,7 +273,7 @@
         "services/courier-bonuses/evaluate.js": ["buildUnits", "isEligibleBooking", "bookingFacts"],
         "services/courier-bonuses/sweeper.js": ["sweepRuleBonuses", "ensureLedgerIndexes", "startCourierBonusSweeper"],
         "services/courier-bonuses/rules.js": ["validateRule", "inWindow", "bestRuleFor", "ruleAmount"],
-        "services/courier-bonuses/reconcile.js": ["voidCancelledBonuses", "reportCovering", "RECHECK_DAYS", "VOID_REASON = \"order-cancelled\""],
+        "services/courier-bonuses/reconcile.js": ["voidCancelledBonuses", "reviveTwinSides", "reportCovering", "RECHECK_DAYS", "VOID_REASON = \"order-cancelled\""],
         "services/courier-bonuses/by-booking.js": ["ledgerRowsForBookings", "courierView", "parseIds"],
         "services/kopa/receipts.js": ["buildReceiptPayload", "issueReceipt", "RECEIPTS_DISABLED", "EZCOUNT_NOT_CONNECTED", "ADAPTER_UNFIT", "ALREADY_CLAIMED", "isVatExempt", "withoutVAT"]
       },
@@ -1559,6 +1559,7 @@
         { "file": "services/courier-bonuses/reconcile.js", "regex": "r\\.status !== \"draft\" \\|\\| r\\.invoiceSent \\|\\| r\\.transferPerformed", "desc": "CORE invariant 21: a settled company report (past draft) locks a cancelled delivery's bonus — flagged, not changed" },
         { "file": "services/courier-bonuses/sweeper.js", "regex": "const cancelled = await voidCancelled\\(shoofiDb, deliveryDb, now\\);", "desc": "CORE invariant 21: the cancel check runs on every sweep, switch on or off" },
         { "file": "services/courier-bonuses/payout.js", "regex": "await bonusesOf\\(deliveryDb\\)\\.deleteOne\\(k\\)", "desc": "CORE invariant 21: a day with nothing left to pay loses its payable row (never a zero row)" },
+        { "file": "services/courier-bonuses/sweeper.js", "regex": "const done = new Set\\(already\\.filter\\(\\(r\\) => !r\\.voidedAt\\)", "desc": "CORE invariant 21: a voided ledger row does not block a revived delivery from earning again" },
         { "file": "routes/delivery/driver-bonuses.js", "regex": "ledgerRowsForBookings\\(deliveryDb, ids, \\{ driverId: String\\(req\\.auth\\.id\\) \\}\\)", "desc": "CORE invariant 21: the courier's by-booking route answers the token's own rows only" }
       ]
     },

@@ -367,7 +367,7 @@ booking's CREATION time, `cityIds` = pickup zones on `area.cityId`, `peakShiftsO
 ruleName_he, ruleAmountKind, ruleValue, fee, amount, bookingCreatedAt, bookingCreated, deliveredAt,
 createdAt, paidToBonusesAt, [twinGroupId, twinKey (unique), twinBookingIds | coveredBy, amount 0],
 [voidedAt, voidedAmount, voidReason "order-cancelled" | cancelHold { at, reportId, reportStatus,
-cancelledBookingIds } | movedFrom, amountBefore, recomputedAt, staleDraftReportId] }` (the second
+cancelledBookingIds } | movedFrom, amountBefore, recomputedAt, staleDraftReportId], [revivedAt, revivals: [{ voidedAt, voidedAmount, voidReason, previousDriverId, revivedAt }]] }` (the second
 bracket: a delivery cancelled after earning, CORE invariant 21) —
 a same-courier twin is one unit paid once on the sum of its fees — and PAYS it as `drivers-bonuses` rows
 (`source: "courier-bonus-rules"`, one per courier/company/Israel calendar day of booking creation,
