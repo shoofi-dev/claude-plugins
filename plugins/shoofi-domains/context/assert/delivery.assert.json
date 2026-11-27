@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@fix/admin-assign-existing-booking + shoofi-delivery-web@fix/assign-modal-late-confirm / 2026-11-28 (CORE invariant 22: ranked pickers, admin/assign reuses a live booking, confirmation behind supportsConfirmation, store-order ranking via storeAppName); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/admin-assign-existing-booking + shoofi-delivery-web@fix/assign-modal-late-confirm / 2026-11-28 (CORE invariant 22: ranked pickers, admin/assign reuses a live booking, confirmation behind supportsConfirmation, store-order ranking via storeAppName, booking pickup = pickupFromStoreOrder as minutes-from-now); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -882,6 +882,16 @@
           "file": "services/delivery/book-delivery.js",
           "regex": "(?:if \\(deliveryData\\?\\.driverId && !result\\.area\\) \\{|console\\.log\\(\"driver\", result\\.driver\\);)",
           "desc": "CORE invariant 22: a hand-picked courier with no area is refused BEFORE the insert - valid-before leg is the code on main before the code PR; drop it once shoofi-server fix/admin-assign-existing-booking has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:pickupTime: pickup\\.minutesFromNow,|pickupTime: 0,)",
+          "desc": "CORE invariant 22: admin/assign books with the order's own pickup clock (pickupFromStoreOrder) as minutes from now, the form bookDelivery takes - never pickupTime 0 - valid-before leg is the code on main before the code PR; drop it once shoofi-server fix/admin-assign-existing-booking has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:function pickupFromStoreOrder\\(orderDate, now = moment\\(\\)\\.utcOffset\\(getUTCOffset\\(\\)\\)\\) \\{|const deliveryData = \\{\\s*fullName: order\\.customerDetails\\?\\.fullName,)",
+          "desc": "CORE invariant 22: ONE pickup helper for the assign window's ranked list and the booking it creates - valid-before leg is the code on main before the code PR; drop it once shoofi-server fix/admin-assign-existing-booking has merged"
         }
       ]
     },

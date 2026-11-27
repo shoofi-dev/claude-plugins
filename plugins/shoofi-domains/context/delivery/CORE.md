@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/admin-assign-existing-booking + shoofi-delivery-web@fix/assign-modal-late-confirm / 2026-11-28 (invariant 22: admin pickers are ranked by manual-assignment-ranking; admin/assign reuses a live booking, asks the reassign confirmation behind `supportsConfirmation`, ranks a store order with no booking via `storeAppName`); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@fix/admin-assign-existing-booking + shoofi-delivery-web@fix/assign-modal-late-confirm / 2026-11-28 (invariant 22: admin pickers are ranked by manual-assignment-ranking; admin/assign reuses a live booking, asks the reassign confirmation behind `supportsConfirmation`, ranks a store order with no booking via `storeAppName`, books with the order's own pickup clock `pickupFromStoreOrder` as minutes-from-now); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -684,8 +684,8 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
       order with NO booking and sends the store order `_id` plus `storeAppName`. With no booking
       under that id, `storeOrderAsDelivery` builds a stand-in from the store order. The store db
       comes from `getOrInitializeDb`, which validates the name against `shoofi.stores`. It takes
-      `store{id:1}.location`, `order.geo_positioning`, `orderDate` → `"HH:mm"` pickup (now when
-      missing or past) and the pickup zone. Then it runs the same filter + ranking. Missing a
+      `store{id:1}.location`, `order.geo_positioning`, `pickupFromStoreOrder` as the pickup,
+      and the pickup zone. Then it runs the same filter + ranking. Missing a
       point → the old all-active list minus store-excluded and blocked couriers. Coverage cannot
       be applied there: it needs the dropoff point. With no `storeAppName` (older bundle),
       behaviour is unchanged.
@@ -697,13 +697,21 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
       - delivered → 409.
       A fresh booking is attempted only once the store (from the order, never the admin web's
       default `app-name: shoofi`), the store point and the customer point are known. Otherwise
-      it returns 400 with nothing written. `bookDelivery` refuses a hand-picked courier with no
+      it returns 400 with nothing written. It books with the order's own pickup clock,
+      `pickupFromStoreOrder` (`orderDate`, or now when missing or past). This is the same helper
+      the ranked list uses, so the list and the booking agree. It is passed to `bookDelivery`
+      as **minutes from now**, the input form partner-accept uses (`readyMinutes` + twin
+      buffer), and `bookDelivery` stores the usual `"HH:mm"` (invariant 10). It used to be
+      `pickupTime: 0`, "now" whatever the kitchen said. So the courier app's pickup clock and
+      countdown, `expectedDeliveryAt` and the late-delivery measure now follow the order's
+      ready time on admin-created bookings. `bookDelivery` refuses a hand-picked courier with no
       area BEFORE its insert (it used to insert, then 500 on `result.area._id`).
     - **Same confirmation as reassign** (`collectAssignConfirmations`/`confirmationConflict`,
       409 `needsConfirmation`, cleared by `forceAssign: true`, `lateConfirmedByAdmin: true` on
-      the confirmed retry), on all three branches. A fresh booking gets only the store question,
-      because it is booked with `pickupTime: 0` ("pick up now") and a lateness check would flag
-      every courier not already in the store. **The gate applies only when the body carries
+      the confirmed retry), on all three branches. A fresh booking is asked both questions
+      against the booking it would create (`bookingStandIn`), with nothing written on the 409.
+      `bookDelivery` records the result in `assignmentMetadata.pickupFeasibility`, never at the
+      top level. **The gate applies only when the body carries
       `supportsConfirmation: true`**, which only the new `AssignDriverModal` sends. A tab on the
       old bundle cannot read a 409, so it stays ungated and records `lateConfirmedByAdmin: false`.
       This is also why server and web may deploy in either order. Removing the marker check
