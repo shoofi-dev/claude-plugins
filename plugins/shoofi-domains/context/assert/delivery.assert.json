@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server + shoofi-app + shoofi-delivery-web @feat/city-area-single-region-and-inactive-admin / 2026-11-21 (CORE 'Hiding a REGION'); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/inactive-region-blocks-new-address / 2026-11-27 (CORE 'Hiding a REGION': an off region blocks new addresses via location/supported); shoofi-server + shoofi-app + shoofi-delivery-web @feat/city-area-single-region-and-inactive-admin / 2026-11-21 (CORE 'Hiding a REGION'); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -862,6 +862,24 @@
           "file": "routes/delivery/geography.js",
           "regex": "\\.find\\(includeInactive \\? \\{\\} : \\{ isActive: \\{ \\$ne: false \\} \\}\\)",
           "desc": "CORE 'Hiding a REGION': GET /delivery/city-areas is active-only unless ?includeInactive=true"
+        },
+        {
+          "file": [
+            "services/delivery/region-gate.js",
+            "routes/delivery/driver.js"
+          ],
+          "regex": "(?:return !inAnyRegion\\.has\\(zone\\) \\|\\| inActiveRegion\\.has\\(zone\\);|const areasWithGeometry = await populateAreaGeometry\\(deliveryDB, \\[areas\\[0\\]\\]\\);)",
+          "desc": "CORE 'Hiding a REGION' (new addresses): a connection is kept when its pickup zone is in an active region or in no region - valid-before leg is the ungated location/supported on main; drop it once shoofi-server fix/inactive-region-blocks-new-address has merged"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "(?:const \\{ servingAreas \\} = await filterAreasByActiveRegion\\(deliveryDB, areas\\);|const areasWithGeometry = await populateAreaGeometry\\(deliveryDB, \\[areas\\[0\\]\\]\\);)",
+          "desc": "CORE 'Hiding a REGION' (new addresses): POST /delivery/location/supported runs the region gate before answering available - valid-before leg as above"
+        },
+        {
+          "file": "routes/delivery/geography.js",
+          "regex": "cityIds: \\{ \\$in: (?:idVariants\\(cityIds\\)|cityIds) \\},\\s*isActive: \\{ \\$ne: false \\}",
+          "desc": "CORE 'Hiding a REGION' (new addresses): by-coordinates' coverage fallback never resolves to an off region (the alternation also holds on main, before idVariants)"
         }
       ]
     },

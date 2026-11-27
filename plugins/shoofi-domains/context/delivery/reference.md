@@ -187,6 +187,14 @@ inventing coverage values. Price/ETA:
 `POST /api/delivery/company/price-by-location` (`geography.js`) resolves geometry→areas→
 `company.supportedAreas` → `{areaId, price, minOrder, eta}`.
 
+**`POST /api/delivery/location/supported`** (`routes/delivery/driver.js`) — "can this pin be an
+address?", called by the customer app's address forms and current-location sheet before saving /
+confirming. Dropoff polygon → covering `areas` → `filterAreasByActiveRegion`
+(`services/delivery/region-gate.js`) drops connections whose pickup zone is only in off regions
+(zone in no region = kept) → `{available, area}` or `{available:false, isRegionInactive:true}`.
+No company, driver or `areas.isActive` check: it is coverage geometry + region switch only. See CORE
+"Hiding a REGION".
+
 **`POST /api/delivery/available-drivers`** (`routes/delivery/driver.js` →
 `services/delivery/availability.js` `checkStoreDeliveryAvailability`, shared with the
 store-availability audit cron, which reads only `available`) returns
@@ -574,7 +582,10 @@ customer-app city/address remnants, `screens/menu/menu.tsx.backup`.
 (`stores/shoofi-admin` `fetchAvailableDrivers` → `shoofiAdminStore.availableDrivers`) is the
 delivery quote. `area.price` is the fee posted as `shippingPrice`, `area.minETA/maxETA` the ETA
 lines, and `available`/`isAreaSupported`/`isDeliveryPaused` the coverage decisions (see §4 `POST /api/delivery/available-drivers`;
-`area` present ≠ supported). **After the order:**
+`area` present ≠ supported). **Saving an address / confirming current location** is gated on
+`POST /delivery/location/supported` `available` (`stores/address` `getLocationSupported`, used by
+`AddressFormWithMap.tsx`, `AddressForm.tsx`, `current-location-modal.tsx`), and the map form also
+reads `POST /delivery/city-area/by-coordinates` (404 → out of area, save disabled). **After the order:**
 `delivery/book/:bookId` with `order.orderId` (`ordersStore.getDeliveryByBookId`). It is used by
 the `order-timer.tsx` in `screens/order/{active,history,item}` and by
 `twin-active-order-header.tsx`, both polling every 30 s, and it reads only `status` and
