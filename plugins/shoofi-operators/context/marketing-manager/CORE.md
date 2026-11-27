@@ -116,10 +116,14 @@ happens after each answer. Never assume yes.
   `src/views/admin/marketing/hub/hub-url.ts`, `HUB_TABS`; verified 2026-11-19): **היום** (default, no `tab`) —
   today's summary and «כדאי לקדם», the offers nothing promotes yet (`promote=all|coupon|deal|store_new|product`,
   `only=unpromoted` for coupons); **קידומים** (`tab=promos`) — one row per קידום (`status=all|pending|live|scheduled|
-  ended|draft`, `q`), or one row per subject with `by=subject` (the old overview: `view=current|live|scheduled|draft|
+  ended|draft`, `q`; plus `hide` below), or one row per subject with `by=subject` (the old overview: `view=current|live|scheduled|draft|
   ended_recently|attention|all`, `channel`, `kind`, `q`, `open`, `auto`); **לוח שנה** (`tab=calendar`); **יצירות**
   (`tab=creations`); **תוצאות** (`tab=results`); **היוצר** (`tab=creator`, `section=stores|field|layouts|design|
   lessons|limits`, `store`) — the creator's store pages, field styles, layouts, lessons and the daily limits.
+  **היום** and **קידומים** (one row per קידום) share a places filter, «מקומות פרסום» (`hide=story,push`, the places
+  left out; none = every place; `hub/PlaceFilter.tsx`, `withoutPlaces` in `hub/item-model.ts`): a hidden place is left
+  out of every card, row and count — a קידום keeps its other places, one with no place left drops out. «כדאי לקדם»
+  is about subjects, not places, and is not filtered.
   Two more tabs were merged 2026-11-20 (shoofi-delivery-web#436, #439; shoofi-server#657, #660): **תוכנית לרשתות** (`tab=plan`, `week`) — the weekly
   plan of our own posts — and **מה מפרסמים** (`tab=watch`) — what the competitors and the big delivery brands
   posted, read daily: topics, the occasions they rode and we did not, their accounts and posts
