@@ -773,13 +773,23 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
     `helpers/order-tracking.ts` (`timerView`, `trackingStep`, `driverFirstName`, …); one ring for
     every card (`components/order/tracking/order-timer.tsx`, the three old copies re-export it).
     **A tapped order push opens `order-tracking`** (`utils/open-order-from-push.ts`), the
-    full-screen tracking screen (`screens/order/tracking`, "Option D", 2026-11-27): picture or
-    staff map on top, a dark-green sheet bulging around a big ring, then store, status, steps,
-    driver first name, delay line, twin note, rating once delivered. It reads the order from
-    `ordersStore.activeOrders` and the booking via `useOrderBooking`; an order that is not a
-    delivery order, or is no longer on the active list, is handed to `order-item` (`replace`).
-    The active card opens it too («تتبع الطلب», and the ring); `AppContainer` paints the
-    status-bar and bottom bands dark green on that route only.
+    tracking screen (`screens/order/tracking`, map-first layout chosen 2026-11-28; it replaced
+    the full-screen ring of 2026-11-27). The top is an animation per stage drawn in code
+    (`components/order/tracking/tracking-scene.tsx`: cook / shop packing / courier riding /
+    delivered) or the staff map where offered; a floating status card has «باقي N دقيقة»
+    (Arabic count forms, `minutesLeftLabel`), the status or the delay sentence, and three bars;
+    a white sheet scrolls up with the driver's first name or the store, a Shoofi-support
+    WhatsApp button, the twin note, rating once delivered, the items (`order.order.items`),
+    store → `order.order.address` (+ `notes`), and the price summary
+    (`helpers/order-price-breakdown`, shared with the order screen). Shop vs restaurant for the
+    animation = `hasGeneralCategories` on `storeData` (twin orders carry the full store doc) or
+    on the home store list by appName (`helpers/tracking-scene-kind`); stores have no type
+    field and a normal order's `storeData` lacks the flag, so unknown → the cook. It reads the
+    order from `ordersStore.activeOrders` and the booking via `useOrderBooking`; an order that
+    is not a delivery order, or is no longer on the active list, is handed to `order-item`
+    (`replace`). The active card opens it too («تتبع الطلب», and the ring; the delivered card
+    has no such button). `AppContainer` paints the status-bar band in the scenes' top colour on
+    that route and leaves the bottom inset to the sheet.
   - **One list, one poll** (`stores/orders/index.tsx`): `ordersStore.activeOrders` is what the
     ActiveOrders tab (`screens/order/active/index.tsx`), the tab-bar order bubble
     (`components/layout/footer-tabs/BottomTabBar.tsx`) and the For-you chips all render.
