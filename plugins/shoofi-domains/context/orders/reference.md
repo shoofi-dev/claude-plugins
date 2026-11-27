@@ -769,6 +769,17 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
     after delivery with `deliveredAt`, and puts `twinPartCancelled { storeName, at }` on the
     surviving half of a degraded twin. The delivery-side fields (`customerEtaAt`, `isDelayed`,
     the driver's first name, the map) come from `delivery/book/{bookId}` — delivery CORE.
+  - **The app half (shoofi-app `feat/order-tracking`, PR #171):** the reading rules are pure in
+    `helpers/order-tracking.ts` (`timerView`, `trackingStep`, `driverFirstName`, …); one ring for
+    every card (`components/order/tracking/order-timer.tsx`, the three old copies re-export it).
+    **A tapped order push opens `order-tracking`** (`utils/open-order-from-push.ts`), the
+    full-screen tracking screen (`screens/order/tracking`, "Option D", 2026-11-27): picture or
+    staff map on top, a dark-green sheet bulging around a big ring, then store, status, steps,
+    driver first name, delay line, twin note, rating once delivered. It reads the order from
+    `ordersStore.activeOrders` and the booking via `useOrderBooking`; an order that is not a
+    delivery order, or is no longer on the active list, is handed to `order-item` (`replace`).
+    The active card opens it too («تتبع الطلب», and the ring); `AppContainer` paints the
+    status-bar and bottom bands dark green on that route only.
   - **One list, one poll** (`stores/orders/index.tsx`): `ordersStore.activeOrders` is what the
     ActiveOrders tab (`screens/order/active/index.tsx`), the tab-bar order bubble
     (`components/layout/footer-tabs/BottomTabBar.tsx`) and the For-you chips all render.
