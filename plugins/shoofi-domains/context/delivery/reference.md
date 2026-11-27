@@ -496,6 +496,11 @@ colour pairing (`getOrderColor(bookId)`, a hash into a fixed 15-slot palette) li
 The live-ops board (`views/admin/live-ops/`) reads `POST analytics/deliveries` like the delivery
 list, resolves `pickupTime` (bare `"HH:mm"`, wraps at midnight) against `expectedDeliveryAt`,
 and re-assigns through `delivery/admin/reassign` with the same 409 `needsConfirmation` handshake.
+**`AssignDriverModal`** (order card, shown only when `GET delivery/order/:id` found no booking) sends the
+whole store order to `delivery/admin/assign` with `supportsConfirmation: true` and the same 409 →
+`confirmTextFromError` → `forceAssign: true` handshake. It asks for its list with
+`getAvailableDrivers(order._id, order.storeData.appName || order.appName)`, so the server ranks a
+booking-less store order (CORE invariant 22).
 `analytics/deliveries` projects **`isFutureOrder`** (`bookDelivery.isFutureOrder`, written by
 `services/delivery/book-delivery.js`). The board uses it for a sixth delivery group,
 **`future`** (הזמנות עתידיות): a future booking with no courier whose pickup is further away than

@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@fix/admin-assign-existing-booking + shoofi-delivery-web@fix/assign-modal-late-confirm / 2026-11-28 (invariant 22: admin pickers are ranked by manual-assignment-ranking; admin/assign reuses a live booking, asks the reassign confirmation behind `supportsConfirmation`, ranks a store order with no booking via `storeAppName`); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -670,6 +670,44 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
     - **Reach.** `sendToAppAdmins` iterates only the sending process's sockets — no Redis
       fan-out — and prod runs two instances, so a frame does not reach a tablet held by the other
       instance. True of every partner frame; the card must keep its focus/action refetch.
+
+22. **Every admin driver picker is ranked by the engine, and `/admin/assign` is the one that
+    starts from a store order, not a booking.** `GET /api/delivery/admin/drivers?orderId=`
+    (`routes/delivery/admin.js`) filters with `findAllMatchingDrivers` (coverage, store rule,
+    switched-off, blocks, at-limit; reassign's rules, which Sari has not changed) and orders
+    best-first with `rankDriversForManualAssignment` (`services/delivery/manual-assignment-ranking.js`),
+    the automatic engine's score and `byConcurrencyTierThenScore` comparator. Each row gets a
+    read-only `assignmentScore` (rank, distance/ETA + `estimatedArrivalBasis`, load, `reasons`
+    chips; see invariant 17). Nothing is written to `assignment-decisions`. `assignmentScore: null`
+    means unrankable (no order, or no customer point), and that is the honest answer.
+    - **`orderId` is a booking `_id`, except from `AssignDriverModal`.** That window opens on an
+      order with NO booking and sends the store order `_id` plus `storeAppName`. With no booking
+      under that id, `storeOrderAsDelivery` builds a stand-in from the store order. The store db
+      comes from `getOrInitializeDb`, which validates the name against `shoofi.stores`. It takes
+      `store{id:1}.location`, `order.geo_positioning`, `orderDate` → `"HH:mm"` pickup (now when
+      missing or past) and the pickup zone. Then it runs the same filter + ranking. Missing a
+      point → the old all-active list minus store-excluded and blocked couriers. Coverage cannot
+      be applied there: it needs the dropoff point. With no `storeAppName` (older bundle),
+      behaviour is unchanged.
+    - **`POST /api/delivery/admin/assign` never makes a second booking.** It finds the order's
+      bookings by `originalBookId`, `order._id` (ObjectId and string) or `bookId`+store
+      (`pickBookingForOrder`):
+      - waiting for a courier → manual assignment;
+      - any other live booking → the `/reassign` logic (`reassignDeliveryToDriver`);
+      - delivered → 409.
+      A fresh booking is attempted only once the store (from the order, never the admin web's
+      default `app-name: shoofi`), the store point and the customer point are known. Otherwise
+      it returns 400 with nothing written. `bookDelivery` refuses a hand-picked courier with no
+      area BEFORE its insert (it used to insert, then 500 on `result.area._id`).
+    - **Same confirmation as reassign** (`collectAssignConfirmations`/`confirmationConflict`,
+      409 `needsConfirmation`, cleared by `forceAssign: true`, `lateConfirmedByAdmin: true` on
+      the confirmed retry), on all three branches. A fresh booking gets only the store question,
+      because it is booked with `pickupTime: 0` ("pick up now") and a lateness check would flag
+      every courier not already in the store. **The gate applies only when the body carries
+      `supportsConfirmation: true`**, which only the new `AssignDriverModal` sends. A tab on the
+      old bundle cannot read a 409, so it stays ungated and records `lateConfirmedByAdmin: false`.
+      This is also why server and web may deploy in either order. Removing the marker check
+      strands every stale tab on a generic "Failed to assign driver".
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
