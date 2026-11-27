@@ -224,6 +224,16 @@
           "desc": "HYP tokenization session endpoint (migration target)"
         },
         {
+          "file": "routes/hyp-pay.js",
+          "regex": "session\\.customerId !== customerId",
+          "desc": "HYP session ownership check: strict string compare of the session's customerId to the token's id (CORE 'HYP sessions - who may read one')"
+        },
+        {
+          "file": "routes/order.js",
+          "regex": "hypPaySessions'\\)\\.findOne\\(\\{ sessionId: parsedBodey\\.order\\.hypSessionId \\}\\)",
+          "desc": "order create attaches a HYP pay session by hypSessionId alone - the open gap CORE names; when this moves, re-read that bullet"
+        },
+        {
           "file": "lib/schemas/creditCard.json",
           "regex": "ccToken",
           "desc": "stored card token field"
