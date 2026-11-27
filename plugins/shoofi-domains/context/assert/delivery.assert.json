@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/delivery-reassign-history-same-driver 46aa3366 / 2026-11-21 (CORE invariant 22: reassignmentHistory on every manual assignment, same-courier 409 same_driver, allowSameDriver resend; admin cancel: -1/-2/-3 already cancelled, a delivered 4 asks first via 409 code delivered + confirmCancelDelivered); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -825,6 +825,34 @@
           "file": "routes/delivery/orders.js",
           "regex": "(?:const result = await deliveryService\\.updateDelivery\\(\\{\\s*deliveryData: updateData,\\s*appDb: req\\.app\\.db,\\s*\\}\\);\\s*if \\(!result\\.ok\\) \\{\\s*return res\\.status\\(result\\.httpStatus\\)|await deliveryService\\.updateDelivery\\(\\{\\s*deliveryData: updateData,\\s*appDb: req\\.app\\.db,\\s*\\}\\);\\s*return res\\s*\\.status\\(200\\))",
           "desc": "CORE invariant 20: POST /api/delivery/update answers updateDelivery's 400/404/409 instead of 200 on a miss - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": [
+            "services/delivery/reassignment-history.js",
+            "routes/delivery/admin.js"
+          ],
+          "regex": "(?:const SAME_DRIVER_CODE = \"same_driver\";|status: DELIVERY_STATUS\\.WAITING_FOR_APPROVE,\\s*company: company,)",
+          "desc": "CORE invariant 22: the same-courier refusal answers code 'same_driver' - valid-before leg is main's unconditional reset to \"1\"; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:\\$push: \\{ reassignmentHistory: historyEntry \\}|\\{ \\$set: updateData \\}\\s*\\);)",
+          "desc": "CORE invariant 22: admin reassign appends reassignmentHistory in the same write as the $set - valid-before leg is main's bare $set; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:confirmations\\.length && forceAssign !== true && !resendToSameDriver|confirmations\\.length && forceAssign !== true\\))",
+          "desc": "CORE invariant 22: forceAssign clears the soft-block confirmations but never the same-courier refusal; only allowSameDriver (a resend) skips both - valid-before leg is main; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:if \\(isCancelledStatus\\(deliveryRecord\\.status\\)\\) \\{\\s*return res\\.status\\(400\\)\\.json\\(\\{\\s*message: \"Delivery is already cancelled\",\\s*currentStatus: deliveryRecord\\.status\\s*\\}\\);\\s*\\}[\\s\\S]{0,400}?const confirmedDelivered = wasDelivered && req\\.body\\.confirmCancelDelivered === true;\\s*if \\(wasDelivered && !confirmedDelivered\\) \\{\\s*return res\\.status\\(409\\)\\.json\\(\\{[\\s\\S]{0,300}?code: \"delivered\",\\s*needsConfirmation: true,|deliveryRecord\\.status === DELIVERY_STATUS\\.CANCELLED_BY_CUSTOMER \\|\\|)",
+          "desc": "CORE invariant 22: admin cancel treats -1/-2/-3 (String-compared) as already cancelled and asks before cancelling a delivered 4 (409 code 'delivered', confirmCancelDelivered) - valid-before leg is main's CANCELLED_BY_CUSTOMER check; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:\\.\\.\\.\\(confirmedDelivered \\? \\{ cancelledAfterDelivered: true \\} : \\{\\}\\)[\\s\\S]{0,3000}?previousStatus: String\\(deliveryRecord\\.status\\),\\s*statusChange: `\\$\\{deliveryRecord\\.status\\} → \\$\\{DELIVERY_STATUS\\.CANCELLED_BY_ADMIN\\}`,[\\s\\S]{0,200}?\\.\\.\\.\\(confirmedDelivered \\? \\{ confirmedDelivered: true \\} : \\{\\}\\),|previousStatus: deliveryRecord\\.status,\\n\\s*statusChange: `\\$\\{deliveryRecord\\.status\\} → \\$\\{DELIVERY_STATUS\\.CANCELLED_BY_ADMIN\\}`,)",
+          "desc": "CORE invariant 22: a confirmed cancel of a delivered booking is recorded (cancelledAfterDelivered on the row, confirmedDelivered + string previousStatus on the flow event) - valid-before leg is main's raw previousStatus; drop it once shoofi-server fix/delivery-reassign-history-same-driver has merged"
         },
         {
           "file": [

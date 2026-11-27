@@ -1330,7 +1330,6 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       20, claude-plugins#369). **Deploy order: #583 must be live before the first `kopa-qr` order
       is written.** Nothing is written while a store's `tableOrdering` is off (the default).
     - Tests: shoofi-server `test/integration/kopa/table-orders.js` (20).
-
 32. **COINS PAY FOR THE STORE'S ITEMS ONLY, NEVER THE DELIVERY FEE. THE APP BLOCKS MORE, AND
     THE COINS THE TOTAL TAKES OFF ARE THE COINS THE ORDER CARRIES.** shoofi-app#145. Built
     2026-11-16 after flafel-baba **3046-8991** (CASH, DELIVERY): items 35 + delivery 20 = 55. The
@@ -1371,7 +1370,6 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       2026-10-01 and 2026-11-16. Whether to compensate them is an open owner decision.
     - Test: shoofi-app `__tests__/components/total-price-coins-single-writer.test.tsx` (8).
       Emulator before/after: shoofi-app `.maestro/coins-items-limit/`.
-
 33. **«RATE ORDER» MEANS THE CUSTOMER HAS THE FOOD — `order.feedbackEligible`, ONE RULE, NEVER
     `completedAt`.** shoofi-server `fix/rate-after-delivery`, 2026-11-17, after VAPEGO **6534-2091**
     (DELIVERY): the app showed «درّج الطلب ⭐» for ~18 min while the courier was still driving,
@@ -1436,6 +1434,24 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     - Tests: shoofi-server `test/integration/feedback-eligibility.js` (22, incl. 6534-2091: `3` +
       `picked_up` → false), `customer-orders-feedback-eligible.js` (8),
       `order-update-actor-and-feedback-push.js` (11), `feedback-notification-eligibility.js` (4).
+34. **CONVERT TO PICKUP CHANGES THE RECEIPT METHOD AND THE FEE THE CUSTOMER PAID — NEVER
+    `status`, `orderPrice` OR THE BOOKING** (shoofi-server#605,
+    `services/orders/convert-to-pickup.js`, HQ #cf11c1). An order whose courier an admin
+    cancelled (`-3`) because the customer collects it becomes `order.receipt_method: "TAKEAWAY"`
+    plus a `pickupConversion` audit record, both written in one `$set`. It is reached through
+    `POST /api/delivery/admin/cancel` with `convertToPickup: true` (or
+    `cancelReasonCode: "customer_pickup"`), or through `POST /api/delivery/admin/convert-to-pickup`.
+    - **The fee paid** is `shippingPrice` minus a delivery-coupon discount, never below 0. A
+      `full_discount` coupon or a store delivery deal goes to `manual:`.
+    - **Cash:** `total` and `shippingPrice` drop by the fee paid, never rebuilt from
+      `orderPrice`.
+    - **Card:** no money field changes; the fee is owed in the ledger (payments invariant 14).
+    - **Never written:** `status`, `orderPrice` / `originalOrderPrice`, coupons, coins,
+      `created` and the booking. Settlement (`services/payments/store-sales.js`) reads none of
+      the fields that do change, so no store report moves.
+    - **Refused:** a cancelled order, a non-DELIVERY order, a twin leg, status `"0"`, or any
+      live or delivered booking. Calling it again is idempotent.
+    - Tests: `test/integration/convert-to-pickup.js` (24).
 
 34. **A PERCENT-SPLIT COUPON'S SHARES ARE SHEKELS OF THE DISCOUNT ON *THAT* ORDER — the server
     resolves them at creation, per twin leg and at amend.** (shoofi-server
