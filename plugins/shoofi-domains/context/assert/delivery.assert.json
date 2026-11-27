@@ -907,6 +907,21 @@
           "file": "services/delivery/delayed-assignment.js",
           "regex": "const manualAdmin = await resolveManualAdminAssignee\\(\\{ appDb, company: bestDriver\\.company \\}\\);",
           "desc": "CORE invariant 6: the scored/cron engine routes a manual-only company to its admin too, not only the immediate one"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "(?:const ranked = await rankDriversForManualAssignment\\(\\{\\s*appDb: req\\.app\\.db,\\s*delivery: booking,\\s*drivers: driversWithCounts,|res\\.status\\(200\\)\\.json\\(driversWithCounts\\);)",
+          "desc": "CORE invariant 22: the company admin's picker ranks HIS company's couriers (not findAllMatchingDrivers) for his own booking - valid-before leg is main before shoofi-server feat/company-admin-ranked-picker; drop it once that has merged"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "(?:assignmentMethod: assignmentResult\\.assignmentMetadata\\?\\.assignmentMethod,|title: 'تم تعيين طلب جديد',)",
+          "desc": "CORE invariant 6: the routed admin's push asks him to assign (assignment-push.js), on the cron engine too - valid-before leg is main before shoofi-server feat/company-admin-ranked-picker; drop it once that has merged"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "(?:'assignmentMetadata\\.assignmentMethod': 1,|'company\\._id': 1,)",
+          "desc": "CORE invariant 6: delivery/list carries the assignment METHOD only, never the scoring blob - valid-before leg is main before shoofi-server feat/company-admin-ranked-picker; drop it once that has merged"
         }
       ]
     },

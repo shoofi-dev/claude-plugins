@@ -501,6 +501,11 @@ whole store order to `delivery/admin/assign` with `supportsConfirmation: true` a
 `confirmTextFromError` → `forceAssign: true` handshake. It asks for its list with
 `getAvailableDrivers(order._id, order.storeData.appName || order.appName)`, so the server ranks a
 booking-less store order (CORE invariant 22).
+**shoofir company admin** (`DriverReassignModal`, `utils/admin-dispatch.ts`) asks
+`GET delivery/admin/:adminId/drivers?orderId=` and shows the server's rank, distance/ETA and reason
+chips, with over-limit and late in red. «تأكيد التعيين» is the only confirmation; success is a toast.
+The store-rule 409 is resent with `forceAssign`. An order waiting on him shows «بانتظار التعيين»,
+and `AdminAssignAlert` on his dashboard opens the picker for it.
 `analytics/deliveries` projects **`isFutureOrder`** (`bookDelivery.isFutureOrder`, written by
 `services/delivery/book-delivery.js`). The board uses it for a sixth delivery group,
 **`future`** (הזמנות עתידיות): a future booking with no courier whose pickup is further away than
