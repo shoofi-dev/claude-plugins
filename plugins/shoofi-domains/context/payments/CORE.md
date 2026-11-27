@@ -86,6 +86,16 @@ plaintext CVV on stored cards goes away as ZCredit is retired (see Known status)
    `isManualInvoicesEnabled: false`), `twin-payment-service.js` prints ONE combined
    document under the PRIMARY's VAT status. Turning manual invoicing off re-opens that
    case, and nothing blocks the pairing any more.
+   ⚠️ **The ZCredit WebCheckout twin (Apple/Google Pay session) is wrong for EVERY pair, flag
+   or no flag.** `/digital-place-pending` → `/digital-finalize` | `/zcredit-callback` →
+   `verifyAndCaptureTwinSession` (`routes/twin-order.js`) calls `applyCaptureSuccess` and
+   never `issueInvoicesForTwin`. The only document is the one ZCredit prints from the session
+   the app built (`shoofi-app/data/zcredit-config.ts` `CreateInvoice: "true"`; the checkout
+   sends one cart line for the whole total, `IsTaxFree: "false"`), so an exempt store's share
+   carries 18% VAT and the groups have `invoices: []`. Seen: `tg_1786221905400_cwoow7`
+   (vapego ₪114 of ₪157), `tg_1787337413375_c6c6cd` (₪178); 15 such groups between
+   2026-08-10 and 2026-10-05. Forcing manual invoicing in `captureCombined` does not reach
+   this path.
 10. **Invoicing is MANUAL and split per revenue owner — behind a flag.**
    Historically each gateway issued the document itself during the charge (HYP
    `SendHesh`/`EZ.*`, ZCredit `ZCreditInvoiceReceipt`), giving one document per charge for

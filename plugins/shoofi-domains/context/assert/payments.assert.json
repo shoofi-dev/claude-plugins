@@ -114,6 +114,11 @@
         {"file": "services/hq/money-audit/checks-money-in.js", "regex": "\\.filter\\(\\(o\\) => !isRefusedRelease\\(o\\)\\)", "desc": "CORE invariant 13: refund-anomaly does not count a CancelTrans refusal as a failed refund"},
         {"file": "routes/creditCard.js", "regex": "delete creditCardData\\.cvv;", "desc": "CORE Known status: an HYP card is saved with no cvv"},
         {
+          "file": "routes/twin-order.js",
+          "regex": "async function verifyAndCaptureTwinSession\\(\\{ req, group \\}\\)",
+          "desc": "CORE invariant 9: the ZCredit WebCheckout twin session captures in verifyAndCaptureTwinSession, which issues no per-store documents (ZCredit's own session receipt is the only one)"
+        },
+        {
           "file": "services/kopa/till-orders.js",
           "regex": "const dueC = totalC \\+ tipC;",
           "desc": "CORE Kopa till money: the tip is NOT in total; amountDue = total + tip"
