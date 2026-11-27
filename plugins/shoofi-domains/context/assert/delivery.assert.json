@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@feat/order-tracking / 2026-11-25 (CORE invariant 22: customerEtaAt forward-only + expectedDeliveryAt never written for the customer, customer-eta cron, customer book view, staff map pilot, driver location token auth, drivers/locations gate; invariant 21 book/:bookId both order._id forms); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@feat/courier-arrival-push + shoofi-shoofir@feat/courier-arrival-push / 2026-11-27 (CORE invariant 23: the courier's nearby / arrived-at-customer taps; reference C1, C4, §7); shoofi-server@feat/order-tracking / 2026-11-25 (CORE invariant 22: customerEtaAt forward-only + expectedDeliveryAt never written for the customer, customer-eta cron, customer book view, staff map pilot, driver location token auth, drivers/locations gate; invariant 21 book/:bookId both order._id forms); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -920,6 +920,45 @@
           "file": "routes/delivery/driver.js",
           "regex": "router\\.get\\(\"/api/delivery/drivers/locations\", (?:\\.\\.\\.driverLocationsAccess, )?async",
           "desc": "CORE driver identity + reference §5: GET drivers/locations is dashboard / own-company admin only (driverLocationsAccess) - the optional group is the valid-before leg; make it mandatory once shoofi-server feat/order-tracking has merged"
+        },
+        {
+          "file": [
+            "services/delivery/courier-arrival.js",
+            "services/delivery/delivery-promise.js"
+          ],
+          "regex": "(?:status: \\{ \\$in: COLLECTED_FORMS \\},\\s*\\[field\\]: null,\\s*\\},\\s*\\{ \\$set: \\{ \\[field\\]: at \\} \\}|function expectedDeliveryAtFrom\\(pickupTimeDate, minutes, offsetHours\\))",
+          "desc": "CORE invariant 23: the nearby / arrived stamp is an atomic once-only claim, only while collected (string or int 3), and writes the stamp alone (never status) - valid-before leg matches shoofi-server main before the code PR; drop it once shoofi-server feat/courier-arrival-push has merged"
+        },
+        {
+          "file": [
+            "services/delivery/courier-arrival.js",
+            "services/delivery/delivery-promise.js"
+          ],
+          "regex": "(?:const NOT_ON_THE_WAY = \\\"NOT_ON_THE_WAY\\\";[\\s\\S]*?const ordered = \\[\\.\\.\\.sides\\]\\.sort\\(|function expectedDeliveryAtFrom\\(pickupTimeDate, minutes, offsetHours\\))",
+          "desc": "CORE invariant 23: not collected is 409 NOT_ON_THE_WAY; a single-mode twin takes the push claim on its lowest-_id side (one push per group) - valid-before leg matches shoofi-server main before the code PR; drop it once shoofi-server feat/courier-arrival-push has merged"
+        },
+        {
+          "file": [
+            "services/delivery/courier-arrival.js",
+            "services/delivery/delivery-promise.js"
+          ],
+          "regex": "(?:field: \\\"customerNearbyAt\\\",\\s*pushType: CUSTOMER_PUSH_TYPE\\.COURIER_NEARBY,[\\s\\S]*?field: \\\"arrivedAtCustomerAt\\\",\\s*pushType: CUSTOMER_PUSH_TYPE\\.COURIER_ARRIVED,|function expectedDeliveryAtFrom\\(pickupTimeDate, minutes, offsetHours\\))",
+          "desc": "CORE invariant 23: the two stamps and their push types (courier_nearby / courier_arrived) - valid-before leg matches shoofi-server main before the code PR; drop it once shoofi-server feat/courier-arrival-push has merged"
+        },
+        {
+          "file": [
+            "routes/delivery/orders.js"
+          ],
+          "regex": "(?:router\\.post\\(\\\"/api/delivery/driver/order/nearby\\\", \\.\\.\\.driverSelfAction, courierStepRoute\\(COURIER_STEP\\.NEARBY\\)\\);[\\s\\S]*?\\\"/api/delivery/driver/order/arrived-at-customer\\\",\\s*\\.\\.\\.driverSelfAction,|router\\.post\\(\\\"/api/delivery/driver/order/waiting-in-store\\\", \\.\\.\\.driverSelfAction,)",
+          "desc": "CORE invariant 23: both taps sit behind driverSelfAction like the other courier steps - valid-before leg matches shoofi-server main before the code PR; drop it once shoofi-server feat/courier-arrival-push has merged"
+        },
+        {
+          "file": [
+            "services/delivery/customer-eta.js",
+            "services/delivery/delivery-promise.js"
+          ],
+          "regex": "(?:customerNearbyAt: iso\\(instantOf\\(booking\\.customerNearbyAt\\)\\),\\s*arrivedAtCustomerAt: iso\\(instantOf\\(booking\\.arrivedAtCustomerAt\\)\\),|function expectedDeliveryAtFrom\\(pickupTimeDate, minutes, offsetHours\\))",
+          "desc": "CORE invariant 23 + reference C4: the customer view carries both stamps as ISO or null - valid-before leg matches shoofi-server main before the code PR; drop it once shoofi-server feat/courier-arrival-push has merged"
         }
       ]
     },
@@ -1011,6 +1050,14 @@
           "file": "components/delivery-driver/OrderItemsModal.tsx",
           "regex": "(?:getItemNote\\(item\\)|const OrderItemsModal: React\\.FC<OrderItemsModalProps> = \\(\\{)",
           "desc": "reference C1: the courier's items list shows each meal's items[].note (2nd alternative = main before feat/driver-notes-visible)"
+        },
+        {
+          "file": [
+            "utils/courier-arrival.ts",
+            "consts/shared.ts"
+          ],
+          "regex": "(?:nearby: \\\"delivery/driver/order/nearby\\\",\\s*arrived: \\\"delivery/driver/order/arrived-at-customer\\\",|DELIVERY_STATUS)",
+          "desc": "reference C1: the task screen's customer taps post {orderId} to nearby / arrived-at-customer and never throw - valid-before leg is consts/shared.ts on main before shoofi-shoofir feat/courier-arrival-push; drop it once that PR (and the redesign line under it) has merged"
         }
       ]
     },
