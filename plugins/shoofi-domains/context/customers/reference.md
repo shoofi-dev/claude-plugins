@@ -516,11 +516,14 @@ body (test: "a client cannot set owner or inferred"). `inferred` is written only
 - **Impersonation:** `stores/auth/impersonation.ts` `consumeMasterLink` also calls
   `updateUserToken` but does **not** merge (verify-code is the only `mergeAfterLogin` caller), so
   a master operator's own visitor answers never land on the customer they open. Keep it so.
-- **Logout / delete:** `stores/auth` `logOut` and `deleteAccount` call `aiHelperStore.clear()`
-  (the in-memory profile and the cache key). `resetAppState` — the forced sign-out the
-  general-server-error dialog runs on a 401 — does **not**; there the account's copy stays cached
-  until the next `refresh()` replaces it with the device's profile (or null). The server keeps
-  the account's profile across logout: it belongs to the account.
+- **Logout / delete:** `stores/auth` `logOut`, `deleteAccount` and `resetAppState` — the forced
+  sign-out the general-server-error dialog runs on a 401 — wipe the same account stores:
+  `aiHelperStore.clear()` (the in-memory profile and the cache key), `coinsStore.clearAll()`,
+  `worldCupStore.clearAll()`, `userDetailsStore.resetUser()`,
+  `forYouStore.resetForAccountChange()` and `addressStore.resetForAccountChange()`
+  (`shoofi-app/stores/auth/index.ts`). `resetAppState` is the wipe for a *different person on
+  this phone*; a new store that holds account data must be cleared in all three. The server
+  keeps the account's profile across logout: it belongs to the account.
 - **Deletion:** `POST /api/customer/delete` leaves the `tasteProfiles` doc in place — §7 item 10.
 
 ## 5c. Marketing content generation (`routes/marketing-generate.js`, CORE invariant 16)
@@ -842,8 +845,8 @@ user → `screens/insert-customer-name` → `customer/update-name`.
 Token in AsyncStorage `@storage_userToken`, sent as `Authorization: Token`. Also sends a
 generated **`device-id`** (`@storage_deviceId`, never cleared) — read by the fraud checks,
 stories and app-logs, and the owner key of a visitor's taste profile (§5a). Stores:
-`stores/auth` (login/logout/deleteAccount; `logOut` and `deleteAccount` also call
-`aiHelperStore.clear()`), `stores/user-details` (`customer/details`), `stores/address`,
+`stores/auth` (login/logout/deleteAccount; `logOut`, `deleteAccount` and the 401
+`resetAppState` all clear the account stores — §5a "Logout / delete"), `stores/user-details` (`customer/details`), `stores/address`,
 `stores/ai-helper` (the taste-profile copy, §5a).
 Profile → **"إشعارات العروض / התראות על מבצעים"** switch (`components/profile/MarketingPushToggle.tsx`,
 logged-in only): `GET/PUT customer/marketing-preferences` with `silent: true`. Hidden until the
