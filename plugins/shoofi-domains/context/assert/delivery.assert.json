@@ -643,8 +643,42 @@
         },
         {
           "file": "routes/delivery/orders.js",
-          "regex": "if \\(!completeResult \\|\\| completeResult\\.matchedCount === 0\\) \\{\\s*return res\\.status\\(404\\)",
-          "desc": "a complete that matched no delivery of this driver stops before the flow event and the customer push (CORE invariant 19)"
+          "regex": "(?:const step = await advanceDriverStep\\(\\{[\\s\\S]{0,200}?step: \"complete\",[\\s\\S]{0,200}?if \\(answerUnchanged\\(res, \"complete\", step\\)\\) return;|if \\(!completeResult \\|\\| completeResult\\.matchedCount === 0\\) \\{\\s*return res\\.status\\(404\\))",
+          "desc": "CORE invariant 19: complete goes through advanceDriverStep and stops before the flow event and the customer push when the row did not move (404 miss, 200 retry, 409 conflict) - valid-before leg is the old 404-only code on main; drop it once shoofi-server feat/delivery-step-status-guards has merged"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "(?:const step = await advanceDriverStep\\(\\{[\\s\\S]{0,200}?step: \"start\",[\\s\\S]{0,200}?if \\(answerUnchanged\\(res, \"start\", step\\)\\) return;|if \\(!startResult \\|\\| startResult\\.matchedCount === 0\\) \\{\\s*return res\\.status\\(404\\))",
+          "desc": "CORE invariant 19: start goes through advanceDriverStep and stops before the flow event and the customer push when the row did not move (404 miss, 200 retry, 409 conflict) - valid-before leg is the old 404-only code on main; drop it once shoofi-server feat/delivery-step-status-guards has merged"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "(?:const step = await advanceDriverStep\\(\\{[\\s\\S]{0,200}?step: \"waiting-in-store\",[\\s\\S]{0,200}?if \\(answerUnchanged\\(res, \"waiting-in-store\", step\\)\\) return;|if \\(!waitingResult \\|\\| waitingResult\\.matchedCount === 0\\) \\{\\s*return res\\.status\\(404\\))",
+          "desc": "CORE invariant 19: waiting-in-store goes through advanceDriverStep and stops before the flow event and the customer push when the row did not move (404 miss, 200 retry, 409 conflict) - valid-before leg is the old 404-only code on main; drop it once shoofi-server feat/delivery-step-status-guards has merged"
+        },
+        {
+          "file": [
+            "services/delivery/driver-step.js",
+            "routes/delivery/orders.js"
+          ],
+          "regex": "(?:\"waiting-in-store\": \\{\\s*from: \\[DELIVERY_STATUS\\.APPROVED\\],\\s*to: DELIVERY_STATUS\\.WAITING_IN_STORE,\\s*\\},\\s*start: \\{\\s*from: \\[DELIVERY_STATUS\\.APPROVED, DELIVERY_STATUS\\.WAITING_IN_STORE\\],\\s*to: DELIVERY_STATUS\\.COLLECTED_FROM_RESTAURANT,\\s*\\},\\s*complete: \\{\\s*from: \\[DELIVERY_STATUS\\.COLLECTED_FROM_RESTAURANT\\],\\s*to: DELIVERY_STATUS\\.DELIVERED,|(?<![\\s\\S])(?![\\s\\S]*driver-step))",
+          "desc": "CORE invariant 19: STEP_TRANSITIONS - waiting-in-store from 2, start from 2 or 5, complete from 3 - valid-before leg: the route file does not use driver-step at all (main before the code PR); drop it once shoofi-server feat/delivery-step-status-guards has merged"
+        },
+        {
+          "file": [
+            "services/delivery/driver-step.js",
+            "routes/delivery/orders.js"
+          ],
+          "regex": "(?:\"driver\\._id\": driverOid,\\s*status: \\{ \\$in: transition\\.from \\},|(?<![\\s\\S])(?![\\s\\S]*driver-step))",
+          "desc": "CORE invariant 19: the step's status condition is in the update filter, so a cancelled or delivered row is never written over - valid-before leg: the route file does not use driver-step at all (main before the code PR); drop it once shoofi-server feat/delivery-step-status-guards has merged"
+        },
+        {
+          "file": [
+            "services/delivery/driver-step.js",
+            "routes/delivery/orders.js"
+          ],
+          "regex": "(?:res\\.status\\(409\\)\\.json\\(\\{[\\s\\S]{0,200}?code: \"STATUS_CONFLICT\",|(?<![\\s\\S])(?![\\s\\S]*driver-step))",
+          "desc": "CORE invariant 19: a step from the wrong status is a 409 STATUS_CONFLICT carrying the current status - valid-before leg: the route file does not use driver-step at all (main before the code PR); drop it once shoofi-server feat/delivery-step-status-guards has merged"
         },
         {
           "file": "routes/delivery/orders.js",
