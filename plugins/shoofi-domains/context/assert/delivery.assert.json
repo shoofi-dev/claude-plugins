@@ -892,6 +892,21 @@
           "file": "routes/delivery/admin.js",
           "regex": "(?:function pickupFromStoreOrder\\(orderDate, now = moment\\(\\)\\.utcOffset\\(getUTCOffset\\(\\)\\)\\) \\{|const deliveryData = \\{\\s*fullName: order\\.customerDetails\\?\\.fullName,)",
           "desc": "CORE invariant 22: ONE pickup helper for the assign window's ranked list and the booking it creates - valid-before leg is the code on main before the code PR; drop it once shoofi-server fix/admin-assign-existing-booking has merged"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "company\\.isControlledByAdmin !== true \\|\\|\\s*company\\.manualAssignmentOnly !== true",
+          "desc": "CORE invariant 6: routing to the company admin needs BOTH isControlledByAdmin and manualAssignmentOnly - isControlledByAdmin alone still auto-assigns a courier"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "has no active admin — falling back to auto-assignment",
+          "desc": "CORE invariant 6: a manual-only company with no ACTIVE admin falls back to auto-assignment (console.warn only, no alert)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "const manualAdmin = await resolveManualAdminAssignee\\(\\{ appDb, company: bestDriver\\.company \\}\\);",
+          "desc": "CORE invariant 6: the scored/cron engine routes a manual-only company to its admin too, not only the immediate one"
         }
       ]
     },
