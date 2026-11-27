@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server + shoofi-app + shoofi-delivery-web @feat/city-area-single-region-and-inactive-admin / 2026-11-21 (region isActive hides it from the app picker; includeInactive for the admin page; one region → auto-picked); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@fix/inactive-region-blocks-new-address / 2026-11-27 (an off region blocks new addresses via location/supported; region-gate.js); shoofi-server + shoofi-app + shoofi-delivery-web @feat/city-area-single-region-and-inactive-admin / 2026-11-21 (region isActive hides it from the app picker; includeInactive for the admin page; one region → auto-picked); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -49,7 +49,7 @@ sets**, and the second one is wrong for anything dispatch-related. Note the asym
 scope documents above it — `cityAreas.isActive` and `parentCities.isActive` really are read as
 `{$ne: false}`, so absent means active *there*. Same field name, opposite default, one collection
 apart. Anything reasoning about whether an area was serving must use `isActive === true`.
-**Hiding a REGION = `cityAreas.isActive:false` (visibility only, no dispatch effect).**
+**Hiding a REGION = `cityAreas.isActive:false` (hides it AND blocks new addresses; no dispatch effect).**
 `GET /api/delivery/city-areas` returns only `isActive !== false` regions; that list is the customer
 app's region picker ("اختر المنطقة", `components/dialogs/city-areas-modal-based-event.tsx` +
 `components/address/CityAreasList.tsx`), so unticking "פעיל" on a region in the admin hides it at
@@ -60,6 +60,22 @@ notes, selects) still gets active-only. **One region left → no picker:** when 
 itself (fallback after the address in use is deleted) or the home screen shows its no-location
 list, the app selects the single region (`autoSelectSingle`); the "check / discover delivery
 areas" links send `{ browse: true }` and still show the sheet with its one card.
+**An off region also blocks NEW customer addresses** (shoofi-server `fix/inactive-region-blocks-new-address`).
+`POST /api/delivery/location/supported` (`routes/delivery/driver.js`) is the gate every app version
+calls before saving an address or confirming "current location". After the dropoff-polygon match it
+runs `filterAreasByActiveRegion` (`services/delivery/region-gate.js`), keyed on the **pickup zone**
+`area.cityId`: a connection is kept if its zone is in **≥1 active region** or in **no region at all**,
+and dropped only if every region holding the zone is off. Nothing left →
+`{available:false, isRegionInactive:true}`; the app's existing "location not supported" dialog
+shows, no app release. `POST /api/delivery/city-area/by-coordinates` already returned only
+`isActive !== false` regions (404 → the map form's "out of area", save disabled); both of its
+lookups now match `cityIds` in both id forms (`idVariants`), because a region can list a zone as a
+string. `areas.isActive` is deliberately NOT read there (it would change "supported" for every
+region; a paused area is `available-drivers`' `isDeliveryPaused`). Left alone on purpose: already
+saved addresses (selectable; editing one re-runs the gate), `addresses/add` itself (never checked
+coverage), the quote and order creation, and assignment. Prod 2026-11-27: every pickup zone that has
+areas belongs to exactly one region, and every covered pin in Taibe / Tira / Qalansawe is covered
+only from "אזור טייבה וקלנסווה וטירה" zones, so switching that region off blocks exactly those towns.
 **Paused ≠ out of zone.** Staff pause delivery by switching areas off (the region "כבה" button
 → `areas.isActive=false`), so the active-only lookup misses exactly as for "no area here".
 `checkStoreDeliveryAvailability` (`services/delivery/availability.js`, behind
