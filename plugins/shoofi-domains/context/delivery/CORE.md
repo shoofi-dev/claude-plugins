@@ -69,6 +69,13 @@ version prices the fee as `availableDrivers?.area?.price || 0`, and before shoof
 5 at ₪0). **"`area` present" never means "supported"**: the no-company branch also returns
 `area` with `isAreaSupported: false`. Gate on `isAreaSupported`/`available`, never on `area`.
 
+**A twin SECONDARY is `shippingPrice: 0` by design, not a missing quote.** Only the primary side
+carries the area fee (`services/twin-order/twin-delivery-price.js` `enforceTwinSideDeliveryPrice`:
+`shippingPrice: isPrimary ? sideBody.shippingPrice : 0`); the secondary's order and its delivery
+row both say 0, and the fee moves onto the secondary only if the primary is cancelled
+(`twin-group-service.js`). Any "DELIVERY order at ₪0" hunt must filter on `twinGroup.role` first:
+in 2026-10-26 → 11-09, 158 of 159 ₪0 DELIVERY orders were twin secondaries.
+
 ## Driver identity on the wire — `fullName` is the record, `name` is the response
 In `delivery-company.customers` the driver's name is **`fullName`**; the `name` field is
 **never populated** (0 of 246 driver/admin records, checked 2026-09-30). But
