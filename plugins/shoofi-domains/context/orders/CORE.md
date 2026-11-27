@@ -841,6 +841,12 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
       `{ _id: row._id }`, so the row whose driver is notified is the row that changed:
       `/api/order/update` cancel (`4`/`7`/`8` → delivery `-3`) and ready-for-pickup (`3` →
       `isReadyForPickup`), `/api/order/update-delay`, and order-amend `syncDeliverySnapshot`.
+    - **Ready-for-pickup and the delay push touch only a LIVE row** (`1`/`2`/`3`/`5`). Both add
+      `status: liveDeliveryStatusCondition()` to the helper's filter for their own read, and the
+      ready write is atomic on it too (`{ _id, status: live }`, push only when `matchedCount > 0`),
+      so a cancelled courier (`-1`/`-2`/`-3`) is neither stamped `isReadyForPickup` nor pushed
+      (`services/delivery/delivery-row-locator.js` `isLiveDeliveryStatus`). The helper itself
+      stays status-free: cancel, amend, twin, support and monitoring need cancelled rows.
     - **Twin legs** are two orders with their own `originalOrderId` and their own row, so the
       same filter works per leg. The group document stores only each leg's SHORT number, so
       `services/twin-order/twin-group-service.js` resolves a leg through `legDeliveryFilter`
