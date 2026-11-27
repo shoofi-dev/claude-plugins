@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@fix/driver-status-writes-skip-cancelled-booking / 2026-11-21 (invariant 19: the driver's start / complete / waiting / cancel writes skip a cancelled booking and answer ORDER_CANCELLED); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -532,7 +532,13 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
       and then the field is **overwritten with the token id**. Each handler's existing
       `driver._id = driverId` filter is therefore the ownership check. Cancel, start, complete and
       waiting answer **404 on a miss**. They used to answer 200 and still send the flow event and
-      the customer push for a delivery that never moved. There is no "offer" state to accept:
+      the customer push for a delivery that never moved. **A cancelled booking stays cancelled
+      when its courier taps:** no cancel path clears `driver`, so the `driver._id` filter alone
+      never excluded a cancelled row. `start`, `complete`, `waiting-in-store` and `cancel` carry
+      `status: NOT_CANCELLED` (`services/delivery/cancelled-booking.js`, -1/-2/-3 as strings and
+      ints) in the write's own filter and answer `400 {error: "ORDER_CANCELLED"}` with no side
+      effect. The guard refuses cancels only - these writes still accept any other current
+      status, and a row an admin moved back to a live status is the courier's again. There is no "offer" state to accept:
       assignment writes `driver` before status `1`, and an `isPendingAssignment` booking has no
       driver at all. A company admin acts on its own assignments like any driver, and moves its
       drivers' work only through the `/:adminId/` reassign route. shoofir always sends its own

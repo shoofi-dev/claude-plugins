@@ -648,6 +648,16 @@
         },
         {
           "file": "routes/delivery/orders.js",
+          "regex": "\\{ _id: getId\\(orderId\\), \"driver\\._id\": ObjectId\\(driverId\\), status: NOT_CANCELLED \\},[\\s\\S]{0,200}?status: DELIVERY_STATUS\\.COLLECTED_FROM_RESTAURANT",
+          "desc": "the driver's start write carries the not-cancelled status guard in its own filter, so a cancelled booking is not revived (CORE invariant 19)"
+        },
+        {
+          "file": "services/delivery/cancelled-booking.js",
+          "regex": "\\$nin: \\[\\.\\.\\.CANCELLED_DELIVERY_STATUSES, \\.\\.\\.CANCELLED_DELIVERY_STATUSES\\.map\\(Number\\)\\]",
+          "desc": "NOT_CANCELLED lists the three cancel statuses as strings and as ints (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/orders.js",
           "regex": "router\\.post\\(\"/api/delivery/list\", \\.\\.\\.driverListAccess, async",
           "desc": "the driver's order list is gated (CORE invariant 19)"
         },
