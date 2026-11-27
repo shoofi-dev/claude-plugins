@@ -1,6 +1,6 @@
 {
   "doc": "menu-catalog",
-  "lastVerified": "shoofi-delivery-web@feat/import-warnings / 2026-11-22 (reference §2: the Excel product import checks the file against the template, needs an explicit OK for rows without Arabic, a 90 s per-request limit and an on-screen summary; two new import-issue codes); shoofi-server@fix/product-update-image-error / 2026-11-21 (reference §7: a failed imageUrl on product/update answers 422/502, any other throw 500, nothing saved); shoofi-server@475b0cb5 (#633 merged) / 2026-11-17 (invariant 35 + reference 7n: menu copy between stores, new ids + full remap, resets, replace + rollback, PRICE_EDIT_ROLES gate (no accountant); menu-copy pins single-path since server#633 merged); shoofi-server@feat/kopa-qr-shared-menu / 2026-11-13 (invariant 34 + reference 7m: the QR menu shares the app menu, rule collections, qrOnly needs isHidden, 20 s cache); shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@fix/pizza-free-topping-count (#479) + shoofi-app@design/round-2 b581604 (reference §4 free pizza-topping slots) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 outOfStoreUntil admin-only projection + 07:00 restore) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 misheard dish name, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
+  "lastVerified": "shoofi-server@feat/partner-action-trail / 2026-11-28 (invariant 36 + reference §2: product-update-history, the actor on store-update-history, the partner app in the admin audit log, the audit map gains quantity / isHidden / byCategory / calendar hours; uncommitted worktree); shoofi-delivery-web@feat/import-warnings / 2026-11-22 (reference §2: the Excel product import checks the file against the template, needs an explicit OK for rows without Arabic, a 90 s per-request limit and an on-screen summary; two new import-issue codes); shoofi-server@fix/product-update-image-error / 2026-11-21 (reference §7: a failed imageUrl on product/update answers 422/502, any other throw 500, nothing saved); shoofi-server@475b0cb5 (#633 merged) / 2026-11-17 (invariant 35 + reference 7n: menu copy between stores, new ids + full remap, resets, replace + rollback, PRICE_EDIT_ROLES gate (no accountant); menu-copy pins single-path since server#633 merged); shoofi-server@feat/kopa-qr-shared-menu / 2026-11-13 (invariant 34 + reference 7m: the QR menu shares the app menu, rule collections, qrOnly needs isHidden, 20 s cache); shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@fix/pizza-free-topping-count (#479) + shoofi-app@design/round-2 b581604 (reference §4 free pizza-topping slots) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 outOfStoreUntil admin-only projection + 07:00 restore) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 misheard dish name, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 \"do THEY have\", store_no_match) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 the chat never leaves by itself) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 onboarding cuisines from all area stores) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 MODELS.support + converse()) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link) / 2026-10-31 (CORE invariant 18 — the three public-coupon filters stay separate); shoofi-server@feat/marketing-generate (invariant 16 MODELS.marketing + 5.5 price rows) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (invariant 25) / 2026-10-28; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -123,7 +123,10 @@
         "scripts/seed-extras-catalog.js",
         "docs/extras-icons.md",
         "test/integration/extras-icons.js",
-        "services/catalog/clone-from-template.js"
+        "services/catalog/clone-from-template.js",
+        "services/audit/actor.js",
+        "services/audit/product-update-history.js",
+        "test/integration/partner-action-trail.js"
       ],
       "symbols": {
         "services/catalog/clone-from-template.js": ["cloneProductForStore", "mockProductId: product._id"],
@@ -502,7 +505,9 @@
           "readSyncFlags",
           "SCHEDULE",
           "LOCK_KEY"
-        ]
+        ],
+        "services/audit/actor.js": ["clientInfo", "describeActor", "storeUserName", "HEADER_CAPS"],
+        "services/audit/product-update-history.js": ["TRACKED_FIELDS", "recordProductChanges", "readBefore", "readManyBefore", "storableValue", "historyCollection"]
       },
       "patterns": [
         {
@@ -2544,6 +2549,116 @@
           "file": "services/database/DatabaseInitializationService.js",
           "regex": "db\\.menuCopyBackups\\.createIndex\\(\\{ expiresAt: 1 \\}, \\{ background: true, expireAfterSeconds: 0 \\}\\)",
           "desc": "doc reference 2: menu-copy-backups has a TTL index on expiresAt"
+        },
+        {
+          "file": "services/audit/product-update-history.js",
+          "regex": "const COLLECTION = \"product-update-history\";",
+          "desc": "doc CORE invariant 36 + reference §2: the per-store product history collection name"
+        },
+        {
+          "file": "services/audit/product-update-history.js",
+          "regex": "\"price\",\\n  \"nameAR\",\\n  \"nameHE\",\\n  \"extras\",\\n  \"isInStore\",\\n  \"outOfStoreUntil\",\\n  \"quantity\",\\n  \"outOfStockByQuantity\",\\n  \"isHidden\",",
+          "desc": "doc CORE invariant 36: the tracked fields, img not among them"
+        },
+        {
+          "file": "services/audit/product-update-history.js",
+          "regex": "if \\(typeof value === \"string\" && value\\.startsWith\\(\"data:\"\\)\\) return \"\\[BINARY_OMITTED\\]\";",
+          "desc": "doc CORE invariant 36: a data URL is never stored"
+        },
+        {
+          "file": "services/audit/product-update-history.js",
+          "regex": "const MAX_ROWS_PER_REQUEST = 500;",
+          "desc": "doc CORE invariant 36: byCategory writes at most 500 rows"
+        },
+        {
+          "file": "services/audit/actor.js",
+          "regex": "const HEADER_CAPS = Object\\.freeze\\(\\{ \"app-type\": 40, \"app-version\": 40, \"device-id\": 100 \\}\\);",
+          "desc": "doc CORE invariant 36: app-type / app-version / device-id caps"
+        },
+        {
+          "file": "services/audit/actor.js",
+          "regex": "actorType: \"storeUser\",\\n        adminUserId: null,\\n        storeUserId: id,",
+          "desc": "doc CORE invariant 36: a partner actor is a storeUser, its id only"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "source: \"update\",\\n        items: \\[\\{ productId: product\\._id, before: product, after: productDoc \\}\\],",
+          "desc": "doc CORE invariant 36: the full product update writes the history"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "source: \"update/isInStore\",",
+          "desc": "doc CORE invariant 36: isInStore writes the history"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "source: \"update/quantity\",",
+          "desc": "doc CORE invariant 36: quantity writes the history"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "source: \"update/isHidden\",",
+          "desc": "doc CORE invariant 36: isHidden writes the history"
+        },
+        {
+          "file": "routes/product.js",
+          "regex": "source: \"update/isInStore/byCategory\",",
+          "desc": "doc CORE invariant 36: byCategory writes one row per changed product"
+        },
+        {
+          "file": "routes/store.js",
+          "regex": "callerKind: \\(req\\.storeUpdateCaller && req\\.storeUpdateCaller\\.kind\\) \\|\\| null,\\n\\s*\\.\\.\\.\\(await describeActor\\(req\\)\\),\\n\\s*\\.\\.\\.clientInfo\\(req\\),",
+          "desc": "doc CORE invariants 28 + 36: store-update-history carries callerKind, the req.auth actor and the app headers"
+        },
+        {
+          "file": "middleware/admin-audit-middleware.js",
+          "regex": "const AUDITED_APP_TYPES = \\[ADMIN_APP_TYPE, PARTNER_APP_TYPE\\];",
+          "desc": "doc CORE invariant 36: the audit log takes the admin web and the partner app, nothing else"
+        },
+        {
+          "file": "middleware/admin-audit-middleware.js",
+          "regex": "if \\(isPartner && routeMatch\\.category === 'orders'\\) return;",
+          "desc": "doc CORE invariant 36: a partner's order actions are left to orderFlowEvents, not the audit log"
+        },
+        {
+          "file": "middleware/admin-audit-middleware.js",
+          "regex": "if \\(!adminUser && !isPartner\\) \\{",
+          "desc": "doc CORE invariant 36: a partner token is never decoded unverified"
+        },
+        {
+          "file": "middleware/admin-audit-middleware.js",
+          "regex": "adminPhone: null,\\n\\s*actorType: 'storeUser',",
+          "desc": "doc CORE invariant 36: a partner row keeps no phone"
+        },
+        {
+          "file": "services/audit/admin-audit-service.js",
+          "regex": "\\{ \\$match: \\{ adminUserId: \\{ \\$ne: null \\} \\} \\},",
+          "desc": "doc CORE invariant 36: store users stay out of the admin filter list"
+        },
+        {
+          "file": "services/audit/admin-audit-routes.js",
+          "regex": "pattern: '/api/admin/product/update/quantity', method: 'POST', action: 'update_product_quantity'",
+          "desc": "doc CORE invariant 36: quantity is audited"
+        },
+        {
+          "file": "services/audit/admin-audit-routes.js",
+          "regex": "pattern: '/api/admin/product/update/isHidden', method: 'POST', action: 'toggle_product_hidden'",
+          "desc": "doc CORE invariant 36: isHidden is audited"
+        },
+        {
+          "file": "services/audit/admin-audit-routes.js",
+          "regex": "pattern: '/api/admin/product/update/isInStore/byCategory', method: 'POST', action: 'toggle_category_availability'[^\\n]*bodyResourceIdKey: 'categoryId'",
+          "desc": "doc CORE invariant 36: byCategory is audited, resource = categoryId"
+        },
+        {
+          "file": "services/audit/admin-audit-routes.js",
+          "regex": "pattern: '/api/store/out-of-stock-extras', method: 'POST', action: 'update_out_of_stock_extras'",
+          "desc": "doc CORE invariant 36: the sold-out options list is audited"
+        },
+        {
+          "file": "services/audit/admin-audit-routes.js",
+          "regex": "pattern: '/api/admin/calander/disable/hour/insert', method: 'POST'[\\s\\S]*?pattern: '/api/admin/calander/disable/hour/insert/multi', method: 'POST'[\\s\\S]*?pattern: '/api/admin/calander/enable/hour', method: 'POST'[\\s\\S]*?pattern: '/api/admin/calander/enable/hour/multi', method: 'POST'",
+          "desc": "doc CORE invariant 36: the four calendar hour writes are audited"
         }
       ]
     },

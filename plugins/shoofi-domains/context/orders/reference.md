@@ -106,7 +106,8 @@ check follows it, so accepting a `5` order overwrites it to `1` (or `14`/`15`);
 order is a 404. Anything else is **`409 {message: "הסטטוס כבר עודכן", code:
 "STATUS_ALREADY_CHANGED", currentStatus}`**, the same body the PENDING guard returns with a
 400. None of these early answers runs a side effect (websocket, `status_change` flow event,
-feedback push, customer or driver push). It exists because a stale partner card could write
+feedback push, customer or driver push); each writes only an `order_update_rejected` flow event,
+not awaited (CORE invariant 36). It exists because a stale partner card could write
 `10`/`11` over a support cancel (`7`): an un-cancel that left the COMP coupon, the compensation,
 the coins refund and the `-3` booking in place. A dashboard token (`roles`) is exempt on
 purpose, so support's behaviour is unchanged. Fields: `status`, `statusUpdatedAt`,
@@ -329,9 +330,18 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
     `actorType: "shoofi_support"` (from the body). Readers handle both: the admin
     `OrderFlowDashboard` labels admin/store/system, `services/kopa/orders.js` reads `admin` and
     `shoofi_support` as support and treats `store admin` / `system` as unnamed.
-  - **`order_viewed` `metadata.previousStatus` is always wrong** — `/update/viewd` reads it
-    from the order re-fetched *after* its `$set`, so it equals the new status. Pre-accept
-    status (normally `6`) is not recorded there; take it from the prior event.
+  - **`order_viewed` `metadata.previousStatus` is wrong on rows before the
+    `feat/partner-action-trail` deploy** — `/update/viewd` read it from the order re-fetched
+    *after* its `$set`, so it equals the new status; take the pre-accept status (normally `6`)
+    from the prior event. Since then it is read before the write, and the row names the token's
+    person (`resolveOrderUpdateActor`; older rows say `"Store Admin"` / `actorType:
+    "store_admin"` for every accept) — CORE invariant 36.
+  - **The partner action trail** (CORE invariant 36): `order_update_rejected` (a refused
+    `order/update` or `order/update/viewd`; `status` is the order's UNCHANGED status, the ask is
+    `metadata.requestedStatus`), `order_printed`, `delivery_booking_requested` /
+    `delivery_booking_failed`, `order_item_collected`. These, `status_change`, `order_viewed`
+    and `order_amended` carry `metadata.appVersion` + `deviceId` (headers; `deviceId` null from a
+    build that does not send `device-id`). Join a device's presses on `metadata.deviceId`.
 - **`delivery-company.bookDelivery`** (Mongo collection `book-delivery`) carries three order keys:
   `bookId` = the order's short `orderId`, `originalBookId` = its full `originalOrderId`, and
   `appName` = the store's DB name. It mirrors `DELIVERY_STATUS` (`1` waiting_approve … `3`
@@ -866,7 +876,10 @@ Role: executes the **delivery leg**; drives `bookDelivery` status only — never
 ## C3. shoofi-partner — the STORE-OWNER app (React Native, MobX)
 Role: receives orders, **accepts**, prepares, prints, and drives status forward.
 - **API client**: axios (`utils/http-interceptor/index.ts`), token `@storage_userToken`
-  as `"Token …"`, `app-type: shoofi-partner`, `app-name` = `@storage_storeDB` (per-call overridable).
+  as `"Token …"`, `app-type: shoofi-partner`, `app-name` = `@storage_storeDB` (per-call overridable),
+  `app-version` (the build), and `device-id` (a stable per-install id) from the build that ships
+  `feat/partner-action-trail`; older builds send no `device-id`. The server records them on the
+  order action trail (CORE invariant 36).
 - **Endpoints** (`stores/orders/index.tsx`, controller `order/`): `admin/orders` (list; each
   DELIVERY row also carries `courier`, the delivery domain's summary — delivery
   `reference.md` §2c),

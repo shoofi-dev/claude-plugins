@@ -919,9 +919,10 @@ contacts and the download-link SMS.
   (`toStoreUserResponse`), which is exactly what the screens read. The customer lists keep
   their shape minus `token`, `authCode`, `notificationToken`, `refreshToken` and `password`.
 - Writes are audited (`create_store_user` / `update_store_user` / `delete_store_user` in
-  `services/audit/admin-audit-routes.js`). The audit middleware only logs an admin-token
-  write, so since the gate there is no unaudited way to create a partner account through the
-  API.
+  `services/audit/admin-audit-routes.js`). The audit middleware logs admin-dashboard writes and,
+  since 2026-11, partner-app writes (`actorType: "storeUser"`, menu-catalog CORE invariant 36);
+  customer and driver traffic is skipped. These routes take an admin token, so since the gate
+  there is no unaudited way to create a partner account through the API.
 Push campaigns (§5b): `views/admin/customer-campaigns/` has the list with the
 `PushCapSettings` panel, skip counts, the scheduled time and cancel-schedule. The form sends
 the schedule as an Israel wall-clock string and shows stored instants through

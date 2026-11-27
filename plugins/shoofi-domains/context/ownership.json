@@ -10,6 +10,8 @@
       "shoofi-server": [
         "routes/menu.js",
         "routes/product.js",
+        "services/audit/actor.js",
+        "services/audit/product-update-history.js",
         "routes/category.js",
         "routes/translations.js",
         "routes/global-search.js",

@@ -1,6 +1,6 @@
 ---
 domain: menu-catalog
-last-verified: shoofi-server@fix/coupon-strip-benefit-promo-audit 6c1a7770 / 2026-11-19 (reference §2 writers: the auto store-page subtitle of a coupon draft is the title plus the condition, withBenefit); shoofi-server@feat/admin-menu-copy (invariant 35 + reference §7n — copy one store's whole menu into another: new ids + full remap, availability and discounts reset, replace + 7-day rollback, gated by PRICE_EDIT_ROLES (no accountant); scope adds menu-copy.js and clone-from-template.js) / 2026-11-17; shoofi-server@feat/kopa-qr-shared-menu / 2026-11-13 (invariant 34 + reference §7m: the QR menu SHARES the app menu - kopaQrProductRules / kopaQrCategoryRules, qrOnly needs isHidden, qrPrice on the base price with the category discount, 20 s public cache); shoofi-server@feat/kopa-phase8 (invariant 34 + reference §7m — Kopa phase 8 QR menu: its own catalog kopaQrCategories/kopaQrItems, copied once, public read; uncommitted worktree) / 2026-11-13; shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@feat/kopa-phase1 (invariant 33 — Kopa phase 2 category writes + phase 3 till-only meta, /api/kopa/{categories,meta,kitchens}; uncommitted worktree) / 2026-11-11; shoofi-server@feat/kopa-phase1 (invariant 32 — Kopa product and extras stats, /api/kopa/{products,extras}/stats; uncommitted worktree on origin/main cf25d5c2) / 2026-11-11; shoofi-app@design/round-2 67d4533 (invariant 29 — where the app draws option icons; the app files are committed) / 2026-11-08; shoofi-server@feat/store-closed-until (invariant 31 — special hours closedUntil / closedDays on isStoreClose, the same cron; invariant 28 partner fields; /api/store/holiday/* removed) / 2026-11-08; shoofi-server@feat/timed-busy-prep-extra (invariant 30 — timed busy busyUntil, extra prep time prepExtra, the expiry cron; invariant 28 partner fields) / 2026-11-07; shoofi-server@feat/prep-time-suggestion-field (invariant 28 — prepTimeSuggestion, a partner store field) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 — outOfStoreUntil, the 07:00 restore, store-wide outOfStockExtras) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
+last-verified: shoofi-server@feat/partner-action-trail (invariant 36 + reference §2: who changed a product or the store, product-update-history, the actor on store-update-history, the partner app in the admin audit log; uncommitted worktree on origin/main 2b31f1d2) / 2026-11-28; shoofi-server@fix/coupon-strip-benefit-promo-audit 6c1a7770 / 2026-11-19 (reference §2 writers: the auto store-page subtitle of a coupon draft is the title plus the condition, withBenefit); shoofi-server@feat/admin-menu-copy (invariant 35 + reference §7n — copy one store's whole menu into another: new ids + full remap, availability and discounts reset, replace + 7-day rollback, gated by PRICE_EDIT_ROLES (no accountant); scope adds menu-copy.js and clone-from-template.js) / 2026-11-17; shoofi-server@feat/kopa-qr-shared-menu / 2026-11-13 (invariant 34 + reference §7m: the QR menu SHARES the app menu - kopaQrProductRules / kopaQrCategoryRules, qrOnly needs isHidden, qrPrice on the base price with the category discount, 20 s public cache); shoofi-server@feat/kopa-phase8 (invariant 34 + reference §7m — Kopa phase 8 QR menu: its own catalog kopaQrCategories/kopaQrItems, copied once, public read; uncommitted worktree) / 2026-11-13; shoofi-server@feat/kopa-phase7 (invariant 33 + reference §7k — Kopa phase 7a product writes: /api/kopa/products/{insert,update,is-in-store,is-hidden,delete} mount routes/product.js handlers behind KOPA_OWNER + sameStoreAsGate; uncommitted worktree) / 2026-11-12; shoofi-server@feat/kopa-phase1 (invariant 33 — Kopa phase 2 category writes + phase 3 till-only meta, /api/kopa/{categories,meta,kitchens}; uncommitted worktree) / 2026-11-11; shoofi-server@feat/kopa-phase1 (invariant 32 — Kopa product and extras stats, /api/kopa/{products,extras}/stats; uncommitted worktree on origin/main cf25d5c2) / 2026-11-11; shoofi-app@design/round-2 67d4533 (invariant 29 — where the app draws option icons; the app files are committed) / 2026-11-08; shoofi-server@feat/store-closed-until (invariant 31 — special hours closedUntil / closedDays on isStoreClose, the same cron; invariant 28 partner fields; /api/store/holiday/* removed) / 2026-11-08; shoofi-server@feat/timed-busy-prep-extra (invariant 30 — timed busy busyUntil, extra prep time prepExtra, the expiry cron; invariant 28 partner fields) / 2026-11-07; shoofi-server@feat/prep-time-suggestion-field (invariant 28 — prepTimeSuggestion, a partner store field) / 2026-11-07; shoofi-server@feat/menu-admin-out-of-store-until (invariant 4 — outOfStoreUntil, the 07:00 restore, store-wide outOfStockExtras) / 2026-11-08; shoofi-server@fix/voice-sounds-alike + shoofi-app@feat/chat-sounds-like (invariant 14 — a misheard dish name found by its consonant skeleton, soundsLike) / 2026-11-02; shoofi-server@feat/chat-store-focus + shoofi-app@feat/chat-store-focus (invariant 14 — "do THEY have", store_no_match, otherThan) / 2026-11-01; shoofi-app@feat/chat-stay-in-chat (invariant 19 — the chat never leaves by itself: card tap + menu controls in the sheet) / 2026-11-01; shoofi-server@fix/onboarding-cuisines-closed-stores (invariant 19 — onboarding cuisines from ALL the area's stores, open + closed) / 2026-11-01; shoofi-server@feat/support-agent (invariant 16 — MODELS.support + converse(), the support assistant) / 2026-11-01; shoofi-server@9a07c2fb (feat/coupon-detail-link — invariant 18, the three public-coupon filters stay separate) / 2026-10-31; shoofi-server@feat/marketing-generate (MODELS.marketing + 5.5 price rows + artlist usage rows, invariant 16) / 2026-10-30; shoofi-server@feat/extras-icons-pipeline (extras icons catalog + map.json, invariant 29) / 2026-10-30; shoofi-server@fix/catalog-admin-auth (category/explore route auth, public store card, invariant 27) / 2026-10-30; shoofi-server@fix/store-update-auth (who may save a store document, invariant 28) / 2026-10-30; shoofi-server@fix/product-admin-auth (product route auth, invariant 26) / 2026-10-30; shoofi-server@feat/store-launch-date (store launchDate / isNew, invariant 25) / 2026-10-28; shoofi-server@64bfaf6c (fix/campaign-row-public-coupons — حملات coupons) / 2026-10-26; shoofi-server@514d1a4b (feat/store-card-deal-badge — store-card promotions) / 2026-10-26; shoofi-server@9cf91e62 + uncommitted feat/coupon-drafts worktree (translations, invariant 24) / 2026-10-26; rest shoofi-server@1870b2ff / 2026-10-19
 scope: server-first (shoofi-server; clients mostly render what the server assembles)
 reference: ./reference.md   # data model, endpoint tables, flows, options/extras detail
 ---
@@ -27,7 +27,9 @@ written by code — invariant 24), `routes/global-search.js`, `utils/menu-cache.
 `utils/order-stock.js` (stock semantics only), `utils/weight-extra-invariant.js`,
 `utils/general-category-order.js` (tile order),
 the menu copy between stores `services/catalog/menu-copy.js` + `routes/admin/menu-copy.js`
-(invariant 35), the template-store product clone behind create-from-mock
+(invariant 35), the action trail of product and store writes `services/audit/actor.js` +
+`services/audit/product-update-history.js`, and the partner half of
+`middleware/admin-audit-middleware.js` (invariant 36), the template-store product clone behind create-from-mock
 `services/catalog/clone-from-template.js` (`cloneProductForStore`; it KEEPS the template's `_id`s),
 `utils/catalog-lint.js` (the extras lint rules), `services/catalog/catalog-lint.js` (the
 worklist writer + nightly run), `routes/admin/catalog-lint.js`, `utils/crons/catalog-lint-cron.js`,
@@ -1017,6 +1019,9 @@ boundary and say so in the PR.
       `coinsSettings`; it carries its own `COINS_SETTINGS_ADMIN`, and no client calls it.
       `GET /api/store/get/:appName` returns the raw store document, `hyp` and `accounting`
       included, and is `CATALOG_ADMIN` (`routes/store.js`, invariant 27).
+    - **Who saved it** is on each `store-update-history` row since 2026-11 (invariant 36):
+      `callerKind` (`req.storeUpdateCaller.kind`), the actor read from `req.auth`, and the app
+      headers. Older rows have none; the route used to read `req.user`, which nothing sets.
 
 29. **OPTION ICONS COME FROM ONE PUBLISHED MAP, KEYED EXACTLY AS THE APP KEYS A NAME; A MACHINE
     MAY ONLY APPLY A CONFIDENT MATCH TO A KEY THAT EXISTS** (`docs/extras-icons.md`, reference §2
@@ -1313,6 +1318,52 @@ boundary and say so in the PR.
       admin web's `MENU_COPY_ROLES`. Master passes through `hasAdminRole`. Do not widen it to
       `DASHBOARD_ROLES` / `PRODUCT_ADMIN` without the owner. There is no partner path. The only caller
       is the admin web "העתקת תפריט" screen (`shoofi-delivery-web` `src/apis/admin/menu-copy.ts`).
+
+36. **EVERY PRODUCT OR STORE CHANGE A STORE OWNER CAN ASK ABOUT IS IN A TRAIL WITH WHO, WHEN, WHICH
+    APP AND OLD → NEW; A TRAIL WRITE NEVER FAILS THE REQUEST, AND NEVER HOLDS A TOKEN, A PHONE OR AN
+    IMAGE** (`services/audit/actor.js`, `services/audit/product-update-history.js`,
+    `middleware/admin-audit-middleware.js`, reference §2). Support answers "who marked this out of
+    stock" or "who changed my price / my hours" from three places:
+    - **`<store>.product-update-history`** (`db.productUpdateHistory`, else
+      `db.collection("product-update-history")`; no index). One row per product whose tracked field
+      changed: `price`, `nameAR`, `nameHE`, `extras`, `isInStore`, `outOfStoreUntil`, `quantity`,
+      `outOfStockByQuantity`, `isHidden` (`TRACKED_FIELDS`) as `changes: { <field>: { old, new } }`.
+      Written by `POST /api/admin/product/update` (`source: "update"`), `update/isInStore`,
+      `update/quantity`, `update/isHidden` (one `findOne` with a projection before the write) and
+      `update/isInStore/byCategory` (one row per product that changed, at most 500, with
+      `categoryId`). The Kopa mounts of the same handlers write it too. `img` is never tracked; a
+      `data:` string or a Buffer becomes `"[BINARY_OMITTED]"`, a value over 20 KB of JSON
+      `{ _truncated, size }`. No product matched = no row. A failed old-value read still writes
+      the row with `old: null` and `oldUnknown: true`. Every function there swallows and logs.
+    - **`<store>.store-update-history`** (`POST /api/store/update`): `callerKind` (`admin` /
+      `partner`) plus the actor fields below. The `req.user` branch it had was dead.
+    - **`shoofi.adminAuditLog`**: the middleware now takes `app-type: shoofi-partner` as well as
+      `shoofi-admin`. A partner row is `actorType: "storeUser"`, `storeUserId` = the token's
+      `storeUsers` id, `adminUserId: null`, `adminPhone: null`, `adminName` = that doc's `fullName`
+      (else `"Store user"`), and is written only when `auth.required` verified the token
+      (`req.auth`); an unverified partner token is never `jwt.decode`d. Admin rows keep their shape,
+      plus `actorType: "admin"`. Customer (`shoofi-shopping`), driver (`shoofi-shoofir`) and every
+      other app type are still skipped. `getAuditAdmins` leaves out rows with no `adminUserId`, so
+      store users are not in the admin filter. `requestBody` keeps `sanitizeBody`'s scrubbing.
+      A partner's routes in the `orders` category (`/api/order/update` and the rest) are skipped:
+      they are already in `shoofi.orderFlowEvents` with the actor, the device and every refusal
+      (orders CORE invariant 36), and a row here would add a `storeUsers` read per accept.
+    - **Actor fields** (`describeActor`, all three trails): `actorType` (`admin` / `storeUser` /
+      `other` / null), `adminUserId`, `storeUserId`, `actorName` (admin token `fullName`, or the
+      store user's `fullName`, capped at 100). **App fields** (`clientInfo`): `appType`,
+      `appVersion`, `deviceId` from the `app-type`, `app-version` and `device-id` headers, capped at
+      40 / 40 / 100 characters, `null` when missing. Partner builds before `device-id` send none.
+    - **The audit map** (`services/audit/admin-audit-routes.js`) has every partner product toggle:
+      `update/isInStore`, `update/quantity` (`update_product_quantity`), `update/isHidden`
+      (`toggle_product_hidden`), `update/isInStore/byCategory` (`toggle_category_availability`,
+      resource = `categoryId`), `store/out-of-stock-extras`, and the four
+      `/api/admin/calander/{disable/hour/insert[/multi], enable/hour[/multi]}` writes
+      (`disable_calendar_hour(s)` / `enable_calendar_hour(s)`). A new partner write route needs an
+      entry here, or it leaves no audit row.
+    - **Unchanged on purpose:** `update/isInStore`, `update/quantity` and `update/isHidden` still
+      answer 200 when no product matched the id.
+    - Tests: `test/integration/partner-action-trail.js` (each map entry through `matchRoute`, the
+      middleware audiences, both history collections, and a failing history write still 200).
 
 ## Catalog text — what you are actually searching
 Before writing anything that matches on a name, know what the corpus looks like. Verified
