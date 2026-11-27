@@ -782,9 +782,9 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
     WhatsApp button, the twin note, rating once delivered, the items (`order.order.items`),
     store → `order.order.address` (+ `notes`), and the price summary
     (`helpers/order-price-breakdown`, shared with the order screen). Shop vs restaurant for the
-    animation = `hasGeneralCategories` on `storeData` (twin orders carry the full store doc) or
-    on the home store list by appName (`helpers/tracking-scene-kind`); stores have no type
-    field and a normal order's `storeData` lacks the flag, so unknown → the cook. It reads the
+    animation = `hasGeneralCategories` on the home store list by appName
+    (`helpers/tracking-scene-kind`); stores have no type field and an order's `storeData` does
+    not carry the flag, so a store missing from the list → the cook. It reads the
     order from `ordersStore.activeOrders` and the booking via `useOrderBooking`; an order that
     is not a delivery order, or is no longer on the active list, is handed to `order-item`
     (`replace`). The active card opens it too («تتبع الطلب», and the ring; the delivered card
