@@ -228,14 +228,16 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
     `@storage_cart_storeDB` (the name — the menu, cart and `isDifferentStore` read it) and
     `@storage_cart_storeData` (the record — checkout sends the order with it). A BLANK name is
     not "no store": `isDifferentStore` checks a cart with items against BOTH (any owner ≠ the
-    browsed store, or items with no owner at all → the "replace the cart?" dialog), and
+    browsed store, or items with no owner at all → the "replace the cart?" dialog); an EMPTY
+    cart never asks (nothing to replace — the first add re-stamps name + record and drops a
+    record that isn't the browsed store's), and
     `getCartOwnerAppName` = name, else the record's `appName`. Clearing goes through
     `clearCartStoreKeys` (one `multiRemove` of both keys) after the empty items are persisted —
     `resetCart`, the last `removeProduct`, the cart screen's empty-cart paths; never
     `setCartStoreDBName("")` alone. `resetCartForNewStore` drops a record that does not match
     the name it stamps. On launch `reconcileCartStoreKeys` heals a split (the name follows the
     record; items with no owner are emptied, logged `cart_store_reconciled` /
-    `cart_store_orphan_reset`), and checkout logs `checkout_store_mismatch` (log only).
+    `cart_store_orphan_reset`; store keys left on an empty cart are cleared silently), and checkout logs `checkout_store_mismatch` (log only).
     Incident 2026-11-24, order 8306-6247: the app was killed inside the post-order `resetCart`
     after the name was blanked, the next store's product joined the old cart with no dialog,
     and the order went to the previous store. Test: `__tests__/stores/cart-store-identity.test.ts`.
