@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@feat/order-tracking / 2026-11-25 (invariant 22: customerEtaAt forward-only, expectedDeliveryAt never written for the customer; the customer-eta cron + delay push; the customer book view; the staff map pilot; POST driver/location takes the driver from the token, GET drivers/locations dashboard / own-company admin only; invariant 21 book/:bookId matches both order._id forms); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@feat/courier-arrival-push + shoofi-shoofir@feat/courier-arrival-push / 2026-11-27 (invariant 23: the courier's manual nearby / arrived-at-customer taps, once per booking, one push per single-mode twin, never a status); shoofi-server@feat/order-tracking / 2026-11-25 (invariant 22: customerEtaAt forward-only, expectedDeliveryAt never written for the customer; the customer-eta cron + delay push; the customer book view; the staff map pilot; POST driver/location takes the driver from the token, GET drivers/locations dashboard / own-company admin only; invariant 21 book/:bookId matches both order._id forms); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -721,6 +721,38 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
       (`driverLocationPost`). A token-less post is still accepted for now, stored
       `lastFixVerified: false` and logged; `DRIVER_LOCATION_REQUIRE_AUTH=1` refuses it. There is
       no per-ping customer broadcast (the old one read a top-level `customerId` and never sent).
+
+23. **"I'm close" / "I've arrived" are MANUAL courier taps that stamp a field and push once —
+    they are NOT a `DELIVERY_STATUS`** (Sari's ruling 2026-11-27: no geofence, no automatic
+    proximity push; push only, D7). `POST /api/delivery/driver/order/nearby` and
+    `POST /api/delivery/driver/order/arrived-at-customer`, body `{orderId: <book-delivery _id>}`,
+    `driverSelfAction` like the other courier steps (`services/delivery/courier-arrival.js`,
+    shoofi-server `docs/order-tracking-delivery.md` §6).
+    - **Stamps:** `customerNearbyAt` / `arrivedAtCustomerAt` (Date) on `book-delivery`. The
+      status stays `"3"` until delivered — never add a status for these, and never read them as
+      a transition. Before this the only "arrived at the customer" was local phone state
+      (shoofir `utils/task-local-state.ts` `atCustomer`), which still drives the courier's step.
+    - **Only while collected** (`status` `"3"` or the int `3`); anything else is **409
+      `{code: "NOT_ON_THE_WAY"}`**. Another courier's booking is 404; a body `driverId` naming
+      someone else or a non-driver token is 403.
+    - **Once per booking:** the stamp is an atomic claim (`{[field]: null}` in the update filter);
+      the winner pushes, a repeat answers 200 `{alreadySent: true}` with no push. First answer
+      `{alreadySent: false, pushed, at}`; `pushed: false` = nobody to push (delivery-only, or a
+      customer with no token).
+    - **Twin, single mode** (invariant 5 — `twinAssignmentMode` absent or `"single"`): ONE event.
+      Every side of the group (`twinGroupId` or `order.twinGroup.groupId`) the courier holds in
+      status 3 for the same `order.customerId` is stamped and ONE push goes out, opening the order
+      tapped. The push claim is taken on the lowest-`_id` side, so taps on both halves at once
+      still push once; a side already stamped makes the whole group "already sent" (a half
+      collected later is stamped silently). A side not yet collected is not stamped.
+    - **Push:** orders' `sendCustomerOrderPush`, `data.type` `courier_nearby` / `courier_arrived`
+      (Arabic + Hebrew in `CUSTOMER_PUSH_TEXTS`, no courier name — D3), stored notification type
+      the same, `extraData {bookId, deliveryStatus: "3"}`. Flow events
+      `delivery_courier_nearby` / `delivery_arrived_at_customer` (status `"3"`) after the push, in
+      their own try/catch (invariant 6).
+    - **Readers:** `customerBookingView` carries both as ISO or null (`GET delivery/book/:bookId`,
+      `GET delivery/order/:id` for a customer); `POST delivery/list` projects both, so the courier
+      card shows «أبلغناه» after a reload.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**

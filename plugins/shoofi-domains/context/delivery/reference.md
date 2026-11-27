@@ -49,7 +49,9 @@ request is refused with a 409 and no write.
 `1` WAITING_FOR_APPROVE → `2` APPROVED → `3` COLLECTED_FROM_RESTAURANT (pickup) →
 `4` DELIVERED; `5` WAITING_IN_STORE; cancels `-1` by-driver, `-2` by-store, `-3` by-admin.
 Transitions: driver `approve`/`start`/`complete`/`cancel`/`waiting-in-store`
-(`routes/delivery/orders.js`); admin `assign`/`reassign`/`cancel` + generic
+(`routes/delivery/orders.js`; the courier's `nearby` / `arrived-at-customer` taps beside them are
+NOT transitions — they stamp `customerNearbyAt` / `arrivedAtCustomerAt` and push the customer
+once, CORE invariant 23); admin `assign`/`reassign`/`cancel` + generic
 `order/status/update` (`admin.js`, admin-web only, CORE invariant 19); store cancel `-2`
 (`store/order/cancel`, the delivery's own store or a dashboard role). Every transition writes a
 `centralizedFlowMonitor` event. (⚠️ status-value inconsistencies exist — see §10.)
@@ -373,7 +375,10 @@ sends the neutral delay push, max 3 per order; never writes `expectedDeliveryAt`
   twinPickupSequence, twinAssignmentMode, twinPeer, twinDegraded, *DelayNotified*,
   assignedAt, approvedAt, waitingInStoreAt(Date), startedAt, completedAt(Date), cancelledAt,
   isReadyForPickup, readyForPickupAt, customerEtaAt(Date), customerEtaHistory[],
-  delayNotice{count,lastToldEtaAt,lastNoticeAt}, deliveredAt(Date)}`.
+  delayNotice{count,lastToldEtaAt,lastNoticeAt}, deliveredAt(Date),
+  customerNearbyAt(Date), arrivedAtCustomerAt(Date)}`. The last two are the courier's manual
+  taps (CORE invariant 23), absent before 2026-11-27 and on any booking he never tapped — they
+  are not an arrival measurement (no GPS behind them).
   `customerEtaAt` is the customer's forward-only estimate — never confuse it with, or copy it
   into, `expectedDeliveryAt` (CORE invariant 22). Absent on bookings made before 2026-11.
   ⚠️ `order._id` is an ObjectId on partner-accept bookings and a 24-hex **string** on bookings
@@ -442,7 +447,14 @@ AsyncStorage offline-retry queue. **Availability/active**: `delivery/driver/avai
 + `.../update-active-status`. **Shifts**: `services/driverShiftService.ts` → `/driver-shift-manager/*`.
 **Assignment**: arrives via push/WS (not polling); lifecycle actions POST `delivery/driver/order/*`
 (`approve`/`waiting-in-store`/`start`/`complete`/`cancel`, from `screens/delivery-driver/index.tsx`
-and `notifications.tsx`) with `driverId = userDetails.customerId`. The server takes the driver from
+and `notifications.tsx`) with `driverId = userDetails.customerId`. The redesign task screen
+(`screens/delivery-driver/task.tsx`, feat/courier-bonuses line) adds two customer taps through
+`utils/courier-arrival.ts`, body `{orderId}` only: «وصلت عند الزبون» keeps its local step
+(`task-local-state.ts`) and calls `arrived-at-customer` in the background (any failure or an old
+server's 404 never stops the courier; «أبلغنا الزبون إنك وصلت» on success), and an optional
+«قريب من الزبون، بلّغه» button on the to-customer step calls `nearby` once, then reads «أبلغناه»
+(hidden at the door and for delivery-only). One call for a twin (the first status-3 side); the
+server stamps the other half (CORE invariant 23). The server takes the driver from
 the token: a different body `driverId` is a 403, and a delivery not assigned to it is a 404 (CORE
 invariant 19). The order list is `POST delivery/list {customerId}` (own id; a company admin of an
 `isControlledByAdmin` company gets its company's rows). Order details are `GET delivery/order/:id`,
@@ -609,13 +621,14 @@ dialog, but every screen that polls this route already sits behind the auth-gate
 `order/customer-active-orders`. The app never calls `delivery/order/:orderId/driver`.
 **Since order tracking (CORE invariant 22)** a customer token gets `customerBookingView`, not
 the snapshot: `{_id, bookId, appName, status, created, pickupTime, expectedDeliveryAt,
-customerEtaAt, isDelayed, deliveredAt, startedAt, mapAvailable, driver: {firstName}|null,
-order: {_id, orderId}, twinGroupId}` — `driver` only at status 3, never a phone or an id. The app
+customerEtaAt, isDelayed, deliveredAt, startedAt, customerNearbyAt, arrivedAtCustomerAt,
+mapAvailable, driver: {firstName}|null, order: {_id, orderId}, twinGroupId}` — `driver` only at status 3, never a phone or an id. The app
 should send the order's Mongo `_id` (unique; both stored forms match) and count down from
 `customerEtaAt`. With `mapAvailable` it polls
 `GET delivery/customer/order/:orderId/driver-location` every 10 s
 (`{available:false}` | `{available:true, lat, lng, at}`). The delay push arrives as
-`type: "order_delay"` with `data {type, orderId, orderNumber, appName}`.
+`type: "order_delay"` with `data {type, orderId, orderNumber, appName}`; the courier's manual
+taps as `courier_nearby` / `courier_arrived` (CORE invariant 23; read by shoofi-app#172).
 
 ## 10. Known status / flagged for verdict (do NOT silently "fix")
 1. **CONFIRMED BUG — FIXED** (partner PR #4): partner `DELIVERY_STATUS` was `0..3`, off by one

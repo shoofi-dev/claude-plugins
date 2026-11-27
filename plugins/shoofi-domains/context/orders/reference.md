@@ -504,7 +504,8 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   **Customer order pushes (CORE invariant 36, `docs/order-tracking.md` in shoofi-server).** Every
   push to the customer about an order carries `data = { type, orderId: <order _id>, orderNumber:
   <short number>, appName: <store> }` (+ the sender's old keys, never overriding these four),
-  `type` ∈ `order_status` · `order_delay` · `twin_part_cancelled` · `order_delivered`, and is sent
+  `type` ∈ `order_status` · `order_delay` · `twin_part_cancelled` · `order_delivered` ·
+  `courier_nearby` · `courier_arrived` (the courier's manual taps, delivery CORE invariant 23), and is sent
   with `appType: "shoofi-shopping"`. `sendCustomerOrderPush` (`services/order-tracking/customer-push.js`)
   does both and never throws; `customerOrderPushData` builds the data for a caller that sends
   itself. `sendNotification` takes optional `localized: { ar: {title, body}, he: {title, body} }` +
@@ -769,6 +770,19 @@ Role: **places** the order and **tracks** it. The origin of the whole lifecycle.
     after delivery with `deliveredAt`, and puts `twinPartCancelled { storeName, at }` on the
     surviving half of a degraded twin. The delivery-side fields (`customerEtaAt`, `isDelayed`,
     the driver's first name, the map) come from `delivery/book/{bookId}` — delivery CORE.
+  - **Courier 'close' / 'arrived' (Sari 2026-11-27, shoofi-app#172).** The booking fields
+    `customerNearbyAt` and `arrivedAtCustomerAt` are manual courier stamps. They never change
+    `bookDelivery.status` ("3" until "4") or `orders.status`, so they are not a transition. The
+    app reads them through `courierArrival(order, delivery)` in `helpers/order-tracking.ts`, only
+    while collected and not delivered. Arrived beats nearby, and delivered beats both. Arrived
+    replaces the countdown (`CountdownDisplay` kind `arrived`) and ends the delay state
+    (`isTrackingDelayed`). Push types `courier_nearby` and `courier_arrived` are in
+    `ORDER_PUSH_TYPES`: a tap opens `order-item` like `order_status`. Any order push (websocket
+    message, a push received in the foreground, a tap) emits `utils/order-push-events.ts`, and
+    every mounted `useOrderBooking` re-reads `GET /api/delivery/book/:id` at once, without
+    matching the push's order id (twin cards). Strings: `tracking-courier-nearby`,
+    `tracking-courier-arrived`, `tracking-courier-arrived-ring` (DB-overridable, code defaults).
+    Server side: `services/delivery/courier-arrival.js`, delivery CORE invariant 23.
   - **One list, one poll** (`stores/orders/index.tsx`): `ordersStore.activeOrders` is what the
     ActiveOrders tab (`screens/order/active/index.tsx`), the tab-bar order bubble
     (`components/layout/footer-tabs/BottomTabBar.tsx`) and the For-you chips all render.
