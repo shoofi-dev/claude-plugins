@@ -183,6 +183,27 @@ registry) while `/api/menu` keeps returning none. The copy-from-mock-store flow
 escapes this by setting both documents explicitly. Same shape as the
 `isDeliveryOnlySupport` bug fixed in shoofi-server PR #185.
 
+### `store-update-history` + `product-update-history` — who changed the store or a product (CORE invariant 36)
+_Verified 2026-11-28 against shoofi-server `feat/partner-action-trail` (uncommitted worktree on origin/main 2b31f1d2)._
+- **`store-update-history`** (`db.storeUpdateHistory`), one row per `POST /api/store/update` that
+  changed a key: `timestamp` (Israel-offset string), `appName`, `storeId`, `changes { key: {old,new} }`,
+  `oldValues`, `newValues`, `changedFields`, `userAgent`, `ipAddress`, `isStatusChanging`, and since
+  2026-11 `callerKind` (`admin` / `partner`), `actorType`, `adminUserId`, `storeUserId`, `actorName`,
+  `appType`, `appVersion`, `deviceId`. The timed-status cron writes rows here too, with
+  `source: "store-timed-status-cron"` and no actor. Read by `services/store-analytics/busy-time.js`
+  (`changedFields: "isBusy"`).
+- **`product-update-history`** (`db.productUpdateHistory`, else `db.collection(...)`; no index, so
+  no index build races the first insert): `appName`, `productId` (string), `productName` (the
+  Arabic name before the write, else the Hebrew), `source` (`update`, `update/isInStore`, `update/quantity`,
+  `update/isHidden`, `update/isInStore/byCategory`), `changes { field: {old,new} }`, `changedFields`,
+  `categoryId` (byCategory only), `oldUnknown` (only when the read before the write failed), the
+  actor and app fields above, `timestamp` (Date). Tracked fields only (`TRACKED_FIELDS`); never
+  `img`, a `data:` URL, a Buffer, a token, a phone or the request body.
+- **To answer "who did it":** filter the store's DB by `productId` (or `changedFields`) and sort by
+  `timestamp`; a partner row's `storeUserId` is a `shoofi.storeUsers` `_id`, `deviceId` tells two
+  tablets of one store apart. The same write also has a `shoofi.adminAuditLog` row (route, body,
+  status code), where a partner row has `actorType: "storeUser"`.
+
 ### `menu-import-issues` — the operator worklist: what an import could not bring in, and what the catalog lint found
 `runId`, `fileName`, `phase`, `code`, `row`, `detail`, `reason`, `resolved`, `resolvedAt`;
 lint rows add `severity` (`critical` | `warning`), `productId`, `productName`, `extraId`,
