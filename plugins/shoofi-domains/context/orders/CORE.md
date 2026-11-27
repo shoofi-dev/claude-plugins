@@ -61,11 +61,18 @@ Payments/invoicing files stay off-limits — describe the fix and hand off.
    `bookDelivery`. A consumer that needs post-completion data reads lazily instead (the AI
    helper's `inferred` taste cache), and the AI helper's `deliveredOrders` counts COMPLETED
    statuses, not courier deliveries (reference §5).
-2. **Transition guards:** PENDING(`6`) only from FRAUD_REVIEW; store-accept rejects
-   already-cancelled `4,7,8,9` but **not** REJECTED `5`: its list omits it (`routes/order.js`
-   `/api/order/update/viewd`, ~6002), so a `5` order passes and is overwritten to `1`/`14`/`15`
-   (reference §2); `start-preparing` only from `14`. **ACCEPT is `order/update/viewd`**,
-   not `order/update`.
+2. **Transition guards:** PENDING(`6`) only from FRAUD_REVIEW; store-accept
+   (`/api/order/update/viewd`) is written only over `6` or `14`
+   (`services/orders/accept-guard.js` `ACCEPT_ALLOWED_FROM`, since 2026-11-22), **in the
+   `updateOne` filter**, so a cancel between the read and the write wins. Refused = NONE of the
+   side effects (print frame, delivery booking, external provider, twin stamps, customer push):
+   cancelled/rejected `4,5,7,8,9` → `400 {message, error: "ORDER_CANCELLED", status}` (the body
+   installed partner builds handle; deliberately not a 409); already accepted
+   `1,2,3,10,11,12,15` → `200 {unchanged: true}`; anything else (`13`, `0`) → `409`
+   `STATUS_ALREADY_CHANGED`. No dashboard exemption. Test:
+   `test/integration/order-accept-guard.js` (reference §2). `start-preparing` only from `14`,
+   but that one is still a pre-read check followed by a write by `_id`, so a cancel in the gap
+   is overwritten to `1`. **ACCEPT is `order/update/viewd`**, not `order/update`.
    **"Handed over" only from "ready"** (`services/orders/picked-up-guard.js`, since
    2026-11-15): on `/api/order/update`, `10` needs the order at `2`, and `11` at `2` or `3`
    (the partner `nextStatusFor` edges). The allowed statuses go **in the `updateOne` filter**

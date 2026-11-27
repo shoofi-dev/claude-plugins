@@ -71,12 +71,15 @@
         "services/orders/order-source.js",
         "services/orders/picked-up-guard.js",
         "test/integration/order-picked-up-guard.js",
+        "services/orders/accept-guard.js",
+        "test/integration/order-accept-guard.js",
         "routes/order-fraud-detector.js"
       ],
       "symbols": {
         "services/kopa/table-orders.js": ["createTableOrder", "priceItems", "storeOpenState", "checkLocation", "buildTableOrderDoc"],
         "services/orders/order-source.js": ["isKopaQrOrder"],
         "services/orders/picked-up-guard.js": ["pickedUpAllowedFrom", "statusAlreadyChangedBody"],
+        "services/orders/accept-guard.js": ["ACCEPT_ALLOWED_FROM", "acceptRefusal"],
         "routes/order.js": [
           "processCreditCardPayment",
           "processHypTokenPayment",
@@ -689,6 +692,10 @@
         {"file": "routes/order.js", "regex": "if \\(pickedUpFrom\\) writeFilter\\.status = \\{ \\$in: pickedUpFrom \\};\\s*const written = await db\\.orders\\.updateOne\\(\\s*writeFilter,\\s*\\{ \\$set: updateobj \\},", "desc": "CORE invariant 2: the guard is ATOMIC: the allowed statuses are in the updateOne filter, never only a pre-read check"},
         {"file": "routes/order.js", "regex": "if \\(pickedUpFrom && !\\(written && written\\.matchedCount > 0\\)\\) \\{[\\s\\S]{0,1200}?return res\\.status\\(200\\)\\.json\\(\\{ message: \\\"Order successfully updated\\\", unchanged: true \\}\\);[\\s\\S]{0,800}?return res\\.status\\(409\\)\\.json\\(statusAlreadyChangedBody\\(now\\.status\\)\\);\\s*\\}\\s*const order = await db\\.orders\\.findOne\\(", "desc": "CORE invariant 2: a refused picked-up write answers (retry at target = 200 unchanged, else 409 STATUS_ALREADY_CHANGED) BEFORE the re-read that feeds every side effect"},
         {"file": "test/integration/order-picked-up-guard.js", "regex": "ATOMIC: a cancel between the route's read and its write still wins", "desc": "CORE invariant 2: the race test that fails if the guard becomes a pre-read check"},
+        {"file": "services/orders/accept-guard.js", "regex": "const ACCEPT_ALLOWED_FROM = Object\\.freeze\\(\\[\\s*ORDER_STATUS\\.PENDING,\\s*ORDER_STATUS\\.FUTURE_ORDER_PENDING,?\\s*\\]\\)", "desc": "CORE invariant 2: store-accept is written only over 6 or 14"},
+        {"file": "routes/order.js", "regex": "status: \\{ \\$in: ACCEPT_ALLOWED_FROM \\},\\s*\\},\\s*\\{\\s*\\$set: updateData,", "desc": "CORE invariant 2: the accept guard is ATOMIC: the allowed statuses are in the update/viewd updateOne filter, never only the pre-read check"},
+        {"file": "routes/order.js", "regex": "if \\(!\\(accepted && accepted\\.matchedCount > 0\\)\\) \\{[\\s\\S]{0,1200}?return res\\.status\\(refusal\\.httpStatus\\)\\.json\\(refusal\\.body\\);\\s*\\}\\s*const order = await db\\.orders\\.findOne\\(", "desc": "CORE invariant 2: a refused accept answers acceptRefusal BEFORE the re-read that feeds every side effect"},
+        {"file": "test/integration/order-accept-guard.js", "regex": "ATOMIC: support cancels \\(7\\) between the accept's read and its write", "desc": "CORE invariant 2: the race test that fails if the accept guard becomes a pre-read check"},
         {"file": "routes/order.js", "regex": "orderAmount: parsedBodey\\.orderPrice \\|\\| parsedBodey\\.total\\n", "desc": "CORE invariant 32: the server validates coins against the ITEMS price (orderPrice), never the delivery fee, and refuses silently (usedCoins: null, client total kept) - the owner keeps this server-side as is (2026-11-16); the app cap must equal it"},
         {"file": ["utils/feedback-eligibility.js", "routes/order.js"], "regex": "(?:if \\(courier && courier\\.state === COURIER_DELIVERED\\) return true;|\\(updateobj\\.status === ORDER_STATUS\\.COMPLETED \\|\\| updateobj\\.status === \"10\"\\) &&)", "desc": "CORE invariant 33: a delivery order is rateable once the courier delivered (isFeedbackEligible) - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
         {"file": ["utils/feedback-eligibility.js", "routes/order.js"], "regex": "(?:if \\(courier === null \\|\\| courier\\.state === COURIER_CANCELLED\\) \\{\\s*return DELIVERY_HANDED_OVER_STATUSES\\.includes\\(status\\);|\\(updateobj\\.status === ORDER_STATUS\\.COMPLETED \\|\\| updateobj\\.status === \"10\"\\) &&)", "desc": "CORE invariant 33: delivery with no live Shoofi booking falls back to the store's hand-over 11/12 - valid-before leg is main before shoofi-server fix/rate-after-delivery (the old takeaway push condition / body actor); drop that leg and add the new files to `files` once it has merged"},
