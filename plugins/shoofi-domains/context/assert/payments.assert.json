@@ -373,6 +373,7 @@
     "shoofi-app": {
       "files": [
         "hooks/checkout/use-hyp-tokenize.ts",
+        "helpers/order-submit-error.ts",
         "helpers/get-supported-payment-methods.ts",
         "stores/creditCards/index.ts",
         "data/zcredit-config.ts",
@@ -421,6 +422,11 @@
           "file": "services/public-coupon.ts",
           "regex": "axiosInstance\\.get\\(`coupons/\\$\\{encodeURIComponent\\(couponId\\)\\}/public`, \\{ silent: true \\}",
           "desc": "CORE: the coupon page reads the public coupon silently (its own 404/error states, never the app-wide dialog)"
+        },
+        {
+          "file": "helpers/order-submit-error.ts",
+          "regex": "/\\\\\\(141\\\\\\)\\\\s\\*\\$/\\.test\\(e\\) \\|\\| e\\.includes\\(\"סולק סגור\"\\)",
+          "desc": "CORE Known status: HYP closed acquirer (141) on wallet charges is matched on the trailing code and shown as plain copy, never as the raw Shva wording (HQ #43d1ca, shoofi-app fix/HIGH-RISK-order-submit-error-reason)"
         }
       ]
     },
