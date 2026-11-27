@@ -868,6 +868,11 @@ Driver profile via `delivery/company/employee/{driverId}`.
 change. Token in `localStorage['@storage_userToken']` + `adminUser`, sent as
 **`Authorization: Bearer`** (note: Bearer here, `Token` in the RN apps). A 401 triggers the
 **refresh-token flow** in the interceptor (guarded against loops) → retry, else logout+redirect.
+The refresh is **one shared promise** (`refreshPromise` in `src/utils/http-interceptor/index.ts`,
+cleared in `finally`): every 401 that arrives while it runs awaits it and is retried with the new
+token; a refresh that fails or answers 2xx with no token logs out once and rejects every waiter.
+Never bring back a boolean flag plus a timed wait — waiters then retry with the expired token
+when the refresh is slower than the wait (HQ #d9d347).
 Roles/permissions: `contexts/AdminAuthContext`, `ProtectedRoute`, `RoleBasedAccess`,
 `RestrictedRoleGuard` (e.g. `accountant` limited to invoice screens).
 **`/api/analytics/*` is admin-token only** (shoofi-server `utils/analytics-access.js`,

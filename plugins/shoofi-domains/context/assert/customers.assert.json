@@ -911,6 +911,11 @@
           "desc": "admin uses Bearer (RN apps use 'Token')"
         },
         {
+          "file": "src/utils/http-interceptor/index.ts",
+          "regex": "let refreshPromise: Promise<string> \\| null = null;",
+          "desc": "reference C4: concurrent 401s await one shared refresh promise, not a flag plus a timed wait"
+        },
+        {
           "file": "src/views/admin/customer-campaigns/HoldoutField.tsx",
           "regex": "export const HOLDOUT_PCT_LIMITS: \\[number, number\\] = \\[0, 50\\];",
           "desc": "CORE invariant 12: the form refuses a holdout pct the server would 400"
