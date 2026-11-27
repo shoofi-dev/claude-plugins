@@ -753,7 +753,9 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
       feat/company-admin-ranked-picker). `GET /api/delivery/admin/:adminId/drivers?orderId=<booking>`
       (`routes/delivery/driver.js`, `companyAdminSelf`) returns the same list as before: his
       company's couriers and admins only, NOT `findAllMatchingDrivers`. For a booking of HIS
-      company it is ordered by `rankDriversForManualAssignment`, with `assignmentScore`. Nobody
+      company it is ordered by `rankDriversForManualAssignment`, with `assignmentScore`. Only
+      his switched-on couriers are ranked, so the ranks he sees are 1..N. Switched-off ones
+      follow, unranked (`assignmentScore: null`); the app hides them. Nobody
       is filtered out: a courier at or over the limit stays listed with `over_capacity` and his
       `capacity` (Sari, 2026-11-28: he dispatches by hand and must see everyone; the courier
       app paints it red). Another company's booking, a malformed id, an unscorable booking or a

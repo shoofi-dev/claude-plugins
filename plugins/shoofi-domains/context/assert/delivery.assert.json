@@ -910,8 +910,8 @@
         },
         {
           "file": "routes/delivery/driver.js",
-          "regex": "(?:const ranked = await rankDriversForManualAssignment\\(\\{\\s*appDb: req\\.app\\.db,\\s*delivery: booking,\\s*drivers: driversWithCounts,|res\\.status\\(200\\)\\.json\\(driversWithCounts\\);)",
-          "desc": "CORE invariant 22: the company admin's picker ranks HIS company's couriers (not findAllMatchingDrivers) for his own booking - valid-before leg is main before shoofi-server feat/company-admin-ranked-picker; drop it once that has merged"
+          "regex": "(?:const active = driversWithCounts\\.filter\\(\\(d\\) => d\\.isActive === true\\);[\\s\\S]{0,400}?rankDriversForManualAssignment\\(\\{\\s*appDb: req\\.app\\.db,\\s*delivery: booking,\\s*drivers: active,|res\\.status\\(200\\)\\.json\\(driversWithCounts\\);)",
+          "desc": "CORE invariant 22: the company admin's picker ranks HIS company's couriers (not findAllMatchingDrivers) for his own booking, ranking only the switched-on ones (ranks 1..N) - valid-before leg is main before shoofi-server feat/company-admin-ranked-picker; drop it once that has merged"
         },
         {
           "file": "services/delivery/delayed-assignment.js",
