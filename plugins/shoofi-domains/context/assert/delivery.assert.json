@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/admin-assign-existing-booking + shoofi-delivery-web@fix/assign-modal-late-confirm / 2026-11-28 (CORE invariant 22: ranked pickers, admin/assign reuses a live booking, confirmation behind supportsConfirmation, store-order ranking via storeAppName, booking pickup = pickupFromStoreOrder as minutes-from-now); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -128,6 +128,11 @@
           "/api/delivery/delivery-only/book",
           "/api/delivery/delivery-only/list",
           "isDeliveryOnly"
+        ],
+        "services/delivery/manual-assignment-ranking.js": [
+          "rankDriversForManualAssignment",
+          "assessPickupFeasibility",
+          "RANK_REASONS"
         ]
       },
       "patterns": [
@@ -857,6 +862,66 @@
           ],
           "regex": "(?:admin/cancel legacy \\{bookId\\} shared by 3 rows cancels the single live one|bookId: deliveryData\\.bookId  // Match by bookId)",
           "desc": "CORE invariant 20: the decoy-first tests (another store + same store older row inserted ahead of the real one) - valid-before leg is the old bookId-only code on main before the code PR; drop it once shoofi-server fix/delivery-side-row-by-original-id has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:async function storeOrderAsDelivery\\(appDb, \\{ orderId, storeAppName \\}\\)|Order \\$\\{orderId\\} has no location, returning all available drivers\\.)",
+          "desc": "CORE invariant 22: the drivers list ranks a booking-less store order when it is told storeAppName - valid-before leg is the code on main before the code PR; drop it once shoofi-server fix/admin-assign-existing-booking has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:const gate = req\\.body\\?\\.supportsConfirmation === true;|const existingDelivery = await db\\.bookDelivery\\.findOne\\(\\{ originalBookId: originalOrderId \\}\\);)",
+          "desc": "CORE invariant 22: admin/assign gates ONLY a caller that sends supportsConfirmation (a stale tab cannot read a 409) - valid-before leg is the code on main before the code PR; drop it once shoofi-server fix/admin-assign-existing-booking has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:const bookings = await findBookingsForAdminAssign\\(db, \\{ order, originalOrderId, bookId, storeAppName \\}\\);|const existingDelivery = await db\\.bookDelivery\\.findOne\\(\\{ originalBookId: originalOrderId \\}\\);)",
+          "desc": "CORE invariant 22: admin/assign finds the order's bookings by originalBookId, order._id or bookId+store before it ever books - valid-before leg is the code on main before the code PR; drop it once shoofi-server fix/admin-assign-existing-booking has merged"
+        },
+        {
+          "file": "services/delivery/book-delivery.js",
+          "regex": "(?:if \\(deliveryData\\?\\.driverId && !result\\.area\\) \\{|console\\.log\\(\"driver\", result\\.driver\\);)",
+          "desc": "CORE invariant 22: a hand-picked courier with no area is refused BEFORE the insert - valid-before leg is the code on main before the code PR; drop it once shoofi-server fix/admin-assign-existing-booking has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:pickupTime: pickup\\.minutesFromNow,|pickupTime: 0,)",
+          "desc": "CORE invariant 22: admin/assign books with the order's own pickup clock (pickupFromStoreOrder) as minutes from now, the form bookDelivery takes - never pickupTime 0 - valid-before leg is the code on main before the code PR; drop it once shoofi-server fix/admin-assign-existing-booking has merged"
+        },
+        {
+          "file": "routes/delivery/admin.js",
+          "regex": "(?:function pickupFromStoreOrder\\(orderDate, now = moment\\(\\)\\.utcOffset\\(getUTCOffset\\(\\)\\)\\) \\{|const deliveryData = \\{\\s*fullName: order\\.customerDetails\\?\\.fullName,)",
+          "desc": "CORE invariant 22: ONE pickup helper for the assign window's ranked list and the booking it creates - valid-before leg is the code on main before the code PR; drop it once shoofi-server fix/admin-assign-existing-booking has merged"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "company\\.isControlledByAdmin !== true \\|\\|\\s*company\\.manualAssignmentOnly !== true",
+          "desc": "CORE invariant 6: routing to the company admin needs BOTH isControlledByAdmin and manualAssignmentOnly - isControlledByAdmin alone still auto-assigns a courier"
+        },
+        {
+          "file": "services/delivery/assignDriver.js",
+          "regex": "has no active admin — falling back to auto-assignment",
+          "desc": "CORE invariant 6: a manual-only company with no ACTIVE admin falls back to auto-assignment (console.warn only, no alert)"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "const manualAdmin = await resolveManualAdminAssignee\\(\\{ appDb, company: bestDriver\\.company \\}\\);",
+          "desc": "CORE invariant 6: the scored/cron engine routes a manual-only company to its admin too, not only the immediate one"
+        },
+        {
+          "file": "routes/delivery/driver.js",
+          "regex": "(?:const active = driversWithCounts\\.filter\\(\\(d\\) => d\\.isActive === true\\);[\\s\\S]{0,400}?rankDriversForManualAssignment\\(\\{\\s*appDb: req\\.app\\.db,\\s*delivery: booking,\\s*drivers: active,|res\\.status\\(200\\)\\.json\\(driversWithCounts\\);)",
+          "desc": "CORE invariant 22: the company admin's picker ranks HIS company's couriers (not findAllMatchingDrivers) for his own booking, ranking only the switched-on ones (ranks 1..N) - valid-before leg is main before shoofi-server feat/company-admin-ranked-picker; drop it once that has merged"
+        },
+        {
+          "file": "services/delivery/delayed-assignment.js",
+          "regex": "(?:assignmentMethod: assignmentResult\\.assignmentMetadata\\?\\.assignmentMethod,|title: 'تم تعيين طلب جديد',)",
+          "desc": "CORE invariant 6: the routed admin's push asks him to assign (assignment-push.js), on the cron engine too - valid-before leg is main before shoofi-server feat/company-admin-ranked-picker; drop it once that has merged"
+        },
+        {
+          "file": "routes/delivery/orders.js",
+          "regex": "(?:'assignmentMetadata\\.assignmentMethod': 1,|'company\\._id': 1,)",
+          "desc": "CORE invariant 6: delivery/list carries the assignment METHOD only, never the scoring blob - valid-before leg is main before shoofi-server feat/company-admin-ranked-picker; drop it once that has merged"
         }
       ]
     },
@@ -1072,6 +1137,16 @@
           "file": "src/components/Modals/CancelDeliveryModal.tsx",
           "regex": "(?:await onCancel\\(buildCancelDeliveryData\\(deliveryOrder, cancelReason\\.trim\\(\\), \"admin\"\\)\\);|bookId: deliveryOrder\\.bookId \\|\\| deliveryOrder\\._id,)",
           "desc": "CORE invariant 20: CancelDeliveryModal builds its body with buildCancelDeliveryData (never bookId alone) - valid-before leg is the old bookId-only payload on main before the code PR; drop it once shoofi-delivery-web fix/admin-cancel-delivery-by-original-id has merged"
+        },
+        {
+          "file": "src/components/Modals/AssignDriverModal.tsx",
+          "regex": "(?:supportsConfirmation: true,|driverId: selectedDriver,\\s*\\}\\);)",
+          "desc": "CORE invariant 22: the assign window says it can answer the 409, or the server never gates it - valid-before leg is main before shoofi-delivery-web fix/assign-modal-late-confirm; drop it once that has merged"
+        },
+        {
+          "file": "src/components/Modals/AssignDriverModal.tsx",
+          "regex": "(?:getAvailableDrivers\\(order\\._id, storeAppName\\)|getAvailableDrivers\\(order\\._id\\);)",
+          "desc": "CORE invariant 22: the assign window sends storeAppName so its list is ranked from the store order - valid-before leg is main before shoofi-delivery-web fix/assign-modal-late-confirm; drop it once that has merged"
         }
       ]
     }

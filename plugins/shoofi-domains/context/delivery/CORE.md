@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@fix/admin-assign-existing-booking + shoofi-delivery-web@fix/assign-modal-late-confirm / 2026-11-28 (invariant 22: admin pickers are ranked by manual-assignment-ranking; admin/assign reuses a live booking, asks the reassign confirmation behind `supportsConfirmation`, ranks a store order with no booking via `storeAppName`, books with the order's own pickup clock `pickupFromStoreOrder` as minutes-from-now); shoofi-server@fix/admin-assign-existing-booking / 2026-11-28 (invariant 6: isControlledByAdmin vs manualAssignmentOnly, admin-routed dispatch and its no-active-admin fallback, integration-tested; invariant 22: company admins never reach the dashboard assign routes); shoofi-server@feat/company-admin-ranked-picker + shoofi-shoofir@feat/company-admin-dispatch-ux / 2026-11-28 (invariant 6: the routed admin's push asks him to assign; invariant 22: the company admin's picker ranked by ?orderId); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -251,7 +251,40 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
    `twinPickupSequence:1` side drives selection, the peer mirrors it, and `assignDriverAt` is
    aligned to the later side. Breaking any of it splits a twin.
 6. **Manual-admin routing:** companies with `isControlledByAdmin && manualAssignmentOnly` route
-   to a company **admin**, not a driver. Don't auto-assign them. Corollary for reports: a
+   to a company **admin**, not a driver. Don't auto-assign them. The two flags are NOT the same
+   thing, and a company that has only the first auto-assigns. Integration-tested in
+   `test/integration/delivery-company-admin-dispatch.js` (shoofi-server#711):
+   - **`isControlledByAdmin` alone.** The company has its own admin, who manages its couriers
+     from the courier app. Both engines still auto-assign a courier. Every active
+     `role:"admin"` of the company, minus the assignee, gets an OVERSIGHT push naming the
+     courier (`book-delivery.js` / `delayed-assignment.js` "Notify company admins").
+   - **`+ manualAssignmentOnly`** (admin web: Delivery companies → edit, checkbox). After
+     choosing the best candidate, `resolveManualAdminAssignee` (`assignDriver.js`) swaps in the
+     company's admin, and both engines call it: immediate (`assignBestDeliveryDriver`) and
+     scored/cron (`assignDriverByScore`). The admin is written as the booking's `driver`, status
+     `"1"`, `assignmentMethod: "manual-admin-routed"`. He gets the one assignment push and no
+     courier hears anything. That push says «طلب جديد بانتظار التعيين / … عيّن كابتن» with
+     `data.needsAssignment: true`, not «تم تعيين طلب جديد». It comes from
+     `services/delivery/assignment-push.js`, used by both engines (shoofi-server
+     feat/company-admin-ranked-picker). `POST /api/delivery/list` projects
+     `assignmentMetadata.assignmentMethod` (the method only), so the courier app shows such an
+     order as waiting on him («بانتظار التعيين» + «تعيين كابتن», shoofir
+     `utils/admin-dispatch.ts`). It never offers «موافقة» on it: approving would make him the
+     courier without choosing. Couriers are told only when he reassigns through
+     `/api/delivery/admin/:adminId/order/:orderId/reassign`, and only the new holder is told.
+     In delayed mode the booking waits in the queue silently, and at dispatch the cron routes it
+     to the admin, never later to a courier. A single-mode twin mirrors the admin onto the peer
+     side. Nothing broadcasts an "offer" to couriers. There is no offer state: assignment
+     writes `driver` before status `"1"`.
+   - **"Active" admin** = `isActive: true`, i.e. switched on in the courier app (invariant 4).
+     With no active admin, `resolveManualAdminAssignee` **falls back to normal auto-assignment**,
+     with only a `console.warn` and no alert. A switched-off admin is not sent the oversight
+     push either, so exactly one person is still sent to the store.
+   - The admin is swapped in only when the engine's BEST candidate belongs to the manual-only
+     company. With no eligible candidate (none covering, all switched off or at capacity, or no
+     location on the scored path), nobody is assigned, the admin included. The swap does not
+     re-check the admin's own blocks or capacity.
+   Corollary for reports: a
    company's admin login (`delivery-company.customers`, `role: "admin"`) **also takes jobs** —
    one such account took ~1,164 in 30 days — so it is a fleet, not a courier. Any per-driver
    table (lateness, load, pay) must flag `role === "admin"` rows rather than rank them.
@@ -519,7 +552,13 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
       `redactDeliveryCredentials` (`lib/delivery/helpers.js`) strips `driver.{token, authCode,
       notificationToken}` and `{company, driver.company}.{hyp, accounting, credentials}`. Run it
       on any route that hands out a raw delivery doc. `book/:bookId`, `orders/batch` and
-      `GET /api/delivery/order/:id` do. Since the driver-loop change, every `/api/delivery`
+      `GET /api/delivery/order/:id` do. A raw COURIER record (`delivery-company.customers`)
+      carries the same three fields: `redactDriverCredentials` (same file, the driver half of
+      the above) strips them, and the company admin's `GET admin/:adminId/drivers` (plain and
+      ranked) and `POST admin/:adminId/driver/update/:driverId` answer through it (shoofi-server
+      feat/company-admin-ranked-picker, 2026-11-28; before it, the company admin's courier list
+      sent every courier's live login token to the app). His screens read none of the three.
+      Pinned in `test/integration/company-admin-ranked-picker.js`. Since the driver-loop change, every `/api/delivery`
       response also goes through `services/delivery/response-redaction.js` (see the driver-loop
       bullet below).
       `test/integration/delivery-mobile-admin-auth.js` fails if any route in
@@ -670,6 +709,69 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
     - **Reach.** `sendToAppAdmins` iterates only the sending process's sockets — no Redis
       fan-out — and prod runs two instances, so a frame does not reach a tablet held by the other
       instance. True of every partner frame; the card must keep its focus/action refetch.
+
+22. **Every admin driver picker is ranked by the engine, and `/admin/assign` is the one that
+    starts from a store order, not a booking.** `GET /api/delivery/admin/drivers?orderId=`
+    (`routes/delivery/admin.js`) filters with `findAllMatchingDrivers` (coverage, store rule,
+    switched-off, blocks, at-limit; reassign's rules, which Sari has not changed) and orders
+    best-first with `rankDriversForManualAssignment` (`services/delivery/manual-assignment-ranking.js`),
+    the automatic engine's score and `byConcurrencyTierThenScore` comparator. Each row gets a
+    read-only `assignmentScore` (rank, distance/ETA + `estimatedArrivalBasis`, load, `reasons`
+    chips; see invariant 17). Nothing is written to `assignment-decisions`. `assignmentScore: null`
+    means unrankable (no order, or no customer point), and that is the honest answer.
+    - **`orderId` is a booking `_id`, except from `AssignDriverModal`.** That window opens on an
+      order with NO booking and sends the store order `_id` plus `storeAppName`. With no booking
+      under that id, `storeOrderAsDelivery` builds a stand-in from the store order. The store db
+      comes from `getOrInitializeDb`, which validates the name against `shoofi.stores`. It takes
+      `store{id:1}.location`, `order.geo_positioning`, `pickupFromStoreOrder` as the pickup,
+      and the pickup zone. Then it runs the same filter + ranking. Missing a
+      point → the old all-active list minus store-excluded and blocked couriers. Coverage cannot
+      be applied there: it needs the dropoff point. With no `storeAppName` (older bundle),
+      behaviour is unchanged.
+    - **`POST /api/delivery/admin/assign` never makes a second booking.** It finds the order's
+      bookings by `originalBookId`, `order._id` (ObjectId and string) or `bookId`+store
+      (`pickBookingForOrder`):
+      - waiting for a courier → manual assignment;
+      - any other live booking → the `/reassign` logic (`reassignDeliveryToDriver`);
+      - delivered → 409.
+      A fresh booking is attempted only once the store (from the order, never the admin web's
+      default `app-name: shoofi`), the store point and the customer point are known. Otherwise
+      it returns 400 with nothing written. It books with the order's own pickup clock,
+      `pickupFromStoreOrder` (`orderDate`, or now when missing or past). This is the same helper
+      the ranked list uses, so the list and the booking agree. It is passed to `bookDelivery`
+      as **minutes from now**, the input form partner-accept uses (`readyMinutes` + twin
+      buffer), and `bookDelivery` stores the usual `"HH:mm"` (invariant 10). It used to be
+      `pickupTime: 0`, "now" whatever the kitchen said. So the courier app's pickup clock and
+      countdown, `expectedDeliveryAt` and the late-delivery measure now follow the order's
+      ready time on admin-created bookings. `bookDelivery` refuses a hand-picked courier with no
+      area BEFORE its insert (it used to insert, then 500 on `result.area._id`).
+    - **Same confirmation as reassign** (`collectAssignConfirmations`/`confirmationConflict`,
+      409 `needsConfirmation`, cleared by `forceAssign: true`, `lateConfirmedByAdmin: true` on
+      the confirmed retry), on all three branches. A fresh booking is asked both questions
+      against the booking it would create (`bookingStandIn`), with nothing written on the 409.
+      `bookDelivery` records the result in `assignmentMetadata.pickupFeasibility`, never at the
+      top level. **The gate applies only when the body carries
+      `supportsConfirmation: true`**, which only the new `AssignDriverModal` sends. A tab on the
+      old bundle cannot read a 409, so it stays ungated and records `lateConfirmedByAdmin: false`.
+      This is also why server and web may deploy in either order. Removing the marker check
+      strands every stale tab on a generic "Failed to assign driver".
+    - **The company admin's own picker is ranked too** (shoofi-server
+      feat/company-admin-ranked-picker). `GET /api/delivery/admin/:adminId/drivers?orderId=<booking>`
+      (`routes/delivery/driver.js`, `companyAdminSelf`) returns the same list as before: his
+      company's couriers and admins only, NOT `findAllMatchingDrivers`. For a booking of HIS
+      company it is ordered by `rankDriversForManualAssignment`, with `assignmentScore`. Only
+      his switched-on couriers are ranked, so the ranks he sees are 1..N. Switched-off ones
+      follow, unranked (`assignmentScore: null`); the app hides them. Nobody
+      is filtered out: a courier at or over the limit stays listed with `over_capacity` and his
+      `capacity` (Sari, 2026-11-28: he dispatches by hand and must see everyone; the courier
+      app paints it red). Another company's booking, a malformed id, an unscorable booking or a
+      ranking failure answers the plain list. With no `orderId`, behaviour is unchanged.
+    - **A delivery-company admin never reaches these three routes.** Its courier-app token has
+      no `roles`, so `deliveryDashboardAdmin` refuses it with 403. Its surface is
+      `companyAdminSelf` (invariant 19): its company's couriers only (unranked), and reassigning
+      only its own company's bookings to its own couriers. A booking still waiting in the queue
+      (`company: null`) and another company's booking are both refused. Pinned in
+      `test/integration/delivery-admin-assign-existing-booking.js`.
 
 ## Known status (human-confirmed — do NOT "fix")
 - **NOT ROLLED OUT (as of 2026-09-18):** prod `shoofi.store {id:1}` has **no**
