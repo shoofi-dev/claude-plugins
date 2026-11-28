@@ -552,7 +552,13 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
       `redactDeliveryCredentials` (`lib/delivery/helpers.js`) strips `driver.{token, authCode,
       notificationToken}` and `{company, driver.company}.{hyp, accounting, credentials}`. Run it
       on any route that hands out a raw delivery doc. `book/:bookId`, `orders/batch` and
-      `GET /api/delivery/order/:id` do. Since the driver-loop change, every `/api/delivery`
+      `GET /api/delivery/order/:id` do. A raw COURIER record (`delivery-company.customers`)
+      carries the same three fields: `redactDriverCredentials` (same file, the driver half of
+      the above) strips them, and the company admin's `GET admin/:adminId/drivers` (plain and
+      ranked) and `POST admin/:adminId/driver/update/:driverId` answer through it (shoofi-server
+      feat/company-admin-ranked-picker, 2026-11-28; before it, the company admin's courier list
+      sent every courier's live login token to the app). His screens read none of the three.
+      Pinned in `test/integration/company-admin-ranked-picker.js`. Since the driver-loop change, every `/api/delivery`
       response also goes through `services/delivery/response-redaction.js` (see the driver-loop
       bullet below).
       `test/integration/delivery-mobile-admin-auth.js` fails if any route in
