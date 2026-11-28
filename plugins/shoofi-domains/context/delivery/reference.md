@@ -513,7 +513,8 @@ and rules: `GET delivery/city-areas`, then per region `delivery/company/employee
 `isActive:false`** (there is no zone-level flag), and "כבה"/"הפעל" are
 `POST delivery/city-area/:id/bulk-toggle-areas {isActive}`, the navbar's own call, so the
 availability trace and the admin audit row are unchanged. That endpoint takes **no reason and no
-duration** (the server hard-codes the trace reason) and has **no role check**. Zones are re-read at
+duration** (the server hard-codes the trace reason) and **no narrower role**: any dashboard token
+passes (`deliveryDashboardAdmin`, since 2026-11-28; before that it took no token at all). Zones are re-read at
 most every 30 s, because `company/employees` counts every courier's open bookDelivery rows per call.
 **The area/coverage CONTROL PANEL**
 lives here: `views/admin/delivery-areas/*` — full CRUD for cities, parent-cities, city-areas,
@@ -542,6 +543,9 @@ caller, and so it takes only a dashboard token (`deliveryDashboardAdmin`, CORE i
 does `delivery/driver/:id/orders`, the live-ops place cache's per-courier fallback
 (`apis/delivery/get-driver-orders.ts`).
 This is where a human curates coverage — treat it as the source of truth UI for §1/§4.
+Every coverage write this panel makes needs a dashboard token (CORE invariant 19, coverage-writes
+bullet), so a page outside the web's axios interceptor, or a curl in an E2E script, must send
+`Authorization: Bearer <admin jwt>` + `app-type: shoofi-admin`.
 
 ### C3. shoofi-partner — STORE-OWNER (booking trigger + coverage check)
 `app-type: shoofi-partner`. Books delivery: `order/book-delivery` (`{updateData:{isDeliverySent},

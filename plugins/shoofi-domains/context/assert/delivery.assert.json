@@ -1,6 +1,6 @@
 {
   "doc": "delivery",
-  "lastVerified": "shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
+  "lastVerified": "shoofi-server@fix/geography-write-routes-admin-auth / 2026-11-28 (invariant 19: the 22 coverage writes in geography.js + company.js take deliveryDashboardAdmin; the app reads stay open); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (CORE invariant 21: a cancelled delivery names nobody to the store); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and meal notes; reference C1); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (CORE invariant 20); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows floor / apartment / entrance + the landmark note order.order.address.notes, a booking-time snapshot; reference C1); shoofi-server@327fa80 / 2026-09-18",
   "repos": {
     "shoofi-server": {
       "files": [
@@ -515,6 +515,36 @@
           "file": "routes/delivery/admin.js",
           "regex": "(?<![\\s\\S])(?![\\s\\S]*router\\.(?:get|post|delete|put|patch)\\(\"/api/delivery/admin/[^\"]*\", async)",
           "desc": "NO /api/delivery/admin route in this router goes straight to its handler without a gate (CORE invariant 19)"
+        },
+        {
+          "file": "routes/delivery/geography.js",
+          "regex": "router\\.post\\(\"/api/delivery/city-area/update/:id\", \\.\\.\\.deliveryDashboardAdmin, async",
+          "desc": "switching a region on/off (city-area update) needs a dashboard token; until 2026-11-28 it took none (CORE invariant 19, coverage writes)"
+        },
+        {
+          "file": "routes/delivery/geography.js",
+          "regex": "router\\.post\\(\"/api/delivery/city-area/:id/bulk-toggle-areas\", \\.\\.\\.deliveryDashboardAdmin, async",
+          "desc": "the navbar / live-ops region shut-open toggle needs a dashboard token (CORE invariant 19, coverage writes)"
+        },
+        {
+          "file": "routes/delivery/geography.js",
+          "regex": "(?<![\\s\\S])(?![\\s\\S]*router\\.(?:post|delete)\\(\"/api/delivery/(?:area|geometry|city|city-area|parent-city)/(?:add|update/:id|:id)\", async)",
+          "desc": "NO add / update / delete of an area, geometry, city, city-area or parent-city goes straight to its handler without the dashboard gate (CORE invariant 19, coverage writes)"
+        },
+        {
+          "file": "routes/delivery/geography.js",
+          "regex": "router\\.get\\(\"/api/delivery/city-areas\", async",
+          "desc": "the customer app's region list stays OPEN - it is called with a customer token or none, and a role gate would 403 silently (CORE invariant 19, coverage writes)"
+        },
+        {
+          "file": "routes/delivery/geography.js",
+          "regex": "router\\.post\\(\"/api/delivery/city-area/by-coordinates\", async",
+          "desc": "the customer app's address-to-region lookup stays OPEN (CORE invariant 19, coverage writes)"
+        },
+        {
+          "file": "routes/delivery/company.js",
+          "regex": "router\\.post\\(\"/api/delivery/city/:cityId/company/add\", \\.\\.\\.deliveryDashboardAdmin, async",
+          "desc": "adding a company to a pickup zone's supportedCities needs a dashboard token (CORE invariant 19, coverage writes)"
         },
         {
           "file": "routes/delivery/driver.js",
