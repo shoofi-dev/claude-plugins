@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@fix/geography-write-routes-admin-auth / 2026-11-28 (invariant 19: the 22 coverage writes in geography.js + company.js take deliveryDashboardAdmin; the app reads stay open); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -551,6 +551,25 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
       route has ever succeeded: 0 `delivery_status_update` events since 2025-07-24. **Nothing calls the loop over
       HTTP from the server.** Order creation, twin orders, the assignment scheduler and the crons
       call `services/delivery/*` in process. Keep it that way, or forward a token.
+    - **The coverage writes take a dashboard token (2026-11-28).** Until then
+      `POST delivery/city-area/update/:id {isActive:false}` worked with NO token, so anyone could
+      switch a region off. All 20 writes in `routes/delivery/geography.js` now take
+      `...deliveryDashboardAdmin`: add / update / delete of areas, geometries, cities,
+      city-areas and parent-cities; `company/:companyId/area/{add,update/:areaId,:areaId}` (the
+      company's `supportedAreas`); `city-area/:id/bulk-toggle-areas`; and
+      `geometry/suggest-city-areas`, which writes nothing but spends an LLM call per request. So
+      do the two `supportedCities` writes in `company.js`
+      (`city/:cityId/company/{add,:companyId}`). The 22 have left `NOT_YET_GATED`; the count in the
+      next bullet was taken before this change, so it is 22 lower now. Their only caller on origin/main of every client
+      is the admin web's `views/admin/delivery-areas/*`, the navbar, live-ops, settings and
+      shift screens, all through the Bearer interceptor. **The reads stay open on purpose**: the
+      customer app calls `GET delivery/city-areas`, `POST delivery/city-area/by-coordinates` and
+      `GET delivery/parent-cities` with a customer token or none, and a role gate there 403s
+      silently. `test/integration/delivery-geography-admin-auth.js` pins both sides. Still open:
+      `geometry/fill-gaps` and `parent-city/auto-assign-cities` (admin web only, compute, no
+      write), and the rest of `company.js` (company / employee / accounting / billing-contacts
+      writes). Those need their own callers pass: shoofir's profile screen GETs and PUTs
+      `company/:companyId/accounting` with a driver token, so a dashboard gate there would break it.
     - **No `/api/delivery` response carries a session token or a company's payment keys.**
       `redactDeliveryResponses` is installed once, path-scoped, at the top of
       `routes/delivery.js`. It removes `token`, `authCode` and `notificationToken` from any
