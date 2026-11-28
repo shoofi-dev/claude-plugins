@@ -545,7 +545,10 @@ This is where a human curates coverage — treat it as the source of truth UI fo
 
 ### C3. shoofi-partner — STORE-OWNER (booking trigger + coverage check)
 `app-type: shoofi-partner`. Books delivery: `order/book-delivery` (`{updateData:{isDeliverySent},
-orderId}`), `order/book-custom-delivery` (ad-hoc), reads `delivery/book/:bookId` +
+orderId}`; the server writes **only** `isDeliverySent` (boolean) — `BOOK_DELIVERY_UPDATE_FIELDS` in
+`routes/order.js` — drops and logs any other key, and answers 400 when nothing allowed is left; it
+used to `$set` the whole `updateData`. `readyMinutes` is read for the booking's `pickupTime`, never
+written), `order/book-custom-delivery` (ad-hoc), reads `delivery/book/:bookId` +
 `delivery/order/:orderId/driver` (`getOrderDriverDetails`: the order list v1/v2, school orders,
 and the delivery-only list, which passes the booking's own `_id`). The server answers only for
 the token's own store (`bookDelivery.appName = storeUsers.appName`, CORE invariant 19).

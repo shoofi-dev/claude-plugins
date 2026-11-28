@@ -1,6 +1,6 @@
 ---
 domain: delivery
-last-verified: shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
+last-verified: shoofi-server@fix/HIGH-RISK-order-route-findings 4b62663e / 2026-11-28 (invariant: trackOrderFlowEventSafe; reference C3: book-delivery writes only isDeliverySent); shoofi-server@fix/delivery-only-towns-no-town-fallback / 2026-11-20 (delivery-only /towns: a covered area with no town falls back to its city or its own polygon, source town|city|area); shoofi-server@fix/cancelled-delivery-hide-courier / 2026-11-20 (invariant 21: a cancelled delivery sends no driverName and the driver dialog route answers null; the route picks the live booking); shoofi-shoofir + shoofi-server @feat/driver-notes-visible / 2026-11-20 (driver card shows the note to the restaurant and the meal notes; /api/delivery/list whitelists commentToStore; reference C1); shoofi-partner@feat/deliveries-v3 / 2026-11-11 (delivery-only card states: status first, isPendingAssignment stale on old rows); shoofi-server@fix/delivery-side-row-by-original-id + shoofi-delivery-web@fix/admin-cancel-delivery-by-original-id / 2026-11-08 (invariant 20, invariant 19 `update` callers); shoofi-shoofir@feat/driver-sees-address-note / 2026-11-10 (driver card shows the address snapshot: floor / apartment / entrance + the landmark note order.order.address.notes, reference C1); shoofi-server@fix/delivery-row-by-original-order-id / 2026-11-08 (invariant 20); shoofi-server@327fa80 / 2026-09-18
 scope: full-stack (shoofi-server + shoofir + delivery-web + partner booking)
 reference: ./reference.md   # endpoint tables, assignment scoring, crons, data model, clients
 ---
@@ -265,6 +265,11 @@ whitelist) and each meal's `order.order.items[].note` («ملاحظة للوجب
    notifications, not before (`routes/delivery/admin.js` reassign is the worked example). This is
    the delivery-side instance of the shared "a secondary feature must never fail the primary
    flow" rule, and the one place the code does not enforce it for you.
+   **`trackOrderFlowEventSafe(params)`** (same file) is that wrapper: it awaits
+   `trackOrderFlowEvent`, logs a failure and resolves `null`. Use it for an event written after the
+   route's own write has committed. `/api/order/update` uses it for `status_change` and the
+   order-cancel `delivery_cancelled_by_order_cancellation` event (a failure there used to answer
+   400 after the status was saved, and skip the stock / coins / driver-notify / twin side effects).
 7. **Collection name ≠ property name:** `db.bookDelivery` is bound to the MongoDB collection
    **`book-delivery`** (hyphenated) — `services/database/DatabaseInitializationService.js:28`.
    Querying `delivery-company.bookDelivery` directly returns **zero documents silently**
