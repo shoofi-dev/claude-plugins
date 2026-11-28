@@ -321,6 +321,13 @@ Lifecycle lives in `shoofi.twinOrderGroups` (`tg_...`). Group states
   admin order-monitoring + the `investigate-order` skill. Traps:
   - **No TTL, no retention.** `cleanupOldEvents` (`centralized-flow-monitor.js`) is never
     called; history runs back to 2025-07-24 (~11.8M docs, 2026-10-06).
+  - **No customer phone in `delivery_booked`** (partner accept and future-order release) since
+    2026-11-28; older rows carry `metadata.customerPhone`. The delivery-side events still carry
+    `metadata.customerInfo.phone` (`services/delivery/book-delivery.js`, `routes/delivery/*`);
+    nothing reads either.
+  - **A failed write after the status is saved is not the route's answer:** `/api/order/update`
+    writes `status_change` through `trackOrderFlowEventSafe` (delivery CORE invariant on the
+    rethrow), so a monitor failure leaves the status changed, answered 200, with no event row.
   - **`status_change` from `/api/order/update` names the token's person since 2026-11-17**
     (CORE invariant 33, `resolveOrderUpdateActor`): `actorType` `store` (partner tablet, name from
     `shoofi.storeUsers`), `admin` (admin token, or the admin behind an impersonation token, with
